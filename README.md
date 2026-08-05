@@ -399,6 +399,9 @@ make build-ci      # ci       query only, smallest possible
 
 ## Development
 
+Commits follow Conventional Commits (`feat(issue):`, `fix(transport):`); the
+`commit-msg` hook checks the header shape.
+
 ```
 make test           # the default build
 make test-profiles  # the suite under every shipped tag set

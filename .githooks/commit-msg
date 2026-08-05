@@ -1,0 +1,37 @@
+#!/bin/sh
+# Check the commit header is a Conventional Commit.
+#
+# The shape only: a header that parses says nothing about whether the body
+# explains anything, and the body is the part that matters. This catches the
+# mechanical mistake, not the substantive one.
+set -e
+
+header=$(head -1 "$1")
+
+# A merge, revert, or fixup carries its own conventions.
+case "$header" in
+	Merge\ *|Revert\ *|fixup!\ *|squash!\ *) exit 0 ;;
+esac
+
+pattern='^(feat|fix|docs|test|refactor|perf|chore|build|ci)(\([a-z0-9._/-]+\))?!?: .+'
+if ! printf '%s' "$header" | grep -Eq "$pattern"; then
+	echo "commit-msg: the header is not a Conventional Commit."
+	echo
+	echo "  got:  $header"
+	echo "  want: <type>(<scope>): <subject>"
+	echo
+	echo "  types: feat fix docs test refactor perf chore build ci"
+	echo "  e.g.:  feat(issue): add issue get"
+	echo "         fix(transport): name the failing endpoint in a 404"
+	exit 1
+fi
+
+subject=${header#*: }
+if [ ${#header} -gt 72 ]; then
+	echo "commit-msg: the header is ${#header} characters; keep it under 72."
+	echo "  $header"
+	exit 1
+fi
+case "$subject" in
+	*.) echo "commit-msg: the subject ends with a period; drop it."; exit 1 ;;
+esac
