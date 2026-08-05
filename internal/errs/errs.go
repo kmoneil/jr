@@ -139,6 +139,16 @@ func ExitOf(err error) exitcode.Code {
 	return exitcode.Error
 }
 
+// AsError returns the structured error carried by err, walking the wrap chain.
+// It is the typed counterpart to ExitOf, for a caller that needs to branch on
+// the code rather than the exit status.
+func AsError(err error) (*Error, bool) {
+	if err == nil {
+		return nil, false
+	}
+	return errors.AsType[*Error](err)
+}
+
 // Coerce returns err as an *Error, wrapping an unstructured error as a generic
 // runtime failure so every failure path reaches the renderer with a code.
 func Coerce(err error) *Error {

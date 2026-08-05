@@ -77,6 +77,11 @@ size: build-reader
 test:
 	go test ./...
 
+## test-race: run the suite under the race detector
+.PHONY: test-race
+test-race:
+	go test -race ./...
+
 ## test-profiles: run the test suite under every shipped tag set
 .PHONY: test-profiles
 test-profiles:
@@ -91,21 +96,58 @@ cover:
 	go test -coverprofile=coverage.out ./...
 	go tool cover -func=coverage.out | tail -1
 
-# Seconds per fuzz target. CI uses the default; raise it locally when changing
-# anything that quotes, escapes, or parses.
-FUZZTIME ?= 30s
+# Time budget per fuzz target. Override for a longer hunt:
+#   make fuzz FUZZTIME=5m
+FUZZTIME ?= 60s
 
-## fuzz: run every fuzz target for FUZZTIME each (default 30s)
+# Fuzz sweep. Each target runs for FUZZTIME.
+#
+# -run=^$$ so the regular test suite does NOT run before each target: without
+# it a regular test failure masks the fuzz result, and the serial setup adds
+# seconds per target across the sweep.
+#
+# -fuzz is anchored ^...$$ to avoid prefix-match ambiguity, e.g.
+# FuzzValuesRoundTrip vs a later FuzzValuesRoundTripAdversarial.
+#
+# Targets are discovered rather than listed, so a new fuzz target is picked up
+# the moment it is written. A target this sweep never ran is worse than useless:
+# it reads as coverage that does not exist.
+#
+# Output is captured rather than piped, because a pipe would discard the exit
+# status and the sweep would report success while a target was failing.
+## fuzz: run every fuzz target for FUZZTIME each (default 60s)
 .PHONY: fuzz
 fuzz:
-	@set -e; \
-	for pkg in $$(go list ./... ); do \
-		targets=$$(go test -list '^Fuzz' $$pkg 2>/dev/null | grep '^Fuzz' || true); \
-		for t in $$targets; do \
-			echo "== $$pkg $$t"; \
-			go test $$pkg -run '^$$' -fuzz "^$$t$$" -fuzztime $(FUZZTIME); \
+	@echo "==> Fuzz sweep (FUZZTIME=$(FUZZTIME) per target)"
+	@failed=0; start=$$(date +%s); ran=0; \
+	for pkg in $$(go list ./...); do \
+		for target in $$(go test $$pkg -list 'Fuzz.*' 2>/dev/null | grep '^Fuzz' || true); do \
+			ran=$$((ran + 1)); \
+			printf "    %-52s " "$${pkg#$(MODULE)/} $$target"; \
+			if out=$$(go test $$pkg -run=^$$ -fuzz="^$$target$$" -fuzztime=$(FUZZTIME) 2>&1); then \
+				echo "$$out" | tail -1; \
+			else \
+				failed=1; echo "FAIL"; echo "$$out" | sed 's/^/        /'; \
+			fi; \
 		done; \
-	done
+	done; \
+	echo "==> $$ran target(s) in $$(($$(date +%s) - start))s"; \
+	exit $$failed
+
+## fuzz-jql-values: hammer the JQL value round-trip fuzzer
+.PHONY: fuzz-jql-values
+fuzz-jql-values:
+	go test ./internal/jql/ -run=^$$ -fuzz='^FuzzValuesRoundTrip$$' -fuzztime=$(FUZZTIME)
+
+## fuzz-jql-tokenize: hammer the JQL tokenizer fuzzer
+.PHONY: fuzz-jql-tokenize
+fuzz-jql-tokenize:
+	go test ./internal/jql/ -run=^$$ -fuzz='^FuzzTokenizeDoesNotPanic$$' -fuzztime=$(FUZZTIME)
+
+## fuzz-jql-date: hammer the JQL date parser fuzzer
+.PHONY: fuzz-jql-date
+fuzz-jql-date:
+	go test ./internal/jql/ -run=^$$ -fuzz='^FuzzParseDateDoesNotPanic$$' -fuzztime=$(FUZZTIME)
 
 ## golden: rewrite the output-contract golden files
 .PHONY: golden
@@ -135,7 +177,7 @@ vet:
 
 ## ci: everything CI enforces, runnable locally
 .PHONY: ci
-ci: fmt-check vet lint test-profiles build-all size
+ci: fmt-check vet lint test-profiles test-race build-all size
 
 ## fmt-check: fail if the tree is not formatted
 .PHONY: fmt-check

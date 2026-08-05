@@ -67,6 +67,37 @@ A command that returns a kind it did not declare is rejected before anything is
 written, because a consumer dispatching on the declared kind would silently
 mis-parse it.
 
+## Recorded fixtures
+
+`internal/transport` provides the record/replay mechanism every resource tests
+against. A resource ships a cassette per deployment under its own `testdata/`:
+
+```
+internal/resource/issue/testdata/list.cloud.json
+internal/resource/issue/testdata/list.datacenter.json
+```
+
+Both are required. Cloud and Data Center differ in API version, body format,
+and pagination shape, so a fixture recorded against one proves nothing about
+the other — and a resource that ships only the Cloud recording has tested half
+of what it claims to.
+
+Three properties make a fixture-backed test trustworthy:
+
+- **An unmatched request is an error.** Falling through to the network would be
+  green in CI, where there are no credentials, while exercising nothing.
+- **Matching ignores headers.** Matching on `User-Agent` or `X-Request-Id`
+  would invalidate every cassette on every release, or on every run.
+- **Query and JSON field order are canonicalized.** A change in the order a
+  caller builds parameters changes nothing about the request, and should not
+  break a fixture.
+
+`Replayer.Unplayed` reports interactions a test never triggered, which is
+usually a test that stopped covering what it claims to.
+
+Credentials are redacted as an interaction is recorded, not as it is written, so
+a token cannot reach a fixture file even if recording is interrupted.
+
 ## Config, state, cache
 
 | Path                              | Contents                                              |

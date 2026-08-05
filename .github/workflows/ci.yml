@@ -48,8 +48,11 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+      # -race because the request budget is shared across concurrent
+      # pagination, and a counter that undercounts would silently exceed the
+      # limit it exists to enforce.
       - name: test
-        run: go test -tags "${{ matrix.tags }}" ./...
+        run: go test -race -tags "${{ matrix.tags }}" ./...
 
   contract:
     name: output contract is unchanged
@@ -82,6 +85,23 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+      # Go keeps the generated corpus in $GOCACHE/fuzz. Without this, every CI
+      # run starts from the seeds alone and spends its whole budget
+      # re-deriving the same shallow coverage. Persisting it makes each run
+      # continue where the last one stopped, so coverage compounds instead of
+      # resetting.
+      - name: locate the fuzz cache
+        id: gocache
+        run: echo "dir=$(go env GOCACHE)/fuzz" >> "$GITHUB_OUTPUT"
+      - name: restore the fuzz corpus
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.gocache.outputs.dir }}
+          # The key rotates every run so a run that finds new inputs saves
+          # them; restore-keys falls back to the most recent previous corpus.
+          key: fuzz-corpus-${{ github.run_id }}
+          restore-keys: fuzz-corpus-
+
       # The seed corpus runs as part of `go test`. This is the search on top of
       # it: quoting, escaping, and date parsing are where a silent
       # mis-interpretation would do real damage, so they get exercised with

@@ -72,9 +72,10 @@ is not shipped at all.
 
 - All Jira resources: `issue`, `epic`, `sprint`, `board`, `project`, `user`,
   `field`, `meta`.
-- `auth` and `context`. No credentials, no sites, no config file.
-- `transport` and `adf` — the packages exist with their contracts documented
-  and no implementation.
+- `auth` and `context`. No credentials, no sites, no config file, so nothing
+  yet supplies the transport with a site to talk to.
+- `adf` — the package exists with its contract documented and no
+  implementation.
 - `jr jql validate` and `jr jql explain`. The JQL library is complete (see
   below) but `validate` is specified as a round trip to Jira's parse endpoint,
   and shipping a local-only check under that name would overclaim.
@@ -119,6 +120,31 @@ Three fuzzers back it up: `make fuzz`. The value round-trip one found a real
 bug during development — a byte that is not valid UTF-8 was being silently
 replaced with U+FFFD, which would have queried for something other than what
 the caller asked for. It is now a structured refusal.
+
+### Transport
+
+`internal/transport` is the only path to Jira, and the only package that
+imports `net/http`. It owns retry, the request budget, and redaction.
+
+**Redaction is structural, not a rule to follow.** A credential is replaced when
+a trace event is *built*, inside the package, so it never reaches whatever is
+formatting the output. A debug formatter cannot leak a token because it is never
+given one. URLs count too: userinfo, credential-shaped query parameters, and the
+URL inside a `*url.Error` are all scrubbed.
+
+**A POST is not replayed after a 503.** The server may have processed it before
+failing, and retrying is how one `issue create` becomes two issues. A 429 is
+different — it is refused before processing — and so is a request whose caller
+holds an idempotency key. That distinction is the difference between a retry
+that is safe and one that silently duplicates work.
+
+Retries count against `--max-requests`, because a retry is another request from
+the server's side and a budget that ignored them would bound nothing. Exhausting
+the retry budget exits 8 or 9, never 0.
+
+Recorded fixtures replay against both Cloud and Data Center, and an unmatched
+request is an error — a fixture test that fell through to the network would be
+green in CI, where there are no credentials, while exercising nothing.
 
 ## Documentation
 
