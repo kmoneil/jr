@@ -44,9 +44,18 @@ On Cloud, pair --email with an API token. On Data Center, either pair --user
 with a password, or supply a personal access token alone and it is used as a
 bearer token.
 
-The token is read from --token-stdin rather than a flag, because a token on the
-command line lands in the shell history and in the process list, where anyone on
-the machine can read it.
+Supply the token with --token-stdin or --token-file, never as a flag value: a
+token on the command line lands in the shell history and in the process list,
+where anyone on the machine can read it.
+
+    printf '%s' "$TOKEN" | ` + buildinfo.App + ` auth login --site <host> --token-stdin
+    ` + buildinfo.App + ` auth login --site <host> --token-file ~/.secrets/jira
+
+This command never prompts. If stdin is a terminal it refuses rather than
+waiting, because a headless build has no human to wait for.
+
+You do not have to log in at all: set ` + auth.EnvToken + `, plus ` + auth.EnvEmail + ` on
+Cloud, and every command uses it.
 
 This writes local state only. It does not contact Jira, so it does not prove the
 credential works: run ` + "`" + buildinfo.App + ` auth status` + "`" + ` for that.`),
@@ -64,8 +73,12 @@ credential works: run ` + "`" + buildinfo.App + ` auth status` + "`" + ` for tha
 			{Name: "email", Type: registry.TypeString, Usage: "Cloud account email"},
 			{Name: "user", Type: registry.TypeString, Usage: "Data Center username"},
 			{
-				Name: "token-stdin", Type: registry.TypeBool, Required: true,
-				Usage: "read the token from stdin",
+				Name: "token-stdin", Type: registry.TypeBool,
+				Usage: "read the token from stdin; required unless --token-file is given",
+			},
+			{
+				Name: "token-file", Type: registry.TypeString,
+				Usage: "read the token from this file; - means stdin",
 			},
 			{
 				Name: "scheme", Type: registry.TypeEnum, Enum: auth.Schemes(),
@@ -85,7 +98,21 @@ func (a *app) runAuthLogin(_ context.Context, inv *registry.Invocation) (*render
 		return nil, err
 	}
 
-	token, err := a.readToken()
+	tokenFile := inv.Flags.String("token-file")
+	fromStdin := inv.Flags.Bool("token-stdin")
+	switch {
+	case !fromStdin && tokenFile == "":
+		return nil, errs.Usage("NO_TOKEN_SOURCE", "no token source given").
+			WithRemedy("%s", tokenSourceRemedy)
+	case fromStdin && tokenFile != "" && tokenFile != "-":
+		// Two sources would mean silently picking one, and the caller would
+		// have no way to know which credential was stored.
+		return nil, errs.Usage("AMBIGUOUS_TOKEN_SOURCE",
+			"--token-stdin and --token-file name two different sources").
+			WithRemedy("pass one of them, or --token-file - for stdin")
+	}
+
+	token, err := a.readToken(tokenFile)
 	if err != nil {
 		return nil, err
 	}

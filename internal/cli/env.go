@@ -2,10 +2,12 @@ package cli
 
 import (
 	"io"
+	"os"
 	"strings"
 	"sync"
 
 	"github.com/kmoneil/jira-cli/internal/auth"
+	"github.com/kmoneil/jira-cli/internal/buildinfo"
 	"github.com/kmoneil/jira-cli/internal/errs"
 	"github.com/kmoneil/jira-cli/internal/jctx"
 )
@@ -104,33 +106,81 @@ func (a *app) siteFor(flagValue string) (string, error) {
 	return resolved.RequireSite()
 }
 
-// readToken reads a credential from stdin.
+// isTerminal reports whether r is an interactive terminal rather than a pipe or
+// a file.
+func isTerminal(r io.Reader) bool {
+	f, ok := r.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
+}
+
+// tokenSourceRemedy lists every way to supply a credential, because "it did
+// nothing" is the least actionable failure there is.
+const tokenSourceRemedy = "pipe it in: printf '%s' \"$TOKEN\" | " +
+	buildinfo.App + " auth login --site <host> --token-stdin; " +
+	"or read a file: --token-file <path>; " +
+	"or skip login entirely and set " + auth.EnvToken + " (with " +
+	auth.EnvEmail + " on Cloud)"
+
+// readToken reads a credential from stdin or from a file.
 //
-// Stdin rather than a flag because a token passed as an argument is visible in
-// the shell history and in the process list, where every other user on the
-// machine can read it. Trailing whitespace is trimmed, since `echo` adds a
-// newline and a token with one would fail authentication in a way that looks
-// like a wrong token.
-func (a *app) readToken() (auth.Secret, error) {
-	if a.stdin == nil {
-		return "", errs.Usage("NO_STDIN", "no input to read the token from").
-			WithRemedy("pipe the token in, e.g. printf '%%s' \"$TOKEN\" | ...")
+// Never from a flag: a token passed as an argument is visible in the shell
+// history and in the process list, where every other user on the machine can
+// read it. Trailing whitespace is trimmed, since `echo` adds a newline and a
+// token carrying one fails authentication in a way that looks like a wrong
+// token.
+func (a *app) readToken(path string) (auth.Secret, error) {
+	source := a.stdin
+	name := "stdin"
+
+	if path != "" && path != "-" {
+		f, err := os.Open(path) //nolint:gosec // the path is the caller's own token file.
+		if err != nil {
+			return "", errs.Usage("TOKEN_FILE_UNREADABLE",
+				"cannot read the token file").
+				WithDetail("%s", err.Error()).
+				WithRemedy("check the path and its permissions")
+		}
+		defer func() { _ = f.Close() }()
+		source, name = f, path
 	}
 
-	data, err := io.ReadAll(io.LimitReader(a.stdin, maxTokenBytes+1))
+	if source == nil {
+		return "", errs.Usage("NO_TOKEN_SOURCE", "no input to read the token from").
+			WithRemedy("%s", tokenSourceRemedy)
+	}
+
+	// Reading from a terminal would block until the caller pressed Ctrl-D,
+	// with no prompt and no output — which reads as the command hanging. A
+	// headless-first tool never waits on a human, so this refuses instead and
+	// says what to do.
+	if isTerminal(source) {
+		return "", errs.Usage("NO_TOKEN_SOURCE",
+			"--token-stdin was given but stdin is a terminal, not a pipe or a file").
+			WithDetail("this command never prompts: it would have waited forever").
+			WithRemedy("%s", tokenSourceRemedy)
+	}
+
+	data, err := io.ReadAll(io.LimitReader(source, maxTokenBytes+1))
 	if err != nil {
-		return "", errs.Usage("STDIN_UNREADABLE", "cannot read the token from stdin").Wrap(err)
+		return "", errs.Usage("TOKEN_UNREADABLE", "cannot read the token from %s", name).Wrap(err)
 	}
 	if len(data) > maxTokenBytes {
 		return "", errs.Usage("TOKEN_TOO_LARGE",
-			"the token on stdin is larger than %d bytes", maxTokenBytes).
-			WithRemedy("check that a file was not redirected in by mistake")
+			"the token from %s is larger than %d bytes", name, maxTokenBytes).
+			WithRemedy("check that the wrong file was not redirected in by mistake")
 	}
 
 	token := strings.TrimSpace(string(data))
 	if token == "" {
-		return "", errs.Usage("EMPTY_TOKEN", "stdin was empty").
-			WithRemedy("pipe the token in, e.g. printf '%%s' \"$TOKEN\" | ...")
+		return "", errs.Usage("EMPTY_TOKEN", "%s was empty", name).
+			WithRemedy("%s", tokenSourceRemedy)
 	}
 	return auth.Secret(token), nil
 }

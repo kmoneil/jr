@@ -455,3 +455,91 @@ readonly = true
 		}
 	}
 }
+
+// TestTokenFile covers the alternative to a pipe, for a secret manager that
+// writes to disk or a shell where quoting a pipeline is awkward.
+func TestTokenFile(t *testing.T) {
+	env := session(t)
+	mustRun(t, env, "context", "create", "work", "--site", "acme.atlassian.net")
+
+	path := filepath.Join(t.TempDir(), "token")
+	if err := os.WriteFile(path, []byte(theToken+"\n"), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	got := run(t, env, "auth", "login",
+		"--site", "acme.atlassian.net", "--email", "ada@example.com",
+		"--token-file", path)
+	if got.exit != exitcode.OK {
+		t.Fatalf("exit = %v\nstderr: %s", got.exit, got.stderr)
+	}
+	if strings.Contains(got.stdout, theToken) {
+		t.Fatal("login echoed the token")
+	}
+
+	status := mustRun(t, env, "auth", "status")
+	if !strings.Contains(status.stdout, `authenticated="true"`) {
+		t.Errorf("the token file was not stored:\n%s", status.stdout)
+	}
+}
+
+// TestTokenFileDashMeansStdin follows the universal convention.
+func TestTokenFileDashMeansStdin(t *testing.T) {
+	env := session(t)
+	got := runWithStdin(t, env, strings.NewReader(theToken),
+		"auth", "login", "--site", "acme.atlassian.net", "--token-file", "-")
+	if got.exit != exitcode.OK {
+		t.Fatalf("exit = %v\nstderr: %s", got.exit, got.stderr)
+	}
+}
+
+// TestNoTokenSourceIsRefusedWithEveryOption is the fix for the failure that
+// reads as a hang: the command says what it needs instead of waiting.
+func TestNoTokenSourceIsRefusedWithEveryOption(t *testing.T) {
+	env := session(t)
+	got := run(t, env, "auth", "login", "--site", "acme.atlassian.net")
+	if got.exit != exitcode.Usage {
+		t.Fatalf("exit = %v, want %v\nstderr: %s", got.exit, exitcode.Usage, got.stderr)
+	}
+	if !strings.Contains(got.stderr, "NO_TOKEN_SOURCE") {
+		t.Errorf("stderr does not name the problem:\n%s", got.stderr)
+	}
+	// Every way in has to be listed, because "it did nothing" is the least
+	// actionable failure there is.
+	for _, want := range []string{"--token-stdin", "--token-file", "JIRA_API_TOKEN"} {
+		if !strings.Contains(got.stderr, want) {
+			t.Errorf("the remedy does not mention %q:\n%s", want, got.stderr)
+		}
+	}
+}
+
+func TestAmbiguousTokenSourceIsRefused(t *testing.T) {
+	env := session(t)
+	path := filepath.Join(t.TempDir(), "token")
+	if err := os.WriteFile(path, []byte(theToken), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	got := runWithStdin(t, env, strings.NewReader("other"),
+		"auth", "login", "--site", "acme.atlassian.net",
+		"--token-stdin", "--token-file", path)
+	if got.exit != exitcode.Usage {
+		t.Errorf("exit = %v, want %v", got.exit, exitcode.Usage)
+	}
+	// Picking one silently would store a credential the caller cannot identify.
+	if !strings.Contains(got.stderr, "AMBIGUOUS_TOKEN_SOURCE") {
+		t.Errorf("stderr does not explain the conflict:\n%s", got.stderr)
+	}
+}
+
+func TestMissingTokenFileIsAUsageError(t *testing.T) {
+	env := session(t)
+	got := run(t, env, "auth", "login",
+		"--site", "acme.atlassian.net", "--token-file", "/nonexistent/token")
+	if got.exit != exitcode.Usage {
+		t.Errorf("exit = %v, want %v", got.exit, exitcode.Usage)
+	}
+	if !strings.Contains(got.stderr, "TOKEN_FILE_UNREADABLE") {
+		t.Errorf("stderr does not name the problem:\n%s", got.stderr)
+	}
+}

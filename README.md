@@ -150,14 +150,30 @@ hand-edited and kept in a dotfiles repository, so it holds a *reference*; the
 secret lives under the state directory at mode 0600, and is refused on read if
 it is readable by anyone else.
 
+There are four ways in, and no flag takes a token as its value — an argument
+lands in the shell history and the process list, where anyone on the machine
+can read it.
+
 ```console
+# 1. Pipe it.
 $ printf '%s' "$TOKEN" | jr auth login --site acme.atlassian.net \
       --email ada@example.com --token-stdin
-$ jr auth status
+
+# 2. From a file, which is what most secret managers write.
+$ jr auth login --site acme.atlassian.net --email ada@example.com \
+      --token-file ~/.secrets/jira
+
+# 3. Environment. No login step at all — every command just works.
+$ export JIRA_API_TOKEN=... JIRA_EMAIL=ada@example.com   # Cloud
+$ export JIRA_API_TOKEN=...                              # Data Center PAT
+
+# 4. .netrc, shared with curl and git.
+machine acme.atlassian.net login ada@example.com password ...
 ```
 
-The token comes from stdin rather than a flag because an argument lands in the
-shell history and the process list. Sources are tried environment, then the
+`jr auth login` never prompts. If stdin is a terminal it refuses and lists these
+options rather than waiting for input nobody knew to type — a headless build has
+no human to wait for. Sources are tried environment, then the
 store, then `.netrc` — the environment first so CI can override what is on disk
 without editing it, `.netrc` last because it is shared with every other tool on
 the machine.
