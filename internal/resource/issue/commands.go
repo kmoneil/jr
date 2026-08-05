@@ -93,7 +93,8 @@ filters, so an OR inside it cannot escape the project scope.`),
 			},
 			{
 				Name: "field", Type: registry.TypeString, Repeatable: true,
-				Usage: "extra field id to include, e.g. customfield_10042; " +
+				Usage: "extra field to include, by id or name, e.g. " +
+					"customfield_10042 or 'Story Points'; " +
 					"added to the default set, repeat for several",
 			},
 			{
@@ -110,7 +111,7 @@ filters, so an OR inside it cannot escape the project scope.`),
 		CollectionName: "issues",
 		Columns:        ListColumns(),
 		ColumnsFor:     listColumnsFor,
-		Validate:       validateList,
+		Validate:       validateFields,
 		Outputs:        []registry.Output{{Kind: KindList, Version: VersionList}},
 		ExitCodes: []exitcode.Code{
 			exitcode.Partial, exitcode.Auth, exitcode.NotFound,
@@ -162,7 +163,7 @@ func runList(
 		Limit:     inv.Limit,
 		PageSize:  inv.Flags.Int("page-size"),
 		PageToken: inv.Flags.String("page-token"),
-		Fields:    requestedFields(inv.Flags.StringSlice("field")),
+		Fields:    requestedFields(resolvedFields(inv)),
 	}, func(page []Issue, total int) error {
 		nodes := make([]*render.Node, 0, len(page))
 		for _, i := range page {
@@ -192,20 +193,60 @@ func runList(
 // `--field customfield_10042` silently blanked the status and assignee columns,
 // which looks like every issue is unassigned rather than like a flag that
 // narrowed the request.
-func requestedFields(requested []string) []string {
-	return append(DefaultFields(), ExtraFieldNames(requested)...)
+func requestedFields(resolved []string) []string {
+	return append(DefaultFields(), ExtraFieldNames(resolved)...)
 }
 
-// validateList rejects flags the generic machinery cannot check, before the
-// stream opens and its header is written.
-func validateList(inv *registry.Invocation) error {
-	return ValidateFieldNames(inv.Flags.StringSlice("field"))
+// resolvedFieldsKey is where the ids resolved during validation are left for
+// the rest of the invocation.
+const resolvedFieldsKey = "issue.fields"
+
+// validateFields resolves --field against the site's catalogue and leaves the
+// ids on the invocation.
+//
+// It happens here rather than in the command body because the columns are
+// computed from those ids before the body runs — a streaming command's header
+// goes out first — and because a name that resolves to nothing has to be
+// refused before any bytes reach stdout.
+func validateFields(ctx context.Context, inv *registry.Invocation) error {
+	requested := inv.Flags.StringSlice("field")
+	if len(requested) == 0 {
+		// No --field means no catalogue, and no catalogue means no request. The
+		// common invocation must not pay for a feature it did not ask for.
+		inv.SetValue(resolvedFieldsKey, []string(nil))
+		return nil
+	}
+	if inv.Jira == nil {
+		return errs.Runtime("NO_SESSION", "--field cannot be resolved without a connection to Jira")
+	}
+
+	meta, err := inv.Jira.Metadata(ctx)
+	if err != nil {
+		return err
+	}
+	catalogue, err := meta.Fields(ctx)
+	if err != nil {
+		return err
+	}
+
+	resolved, err := ResolveFields(catalogue, requested)
+	if err != nil {
+		return err
+	}
+	inv.SetValue(resolvedFieldsKey, resolved)
+	return nil
+}
+
+// resolvedFields returns the ids validation resolved.
+func resolvedFields(inv *registry.Invocation) []string {
+	ids, _ := inv.Value(resolvedFieldsKey).([]string)
+	return ids
 }
 
 // listColumnsFor appends a column per requested field, so asking for one
 // changes the default TSV output rather than only the structured formats.
 func listColumnsFor(inv *registry.Invocation) []render.Column {
-	return append(ListColumns(), ExtraColumns(inv.Flags.StringSlice("field"))...)
+	return append(ListColumns(), ExtraColumns(resolvedFields(inv))...)
 }
 
 // DefaultFields is what `issue list` asks Jira for.
@@ -406,7 +447,8 @@ parses both identically. It simply has more of it filled in.`),
 		}},
 		Flags: []registry.Flag{{
 			Name: "field", Type: registry.TypeString, Repeatable: true,
-			Usage: "extra field id to include, e.g. customfield_10042; " +
+			Usage: "extra field to include, by id or name, e.g. " +
+				"customfield_10042 or 'Story Points'; " +
 				"added to the default set, repeat for several",
 		}},
 		NeedsJira: true,
@@ -415,13 +457,9 @@ parses both identically. It simply has more of it filled in.`),
 			exitcode.Auth, exitcode.NotFound, exitcode.Permission,
 			exitcode.RateLimit, exitcode.Remote,
 		},
-		Validate: validateGet,
+		Validate: validateFields,
 		Run:      runGet,
 	}
-}
-
-func validateGet(inv *registry.Invocation) error {
-	return ValidateFieldNames(inv.Flags.StringSlice("field"))
 }
 
 func runGet(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) {
@@ -435,7 +473,7 @@ func runGet(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) 
 	}
 	client := &Client{Transport: conn, Site: info}
 
-	fields := append(DetailFields(), ExtraFieldNames(inv.Flags.StringSlice("field"))...)
+	fields := append(DetailFields(), ExtraFieldNames(resolvedFields(inv))...)
 	issue, err := client.Get(ctx, inv.Args[0], fields)
 	if err != nil {
 		return nil, err

@@ -9,6 +9,7 @@ context.list	List every configured context	false	false	context.list
 context.show	Show one context, or the effective settings for this invocation	false	false	context.get
 context.use	Select the context every command uses by default	false	false	context.get
 contract	Dump the machine-readable output contract for every kind	false	false	contract
+field.list	List every field this site has	false	false	field.list
 issue.get	Fetch one issue in full	false	false	issue.get
 issue.list	List issues matching a query	false	false	issue.list
 schema	Describe every command this build contains	false	false	schema.commands

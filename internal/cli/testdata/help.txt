@@ -15,6 +15,7 @@ Available Commands:
   auth        Authenticate against a Jira site
   context     Manage named site/project contexts
   contract    Dump the machine-readable output contract for every kind
+  field       Discover fields, including custom fields
   help        Help about any command
   issue       Work with issues
   schema      Describe every command this build contains

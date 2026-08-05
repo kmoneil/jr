@@ -156,7 +156,7 @@ func TestValidateRunsBeforeAnyOutput(t *testing.T) {
 		Columns:        []render.Column{{Header: "key", Path: "@key"}},
 		Outputs:        []registry.Output{{Kind: "fake.list", Version: 1}},
 		ExitCodes:      []exitcode.Code{exitcode.Partial},
-		Validate: func(*registry.Invocation) error {
+		Validate: func(context.Context, *registry.Invocation) error {
 			return errs.Usage("REFUSED", "not today")
 		},
 		Stream: func(

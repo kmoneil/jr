@@ -14,6 +14,7 @@ import (
 
 	"github.com/kmoneil/jira-cli/internal/errs"
 	"github.com/kmoneil/jira-cli/internal/render"
+	"github.com/kmoneil/jira-cli/internal/site"
 )
 
 // Kinds and schema versions this resource emits. Bump a version in the same
@@ -499,58 +500,91 @@ var reservedNames = map[string]bool{
 	"resolution": true, "parent": true, "components": true,
 }
 
-// fieldID is what --field accepts: a field id, e.g. customfield_10042 or
-// duedate.
+// fieldID is what an id may look like once resolved. It is narrow because the
+// id becomes an XML element name, and a field whose id is not a valid name
+// cannot be rendered at all.
 var fieldID = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
 
-// ValidateFieldNames rejects a --field value this tool cannot render.
+// ResolveFields turns what a caller typed after --field into field ids.
 //
-// Field *names* — "Story Points" — are not accepted yet. Resolving one to its
-// id needs the field catalogue, and guessing would either send Jira something
-// it rejects opaquely or produce an element name that is not valid XML. Saying
-// so is better than either.
-func ValidateFieldNames(requested []string) error {
+// Every value goes through the catalogue, including one that already looks like
+// an id: a mistyped customfield_1004 is otherwise sent for Jira to reject with
+// a 400 that names nothing, which is the exact row §5.2 exists to fix. The
+// catalogue is cached for a day, so this costs one request on a cold cache and
+// none after it.
+//
+// The returned ids are in the order given, so the columns a caller asked for
+// appear in the order they asked for them.
+func ResolveFields(catalogue *site.Catalogue, requested []string) ([]string, error) {
+	out := make([]string, 0, len(requested))
 	for _, name := range requested {
-		switch {
-		case !fieldID.MatchString(name):
-			return errs.Usage("INVALID_FIELD", "%q is not a field id", name).
-				WithDetail("a field id looks like customfield_10042 or duedate").
-				WithRemedy("field names are not resolved yet; pass the id, " +
-					"which the Jira admin field screen shows")
-		case reservedNames[name] && !nativeFields[name]:
-			return errs.Usage("INVALID_FIELD",
-				"%q collides with a field this tool already reports", name)
+		field, err := catalogue.Resolve(name)
+		if err != nil {
+			return nil, err
 		}
+		if err := checkRenderable(name, field.ID); err != nil {
+			return nil, err
+		}
+		out = append(out, field.ID)
+	}
+	return out, nil
+}
+
+// checkRenderable refuses an id this tool cannot turn into output.
+//
+// Both cases are about the id rather than what the caller typed: the id is what
+// becomes an element name, so it is the id that has to be a legal name and the
+// id that can collide with one an issue already uses.
+func checkRenderable(input, id string) error {
+	switch {
+	case !fieldID.MatchString(id):
+		return errs.Usage("INVALID_FIELD",
+			"%q resolves to %q, which cannot be an element name", input, id).
+			WithDetail("an id must start with a letter and hold only letters, " +
+				"digits, and underscores").
+			WithRemedy("this field cannot be rendered; report it")
+	case reservedNames[id] && !nativeFields[id]:
+		return errs.Usage("INVALID_FIELD",
+			"%q collides with a field this tool already reports", id)
 	}
 	return nil
 }
 
-// ExtraFieldNames returns the requested fields that are not already reported
+// ExtraFieldNames returns the resolved ids that are not already reported
 // natively, deduplicated and in the order given.
-func ExtraFieldNames(requested []string) []string {
+//
+// Two spellings of the same field resolve to one id and collapse here, so
+// `--field "Story Points" --field customfield_10042` produces one column rather
+// than two identical ones.
+func ExtraFieldNames(resolved []string) []string {
 	seen := map[string]bool{}
-	out := make([]string, 0, len(requested))
-	for _, name := range requested {
-		if nativeFields[name] || seen[name] {
+	out := make([]string, 0, len(resolved))
+	for _, id := range resolved {
+		if nativeFields[id] || seen[id] {
 			continue
 		}
-		seen[name] = true
-		out = append(out, name)
+		seen[id] = true
+		out = append(out, id)
 	}
 	return out
 }
 
-// ExtraColumns returns the TSV columns for requested fields, appended after the
+// ExtraColumns returns the TSV columns for the resolved ids, appended after the
 // defaults.
+//
+// The header is the id rather than the name the caller typed, so the output of
+// `--field "Story Points"` is byte-identical to that of
+// `--field customfield_10042`. How a request was spelled is not part of the
+// contract; what came back is.
 //
 // Without these, --field would change the XML and leave TSV — the default
 // format — looking exactly as it did before, which is the same as doing
 // nothing.
-func ExtraColumns(requested []string) []render.Column {
-	extras := ExtraFieldNames(requested)
+func ExtraColumns(resolved []string) []render.Column {
+	extras := ExtraFieldNames(resolved)
 	out := make([]render.Column, 0, len(extras))
-	for _, name := range extras {
-		out = append(out, render.Column{Header: name, Path: name})
+	for _, id := range extras {
+		out = append(out, render.Column{Header: id, Path: id})
 	}
 	return out
 }

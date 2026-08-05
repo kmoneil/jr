@@ -3,6 +3,7 @@
 package mcp
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strconv"
@@ -163,7 +164,7 @@ func flagSchema(flag registry.Flag) map[string]any {
 // them would be describing itself inaccurately — which is the drift this whole
 // design exists to prevent.
 func (s *Server) invocation(
-	cmd *registry.Command, args map[string]any,
+	ctx context.Context, cmd *registry.Command, args map[string]any,
 ) (*registry.Invocation, render.Format, error) {
 	known := map[string]bool{FormatArgument: true, "limit": cmd.Paginated}
 	for _, arg := range cmd.Args {
@@ -243,7 +244,7 @@ func (s *Server) invocation(
 	}
 
 	if cmd.Validate != nil {
-		if err := cmd.Validate(inv); err != nil {
+		if err := cmd.Validate(ctx, inv); err != nil {
 			return nil, "", err
 		}
 	}

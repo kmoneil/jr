@@ -29,6 +29,9 @@ type session struct {
 	client *transport.Client
 	info   site.Info
 	err    error
+
+	metaOnce sync.Once
+	meta     *site.Metadata
 }
 
 // newSession builds the session for this invocation.
@@ -93,6 +96,25 @@ func (s *session) connect(ctx context.Context) (*transport.Client, site.Info, er
 		return nil, site.Info{}, err
 	}
 	return client, info, nil
+}
+
+// Metadata implements registry.Session.
+//
+// The accessor is built once per invocation and memoizes each catalogue it
+// fetches, so a command that resolves a field name while validating its flags
+// and again while running costs one request rather than two.
+func (s *session) Metadata(ctx context.Context) (*site.Metadata, error) {
+	client, info, err := s.Connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	s.metaOnce.Do(func() {
+		s.meta = &site.Metadata{Client: client, Info: info, Refresh: s.app.refresh}
+		if paths, err := s.app.resolvePaths(); err == nil {
+			s.meta.Cache = &site.Cache{Dir: paths.SiteCache(s.resolved.Site)}
+		}
+	})
+	return s.meta, nil
 }
 
 // probe resolves what the site is, from cache when it is still fresh.

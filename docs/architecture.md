@@ -30,7 +30,8 @@ either.
 
 ## The dependency rule
 
-`resource/*` may import `transport`, `auth`, `jql`, `adf`, `render`, `errs`.
+`resource/*` may import `registry`, `transport`, `auth`, `site`, `jql`, `adf`,
+`render`, `errs`.
 
 **Nothing may import `resource/*`** except `cmd`, `tui`, `mcp`, `workflow`, and
 `internal/commands` — which exists only to blank-import resources so their init
@@ -40,6 +41,15 @@ functions run, and is what lets the contract tests see the full command surface.
 issue to a sprint — lives in `workflow` or in the calling layer. This is what
 keeps each resource independently compilable, which is what makes compile-out
 work and what lets a new resource be added without touching an existing one.
+
+That rule is why **site metadata lives in `site`, not in the resource that
+lists it.** `issue list --field "Story Points"` has to resolve a name to
+`customfield_10042`, and it cannot ask the field resource to do it. So `site`
+owns the catalogue — the fetch, the cache, and the resolution — and
+`resource/field` is the command surface over it. Issue types, statuses, and
+transitions belong there for the same reason. A resource reaches all of it
+through one `registry.Session.Metadata` call, so the cache is shared: two
+commands resolving the same name in the same day make one request between them.
 
 Four more rules, all enforced in `internal/lint/importgraph_test.go` against the
 real import graph from `go list`, so a build-tagged file cannot hide an import:

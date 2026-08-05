@@ -1,6 +1,7 @@
 package issue_test
 
 import (
+	"context"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -931,29 +932,142 @@ func TestExtraFieldNamesSkipsNativeOnes(t *testing.T) {
 	}
 }
 
-// TestFieldNamesAreValidated covers what cannot be rendered yet. Guessing at a
-// field name would either send Jira something it rejects opaquely or produce an
-// element name that is not valid XML.
-func TestFieldNamesAreValidated(t *testing.T) {
-	for _, ok := range []string{"customfield_10042", "duedate", "timespent", "summary"} {
-		if err := issue.ValidateFieldNames([]string{ok}); err != nil {
-			t.Errorf("ValidateFieldNames(%q) = %v", ok, err)
+// testCatalogue is a small stand-in for a site's fields, covering the shapes
+// resolution has to deal with: a native field, a custom one, and one whose id
+// could not be an element name.
+func testCatalogue() *site.Catalogue {
+	return &site.Catalogue{Fields: []site.Field{
+		{ID: "summary", Name: "Summary", Type: "string"},
+		{ID: "duedate", Name: "Due Date", Type: "date"},
+		{ID: "timespent", Name: "Time Spent", Type: "number"},
+		{ID: "issuekey", Name: "Key", Type: "string"},
+		{
+			ID: "customfield_10042", Name: "Story Points", Custom: true, Type: "number",
+			ClauseNames: []string{"cf[10042]", "Story Points"},
+		},
+		{ID: "cf[10099]", Name: "Broken Id", Custom: true},
+	}}
+}
+
+// TestFieldsResolveByIdAndName is the point of the catalogue: a caller types
+// what the field is called and gets the id it has to be requested by.
+func TestFieldsResolveByIdAndName(t *testing.T) {
+	for input, want := range map[string]string{
+		"customfield_10042": "customfield_10042",
+		"Story Points":      "customfield_10042",
+		"story points":      "customfield_10042",
+		"cf[10042]":         "customfield_10042",
+		"Due Date":          "duedate",
+		"duedate":           "duedate",
+		"Summary":           "summary",
+	} {
+		got, err := issue.ResolveFields(testCatalogue(), []string{input})
+		if err != nil {
+			t.Errorf("ResolveFields(%q) = %v", input, err)
+			continue
+		}
+		if len(got) != 1 || got[0] != want {
+			t.Errorf("ResolveFields(%q) = %v, want [%s]", input, got, want)
 		}
 	}
-	for _, bad := range []string{"Story Points", "", "cf[10042]", "field-name", "1field", "key"} {
-		err := issue.ValidateFieldNames([]string{bad})
+}
+
+// TestUnknownFieldNamesTheNearMisses is the §5.2 row this exists for: an
+// unknown field is refused against the catalogue rather than sent for Jira to
+// reject with a 400 that names nothing.
+func TestUnknownFieldNamesTheNearMisses(t *testing.T) {
+	_, err := issue.ResolveFields(testCatalogue(), []string{"Story Point"})
+	if err == nil {
+		t.Fatal("a misspelled field was accepted")
+	}
+	if errs.ExitOf(err) != exitcode.Usage {
+		t.Errorf("exit = %v, want %v", errs.ExitOf(err), exitcode.Usage)
+	}
+	e := errs.Coerce(err)
+	if e.Code != "UNKNOWN_FIELD" {
+		t.Errorf("code = %q, want UNKNOWN_FIELD", e.Code)
+	}
+	// The suggestion has to carry the id, because the id is what the caller
+	// needs next. A near-miss list of names alone is another lookup.
+	if !strings.Contains(e.Detail, "Story Points") ||
+		!strings.Contains(e.Detail, "customfield_10042") {
+		t.Errorf("the detail does not name the near match with its id: %q", e.Detail)
+	}
+}
+
+// TestFieldNamesAreValidated covers what cannot be rendered. An id that is not
+// a legal element name has no output shape, and one that collides with a field
+// this tool already reports would overwrite it.
+func TestFieldNamesAreValidated(t *testing.T) {
+	for _, ok := range []string{"customfield_10042", "duedate", "timespent", "summary"} {
+		if _, err := issue.ResolveFields(testCatalogue(), []string{ok}); err != nil {
+			t.Errorf("ResolveFields(%q) = %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"Story Pants", "", "field-name", "1field", "Broken Id"} {
+		_, err := issue.ResolveFields(testCatalogue(), []string{bad})
 		if err == nil {
-			t.Errorf("ValidateFieldNames(%q) was accepted", bad)
+			t.Errorf("ResolveFields(%q) was accepted", bad)
 			continue
 		}
 		if errs.ExitOf(err) != exitcode.Usage {
 			t.Errorf("%q exits %v, want %v", bad, errs.ExitOf(err), exitcode.Usage)
 		}
 	}
-	// The error has to say what to pass instead.
-	err := issue.ValidateFieldNames([]string{"Story Points"})
-	if !strings.Contains(errs.Coerce(err).Remedy, "id") {
-		t.Errorf("the remedy does not point at ids: %q", errs.Coerce(err).Remedy)
+}
+
+// TestAmbiguousFieldNameIsRefused covers two custom fields sharing a name,
+// which Jira permits. They are different fields with different values, so
+// picking one would report the wrong column for every issue.
+func TestAmbiguousFieldNameIsRefused(t *testing.T) {
+	catalogue := &site.Catalogue{Fields: []site.Field{
+		{ID: "customfield_10001", Name: "Team", Custom: true},
+		{ID: "customfield_10002", Name: "Team", Custom: true},
+	}}
+
+	_, err := issue.ResolveFields(catalogue, []string{"Team"})
+	if err == nil {
+		t.Fatal("an ambiguous field name resolved to one of the candidates")
+	}
+	e := errs.Coerce(err)
+	if e.Code != "AMBIGUOUS_FIELD" {
+		t.Errorf("code = %q, want AMBIGUOUS_FIELD", e.Code)
+	}
+	for _, id := range []string{"customfield_10001", "customfield_10002"} {
+		if !strings.Contains(e.Detail, id) {
+			t.Errorf("the detail does not list %s: %q", id, e.Detail)
+		}
+	}
+}
+
+// TestFieldSpellingDoesNotChangeTheOutput keeps the output contract independent
+// of how a request was worded: a column header is the id either way.
+func TestFieldSpellingDoesNotChangeTheOutput(t *testing.T) {
+	byName, err := issue.ResolveFields(testCatalogue(), []string{"Story Points"})
+	if err != nil {
+		t.Fatalf("by name: %v", err)
+	}
+	byID, err := issue.ResolveFields(testCatalogue(), []string{"customfield_10042"})
+	if err != nil {
+		t.Fatalf("by id: %v", err)
+	}
+
+	name, id := issue.ExtraColumns(byName), issue.ExtraColumns(byID)
+	if len(name) != 1 || len(id) != 1 || name[0] != id[0] {
+		t.Errorf("columns differ by spelling: %v vs %v", name, id)
+	}
+	if name[0].Header != "customfield_10042" {
+		t.Errorf("header = %q, want the id", name[0].Header)
+	}
+
+	// Two spellings of one field are one column, not two identical ones.
+	both, err := issue.ResolveFields(testCatalogue(),
+		[]string{"Story Points", "customfield_10042"})
+	if err != nil {
+		t.Fatalf("both: %v", err)
+	}
+	if cols := issue.ExtraColumns(both); len(cols) != 1 {
+		t.Errorf("got %d columns for one field named twice", len(cols))
 	}
 }
 
@@ -1123,4 +1237,151 @@ func TestMissingIssueIsNotFound(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestFieldNamesResolveThroughTheCommand covers the whole path a user takes:
+// the registered command's Validate resolves the name, and the columns computed
+// afterwards carry the id. Testing ResolveFields alone would leave the wiring —
+// which is where the last --field bug lived — uncovered.
+func TestFieldNamesResolveThroughTheCommand(t *testing.T) {
+	cmd, ok := registry.Lookup("issue.list")
+	if !ok {
+		t.Fatal("issue list is not registered")
+	}
+
+	session := &stubSession{doer: &stubDoer{body: catalogueJSON}}
+	inv := &registry.Invocation{Jira: session, Flags: registry.NewFlags()}
+	inv.Flags.SetString("field", "Story Points")
+
+	if err := cmd.Validate(t.Context(), inv); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+
+	columns := cmd.ColumnsFor(inv)
+	last := columns[len(columns)-1]
+	if last.Header != "customfield_10042" || last.Path != "customfield_10042" {
+		t.Errorf("the resolved column is %+v, want the id", last)
+	}
+	if len(columns) != len(issue.ListColumns())+1 {
+		t.Errorf("got %d columns, want the defaults plus one", len(columns))
+	}
+}
+
+// TestAnUnknownFieldIsRefusedBeforeAnyOutput is the §5.2 row. It has to happen
+// in Validate: a streaming command writes its header before its body runs, so a
+// refusal from inside the body would arrive after bytes were on stdout.
+func TestAnUnknownFieldIsRefusedBeforeAnyOutput(t *testing.T) {
+	cmd, ok := registry.Lookup("issue.list")
+	if !ok {
+		t.Fatal("issue list is not registered")
+	}
+
+	session := &stubSession{doer: &stubDoer{body: catalogueJSON}}
+	inv := &registry.Invocation{Jira: session, Flags: registry.NewFlags()}
+	inv.Flags.SetString("field", "Story Point")
+
+	err := cmd.Validate(t.Context(), inv)
+	if err == nil {
+		t.Fatal("a misspelled field reached the request")
+	}
+	if errs.ExitOf(err) != exitcode.Usage {
+		t.Errorf("exit = %v, want %v", errs.ExitOf(err), exitcode.Usage)
+	}
+	if detail := errs.Coerce(err).Detail; !strings.Contains(detail, "customfield_10042") {
+		t.Errorf("the refusal does not suggest the near match: %q", detail)
+	}
+}
+
+// TestNoFieldFlagCostsNoRequest keeps the catalogue from taxing every
+// invocation. A caller who never asked for an extra field must not pay for the
+// machinery that resolves one.
+func TestNoFieldFlagCostsNoRequest(t *testing.T) {
+	cmd, ok := registry.Lookup("issue.list")
+	if !ok {
+		t.Fatal("issue list is not registered")
+	}
+
+	doer := &stubDoer{body: catalogueJSON}
+	inv := &registry.Invocation{
+		Jira: &stubSession{doer: doer}, Flags: registry.NewFlags(),
+	}
+	if err := cmd.Validate(t.Context(), inv); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	if doer.calls != 0 {
+		t.Errorf("the catalogue was fetched %d times with no --field", doer.calls)
+	}
+}
+
+// TestFieldsAreResolvedOnce covers the memoization: validation and the command
+// body both need the catalogue, and fetching it twice would double the cost of
+// the feature.
+func TestFieldsAreResolvedOnce(t *testing.T) {
+	cmd, ok := registry.Lookup("issue.get")
+	if !ok {
+		t.Fatal("issue get is not registered")
+	}
+
+	doer := &stubDoer{body: catalogueJSON}
+	inv := &registry.Invocation{
+		Jira: &stubSession{doer: doer}, Flags: registry.NewFlags(),
+	}
+	inv.Flags.SetString("field", "Story Points")
+	inv.Flags.SetString("field", "customfield_10042")
+
+	for range 2 {
+		if err := cmd.Validate(t.Context(), inv); err != nil {
+			t.Fatalf("validate: %v", err)
+		}
+	}
+	if doer.calls != 1 {
+		t.Errorf("the catalogue was fetched %d times, want 1", doer.calls)
+	}
+}
+
+// catalogueJSON is what /field returns for the resolution tests.
+const catalogueJSON = `[
+	{"id":"summary","name":"Summary","custom":false,"schema":{"type":"string"}},
+	{"id":"duedate","name":"Due Date","custom":false,"schema":{"type":"date"}},
+	{"id":"customfield_10042","name":"Story Points","custom":true,
+	 "clauseNames":["cf[10042]","Story Points"],"schema":{"type":"number"}}
+]`
+
+// stubSession is a registry.Session backed by a stubbed transport, so a command
+// is exercised with no auth, no config, and no network.
+type stubSession struct {
+	doer *stubDoer
+	meta *site.Metadata
+}
+
+func (s *stubSession) Connect(context.Context) (*transport.Client, site.Info, error) {
+	return nil, site.Info{Kind: site.Cloud}, nil
+}
+
+func (s *stubSession) Metadata(context.Context) (*site.Metadata, error) {
+	if s.meta == nil {
+		s.meta = &site.Metadata{Client: s.doer, Info: site.Info{Kind: site.Cloud}}
+	}
+	return s.meta, nil
+}
+
+func (s *stubSession) Project() string                 { return "" }
+func (s *stubSession) RequireProject() (string, error) { return "", nil }
+func (s *stubSession) Board() string                   { return "" }
+func (s *stubSession) CheckWritable(string) error      { return nil }
+
+// stubDoer answers with a fixed body and counts how often it was asked, which
+// is what the "no extra request" assertions read.
+type stubDoer struct {
+	body  string
+	calls int
+}
+
+func (s *stubDoer) Do(context.Context, transport.Request) (*transport.Response, error) {
+	s.calls++
+	return &transport.Response{
+		Status: 200,
+		Body:   []byte(s.body),
+		Header: map[string][]string{"Content-Type": {"application/json"}},
+	}, nil
 }

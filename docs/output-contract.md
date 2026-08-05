@@ -226,6 +226,23 @@ It is always present, never omitted when false.
 `detail` and `remedy` are present when there is something useful to say.
 `request-id` is present for any failure that reached Jira.
 
+### Resolution failures
+
+A value naming something on the server — a field, and in time a user or a
+transition — is resolved against the site before the request is built, never
+sent for Jira to reject. The refusal carries the candidates, because an error
+that only says "unknown" leaves the caller to go and read a catalogue to find
+their typo.
+
+| Code              | Exit | Meaning                                              |
+| ----------------- | ---- | ----------------------------------------------------- |
+| `UNKNOWN_FIELD`   | 2    | No field by that id, name, or clause name. `detail` lists the near misses, each with its id. |
+| `AMBIGUOUS_FIELD` | 2    | Several fields share that name. `detail` lists every candidate with its id; pass the id. |
+| `INVALID_FIELD`   | 2    | The field resolved, but its id cannot be an element name or collides with one the command already emits. |
+
+Resolution costs one request against a cold cache and none against a warm one.
+A command that names nothing to resolve makes no extra request at all.
+
 An unparseable `--format` still produces a readable error: the diagnostic falls
 back to XML rather than failing twice.
 

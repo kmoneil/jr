@@ -137,7 +137,13 @@ type Command struct {
 	// caught earlier or the rejection arrives after bytes are already out. It
 	// is also where a command puts a check the generic flag machinery cannot
 	// express.
-	Validate func(inv *Invocation) error
+	//
+	// It takes a context because checking a flag can require asking the server:
+	// resolving --field "Story Points" against the catalogue is the difference
+	// between exiting 2 with the near misses and letting Jira 400 opaquely.
+	// Whatever it resolves belongs on the invocation, via SetValue — Columns
+	// are computed after this and cannot fail.
+	Validate func(ctx context.Context, inv *Invocation) error
 
 	// Exactly one of Run and Stream is set. Stream is for a command that emits
 	// a collection; Run is for one that emits a record.
@@ -206,6 +212,13 @@ type Session interface {
 	// Connect returns a client bound to the resolved site, probing the
 	// deployment on first use and caching the answer.
 	Connect(ctx context.Context) (*transport.Client, site.Info, error)
+	// Metadata returns the site's descriptive data — the field catalogue, and
+	// in time the issue types and transitions — cached on disk with a TTL.
+	//
+	// It is on the session rather than fetched by each resource so that the
+	// cache is shared: two commands resolving the same custom field name in the
+	// same day make one request between them, not two.
+	Metadata(ctx context.Context) (*site.Metadata, error)
 	// Project is the resolved default project. It may be empty: project is
 	// never mandatory.
 	Project() string
@@ -240,7 +253,28 @@ type Invocation struct {
 	Stderr io.Writer
 	// Progress reports the scale of a long operation. It is never nil.
 	Progress Progress
+
+	// values carries what Validate worked out into the rest of the invocation.
+	//
+	// It exists because Columns are computed between Validate and the command
+	// body, by a function with no context and no way to fail. Anything that
+	// took a request to establish — a field name resolved to its id — has to be
+	// resolved once in Validate and left here, or it would be resolved twice
+	// with the second attempt unable to report the failure.
+	values map[string]any
 }
+
+// SetValue records something Validate resolved, for the rest of the invocation
+// to read.
+func (i *Invocation) SetValue(key string, v any) {
+	if i.values == nil {
+		i.values = map[string]any{}
+	}
+	i.values[key] = v
+}
+
+// Value returns what SetValue recorded, or nil.
+func (i *Invocation) Value(key string) any { return i.values[key] }
 
 // Name returns the dotted command name, e.g. "issue.list". It is also the
 // default output kind and the MCP tool name.

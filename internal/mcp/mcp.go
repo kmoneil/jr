@@ -237,7 +237,7 @@ func (s *Server) callTool(ctx context.Context, params json.RawMessage) (any, *rp
 func (s *Server) run(
 	ctx context.Context, cmd *registry.Command, args map[string]any,
 ) (string, error) {
-	inv, format, err := s.invocation(cmd, args)
+	inv, format, err := s.invocation(ctx, cmd, args)
 	if err != nil {
 		return "", err
 	}
