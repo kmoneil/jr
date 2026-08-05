@@ -21,6 +21,22 @@ import (
 const (
 	KindList    = "issue.list"
 	VersionList = 1
+	KindGet     = "issue.get"
+	VersionGet  = 1
+)
+
+// Body formats a description can arrive in.
+//
+// The attribute is always present and always accurate. A caller that wants to
+// render the text has to know which it got, and guessing — or converting
+// silently — is how markup ends up mangled with nothing to indicate it.
+const (
+	// BodyWiki is Data Center's wiki markup, carried through unchanged.
+	BodyWiki = "wiki"
+	// BodyADF is Cloud's Atlassian Document Format, carried through as JSON
+	// until a converter exists. Emitting it raw is honest; emitting a
+	// half-conversion would not be.
+	BodyADF = "adf"
 )
 
 // Issue is one issue, in the shape this tool reports rather than the shape
@@ -38,6 +54,18 @@ type Issue struct {
 	Created  string
 	Updated  string
 	Labels   []string
+
+	// The fields below are populated by `issue get` and left empty by
+	// `issue list`, which does not request them. The node shape is the same
+	// either way, so a caller parses a listed issue and a fetched one
+	// identically.
+	Description string
+	// BodyFormat names the markup Description is in: wiki or adf.
+	BodyFormat  string
+	Resolution  string
+	Parent      string
+	Components  []string
+	FixVersions []string
 	// Extra holds fields the caller asked for with --field that this package
 	// has no native shape for. They are carried through rather than dropped:
 	// a field that was fetched and then discarded is a flag that did nothing.
@@ -104,9 +132,22 @@ type rawIssue struct {
 		Project *struct {
 			Key string `json:"key"`
 		} `json:"project"`
-		Created string   `json:"created"`
-		Updated string   `json:"updated"`
-		Labels  []string `json:"labels"`
+		Created     string          `json:"created"`
+		Updated     string          `json:"updated"`
+		Labels      []string        `json:"labels"`
+		Description json.RawMessage `json:"description"`
+		Resolution  *struct {
+			Name string `json:"name"`
+		} `json:"resolution"`
+		Parent *struct {
+			Key string `json:"key"`
+		} `json:"parent"`
+		Components []struct {
+			Name string `json:"name"`
+		} `json:"components"`
+		FixVersions []struct {
+			Name string `json:"name"`
+		} `json:"fixVersions"`
 	} `json:"fields"`
 }
 
@@ -223,7 +264,43 @@ func (r rawIssue) convert() (Issue, error) {
 	if r.Fields.Project != nil {
 		out.Project = r.Fields.Project.Key
 	}
+	if r.Fields.Resolution != nil {
+		out.Resolution = r.Fields.Resolution.Name
+	}
+	if r.Fields.Parent != nil {
+		out.Parent = r.Fields.Parent.Key
+	}
+	for _, c := range r.Fields.Components {
+		out.Components = append(out.Components, c.Name)
+	}
+	for _, v := range r.Fields.FixVersions {
+		out.FixVersions = append(out.FixVersions, v.Name)
+	}
+	out.Description, out.BodyFormat = decodeDescription(r.Fields.Description)
 	return out, nil
+}
+
+// decodeDescription reads a description, which is a different type on each
+// deployment.
+//
+// Data Center sends a string of wiki markup. Cloud sends an ADF document, which
+// is an object. Both are carried through unchanged with the format named, so a
+// caller knows what it has. Converting ADF to markdown here would mean shipping
+// a half-converter and calling its output markdown.
+func decodeDescription(raw json.RawMessage) (text, format string) {
+	trimmed := strings.TrimSpace(string(raw))
+	switch {
+	case trimmed == "" || trimmed == "null":
+		return "", ""
+	case trimmed[0] == '"':
+		var s string
+		if err := json.Unmarshal(raw, &s); err != nil {
+			return trimmed, BodyWiki
+		}
+		return s, BodyWiki
+	default:
+		return trimmed, BodyADF
+	}
 }
 
 // decodeIssues converts a page of raw issues. extras names the fields the
@@ -351,14 +428,32 @@ func (i Issue) Node() *render.Node {
 	n.AttrIf("type", i.Type)
 	n.AttrIf("priority", i.Priority)
 	n.AttrIf("project", i.Project)
+	n.AttrIf("resolution", i.Resolution)
+	n.AttrIf("parent", i.Parent)
 	n.LeafIf("created", i.Created)
 	n.LeafIf("updated", i.Updated)
+
+	// Long text is a child element with its markup named, and mixed content
+	// goes in a CDATA section so newlines and fenced code survive untouched.
+	if i.Description != "" {
+		n.Child(render.El("description").
+			Attr("format", i.BodyFormat).
+			SetCDATA(i.Description))
+	}
 
 	labels := make([]*render.Node, 0, len(i.Labels))
 	for _, l := range i.Labels {
 		labels = append(labels, render.El("label").SetText(l))
 	}
 	n.Child(render.ListEl("labels", "label", labels...))
+
+	if len(i.Components) > 0 {
+		n.Child(render.ListEl("components", "component", textNodes("component", i.Components)...))
+	}
+	if len(i.FixVersions) > 0 {
+		n.Child(render.ListEl("fix-versions", "fix-version",
+			textNodes("fix-version", i.FixVersions)...))
+	}
 
 	// A requested field becomes an element named for its id, so it addresses
 	// like any other: `--format json` gives "customfield_10042": "3", and a
@@ -369,20 +464,39 @@ func (i Issue) Node() *render.Node {
 	return n
 }
 
+// textNodes builds a list of text-only elements.
+func textNodes(name string, values []string) []*render.Node {
+	out := make([]*render.Node, 0, len(values))
+	for _, v := range values {
+		out = append(out, render.El(name).SetText(v))
+	}
+	return out
+}
+
+// DetailFields is what `issue get` asks Jira for: everything `issue list`
+// needs, plus the fields only worth fetching one issue at a time.
+func DetailFields() []string {
+	return append(DefaultFields(),
+		"description", "resolution", "parent", "components", "fixVersions")
+}
+
 // nativeFields are the fields this package models itself. A caller naming one
 // of these with --field changes nothing, because it is already in the output.
 var nativeFields = map[string]bool{
 	"summary": true, "status": true, "assignee": true, "reporter": true,
 	"priority": true, "issuetype": true, "project": true,
 	"created": true, "updated": true, "labels": true,
+	"description": true, "resolution": true, "parent": true,
+	"components": true, "fixversions": true, "fixVersions": true,
 }
 
 // reservedNames are the element and attribute names an issue already uses. A
 // requested field cannot take one of them without colliding.
 var reservedNames = map[string]bool{
 	"key": true, "id": true, "summary": true, "status": true, "assignee": true,
-	"type": true, "priority": true, "project": true,
-	"created": true, "updated": true, "labels": true,
+	"reporter": true, "type": true, "priority": true, "project": true,
+	"created": true, "updated": true, "labels": true, "description": true,
+	"resolution": true, "parent": true, "components": true,
 }
 
 // fieldID is what --field accepts: a field id, e.g. customfield_10042 or

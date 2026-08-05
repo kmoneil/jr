@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <result kind="contract" v="1">
-  <kinds count="9" complete="true">
+  <kinds count="10" complete="true">
     <kind name="auth.status" v="1" emitters="auth.login,auth.logout,auth.status"/>
     <kind name="auth.token" v="1" emitters="auth.token"/>
     <kind name="context.get" v="1" emitters="context.create,context.delete,context.show,context.use"/>
     <kind name="context.list" v="1" emitters="context.list"/>
     <kind name="contract" v="1" emitters="contract"/>
+    <kind name="issue.get" v="1" emitters="issue.get"/>
     <kind name="issue.list" v="1" emitters="issue.list"/>
     <kind name="schema.command" v="1" emitters="schema"/>
     <kind name="schema.commands" v="1" emitters="schema"/>

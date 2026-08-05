@@ -956,3 +956,171 @@ func TestFieldNamesAreValidated(t *testing.T) {
 		t.Errorf("the remedy does not point at ids: %q", errs.Coerce(err).Remedy)
 	}
 }
+
+// getClient replays a single-issue conversation for one deployment.
+func getClient(t *testing.T, kind site.Kind) *issue.Client {
+	t.Helper()
+	cassette, err := transport.LoadCassette(
+		filepath.Join("testdata", "get."+string(kind)+".json"),
+	)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	conn, err := transport.New(transport.Options{
+		BaseURL: "https://recorded.invalid", HTTPClient: transport.NewReplayer(cassette).Client(),
+		Retries: -1,
+	})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+	return &issue.Client{Transport: conn, Site: site.Info{Kind: kind}}
+}
+
+func TestGetOnBothDeployments(t *testing.T) {
+	for _, kind := range deployments {
+		t.Run(string(kind), func(t *testing.T) {
+			got, err := getClient(t, kind).Get(t.Context(), "ENG-101", issue.DetailFields())
+			if err != nil {
+				t.Fatalf("get: %v", err)
+			}
+			if got.Key != "ENG-101" || got.Summary == "" {
+				t.Fatalf("got %+v", got)
+			}
+			// The fields only worth fetching one issue at a time.
+			if got.Parent != "ENG-1" {
+				t.Errorf("Parent = %q", got.Parent)
+			}
+			if len(got.Components) != 1 || got.Components[0] != "transport" {
+				t.Errorf("Components = %v", got.Components)
+			}
+			if len(got.FixVersions) != 1 || got.FixVersions[0] != "2.1.0" {
+				t.Errorf("FixVersions = %v", got.FixVersions)
+			}
+			// Normalization still holds across deployments.
+			if got.Status.Category != issue.CategoryInProgress {
+				t.Errorf("category = %q", got.Status.Category)
+			}
+			if got.Assignee.Display != "Ada Lovelace" {
+				t.Errorf("assignee = %+v", got.Assignee)
+			}
+		})
+	}
+}
+
+// TestDescriptionMarkupIsNamedNotConverted is the honest half of shipping
+// without an ADF converter. Data Center sends wiki markup and Cloud sends an ADF
+// object; both are carried through unchanged with the format named, so a caller
+// knows what it has rather than receiving a half-conversion called markdown.
+func TestDescriptionMarkupIsNamedNotConverted(t *testing.T) {
+	dc, err := getClient(t, site.DataCenter).Get(t.Context(), "ENG-101", issue.DetailFields())
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if dc.BodyFormat != issue.BodyWiki {
+		t.Errorf("Data Center description format = %q, want %q", dc.BodyFormat, issue.BodyWiki)
+	}
+	if !strings.Contains(dc.Description, "{code:go}") {
+		t.Errorf("wiki markup was altered:\n%s", dc.Description)
+	}
+
+	cloud, err := getClient(t, site.Cloud).Get(t.Context(), "ENG-101", issue.DetailFields())
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if cloud.BodyFormat != issue.BodyADF {
+		t.Errorf("Cloud description format = %q, want %q", cloud.BodyFormat, issue.BodyADF)
+	}
+	if !strings.Contains(cloud.Description, `"type":"doc"`) {
+		t.Errorf("ADF was not carried through as JSON:\n%s", cloud.Description)
+	}
+}
+
+// TestDescriptionSurvivesRendering covers the mixed content the XML default
+// exists for: newlines, a fenced code block, angle brackets, and a literal ]]>.
+func TestDescriptionSurvivesRendering(t *testing.T) {
+	got, err := getClient(t, site.DataCenter).Get(t.Context(), "ENG-101", issue.DetailFields())
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+
+	doc := issue.GetDoc(got)
+	if doc.Kind != issue.KindGet {
+		t.Errorf("kind = %q", doc.Kind)
+	}
+	if doc.Record == nil {
+		t.Fatal("issue get emitted a collection, not a record")
+	}
+
+	var b strings.Builder
+	if err := render.Write(&b, doc, render.XML); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	out := b.String()
+	if !strings.Contains(out, `format="wiki"`) {
+		t.Errorf("the markup is not named in the output:\n%s", out)
+	}
+	// A literal ]]> inside the text must be split rather than closing the
+	// section early.
+	if strings.Contains(out, "a literal ]]> in") {
+		t.Errorf("a literal ]]> survived into the CDATA section:\n%s", out)
+	}
+	if !strings.Contains(out, "]]]]><![CDATA[>") {
+		t.Errorf("the CDATA terminator was not split:\n%s", out)
+	}
+	// And the code fence is intact.
+	if !strings.Contains(out, "{code:go}") {
+		t.Errorf("the code block was mangled:\n%s", out)
+	}
+}
+
+// TestGetRecordDefaultsToXML pins the per-content rule: one issue is a record,
+// and a description full of newlines is exactly what the XML default is for.
+func TestGetRecordDefaultsToXML(t *testing.T) {
+	got, err := getClient(t, site.DataCenter).Get(t.Context(), "ENG-101", issue.DetailFields())
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if f := render.DefaultFor(issue.GetDoc(got)); f != render.XML {
+		t.Errorf("a fetched issue defaults to %q, want xml", f)
+	}
+	if f := render.DefaultFor(issue.ListDoc(&issue.ListResult{})); f != render.TSV {
+		t.Errorf("a list defaults to %q, want tsv", f)
+	}
+}
+
+// TestGetValidatesTheKeyLocally saves a round trip and, more importantly, a
+// misleading answer: a 404 for a typo reads like a missing issue.
+func TestGetValidatesTheKeyLocally(t *testing.T) {
+	client := getClient(t, site.Cloud)
+	for _, bad := range []string{"foo", "", "12345", "ENG", "ENG-", "ENG-abc"} {
+		_, err := client.Get(t.Context(), bad, issue.DetailFields())
+		if err == nil {
+			t.Errorf("Get(%q) succeeded", bad)
+			continue
+		}
+		if errs.ExitOf(err) != exitcode.Usage {
+			t.Errorf("Get(%q) exits %v, want %v", bad, errs.ExitOf(err), exitcode.Usage)
+		}
+	}
+}
+
+// TestMissingIssueIsNotFound checks both deployments, which word it differently
+// — and Cloud's wording is the one worth surfacing, since a 404 also means an
+// issue you cannot see.
+func TestMissingIssueIsNotFound(t *testing.T) {
+	for _, kind := range deployments {
+		t.Run(string(kind), func(t *testing.T) {
+			_, err := getClient(t, kind).Get(t.Context(), "ENG-9999", issue.DetailFields())
+			if err == nil {
+				t.Fatal("a missing issue was returned")
+			}
+			if errs.ExitOf(err) != exitcode.NotFound {
+				t.Errorf("exit = %v, want %v", errs.ExitOf(err), exitcode.NotFound)
+			}
+			if detail := errs.Coerce(err).Detail; !strings.Contains(detail, "Does Not Exist") &&
+				!strings.Contains(detail, "does not exist") {
+				t.Errorf("Jira's own wording was dropped: %q", detail)
+			}
+		})
+	}
+}

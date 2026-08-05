@@ -41,6 +41,7 @@ make build          # → bin/jr
 
 ```
 jr issue list       # query issues; pages until --limit is satisfied
+jr issue get KEY    # one issue in full, with its description
 
 jr context create|list|use|show|delete   # named site/project pairings
 jr auth login|logout|status|token        # credentials, per site
@@ -79,9 +80,12 @@ Nothing below is stubbed or partially wired — a flag that would silently no-op
 is not shipped at all.
 
 - The rest of the resources: `epic`, `sprint`, `board`, `project`, `user`,
-  `field`, `meta`, and every `issue` verb other than `list`.
+  `field`, `meta`, and every `issue` verb other than `list` and `get`.
 - `adf` — the package exists with its contract documented and no
-  implementation.
+  implementation. Until it lands, a Cloud description is emitted as raw ADF
+  JSON with `format="adf"`, and a Data Center one as wiki markup with
+  `format="wiki"`. Both are carried through unchanged: a half-conversion called
+  markdown would be worse than either.
 - OAuth, mTLS, and a system-keyring credential provider. The provider interface
   is in place; a keyring implementation shells out, so it will arrive behind its
   own build tag rather than in the reader profile.
@@ -94,6 +98,29 @@ is not shipped at all.
   schemas land with the resources that define them.
 - The four build profiles produce identical binaries, because no tag currently
   gates any code. The machinery is tested; there is just nothing to exclude yet.
+
+### Reading one issue
+
+```console
+$ jr issue get IDO-5224
+<result kind="issue.get" v="1">
+  <issue key="IDO-5224" type="Story" priority="High" project="IDO" parent="IDO-1">
+    <summary>...</summary>
+    <status category="in-progress">In Progress</status>
+    <description format="wiki"><![CDATA[ ... ]]></description>
+```
+
+XML by default, because one issue is a record and a description full of
+newlines, quotes, and code fences is exactly the mixed content an escaping tax
+would make unreadable. The markup is **named, never converted**: `wiki` on Data
+Center, `adf` on Cloud. A literal `]]>` inside the text is split across two
+CDATA sections rather than closing the block early.
+
+The issue shape is the same one `issue list` emits for a row, so a caller parses
+both identically — `get` simply has more of it filled in.
+
+A malformed key is rejected locally: `jr issue get foo` is exit 2 without a
+round trip, because a 404 for a typo reads like a missing issue.
 
 ### Streaming
 

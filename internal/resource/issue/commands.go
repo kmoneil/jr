@@ -14,6 +14,7 @@ import (
 
 func init() {
 	registry.Register(listCommand())
+	registry.Register(getCommand())
 }
 
 func listCommand() *registry.Command {
@@ -379,4 +380,72 @@ func orElse(v, fallback string) string {
 		return fallback
 	}
 	return v
+}
+
+func getCommand() *registry.Command {
+	return &registry.Command{
+		Path:    []string{"issue", "get"},
+		Summary: "Fetch one issue in full",
+		Description: strings.TrimSpace(`
+Returns a single issue with its description, resolution, components, and fix
+versions — the fields worth fetching one issue at a time.
+
+The description is carried through unchanged with its markup named. Data Center
+serves wiki markup and Cloud serves an Atlassian Document Format object; the
+format attribute says which, so nothing is silently converted or mangled.
+
+The issue shape here is the same one issue list emits for a row, so a caller
+parses both identically. It simply has more of it filled in.`),
+		Example: strings.Join([]string{
+			buildinfo.App + " issue get ENG-101",
+			buildinfo.App + " issue get ENG-101 --format json",
+			buildinfo.App + " issue get ENG-101 --field customfield_10042",
+		}, "\n"),
+		Args: []registry.Arg{{
+			Name: "key", Usage: "issue key, e.g. ENG-101", Required: true,
+		}},
+		Flags: []registry.Flag{{
+			Name: "field", Type: registry.TypeString, Repeatable: true,
+			Usage: "extra field id to include, e.g. customfield_10042; " +
+				"added to the default set, repeat for several",
+		}},
+		NeedsJira: true,
+		Outputs:   []registry.Output{{Kind: KindGet, Version: VersionGet}},
+		ExitCodes: []exitcode.Code{
+			exitcode.Auth, exitcode.NotFound, exitcode.Permission,
+			exitcode.RateLimit, exitcode.Remote,
+		},
+		Validate: validateGet,
+		Run:      runGet,
+	}
+}
+
+func validateGet(inv *registry.Invocation) error {
+	return ValidateFieldNames(inv.Flags.StringSlice("field"))
+}
+
+func runGet(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) {
+	if inv.Jira == nil {
+		return nil, errs.Runtime("NO_SESSION", "issue get has no connection to Jira")
+	}
+
+	conn, info, err := inv.Jira.Connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	client := &Client{Transport: conn, Site: info}
+
+	fields := append(DetailFields(), ExtraFieldNames(inv.Flags.StringSlice("field"))...)
+	issue, err := client.Get(ctx, inv.Args[0], fields)
+	if err != nil {
+		return nil, err
+	}
+	return GetDoc(issue), nil
+}
+
+// GetDoc renders one issue as a record, so it defaults to XML: a description
+// full of newlines and code fences is mixed content, and XML carries it without
+// an escaping tax.
+func GetDoc(i Issue) *render.Doc {
+	return render.Record(KindGet, VersionGet, i.Node())
 }

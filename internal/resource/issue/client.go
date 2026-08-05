@@ -390,3 +390,45 @@ func resolvePageSize(n int) (int, error) {
 	}
 	return n, nil
 }
+
+// Get fetches one issue.
+//
+// The key is validated locally first. Sending "foo" to Jira costs a round trip
+// to be told what this package can see for itself, and a 404 for a malformed
+// key reads like a missing issue rather than a typo.
+func (c *Client) Get(ctx context.Context, key string, fields []string) (Issue, error) {
+	parsed, ok := ParseKey(key)
+	if !ok {
+		return Issue{}, errs.Usage("INVALID_KEY", "%q is not an issue key", key).
+			WithDetail("an issue key looks like ENG-123").
+			WithRemedy("pass a key, not an id or a summary")
+	}
+
+	query := url.Values{}
+	if len(fields) > 0 {
+		query.Set("fields", strings.Join(fields, ","))
+	}
+
+	resp, err := c.Transport.Do(ctx, transport.Request{
+		Method: transport.MethodGet,
+		Path:   c.Site.APIBase() + "/issue/" + parsed.String(),
+		Query:  query,
+	})
+	if err != nil {
+		return Issue{}, err
+	}
+	if err := transport.Err(resp); err != nil {
+		return Issue{}, err
+	}
+
+	issues, err := decodeIssues([]json.RawMessage{resp.Body}, ExtraFieldNames(fields))
+	if err != nil {
+		return Issue{}, err
+	}
+	if len(issues) != 1 {
+		return Issue{}, errs.Remote("MALFORMED_ISSUE",
+			"Jira returned no usable issue for %s", parsed).
+			WithRequestID(resp.RequestID)
+	}
+	return issues[0], nil
+}
