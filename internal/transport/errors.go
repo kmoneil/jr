@@ -3,6 +3,7 @@ package transport
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/kmoneil/jira-cli/internal/errs"
@@ -52,8 +53,8 @@ func sortStrings(s []string) {
 }
 
 // parseJiraError extracts a human-readable summary from a response body. A body
-// that is not JSON, or is JSON of an unexpected shape, degrades to a trimmed
-// snippet rather than being dropped: an opaque 400 with the body swallowed is
+// that is not JSON, or is JSON of an unexpected shape, degrades to a readable
+// summary rather than being dropped: an opaque 400 with the body swallowed is
 // the least actionable error there is.
 func parseJiraError(body []byte, contentType string) string {
 	if len(body) == 0 {
@@ -64,6 +65,43 @@ func parseJiraError(body []byte, contentType string) string {
 		if err := json.Unmarshal(body, &je); err == nil {
 			if summary := je.summarize(); summary != "" {
 				return summary
+			}
+		}
+	}
+	if isHTML(body, contentType) {
+		return htmlSummary(body)
+	}
+	return snippet(body)
+}
+
+// isHTML reports whether a body is a web page rather than an API response.
+//
+// It matters because a JSON API answering with HTML means the request reached a
+// web server rather than the API — which is a different problem from anything
+// the status code alone suggests.
+func isHTML(body []byte, contentType string) bool {
+	if strings.Contains(strings.ToLower(contentType), "html") {
+		return true
+	}
+	head := strings.ToLower(strings.TrimSpace(string(body[:min(len(body), 64)])))
+	return strings.HasPrefix(head, "<!doctype html") || strings.HasPrefix(head, "<html")
+}
+
+var (
+	titleTag = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
+	h1Tag    = regexp.MustCompile(`(?is)<h1[^>]*>(.*?)</h1>`)
+	anyTag   = regexp.MustCompile(`(?s)<[^>]*>`)
+)
+
+// htmlSummary reduces an error page to its headline.
+//
+// A page of Tomcat's inline CSS tells a reader nothing, and truncating it at
+// some byte count usually cuts before the one line that would have.
+func htmlSummary(body []byte) string {
+	for _, re := range []*regexp.Regexp{titleTag, h1Tag} {
+		if m := re.FindSubmatch(body); len(m) == 2 {
+			if text := strings.TrimSpace(anyTag.ReplaceAllString(string(m[1]), "")); text != "" {
+				return text + " (an HTML page, not a Jira API response)"
 			}
 		}
 	}
@@ -109,6 +147,16 @@ func statusError(resp *Response) *errs.Error {
 			WithRemedy("check the project permissions for this account")
 
 	case resp.Status == http.StatusNotFound:
+		// An HTML 404 did not come from Jira's API at all. Telling the caller
+		// to check an issue key would send them looking for the wrong problem
+		// entirely: the request never reached the API.
+		if isHTML(resp.Body, resp.Header.Get("Content-Type")) {
+			e = errs.NotFound("NO_SUCH_ENDPOINT",
+				"the server returned a web page, not a Jira API response").
+				WithRemedy("check the site URL, including any context path: a Data Center " +
+					"instance is often served under one, e.g. https://jira.example.com/jira")
+			break
+		}
 		e = errs.NotFound("NOT_FOUND", "Jira has no such resource").
 			WithRemedy("check the key or id; a resource you cannot see also reports as missing")
 
@@ -138,6 +186,11 @@ func statusError(resp *Response) *errs.Error {
 		e = errs.Remote("UNEXPECTED_STATUS", "Jira returned an unexpected status %d", resp.Status)
 	}
 
+	// Name the endpoint. A failure that does not say what it asked for leaves
+	// the caller guessing at which of several requests a command made.
+	if endpoint := resp.Endpoint(); endpoint != "" {
+		detail = joinDetail(endpoint, detail)
+	}
 	if detail != "" {
 		e = e.WithDetail("%s", detail)
 	}

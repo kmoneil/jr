@@ -199,3 +199,84 @@ func TestNotFoundRemedyMentionsPermissions(t *testing.T) {
 		t.Errorf("remedy does not mention visibility: %q", errs.Coerce(err).Remedy)
 	}
 }
+
+// TestErrorNamesTheEndpoint is what makes a 404 diagnosable. A failure that does
+// not say what it asked for leaves the caller guessing at which of several
+// requests a command made.
+func TestErrorNamesTheEndpoint(t *testing.T) {
+	err := transport.Err(&transport.Response{
+		Status: http.StatusNotFound,
+		Header: http.Header{},
+		Method: "GET",
+		URL:    "https://jira.corp.com/rest/api/2/search?jql=project+%3D+ENG",
+	})
+	detail := errs.Coerce(err).Detail
+	if !strings.Contains(detail, "GET https://jira.corp.com/rest/api/2/search") {
+		t.Errorf("the detail does not name the endpoint: %q", detail)
+	}
+}
+
+// TestHTMLErrorPageIsRecognized covers the Tomcat 404 a Data Center instance
+// serves when the request never reached the API at all. Telling the caller to
+// check an issue key would send them after the wrong problem.
+func TestHTMLErrorPageIsRecognized(t *testing.T) {
+	tomcat := `<!doctype html><html lang="en"><head><title>HTTP Status 404 – Not Found` +
+		`</title><style type="text/css">body {font-family:Tahoma;} h1 {color:white;}` +
+		`</style></head><body><h1>HTTP Status 404 – Not Found</h1><hr class="line" />` +
+		`<p><b>Type</b> Status Report</p></body></html>`
+
+	header := http.Header{}
+	header.Set("Content-Type", "text/html;charset=utf-8")
+	err := transport.Err(&transport.Response{
+		Status: http.StatusNotFound, Header: header,
+		Body: []byte(tomcat), Method: "GET",
+		URL: "https://jira.corp.com/rest/api/2/search",
+	})
+
+	e := errs.Coerce(err)
+	if e.Code != "NO_SUCH_ENDPOINT" {
+		t.Errorf("code = %q, want NO_SUCH_ENDPOINT", e.Code)
+	}
+	// The headline, not a page of inline CSS truncated mid-selector.
+	if !strings.Contains(e.Detail, "HTTP Status 404") {
+		t.Errorf("the detail does not carry the page's headline: %q", e.Detail)
+	}
+	if strings.Contains(e.Detail, "font-family") {
+		t.Errorf("the detail carries the page's CSS: %q", e.Detail)
+	}
+	// A context path is the usual cause on Data Center, so the remedy says so.
+	if !strings.Contains(e.Remedy, "context path") {
+		t.Errorf("the remedy does not mention a context path: %q", e.Remedy)
+	}
+}
+
+// TestHTMLDetectedWithoutAContentType covers a proxy that serves a page with no
+// or a wrong content type.
+func TestHTMLDetectedWithoutAContentType(t *testing.T) {
+	err := transport.Err(&transport.Response{
+		Status: http.StatusNotFound,
+		Header: http.Header{},
+		Body:   []byte("<html><head><title>Sign in</title></head><body>...</body></html>"),
+	})
+	if got := errs.Coerce(err).Code; got != "NO_SUCH_ENDPOINT" {
+		t.Errorf("code = %q, want NO_SUCH_ENDPOINT", got)
+	}
+}
+
+// TestJSON404StillReportsAMissingResource is the converse: Jira's own 404 means
+// the resource really is missing or invisible.
+func TestJSON404StillReportsAMissingResource(t *testing.T) {
+	header := http.Header{}
+	header.Set("Content-Type", "application/json")
+	err := transport.Err(&transport.Response{
+		Status: http.StatusNotFound, Header: header,
+		Body: []byte(`{"errorMessages":["Issue does not exist"],"errors":{}}`),
+	})
+	e := errs.Coerce(err)
+	if e.Code != "NOT_FOUND" {
+		t.Errorf("code = %q, want NOT_FOUND", e.Code)
+	}
+	if !strings.Contains(e.Detail, "Issue does not exist") {
+		t.Errorf("Jira's explanation was dropped: %q", e.Detail)
+	}
+}

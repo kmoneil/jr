@@ -146,12 +146,26 @@ type Request struct {
 
 // Response is a completed exchange with the body already read.
 type Response struct {
-	Status    int
-	Header    http.Header
-	Body      []byte
+	Status int
+	Header http.Header
+	Body   []byte
+	// Method and URL identify what was asked for. They are here so an error
+	// can say which endpoint failed: a 404 that does not name the path it
+	// tried is nearly useless, and "which URL" is the only question worth
+	// asking about one. URL is already redacted.
+	Method    string
+	URL       string
 	RequestID string
 	// Attempts is how many HTTP calls this response cost, including retries.
 	Attempts int
+}
+
+// Endpoint renders the request this response answered, for an error message.
+func (r *Response) Endpoint() string {
+	if r == nil || r.Method == "" {
+		return ""
+	}
+	return r.Method + " " + r.URL
 }
 
 // New builds a Client.
@@ -355,6 +369,8 @@ func (c *Client) attempt(ctx context.Context, r Request, target *url.URL,
 		Status:    resp.StatusCode,
 		Header:    resp.Header,
 		Body:      payload,
+		Method:    r.Method,
+		URL:       RedactURL(target),
 		RequestID: id,
 		Attempts:  attempt,
 	}, nil
