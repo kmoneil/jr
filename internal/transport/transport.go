@@ -82,7 +82,7 @@ func (f AuthorizerFunc) Authorize(ctx context.Context, req RequestInfo) (map[str
 
 // Options configures a Client.
 type Options struct {
-	// BaseURL is the site root, e.g. https://acme.atlassian.net.
+	// BaseURL is the site root, e.g. https://your-site.atlassian.net.
 	BaseURL string
 	// Auth applies credentials. A nil Auth sends unauthenticated requests,
 	// which is only useful against a public instance or in a test.
@@ -177,7 +177,7 @@ func New(opt Options) (*Client, error) {
 	base, err := url.Parse(strings.TrimRight(opt.BaseURL, "/"))
 	if err != nil || base.Host == "" {
 		return nil, errs.Usage("INVALID_SITE", "%q is not a valid site URL", opt.BaseURL).
-			WithRemedy("use a full URL, e.g. https://acme.atlassian.net")
+			WithRemedy("use a full URL, e.g. https://your-site.atlassian.net")
 	}
 	if base.Scheme != "https" && base.Scheme != "http" {
 		return nil, errs.Usage("INVALID_SITE",

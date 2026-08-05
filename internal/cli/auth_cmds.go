@@ -71,14 +71,14 @@ a setup, and guessing which one this credential belongs to would be worse than
 doing nothing.`),
 		Example: strings.Join([]string{
 			"printf '%s' \"$TOKEN\" | " + buildinfo.App +
-				" auth login --site acme.atlassian.net --email ada@example.com --token-stdin",
+				" auth login --site your-site.atlassian.net --email ada@example.com --token-stdin",
 			"printf '%s' \"$PAT\" | " + buildinfo.App +
 				" auth login --site jira.acme.internal --token-stdin",
 		}, "\n"),
 		Flags: []registry.Flag{
 			{
 				Name: "site", Type: registry.TypeString, Required: true,
-				Usage: "Jira site, e.g. acme.atlassian.net",
+				Usage: "Jira site, e.g. your-site.atlassian.net",
 			},
 			{Name: "email", Type: registry.TypeString, Usage: "Cloud account email"},
 			{Name: "user", Type: registry.TypeString, Usage: "Data Center username"},
@@ -250,7 +250,7 @@ Deletes the credential this tool stored for a site. It cannot remove one that
 came from the environment or from .netrc, and says so if that is where the
 credential is coming from — otherwise ` + "`auth logout`" + ` would report success
 while the site stayed authenticated.`),
-		Example: buildinfo.App + " auth logout --site acme.atlassian.net --yes",
+		Example: buildinfo.App + " auth logout --site your-site.atlassian.net --yes",
 		Flags: []registry.Flag{
 			{
 				Name: "site", Type: registry.TypeString, Required: true,
@@ -318,7 +318,7 @@ This does not contact Jira. It answers "which credential would be used", not
 "does that credential still work".`),
 		Example: strings.Join([]string{
 			buildinfo.App + " auth status",
-			buildinfo.App + " auth status --site acme.atlassian.net",
+			buildinfo.App + " auth status --site your-site.atlassian.net",
 		}, "\n"),
 		Flags: []registry.Flag{{
 			Name: "site", Type: registry.TypeString,
@@ -360,7 +360,7 @@ lookup:
 Everywhere else in this tool a credential is redacted. Here it is the requested
 output, and it goes to stdout like any other result — so redirect it
 deliberately, and do not pass it through a command that logs its arguments.`),
-		Example: buildinfo.App + " auth token --site acme.atlassian.net",
+		Example: buildinfo.App + " auth token --site your-site.atlassian.net",
 		Flags: []registry.Flag{{
 			Name: "site", Type: registry.TypeString,
 			Usage: "site to print the credential for; defaults to the current context's",

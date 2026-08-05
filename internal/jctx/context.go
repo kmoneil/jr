@@ -82,7 +82,7 @@ func suggestName(name string) string {
 func (c Context) Validate() error {
 	if strings.TrimSpace(c.Site) == "" {
 		return errs.Usage("NO_SITE", "context has no site").
-			WithRemedy("pass --site, e.g. --site acme.atlassian.net")
+			WithRemedy("pass --site, e.g. --site your-site.atlassian.net")
 	}
 	if _, err := NormalizeSite(c.Site); err != nil {
 		return err
@@ -103,7 +103,7 @@ func NormalizeSite(site string) (string, error) {
 	s := strings.TrimSpace(site)
 	if s == "" {
 		return "", errs.Usage("NO_SITE", "no site given").
-			WithRemedy("pass --site, e.g. --site acme.atlassian.net")
+			WithRemedy("pass --site, e.g. --site your-site.atlassian.net")
 	}
 
 	scheme := "https://"
@@ -122,7 +122,7 @@ func NormalizeSite(site string) (string, error) {
 	s = strings.TrimRight(s, "/")
 	if s == "" || !siteFormat.MatchString(s) {
 		return "", errs.Usage("INVALID_SITE", "%q is not a valid site", site).
-			WithRemedy("use a hostname, e.g. acme.atlassian.net, " +
+			WithRemedy("use a hostname, e.g. your-site.atlassian.net, " +
 				"optionally with a port and a path prefix")
 	}
 	return scheme + s, nil

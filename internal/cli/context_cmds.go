@@ -49,8 +49,8 @@ context created read-only is a statement about what it is for.
 
 Credentials are not stored here. Store one with "` + buildinfo.App + ` auth login".`),
 		Example: strings.Join([]string{
-			buildinfo.App + " context create work --site acme.atlassian.net --project ENG",
-			buildinfo.App + " context create audit --site acme.atlassian.net --readonly",
+			buildinfo.App + " context create work --site your-site.atlassian.net --project ENG",
+			buildinfo.App + " context create audit --site your-site.atlassian.net --readonly",
 		}, "\n"),
 		Args: []registry.Arg{{
 			Name: "name", Usage: "context name", Required: true,
@@ -58,7 +58,7 @@ Credentials are not stored here. Store one with "` + buildinfo.App + ` auth logi
 		Flags: []registry.Flag{
 			{
 				Name: "site", Type: registry.TypeString, Required: true,
-				Usage: "Jira site, e.g. acme.atlassian.net",
+				Usage: "Jira site, e.g. your-site.atlassian.net",
 			},
 			{Name: "project", Type: registry.TypeString, Usage: "default project key"},
 			{Name: "board", Type: registry.TypeString, Usage: "default board id"},
