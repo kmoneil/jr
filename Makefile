@@ -91,6 +91,22 @@ cover:
 	go test -coverprofile=coverage.out ./...
 	go tool cover -func=coverage.out | tail -1
 
+# Seconds per fuzz target. CI uses the default; raise it locally when changing
+# anything that quotes, escapes, or parses.
+FUZZTIME ?= 30s
+
+## fuzz: run every fuzz target for FUZZTIME each (default 30s)
+.PHONY: fuzz
+fuzz:
+	@set -e; \
+	for pkg in $$(go list ./... ); do \
+		targets=$$(go test -list '^Fuzz' $$pkg 2>/dev/null | grep '^Fuzz' || true); \
+		for t in $$targets; do \
+			echo "== $$pkg $$t"; \
+			go test $$pkg -run '^$$' -fuzz "^$$t$$" -fuzztime $(FUZZTIME); \
+		done; \
+	done
+
 ## golden: rewrite the output-contract golden files
 .PHONY: golden
 golden:

@@ -71,10 +71,13 @@ Nothing below is stubbed or partially wired — a flag that would silently no-op
 is not shipped at all.
 
 - All Jira resources: `issue`, `epic`, `sprint`, `board`, `project`, `user`,
-  `field`, `jql`, `meta`.
+  `field`, `meta`.
 - `auth` and `context`. No credentials, no sites, no config file.
-- `transport`, `jql`, `adf` — the packages exist with their contracts documented
+- `transport` and `adf` — the packages exist with their contracts documented
   and no implementation.
+- `jr jql validate` and `jr jql explain`. The JQL library is complete (see
+  below) but `validate` is specified as a round trip to Jira's parse endpoint,
+  and shipping a local-only check under that name would overclaim.
 - `--page-size`, `--page-token`, `--max-requests`, `--retries`, `--dry-run`,
   `--yes`, `--readonly`, `--no-color`, `--debug`.
 - `jr mcp serve`, `jr ui`.
@@ -82,6 +85,40 @@ is not shipped at all.
   schemas land with the resources that define them.
 - The four build profiles produce identical binaries, because no tag currently
   gates any code. The machinery is tested; there is just nothing to exclude yet.
+
+### JQL
+
+`internal/jql` is complete and is what every resource will build queries with.
+It is a typed builder over an AST with a single renderer, and that renderer is
+the only place in the project where a string is quoted.
+
+```go
+q := jql.New().
+    Project("ENG").                  // project = "ENG"
+    In("labels", labels...).         // values are data, never syntax
+    Raw(userSuppliedJQL).            // always parenthesized
+    OrderBy("updated", jql.Desc)
+```
+
+```console
+project = "ENG" AND labels IN ("retry", "transport")
+  AND (summary ~ "x" OR priority = Highest) ORDER BY updated DESC
+```
+
+The parentheses around the raw fragment are the difference between a filter and
+a scope escape: without them the user's `OR` binds looser than the `AND` that
+scoped the query, and it returns every `Highest` issue in every project the
+caller can see.
+
+Queries are inspected by tokenizing, never by regex — `summary ~ "project =
+FOO"` does not constrain the project, and a regex says it does. Dates are
+validated, so `--created 2020-13-45` is exit 2 with `month 13 is out of range`
+rather than an empty result set that reads like "no matching issues".
+
+Three fuzzers back it up: `make fuzz`. The value round-trip one found a real
+bug during development — a byte that is not valid UTF-8 was being silently
+replaced with U+FFFD, which would have queried for something other than what
+the caller asked for. It is now a structured refusal.
 
 ## Documentation
 
@@ -110,6 +147,7 @@ make build-ci      # ci       query only, smallest possible
 ```
 make test           # the default build
 make test-profiles  # the suite under every shipped tag set
+make fuzz           # every fuzz target, FUZZTIME each (default 30s)
 make golden         # rewrite the output-contract golden files
 make lint fmt vet
 make ci             # everything CI enforces

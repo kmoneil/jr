@@ -91,6 +91,7 @@ name to `customfield_10042` should not cost a round trip on every invocation.
 | CLI surface     | Snapshot tests of `--help`, `schema`, exit codes               | Any diff is reviewed                                |
 | Architecture    | Import-graph assertions                                        | Every PR                                            |
 | Build profiles  | Matrix build of all profiles plus a size assertion             | Every PR                                            |
+| Fuzzing         | `make fuzz`, every target                                      | Every PR, 60s per target                            |
 
 Recorded HTTP contract tests are mandatory, not optional. Pure-function unit
 tests would not have caught any of the incumbent bugs this project exists to
