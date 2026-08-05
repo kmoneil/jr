@@ -9,6 +9,7 @@ import (
 	"github.com/kmoneil/jira-cli/internal/buildinfo"
 	"github.com/kmoneil/jira-cli/internal/errs"
 	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jira-cli/internal/jctx"
 	"github.com/kmoneil/jira-cli/internal/registry"
 	"github.com/kmoneil/jira-cli/internal/render"
 )
@@ -56,6 +57,11 @@ waiting, because a headless build has no human to wait for.
 
 You do not have to log in at all: set ` + auth.EnvToken + `, plus ` + auth.EnvEmail + ` on
 Cloud, and every command uses it.
+
+If no context exists yet, one is created for this site so the next command has
+somewhere to point. If contexts already exist, none are touched: the caller has
+a setup, and guessing which one this credential belongs to would be worse than
+doing nothing.
 
 This writes local state only. It does not contact Jira, so it does not prove the
 credential works: run ` + "`" + buildinfo.App + ` auth status` + "`" + ` for that.`),
@@ -142,7 +148,69 @@ func (a *app) runAuthLogin(_ context.Context, inv *registry.Invocation) (*render
 	}
 
 	cred.Source = store.Path
-	return authStatusDoc(site, cred, true, nil), nil
+	doc := authStatusDoc(site, cred, true, nil)
+
+	// Storing a credential for a site and then having the next command report
+	// "no Jira site configured" is the tool accepting input and behaving as
+	// though it never heard it. When there is no context at all the choice is
+	// unambiguous, so make one; when there already are contexts the caller has
+	// a setup, and guessing which one this belongs to would be worse than
+	// doing nothing.
+	created, err := a.ensureContextFor(site)
+	if err != nil {
+		return nil, err
+	}
+	if created != "" {
+		doc.Record.Attr("context", created)
+	}
+	return doc, nil
+}
+
+// ensureContextFor creates the first context when a credential is stored and
+// none exists. It returns the name it created, or empty if it created nothing.
+func (a *app) ensureContextFor(site string) (string, error) {
+	cfg, err := a.config()
+	if err != nil {
+		return "", err
+	}
+	if len(cfg.Names()) > 0 {
+		return "", nil
+	}
+
+	name := contextNameFor(site)
+	if err := cfg.Set(name, jctx.Context{Site: site}); err != nil {
+		return "", err
+	}
+	if err := cfg.Save(); err != nil {
+		return "", err
+	}
+	return name, nil
+}
+
+// contextNameFor derives a context name from a site's first label, so
+// jira.corp.com becomes "jira". A label that is not a usable name — a bare IP,
+// say — falls back to something that always is.
+func contextNameFor(site string) string {
+	host := jctx.Context{Site: site}.Host()
+	host, _, _ = strings.Cut(host, ":")
+	label, _, _ := strings.Cut(host, ".")
+
+	if jctx.ValidateName(label) == nil && !isAllDigits(label) {
+		return label
+	}
+	return "default"
+}
+
+func isAllDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func (a *app) authLogoutCommand() *registry.Command {

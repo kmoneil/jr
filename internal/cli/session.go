@@ -2,10 +2,12 @@ package cli
 
 import (
 	"context"
+	"strings"
 	"sync"
 
 	"github.com/kmoneil/jira-cli/internal/auth"
 	"github.com/kmoneil/jira-cli/internal/buildinfo"
+	"github.com/kmoneil/jira-cli/internal/errs"
 	"github.com/kmoneil/jira-cli/internal/jctx"
 	"github.com/kmoneil/jira-cli/internal/registry"
 	"github.com/kmoneil/jira-cli/internal/site"
@@ -65,7 +67,7 @@ func (s *session) Connect(ctx context.Context) (*transport.Client, site.Info, er
 func (s *session) connect(ctx context.Context) (*transport.Client, site.Info, error) {
 	siteURL, err := s.resolved.RequireSite()
 	if err != nil {
-		return nil, site.Info{}, err
+		return nil, site.Info{}, s.app.explainMissingSite(err)
 	}
 
 	cred, err := s.app.chain().Resolve(siteURL)
@@ -121,6 +123,36 @@ func authorizerFor(cred auth.Credential) transport.Authorizer {
 			return inner.Authorize(ctx, auth.RequestInfo{Method: req.Method, URL: req.URL})
 		},
 	)
+}
+
+// explainMissingSite adds what the credential store knows to a "no site"
+// error.
+//
+// A caller who has stored a credential has already told this tool which site
+// they mean, and repeating a generic "pass --site" back at them is unhelpful
+// when the answer is sitting on disk.
+func (a *app) explainMissingSite(err error) error {
+	e := errs.Coerce(err)
+	if e.Code != "NO_SITE" {
+		return err
+	}
+
+	store, storeErr := a.credentialStore()
+	if storeErr != nil {
+		return err
+	}
+	hosts, hostsErr := store.Hosts()
+	if hostsErr != nil || len(hosts) == 0 {
+		return err
+	}
+
+	e = e.WithDetail("credentials are stored for: %s", strings.Join(hosts, ", "))
+	if len(hosts) == 1 {
+		return e.WithRemedy("run `%s context create %s --site %s`, or pass --site %s",
+			buildinfo.App, contextNameFor(hosts[0]), hosts[0], hosts[0])
+	}
+	return e.WithRemedy("run `%s context create <name> --site <one of the above>`",
+		buildinfo.App)
 }
 
 // userAgent identifies this build to the server, including the profile, so a

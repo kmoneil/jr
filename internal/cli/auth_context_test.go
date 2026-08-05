@@ -543,3 +543,84 @@ func TestMissingTokenFileIsAUsageError(t *testing.T) {
 		t.Errorf("stderr does not name the problem:\n%s", got.stderr)
 	}
 }
+
+// TestLoginCreatesTheFirstContext closes the gap that made `auth login --site X`
+// succeed and the very next command report "no Jira site configured". Storing a
+// credential for a site and then acting as though the site was never mentioned
+// is the tool ignoring input it accepted.
+func TestLoginCreatesTheFirstContext(t *testing.T) {
+	env := session(t)
+
+	got := runWithStdin(t, env, strings.NewReader(theToken),
+		"auth", "login", "--site", "jira.corp.com", "--token-stdin")
+	if got.exit != exitcode.OK {
+		t.Fatalf("login: exit = %v\nstderr: %s", got.exit, got.stderr)
+	}
+	// The name is derived from the host's first label, and the output says so
+	// rather than leaving the caller to discover it.
+	if !strings.Contains(got.stdout, `context="jira"`) {
+		t.Errorf("login did not report the context it created:\n%s", got.stdout)
+	}
+
+	list := mustRun(t, env, "context", "list")
+	if !strings.Contains(list.stdout, "https://jira.corp.com") {
+		t.Errorf("no context was created:\n%s", list.stdout)
+	}
+
+	// And the site now resolves, which is the whole point.
+	show := mustRun(t, env, "context", "show")
+	if !strings.Contains(show.stdout, `site="https://jira.corp.com"`) {
+		t.Errorf("the site does not resolve after login:\n%s", show.stdout)
+	}
+}
+
+// TestLoginDoesNotTouchExistingContexts is the other half of the rule. With a
+// setup already in place, guessing which context a new credential belongs to
+// would be worse than doing nothing.
+func TestLoginDoesNotTouchExistingContexts(t *testing.T) {
+	env := session(t)
+	mustRun(t, env, "context", "create", "work",
+		"--site", "acme.atlassian.net", "--project", "ENG")
+
+	got := runWithStdin(t, env, strings.NewReader(theToken),
+		"auth", "login", "--site", "other.atlassian.net", "--token-stdin")
+	if got.exit != exitcode.OK {
+		t.Fatalf("login: exit = %v\nstderr: %s", got.exit, got.stderr)
+	}
+	if strings.Contains(got.stdout, "context=") {
+		t.Errorf("login created a context despite one existing:\n%s", got.stdout)
+	}
+
+	list := mustRun(t, env, "context", "list")
+	if strings.Contains(list.stdout, "other.atlassian.net") {
+		t.Errorf("login added a context:\n%s", list.stdout)
+	}
+	show := mustRun(t, env, "context", "show")
+	if !strings.Contains(show.stdout, `project="ENG"`) {
+		t.Errorf("the current context changed:\n%s", show.stdout)
+	}
+}
+
+// TestContextNameIsDerivedFromTheHost covers the fallback for a host whose
+// first label would not be a usable context name.
+func TestContextNameIsDerivedFromTheHost(t *testing.T) {
+	cases := map[string]string{
+		"jira.corp.com":      "jira",
+		"acme.atlassian.net": "acme",
+		"127.0.0.1:8080":     "default",
+		"localhost:8080":     "localhost",
+	}
+	for host, want := range cases {
+		t.Run(host, func(t *testing.T) {
+			env := session(t)
+			got := runWithStdin(t, env, strings.NewReader(theToken),
+				"auth", "login", "--site", host, "--token-stdin")
+			if got.exit != exitcode.OK {
+				t.Fatalf("login: exit = %v\nstderr: %s", got.exit, got.stderr)
+			}
+			if !strings.Contains(got.stdout, `context="`+want+`"`) {
+				t.Errorf("context name for %s is not %q:\n%s", host, want, got.stdout)
+			}
+		})
+	}
+}

@@ -173,7 +173,12 @@ machine acme.atlassian.net login ada@example.com password ...
 
 `jr auth login` never prompts. If stdin is a terminal it refuses and lists these
 options rather than waiting for input nobody knew to type — a headless build has
-no human to wait for. Sources are tried environment, then the
+no human to wait for.
+
+Logging in with `--site` also **creates the first context**, so the next command
+has somewhere to point. If contexts already exist none are touched: you have a
+setup, and guessing which one a new credential belongs to would be worse than
+doing nothing. Sources are tried environment, then the
 store, then `.netrc` — the environment first so CI can override what is on disk
 without editing it, `.netrc` last because it is shared with every other tool on
 the machine.
