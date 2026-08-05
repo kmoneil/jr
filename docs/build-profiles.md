@@ -54,6 +54,10 @@ The capability set is a compile-time constant, and three things follow:
 agent introspecting the binary sees what is there, not a list of commands that
 will refuse.
 
+**A tag gates real code.** `jr mcp serve` exists only under the `mcp` tag: the
+`ci` profile's binary is 65KB smaller and `jr schema` does not list the command,
+because it is not there.
+
 **`jr version` prints the tag set.**
 
 ```

@@ -93,11 +93,11 @@ is not shipped at all.
   below) but `validate` is specified as a round trip to Jira's parse endpoint,
   and shipping a local-only check under that name would overclaim.
 - `--dry-run` and `--no-color`. Nothing mutates yet, and nothing is colored.
-- `jr mcp serve`, `jr ui`.
+- `jr ui`.
 - `--contract` reports each kind's name, version, and emitters. Per-kind element
   schemas land with the resources that define them.
-- The four build profiles produce identical binaries, because no tag currently
-  gates any code. The machinery is tested; there is just nothing to exclude yet.
+- Only the `mcp` tag gates code so far, so `ci` differs from the other three
+  profiles and they do not yet differ from each other.
 
 ### Reading one issue
 
@@ -343,6 +343,37 @@ the retry budget exits 8 or 9, never 0.
 Recorded fixtures replay against both Cloud and Data Center, and an unmatched
 request is an error — a fixture test that fell through to the network would be
 green in CI, where there are no credentials, while exercising nothing.
+
+## MCP
+
+```
+jr mcp serve      # speaks the Model Context Protocol on stdin/stdout
+```
+
+Every command in the build becomes a tool, generated from the same registry
+that builds the command tree and `jr schema` — so a tool cannot drift from the
+command behind it, and adding a command adds a tool for free.
+
+It is also the truth about the binary. A reader build advertises no mutating
+tools because it does not contain any; an agent introspecting the server sees
+what is there rather than a list of tools that will refuse.
+
+A tool call returns the same output the command would print, in the same
+formats, with the same defaults. A failure returns the same structured error, so
+one error contract holds whichever way you called: machine-stable code, remedy,
+and whether retrying can help.
+
+There is no exit code in a tool reply, so a truncated result carries its warning
+in the content instead. It is never reported as complete.
+
+```console
+$ jr mcp serve <<< '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"issue_list", ...
+```
+
+The protocol is spoken directly rather than through an SDK: what is needed is
+JSON-RPC 2.0 over stdio with three methods, and the profiles this ships in are
+the ones meant to carry the least. The wire format is asserted by test.
 
 ## Documentation
 

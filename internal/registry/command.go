@@ -102,6 +102,14 @@ type Command struct {
 	// when set; Columns remains the documented default that `jr schema`
 	// reports.
 	ColumnsFor func(inv *Invocation) []render.Column
+	// OwnsStdout marks a command whose output is a stream it writes itself —
+	// a protocol server, not a result document.
+	//
+	// Such a command declares no output kind, and the CLI renders nothing after
+	// it. Emitting a result alongside a protocol stream puts a frame on the
+	// wire that the peer cannot parse, and the session dies rather than the
+	// message being ignored.
+	OwnsStdout bool
 	// NeedsJira marks a command that talks to the configured site. The CLI
 	// layer builds a Session for it; a command without this never resolves a
 	// credential and never probes the deployment.
@@ -249,6 +257,10 @@ func (c *Command) Kind() string {
 	}
 	return c.Name()
 }
+
+// Emits reports whether this command produces a result document at all. A
+// command that owns stdout does not.
+func (c *Command) EmitsDocument() bool { return !c.OwnsStdout }
 
 // KindVersion returns the schema version of the command's default output kind.
 func (c *Command) KindVersion() int {

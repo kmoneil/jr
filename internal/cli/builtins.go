@@ -32,8 +32,16 @@ func (a *app) builtins() []*registry.Command {
 	}
 	out = append(out, a.authCommands()...)
 	out = append(out, a.contextCommands()...)
+	for _, build := range taggedBuiltins {
+		out = append(out, build(a))
+	}
 	return out
 }
+
+// taggedBuiltins holds commands that exist only under a build tag. A file
+// carrying that tag appends to this from init, so a build without the tag does
+// not merely refuse the command — it does not contain it.
+var taggedBuiltins []func(*app) *registry.Command
 
 func versionCommand() *registry.Command {
 	return &registry.Command{

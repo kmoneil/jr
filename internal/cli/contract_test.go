@@ -184,6 +184,15 @@ func TestCommandsDeclareTheirTags(t *testing.T) {
 // it emits, at a version, so `jr --contract` is complete.
 func TestCommandsDeclareTheirOutput(t *testing.T) {
 	forEachCommand(t, func(t *testing.T, c *registry.Command) {
+		// A command that owns stdout writes a stream rather than a result
+		// document, so it has no kind to declare.
+		if !c.EmitsDocument() {
+			if len(c.Outputs) > 0 {
+				t.Errorf("%s owns stdout but also declares an output kind; "+
+					"rendering one would put an unparseable frame on the wire", c.Name())
+			}
+			return
+		}
 		if len(c.Outputs) == 0 {
 			t.Errorf("%s declares no output kind", c.Name())
 			return
@@ -205,6 +214,23 @@ func TestCommandsDeclareTheirOutput(t *testing.T) {
 				t.Errorf("%s declares kind %q as an alternative output "+
 					"without saying what selects it", c.Name(), o.Kind)
 			}
+		}
+	})
+}
+
+// TestStdoutOwnersEmitNothingElse is the rule a live run caught and the tests
+// had missed: a protocol server cannot also emit a result document, because the
+// document lands on the wire as a frame its peer cannot parse.
+func TestStdoutOwnersEmitNothingElse(t *testing.T) {
+	forEachCommand(t, func(t *testing.T, c *registry.Command) {
+		if !c.OwnsStdout {
+			return
+		}
+		if c.Streams() {
+			t.Errorf("%s owns stdout and also streams a collection to it", c.Name())
+		}
+		if c.Paginated {
+			t.Errorf("%s owns stdout but is marked paginated", c.Name())
 		}
 	})
 }

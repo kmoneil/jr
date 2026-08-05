@@ -259,6 +259,12 @@ func (a *app) newLeaf(rc *registry.Command) *cobra.Command {
 		if err != nil {
 			return err
 		}
+		// A command that owns stdout has already written everything that
+		// belongs there. Rendering a result on top would put a frame on the
+		// wire its peer cannot parse.
+		if !rc.EmitsDocument() {
+			return nil
+		}
 		if !rc.Emits(doc.Kind, doc.Version) {
 			// A command that emits a kind it did not declare would break every
 			// consumer that dispatches on the declared kind, and would be

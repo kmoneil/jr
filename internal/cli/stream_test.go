@@ -178,3 +178,32 @@ func TestValidateRunsBeforeAnyOutput(t *testing.T) {
 		t.Errorf("stderr does not carry the refusal:\n%s", got.stderr)
 	}
 }
+
+// TestStdoutOwnerEmitsNoDocument covers the layer the MCP protocol tests
+// missed.
+//
+// mcp.Serve was tested directly and wrote only frames, but the command wrapper
+// above it then returned a result document, which the CLI rendered onto the
+// same stream. The bug was invisible until a live session was run by hand: the
+// test verified the wrong layer.
+func TestStdoutOwnerEmitsNoDocument(t *testing.T) {
+	r := registry.New()
+	r.Register(&registry.Command{
+		Path:       []string{"proto", "serve"},
+		Summary:    "Own the output stream",
+		Example:    "jr proto serve",
+		OwnsStdout: true,
+		Run: func(_ context.Context, inv *registry.Invocation) (*render.Doc, error) {
+			// A protocol server writes its own frames and returns nothing.
+			return render.Record("proto.serve", 1, render.El("leftover")), nil
+		},
+	})
+
+	got := runStream(t, r, "proto", "serve")
+	if got.exit != exitcode.OK {
+		t.Fatalf("exit = %v\nstderr: %s", got.exit, got.stderr)
+	}
+	if got.stdout != "" {
+		t.Errorf("a document was rendered onto a stream the command owns:\n%s", got.stdout)
+	}
+}
