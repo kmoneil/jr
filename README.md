@@ -95,6 +95,29 @@ is not shipped at all.
 - The four build profiles produce identical binaries, because no tag currently
   gates any code. The machinery is tested; there is just nothing to exclude yet.
 
+### Streaming
+
+Rows reach stdout as each page arrives, so output starts immediately instead of
+after the last of a hundred requests:
+
+```console
+$ jr issue list --limit all --project IDO | head -20   # stops after one page
+$ jr issue list --limit all --project IDO > all.tsv    # 5,270 rows, first in ~300ms
+```
+
+Measured against a deliberately slow server: first row at 528ms, whole run at
+2,784ms. An interrupt leaves you with what arrived; `head` closes the pipe and
+the run stops early.
+
+TSV streams. XML, JSON, and YAML buffer, because their envelopes carry `count`
+and `complete` and neither is known until the end — so the formats you would
+reach for on a 5,000-row dump are exactly the ones that stream. Streamed output
+is byte-identical to buffered.
+
+Progress goes to stderr **only when stderr is a terminal**. Piped or redirected,
+nothing is emitted, so a machine sees the same bytes whether or not someone is
+watching.
+
 ### Pagination
 
 `--limit` is what you want; the page size is transport tuning. The client pages

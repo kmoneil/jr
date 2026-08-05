@@ -68,6 +68,12 @@ type ListResult struct {
 	// fell back to offsets, where an issue created mid-run shifts every later
 	// page.
 	Keyset bool
+	// Fetched counts every issue seen, whether it was accumulated or streamed
+	// straight out.
+	Fetched int
+	// Total is what the server said the whole result set holds, when it says.
+	// Cloud's cursor API does not.
+	Total int
 	// Complete is true only if the result set is exhaustive. It is false when
 	// a limit or a budget cut it short, and then NextPageToken resumes.
 	Complete      bool
@@ -106,7 +112,25 @@ func (c *Client) searchPath() string {
 // If the result set runs out first, the result is complete. If the limit or the
 // request budget stops it first, the result is not complete and carries a token
 // to resume from. There is no third state.
+// List collects every page before returning. It is the buffered form, kept for
+// callers that genuinely need the whole set in hand.
 func (c *Client) List(ctx context.Context, opt ListOptions) (*ListResult, error) {
+	return c.ListStream(ctx, opt, nil)
+}
+
+// ListStream calls onPage as each page arrives, so a caller can emit rows
+// without waiting for the last request.
+//
+// That matters more than it sounds: a `--limit all` over a large project is a
+// hundred requests, and buffering means no output for the whole run, nothing
+// to show for an interrupt, and no way for a downstream `head` to stop early.
+//
+// onPage receives each page and the total the server reported, which is zero
+// when it reported none — Cloud's cursor API does not. It may be nil, in which
+// case every issue is accumulated into the result instead.
+func (c *Client) ListStream(
+	ctx context.Context, opt ListOptions, onPage func(page []Issue, total int) error,
+) (*ListResult, error) {
 	pageSize, err := resolvePageSize(opt.PageSize)
 	if err != nil {
 		return nil, err
@@ -120,7 +144,7 @@ func (c *Client) List(ctx context.Context, opt ListOptions) (*ListResult, error)
 	for {
 		want := pageSize
 		if !opt.Limit.All {
-			remaining := opt.Limit.N - len(out.Issues)
+			remaining := opt.Limit.N - out.Fetched
 			if remaining <= 0 {
 				break
 			}
@@ -133,7 +157,7 @@ func (c *Client) List(ctx context.Context, opt ListOptions) (*ListResult, error)
 		if err != nil {
 			// A spent request budget is not a failure: it means there is more,
 			// and the caller gets what was fetched plus a way to resume.
-			if transport.IsBudgetExceeded(err) && len(out.Issues) > 0 {
+			if transport.IsBudgetExceeded(err) && out.Fetched > 0 {
 				out.NextPageToken = EncodePageToken(token)
 				out.Complete = false
 				return out, nil
@@ -146,7 +170,15 @@ func (c *Client) List(ctx context.Context, opt ListOptions) (*ListResult, error)
 		if err != nil {
 			return nil, err
 		}
-		out.Issues = append(out.Issues, issues...)
+		out.Fetched += len(issues)
+		if page.Total != nil {
+			out.Total = *page.Total
+		}
+		if onPage == nil {
+			out.Issues = append(out.Issues, issues...)
+		} else if err := onPage(issues, out.Total); err != nil {
+			return nil, err
+		}
 
 		if out.Keyset {
 			// Verify the server ordered the way this client assumes. If JQL's
@@ -165,7 +197,7 @@ func (c *Client) List(ctx context.Context, opt ListOptions) (*ListResult, error)
 		}
 		token = next
 
-		if !opt.Limit.All && len(out.Issues) >= opt.Limit.N {
+		if !opt.Limit.All && out.Fetched >= opt.Limit.N {
 			break
 		}
 		if len(issues) == 0 {

@@ -91,6 +91,12 @@ type Command struct {
 	// Paginated marks a command that returns a collection the caller can
 	// bound with --limit.
 	Paginated bool
+	// CollectionName is the container element a streaming command emits, e.g.
+	// "issues", and Columns is its default TSV projection. They live on the
+	// declaration rather than being returned with the rows, because the stream
+	// has to be opened — and its header written — before the first page lands.
+	CollectionName string
+	Columns        []render.Column
 	// NeedsJira marks a command that talks to the configured site. The CLI
 	// layer builds a Session for it; a command without this never resolves a
 	// credential and never probes the deployment.
@@ -111,13 +117,62 @@ type Command struct {
 	// fails the registry test.
 	RequiresTags []string
 
-	Run RunFunc
+	// Exactly one of Run and Stream is set. Stream is for a command that emits
+	// a collection; Run is for one that emits a record.
+	Run    RunFunc
+	Stream StreamFunc
 }
+
+// Emitter reports whether this command streams its output.
+func (c *Command) Streams() bool { return c.Stream != nil }
 
 // RunFunc executes a command. It returns a result document; it never writes to
 // stdout itself, so the render layer stays the only thing that decides what the
 // output looks like.
 type RunFunc func(ctx context.Context, inv *Invocation) (*render.Doc, error)
+
+// StreamFunc executes a command that emits a collection incrementally.
+//
+// It writes rows to the stream as they arrive rather than returning them, so a
+// long paged run produces output immediately instead of after its last request.
+// The stream decides for itself whether that means writing through or
+// buffering — TSV can stream, an envelope that carries a count cannot — so the
+// command never branches on format.
+//
+// Close reports whether the result set was exhausted. Only the thing doing the
+// paging knows, which is why it is the command that says.
+type StreamFunc func(ctx context.Context, inv *Invocation, out *render.Stream) (StreamResult, error)
+
+// StreamResult is what a streaming command reports once its rows are out.
+type StreamResult struct {
+	// Complete is true only if the result set was exhausted.
+	Complete bool
+	// NextPageToken resumes a truncated result set.
+	NextPageToken string
+}
+
+// Progress reports how far a long operation has got.
+//
+// Implementations write to stderr and only when it is a terminal, so a piped or
+// redirected run emits nothing at all — which is what keeps "stderr is always
+// structured" true. It is an interface here so a resource can report progress
+// without knowing where stderr is or whether anyone is watching.
+type Progress interface {
+	// Update reports rows so far, and the total if the server disclosed one.
+	// A total of zero means unknown.
+	Update(done, total int)
+	// Done clears the report.
+	Done()
+}
+
+// noProgress discards reports, so a command need never nil-check.
+type noProgress struct{}
+
+func (noProgress) Update(int, int) {}
+func (noProgress) Done()           {}
+
+// NoProgress is the reporter used when nobody is watching.
+var NoProgress Progress = noProgress{}
 
 // Session is how a command reaches Jira.
 //
@@ -161,6 +216,8 @@ type Invocation struct {
 	// Stderr is where a command may emit structured diagnostics. Nothing a
 	// command writes ever reaches stdout.
 	Stderr io.Writer
+	// Progress reports the scale of a long operation. It is never nil.
+	Progress Progress
 }
 
 // Name returns the dotted command name, e.g. "issue.list". It is also the

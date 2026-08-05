@@ -106,10 +106,10 @@ func (a *app) siteFor(flagValue string) (string, error) {
 	return resolved.RequireSite()
 }
 
-// isTerminal reports whether r is an interactive terminal rather than a pipe or
-// a file.
-func isTerminal(r io.Reader) bool {
-	f, ok := r.(*os.File)
+// isTerminal reports whether v is an interactive terminal rather than a pipe or
+// a file. It takes any so the same check covers stdin and stderr.
+func isTerminal(v any) bool {
+	f, ok := v.(*os.File)
 	if !ok {
 		return false
 	}

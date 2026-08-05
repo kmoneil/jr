@@ -103,25 +103,33 @@ filters, so an OR inside it cannot escape the project scope.`),
 				Usage: "resume from a next-page-token returned by a previous run",
 			},
 		},
-		Paginated: true,
-		NeedsJira: true,
-		Outputs:   []registry.Output{{Kind: KindList, Version: VersionList}},
+		Paginated:      true,
+		NeedsJira:      true,
+		CollectionName: "issues",
+		Columns:        ListColumns(),
+		Outputs:        []registry.Output{{Kind: KindList, Version: VersionList}},
 		ExitCodes: []exitcode.Code{
 			exitcode.Partial, exitcode.Auth, exitcode.NotFound,
 			exitcode.Permission, exitcode.RateLimit, exitcode.Remote,
 		},
-		Run: runList,
+		Stream: runList,
 	}
 }
 
-// runList is wired by the CLI layer, which owns the transport and the resolved
-// context. The registry holds the declaration; the invocation carries the rest.
-func runList(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) {
+// runList streams matching issues.
+//
+// Rows go out as each page arrives rather than after the last request, so a
+// long run produces output immediately, a downstream `head` can stop it early,
+// and an interrupt leaves the caller with what was fetched.
+func runList(
+	ctx context.Context, inv *registry.Invocation, out *render.Stream,
+) (registry.StreamResult, error) {
 	if inv.Jira == nil {
-		return nil, errs.Runtime("NO_SESSION", "issue list has no connection to Jira")
+		return registry.StreamResult{},
+			errs.Runtime("NO_SESSION", "issue list has no connection to Jira")
 	}
 
-	query, err := BuildQuery(QueryOptions{
+	query := QueryOptions{
 		// Project comes from the resolved context rather than a local flag:
 		// --project is global, and it is a default, never a requirement.
 		Project:       inv.Jira.Project(),
@@ -137,28 +145,41 @@ func runList(ctx context.Context, inv *registry.Invocation) (*render.Doc, error)
 		UpdatedAfter:  inv.Flags.String("updated-after"),
 		Sort:          inv.Flags.String("sort"),
 		Order:         inv.Flags.String("order"),
-	})
-	if err != nil {
-		return nil, err
 	}
 
 	conn, info, err := inv.Jira.Connect(ctx)
 	if err != nil {
-		return nil, err
+		return registry.StreamResult{}, err
 	}
 	client := &Client{Transport: conn, Site: info}
 
-	result, err := client.List(ctx, ListOptions{
-		JQL:       query,
+	result, err := client.ListStream(ctx, ListOptions{
+		Query:     query,
 		Limit:     inv.Limit,
 		PageSize:  inv.Flags.Int("page-size"),
 		PageToken: inv.Flags.String("page-token"),
 		Fields:    requestedFields(inv.Flags.StringSlice("field")),
+	}, func(page []Issue, total int) error {
+		nodes := make([]*render.Node, 0, len(page))
+		for _, i := range page {
+			nodes = append(nodes, i.Node())
+		}
+		if err := out.Write(nodes...); err != nil {
+			return err
+		}
+		// The server discloses the total on the first page, so a long run can
+		// say how long it will be from its first second rather than never.
+		inv.Progress.Update(out.Count(), total)
+		return nil
 	})
 	if err != nil {
-		return nil, err
+		return registry.StreamResult{}, err
 	}
-	return ListDoc(result), nil
+
+	return registry.StreamResult{
+		Complete:      result.Complete,
+		NextPageToken: result.NextPageToken,
+	}, nil
 }
 
 // requestedFields returns what to ask Jira for. An empty list means the default

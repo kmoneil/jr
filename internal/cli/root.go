@@ -213,10 +213,11 @@ func (a *app) newLeaf(rc *registry.Command) *cobra.Command {
 		}
 
 		inv := &registry.Invocation{
-			Args:   args,
-			Flags:  binder(cmd),
-			Limit:  registry.Limit{N: registry.DefaultLimit},
-			Stderr: a.stderr,
+			Args:     args,
+			Flags:    binder(cmd),
+			Limit:    registry.Limit{N: registry.DefaultLimit},
+			Stderr:   a.stderr,
+			Progress: registry.NoProgress,
 		}
 		// Built lazily inside: a command that never connects never resolves a
 		// credential and never probes the deployment.
@@ -240,6 +241,10 @@ func (a *app) newLeaf(rc *registry.Command) *cobra.Command {
 			return err
 		}
 		inv.Format = format
+
+		if rc.Streams() {
+			return a.stream(cmd.Context(), rc, inv)
+		}
 
 		doc, err := rc.Run(cmd.Context(), inv)
 		if err != nil {

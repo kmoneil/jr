@@ -238,8 +238,12 @@ func TestCommandsAreDescribed(t *testing.T) {
 		if c.Example == "" {
 			t.Errorf("%s has no example invocation", c.Name())
 		}
-		if c.Run == nil {
+		switch {
+		case c.Run == nil && c.Stream == nil:
 			t.Errorf("%s has no implementation", c.Name())
+		case c.Run != nil && c.Stream != nil:
+			t.Errorf("%s declares both Run and Stream; Run emits a record, "+
+				"Stream emits a collection", c.Name())
 		}
 		for _, f := range c.Flags {
 			if f.Usage == "" {
@@ -251,6 +255,35 @@ func TestCommandsAreDescribed(t *testing.T) {
 			if f.Type != registry.TypeEnum && len(f.Enum) > 0 {
 				t.Errorf("%s: --%s declares values but is typed %q", c.Name(), f.Name, f.Type)
 			}
+		}
+	})
+}
+
+// TestStreamingCommandsDeclareTheirCollection asserts a streaming command says
+// what its rows look like.
+//
+// The stream is opened — and for TSV its header written — before the first page
+// lands, so the container name and columns have to be on the declaration rather
+// than arriving with the data.
+func TestStreamingCommandsDeclareTheirCollection(t *testing.T) {
+	forEachCommand(t, func(t *testing.T, c *registry.Command) {
+		if !c.Streams() {
+			if c.CollectionName != "" || len(c.Columns) > 0 {
+				t.Errorf("%s describes a collection but does not stream one", c.Name())
+			}
+			return
+		}
+		if c.CollectionName == "" {
+			t.Errorf("%s streams but names no container element", c.Name())
+		}
+		if len(c.Columns) == 0 {
+			t.Errorf("%s streams but declares no columns, so TSV would have "+
+				"nothing to emit", c.Name())
+		}
+		// A streaming command emits a collection, which is paginated by
+		// definition and can therefore be truncated.
+		if !c.Paginated {
+			t.Errorf("%s streams a collection but is not marked paginated", c.Name())
 		}
 	})
 }

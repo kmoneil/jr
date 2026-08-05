@@ -70,6 +70,40 @@ the XML tree:
 
 TSV emits a header row and nothing else — no envelope, no counts.
 
+## Streaming
+
+**TSV streams. The structured formats buffer.**
+
+A collection command writes rows as each page arrives, so a long paged run
+produces output immediately rather than after its last request. That is not a
+performance nicety: it is what lets `jr issue list --limit all | head -20` stop
+early, and what leaves a caller who interrupts a hundred-request run with the
+rows already fetched instead of nothing.
+
+XML, JSON, and YAML cannot stream, because their envelopes carry `count` and
+`complete` and neither is known until the last page lands. Those formats buffer
+and emit once, exactly as before — streamed output for a given result is
+byte-identical to buffered output, and a test asserts it.
+
+This works because of the arrangement above: TSV's completeness signal lives on
+stderr and in the exit code rather than in the payload. A row can be written
+before anyone knows whether the set will be exhausted, because the answer was
+never going to appear in the TSV body.
+
+The trade is that a malformed row cannot be caught before its predecessors have
+been written. The column specification is validated before the header, so a bad
+*specification* emits nothing; a bad *row* leaves partial output and a non-zero
+exit. Piping to `head` closes the pipe and the process exits 141, which is
+ordinary Unix behavior and not an error.
+
+## Progress
+
+A long run reports its progress on stderr **only when stderr is a terminal**.
+On a pipe or a redirect nothing is emitted at all, so the rule that stderr
+carries only structured diagnostics is untouched — there is no structured form
+of "42% done" worth defining, and a machine reading stderr sees byte-identical
+output whether or not a human happened to be watching.
+
 ## Truncation
 
 A truncated result is signalled three ways, and a consumer only needs to notice
