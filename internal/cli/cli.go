@@ -43,6 +43,10 @@ type app struct {
 	site        string
 	project     string
 	readOnly    bool
+	debug       bool
+	refresh     bool
+	retries     int
+	maxRequests int
 
 	// requestedFormat is the --format value, or the JIRA_FORMAT value, or
 	// empty when the caller expressed no preference and the per-content

@@ -16,17 +16,22 @@ Available Commands:
   context     Manage named site/project contexts
   contract    Dump the machine-readable output contract for every kind
   help        Help about any command
+  issue       Work with issues
   schema      Describe every command this build contains
   version     Print the build identity and its compiled-in capabilities
 
 Flags:
-      --context string   use this context for one invocation, without selecting it
-      --contract         dump the machine-readable output contract for every kind
-      --describe         print this command's schema instead of running it
-      --format string    output format: tsv|xml|json|yaml (default: tsv for lists, xml for records)
-  -h, --help             help for jr
-      --project string   project key, overriding the context's
-      --readonly         refuse any command that would change Jira
-      --site string      Jira site, overriding the context's
+      --context string     use this context for one invocation, without selecting it
+      --contract           dump the machine-readable output contract for every kind
+      --debug              trace HTTP requests to stderr; credentials are redacted in the transport
+      --describe           print this command's schema instead of running it
+      --format string      output format: tsv|xml|json|yaml (default: tsv for lists, xml for records)
+  -h, --help               help for jr
+      --max-requests int   cap total HTTP calls for this invocation; 0 means no cap
+      --project string     project key, overriding the context's
+      --readonly           refuse any command that would change Jira
+      --refresh            ignore cached site metadata and probe again
+      --retries int        retry budget per request; exhausting it exits 8 or 9, never 0 (default 3)
+      --site string        Jira site, overriding the context's
 
 Use "jr [command] --help" for more information about a command.

@@ -9,6 +9,10 @@ import (
 	"github.com/kmoneil/jira-cli/internal/cli"
 	"github.com/kmoneil/jira-cli/internal/exitcode"
 	"github.com/kmoneil/jira-cli/internal/registry"
+
+	// The contract rules must hold for every command the binary ships, not
+	// only the built-ins, so the resources are linked in here too.
+	_ "github.com/kmoneil/jira-cli/internal/commands"
 )
 
 // bannedFlags are spellings this project has decided never to ship. Each is a

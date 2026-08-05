@@ -8,6 +8,8 @@ import (
 
 	"github.com/kmoneil/jira-cli/internal/exitcode"
 	"github.com/kmoneil/jira-cli/internal/render"
+	"github.com/kmoneil/jira-cli/internal/site"
+	"github.com/kmoneil/jira-cli/internal/transport"
 )
 
 // FlagType is the declared type of a flag, used for the cobra binding, the MCP
@@ -89,6 +91,10 @@ type Command struct {
 	// Paginated marks a command that returns a collection the caller can
 	// bound with --limit.
 	Paginated bool
+	// NeedsJira marks a command that talks to the configured site. The CLI
+	// layer builds a Session for it; a command without this never resolves a
+	// credential and never probes the deployment.
+	NeedsJira bool
 
 	// Outputs lists every payload shape this command can emit. The first is
 	// the one it emits by default. A command that emits a kind it did not
@@ -113,8 +119,36 @@ type Command struct {
 // output looks like.
 type RunFunc func(ctx context.Context, inv *Invocation) (*render.Doc, error)
 
+// Session is how a command reaches Jira.
+//
+// It is an interface so a resource never learns where a site, a credential, or
+// a context comes from — it asks for a connection and gets one. That is what
+// lets a resource be tested against a recorded fixture with no auth, no config,
+// and no network.
+type Session interface {
+	// Connect returns a client bound to the resolved site, probing the
+	// deployment on first use and caching the answer.
+	Connect(ctx context.Context) (*transport.Client, site.Info, error)
+	// Project is the resolved default project. It may be empty: project is
+	// never mandatory.
+	Project() string
+	// RequireProject returns the project or a usage error naming the flag, for
+	// the few commands that genuinely cannot proceed without one.
+	RequireProject() (string, error)
+	// Board is the resolved default board, which may be empty.
+	Board() string
+	// CheckWritable refuses a mutation in read-only mode, before any network
+	// call, so a blocked command costs nothing and cannot half-happen.
+	CheckWritable(command string) error
+}
+
 // Invocation is everything a command needs from the caller.
 type Invocation struct {
+	// Jira reaches the configured site. It is nil for a command that does not
+	// talk to Jira, so a resource that dereferences it without needing it
+	// fails loudly in its own tests rather than quietly in production.
+	Jira Session
+
 	// Args are the positional arguments, after flag parsing.
 	Args []string
 	// Flags holds the parsed flag values.

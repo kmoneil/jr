@@ -67,6 +67,9 @@ func TestOnlyTheEdgesImportResources(t *testing.T) {
 		"internal/mcp",
 		"internal/workflow",
 		"internal/resource/",
+		// internal/commands exists only to link resources in, so it is the one
+		// place their init functions run. See its package comment.
+		"internal/commands",
 	}
 
 	for _, p := range loadPackages(t) {

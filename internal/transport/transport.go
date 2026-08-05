@@ -32,6 +32,19 @@ const (
 	HeaderUserAgent = "User-Agent"
 )
 
+// HTTP methods, re-exported so a caller can name one without importing
+// net/http. That import is confined to this package so header redaction has
+// exactly one place to hold, and a resource naming a method is not a reason to
+// punch a hole in it.
+const (
+	MethodGet    = http.MethodGet
+	MethodHead   = http.MethodHead
+	MethodPost   = http.MethodPost
+	MethodPut    = http.MethodPut
+	MethodPatch  = http.MethodPatch
+	MethodDelete = http.MethodDelete
+)
+
 // DefaultTimeout bounds a single HTTP attempt, not the whole retried call.
 const DefaultTimeout = 30 * time.Second
 

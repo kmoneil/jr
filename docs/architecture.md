@@ -14,6 +14,8 @@ internal/
   jctx/                    # named contexts, resolution, precedence
   jql/                     # AST, builder, renderer, tokenizer
   adf/                     # ADF ⇄ markdown, golden-tested
+  site/                    # deployment probe and the per-site metadata cache
+  commands/                # links every resource in, so their inits run
   resource/                # one isolated package per Jira resource
   workflow/                # operations spanning more than one resource
   tui/                     # build tag: tui
@@ -30,7 +32,9 @@ either.
 
 `resource/*` may import `transport`, `auth`, `jql`, `adf`, `render`, `errs`.
 
-**Nothing may import `resource/*`** except `cmd`, `tui`, `mcp`, and `workflow`.
+**Nothing may import `resource/*`** except `cmd`, `tui`, `mcp`, `workflow`, and
+`internal/commands` — which exists only to blank-import resources so their init
+functions run, and is what lets the contract tests see the full command surface.
 
 **Resources never import each other.** A cross-resource operation — adding an
 issue to a sprint — lives in `workflow` or in the calling layer. This is what

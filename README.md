@@ -9,9 +9,9 @@ approximating.
 
 A clean-room rewrite of the ideas in `ankitpokhrel/jira-cli`, not a fork.
 
-> **Status: early.** The output contract, the command registry, the build
-> profiles, and the exit-code discipline are implemented and tested. No Jira
-> transport yet — see [What works today](#what-works-today).
+> **Status: early.** The output contract, the transport, JQL, contexts,
+> credentials, and `issue list` are implemented and tested. Most resources are
+> not — see [Not yet implemented](#not-yet-implemented).
 
 ## Why
 
@@ -40,6 +40,8 @@ make build          # → bin/jr
 ## What works today
 
 ```
+jr issue list       # query issues; pages until --limit is satisfied
+
 jr context create|list|use|show|delete   # named site/project pairings
 jr auth login|logout|status|token        # credentials, per site
 
@@ -50,9 +52,10 @@ jr contract         # every output kind this build can emit, and its version
 ```
 
 Global: `--format tsv|xml|json|yaml`, `--context`, `--site`, `--project`,
-`--readonly`, `--describe`, and `--limit` on collections. `JIRA_FORMAT`,
-`JIRA_CONTEXT`, `JIRA_SITE`, `JIRA_PROJECT`, and `JIRA_READONLY` set the same
-things from the environment.
+`--readonly`, `--describe`, `--debug`, `--refresh`, `--retries`,
+`--max-requests`, and `--limit` on collections. `JIRA_FORMAT`, `JIRA_CONTEXT`,
+`JIRA_SITE`, `JIRA_PROJECT`, and `JIRA_READONLY` set the same things from the
+environment.
 
 ```console
 $ jr schema
@@ -75,26 +78,51 @@ parseable.
 Nothing below is stubbed or partially wired — a flag that would silently no-op
 is not shipped at all.
 
-- All Jira resources: `issue`, `epic`, `sprint`, `board`, `project`, `user`,
-  `field`, `meta`. Contexts and credentials are configurable, but nothing yet
-  uses them to make a request.
+- The rest of the resources: `epic`, `sprint`, `board`, `project`, `user`,
+  `field`, `meta`, and every `issue` verb other than `list`.
 - `adf` — the package exists with its contract documented and no
   implementation.
 - OAuth, mTLS, and a system-keyring credential provider. The provider interface
   is in place; a keyring implementation shells out, so it will arrive behind its
   own build tag rather than in the reader profile.
-- Deployment auto-detection and the metadata cache. `$XDG_CACHE_HOME/jr/<site>/`
-  is resolved but nothing writes to it yet.
 - `jr jql validate` and `jr jql explain`. The JQL library is complete (see
   below) but `validate` is specified as a round trip to Jira's parse endpoint,
   and shipping a local-only check under that name would overclaim.
-- `--page-size`, `--page-token`, `--max-requests`, `--retries`, `--dry-run`,
-  `--yes`, `--readonly`, `--no-color`, `--debug`.
+- `--dry-run` and `--no-color`. Nothing mutates yet, and nothing is colored.
 - `jr mcp serve`, `jr ui`.
 - `--contract` reports each kind's name, version, and emitters. Per-kind element
   schemas land with the resources that define them.
 - The four build profiles produce identical binaries, because no tag currently
   gates any code. The machinery is tested; there is just nothing to exclude yet.
+
+### Pagination
+
+`--limit` is what you want; the page size is transport tuning. The client pages
+until the limit is satisfied, so nobody has to loop by hand:
+
+```console
+$ jr issue list --project ENG --limit all      # every match, however many pages
+$ jr issue list --limit 2; echo "exit $?"
+key      status       assignee      updated               summary
+ENG-101  In Progress  Ada Lovelace  2026-08-04T11:32:07Z  Retry logic drops...
+ENG-102  To Do                      2026-08-04T09:00:00Z  Tabs and newlines...
+exit 3
+```
+
+Exit 3 because the result set did not run out — the limit stopped it. The
+stderr warning carries a `next-page-token`, and passing it back to
+`--page-token` resumes exactly where it stopped.
+
+**There is no offset flag, and the token is opaque on purpose.** Cloud pages by
+cursor; Data Center still pages by offset. The token wraps whichever the server
+actually uses, so the same flag works against both and a caller never holds an
+offset it could replay against an API that cannot honor one. A token minted
+against Cloud is refused against Data Center rather than read as offset zero.
+
+Which deployment a site is gets **detected, not declared** — probed once from
+`/rest/api/2/serverInfo` and cached for a day under `$XDG_CACHE_HOME`. A value
+frozen into config goes stale the moment the server is upgraded, and the failure
+then looks like an endpoint that used to work returning 404.
 
 ### Contexts and credentials
 

@@ -10,6 +10,7 @@ import (
 	"github.com/kmoneil/jira-cli/internal/errs"
 	"github.com/kmoneil/jira-cli/internal/registry"
 	"github.com/kmoneil/jira-cli/internal/render"
+	"github.com/kmoneil/jira-cli/internal/transport"
 )
 
 // groupSummaries describes the intermediate nouns in the command tree. A noun
@@ -84,6 +85,14 @@ and go to stderr.`),
 		"project key, overriding the context's")
 	root.PersistentFlags().BoolVar(&a.readOnly, "readonly", false,
 		"refuse any command that would change Jira")
+	root.PersistentFlags().BoolVar(&a.debug, "debug", false,
+		"trace HTTP requests to stderr; credentials are redacted in the transport")
+	root.PersistentFlags().BoolVar(&a.refresh, "refresh", false,
+		"ignore cached site metadata and probe again")
+	root.PersistentFlags().IntVar(&a.retries, "retries", transport.DefaultRetries,
+		"retry budget per request; exhausting it exits 8 or 9, never 0")
+	root.PersistentFlags().IntVar(&a.maxRequests, "max-requests", 0,
+		"cap total HTTP calls for this invocation; 0 means no cap")
 	root.Flags().BoolVar(&a.contract, "contract", false,
 		"dump the machine-readable output contract for every kind")
 
@@ -208,6 +217,15 @@ func (a *app) newLeaf(rc *registry.Command) *cobra.Command {
 			Flags:  binder(cmd),
 			Limit:  registry.Limit{N: registry.DefaultLimit},
 			Stderr: a.stderr,
+		}
+		// Built lazily inside: a command that never connects never resolves a
+		// credential and never probes the deployment.
+		if rc.NeedsJira {
+			jira, err := a.jiraSession()
+			if err != nil {
+				return err
+			}
+			inv.Jira = jira
 		}
 		if rc.Paginated {
 			limit, err := registry.ParseLimit(cmd.Flags().Lookup("limit").Value.String())

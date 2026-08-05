@@ -12,6 +12,11 @@ import (
 	"syscall"
 
 	"github.com/kmoneil/jira-cli/internal/cli"
+
+	// Links every resource into the binary. A resource registers itself from
+	// an init function in a tag-gated file, so which ones are present is
+	// decided at compile time.
+	_ "github.com/kmoneil/jira-cli/internal/commands"
 )
 
 func main() {
