@@ -1,0 +1,11 @@
+field	value
+@key	ENG-101
+summary	Retry logic drops the last error
+status/@category	in-progress
+status	In Progress
+description/@format	markdown
+description	## Repro\n\n```go\nclient.Do(req)  // returns err == nil on 5xx\n```\n\nAlso: a < b && c > d, and a literal ]]> in the text.
+labels/@count	2
+labels/label[0]	retry
+labels/label[1]	transport
+components/@count	0

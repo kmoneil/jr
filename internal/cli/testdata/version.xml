@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<result kind="version" v="1">
+  <version app="jr" release="0.0.0-test" profile="ci" writable="false" interactive="false">
+    <display>jr 0.0.0-test (ci; tags=none)</display>
+    <commit>0000000</commit>
+    <built>2026-01-01T00:00:00Z</built>
+    <go>go0.0.0</go>
+    <platform>test/test</platform>
+    <tags count="0"/>
+  </version>
+</result>

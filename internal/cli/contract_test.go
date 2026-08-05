@@ -1,0 +1,301 @@
+package cli_test
+
+import (
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/kmoneil/jira-cli/internal/buildinfo"
+	"github.com/kmoneil/jira-cli/internal/cli"
+	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jira-cli/internal/registry"
+)
+
+// bannedFlags are spellings this project has decided never to ship. Each is a
+// shape that lets a command lie about what it did.
+var bannedFlags = map[string]string{
+	// A boolean negation on top of an implicit default is a coin flip every
+	// time. Sorting is --sort <field> plus --order asc|desc.
+	"reverse": "use --sort and --order instead",
+	// The upstream API is cursor-based. An offset we cannot honor is how the
+	// incumbent shipped a silent lie.
+	"paginate": "use --limit, --page-size, and --page-token",
+	"offset":   "the upstream API is cursor-based; use --page-token",
+	"start-at": "the upstream API is cursor-based; use --page-token",
+	// --plain, --raw, --csv, and --no-headers are escape hatches out of an
+	// interactive layer this tool does not have. Output shape is --format.
+	"plain":      "use --format",
+	"raw":        "use --format",
+	"csv":        "use --format tsv",
+	"no-headers": "use --format",
+}
+
+func TestNoBannedFlags(t *testing.T) {
+	forEachCommand(t, func(t *testing.T, c *registry.Command) {
+		for _, f := range c.Flags {
+			if remedy, banned := bannedFlags[f.Name]; banned {
+				t.Errorf("%s declares banned flag --%s: %s", c.Name(), f.Name, remedy)
+			}
+		}
+	})
+}
+
+// TestShortFlagLettersAppearInTheirNames enforces the rule that makes short
+// flags guessable: no single-letter flag whose letter is not in its own name.
+func TestShortFlagLettersAppearInTheirNames(t *testing.T) {
+	forEachCommand(t, func(t *testing.T, c *registry.Command) {
+		for _, f := range c.Flags {
+			if f.Short == "" {
+				continue
+			}
+			if len(f.Short) != 1 {
+				t.Errorf("%s: --%s declares short flag %q, which is not one letter",
+					c.Name(), f.Name, f.Short)
+				continue
+			}
+			if !strings.Contains(strings.ToLower(f.Name), strings.ToLower(f.Short)) {
+				t.Errorf("%s: -%s for --%s is unguessable; its letter is not in its name",
+					c.Name(), f.Short, f.Name)
+			}
+		}
+	})
+}
+
+// TestShortFlagsAreNotReusedWithDifferentMeanings asserts a short flag never
+// means one thing on one command and something else on another.
+func TestShortFlagsAreNotReusedWithDifferentMeanings(t *testing.T) {
+	meaning, owner := map[string]string{}, map[string]string{}
+	for _, c := range cli.Registry().All() {
+		for _, f := range c.Flags {
+			if f.Short == "" {
+				continue
+			}
+			if prev, seen := meaning[f.Short]; seen && prev != f.Name {
+				t.Errorf("-%s means --%s on %s but --%s on %s",
+					f.Short, prev, owner[f.Short], f.Name, c.Name())
+				continue
+			}
+			meaning[f.Short], owner[f.Short] = f.Name, c.Name()
+		}
+	}
+}
+
+// TestMutatingCommandsAreSafeByConstruction asserts the agent-safety rules:
+// every mutating command can be dry-run and requires the write tag, and every
+// destructive one requires --yes.
+func TestMutatingCommandsAreSafeByConstruction(t *testing.T) {
+	forEachCommand(t, func(t *testing.T, c *registry.Command) {
+		if c.Destructive && !c.Mutating {
+			t.Errorf("%s is destructive but not marked mutating", c.Name())
+		}
+		if !c.Mutating {
+			if _, has := c.Flag("dry-run"); has {
+				t.Errorf("%s is not mutating but declares --dry-run", c.Name())
+			}
+			return
+		}
+		if _, has := c.Flag("dry-run"); !has {
+			t.Errorf("%s mutates but does not accept --dry-run", c.Name())
+		}
+		if !slices.Contains(c.RequiresTags, "write") {
+			t.Errorf("%s mutates but does not require the write tag, "+
+				"so a reader build would contain it", c.Name())
+		}
+		if !slices.Contains(c.ExitCodes, exitcode.Blocked) {
+			t.Errorf("%s mutates but does not declare exit %d (%s), "+
+				"which read-only mode produces", c.Name(), exitcode.Blocked, exitcode.Blocked)
+		}
+		if c.Destructive {
+			if _, has := c.Flag("yes"); !has {
+				t.Errorf("%s is destructive but does not require --yes", c.Name())
+			}
+		}
+	})
+}
+
+// TestReaderBuildCannotMutate is the compile-out guarantee, checked against
+// whatever tags this build actually has.
+func TestReaderBuildCannotMutate(t *testing.T) {
+	if buildinfo.CanWrite() {
+		t.Skip("this build has the write tag")
+	}
+	for _, c := range cli.Registry().All() {
+		if c.Mutating {
+			t.Errorf("%s mutates but is present in a build without the write tag", c.Name())
+		}
+	}
+}
+
+// TestPaginatedCommandsDeclarePartial asserts a command that can truncate says
+// so, because a caller pins the exit codes it handles.
+func TestPaginatedCommandsDeclarePartial(t *testing.T) {
+	forEachCommand(t, func(t *testing.T, c *registry.Command) {
+		if c.Paginated && !slices.Contains(c.ExitCodes, exitcode.Partial) {
+			t.Errorf("%s is paginated but does not declare exit %d (%s)",
+				c.Name(), exitcode.Partial, exitcode.Partial)
+		}
+	})
+}
+
+// TestCommandsDeclareTheirTags asserts the compile-out contract: a command is
+// present only in a build with every tag it needs, and it never names a tag
+// this project does not define.
+func TestCommandsDeclareTheirTags(t *testing.T) {
+	forEachCommand(t, func(t *testing.T, c *registry.Command) {
+		for _, tag := range c.RequiresTags {
+			if !slices.Contains(buildinfo.KnownTags, tag) {
+				t.Errorf("%s requires undocumented tag %q; add it to buildinfo.KnownTags",
+					c.Name(), tag)
+			}
+		}
+		if missing := buildinfo.MissingTags(c.RequiresTags); len(missing) > 0 {
+			t.Errorf("%s is registered in a build missing its required tag(s) %v; "+
+				"move its registration into a file gated on those tags",
+				c.Name(), missing)
+		}
+	})
+}
+
+// TestCommandsDeclareTheirOutput asserts every command names the payload shape
+// it emits, at a version, so `jr --contract` is complete.
+func TestCommandsDeclareTheirOutput(t *testing.T) {
+	forEachCommand(t, func(t *testing.T, c *registry.Command) {
+		if len(c.Outputs) == 0 {
+			t.Errorf("%s declares no output kind", c.Name())
+			return
+		}
+		seen := map[string]bool{}
+		for _, o := range c.Outputs {
+			switch {
+			case o.Kind == "":
+				t.Errorf("%s declares an output with no kind", c.Name())
+			case o.Version < 1:
+				t.Errorf("%s declares kind %q with no schema version", c.Name(), o.Kind)
+			case seen[o.Kind]:
+				t.Errorf("%s declares kind %q twice", c.Name(), o.Kind)
+			}
+			seen[o.Kind] = true
+		}
+		for _, o := range c.Outputs[1:] {
+			if o.When == "" {
+				t.Errorf("%s declares kind %q as an alternative output "+
+					"without saying what selects it", c.Name(), o.Kind)
+			}
+		}
+	})
+}
+
+// TestKindVersionsAreConsistent asserts two commands never claim different
+// schema versions for the same kind.
+func TestKindVersionsAreConsistent(t *testing.T) {
+	version, owner := map[string]int{}, map[string]string{}
+	for _, c := range cli.Registry().All() {
+		for _, o := range c.Outputs {
+			if prev, seen := version[o.Kind]; seen && prev != o.Version {
+				t.Errorf("kind %q is v%d on %s but v%d on %s",
+					o.Kind, prev, owner[o.Kind], o.Version, c.Name())
+				continue
+			}
+			version[o.Kind], owner[o.Kind] = o.Version, c.Name()
+		}
+	}
+}
+
+// TestCommandsAreDescribed asserts the self-description is usable without
+// external documentation.
+func TestCommandsAreDescribed(t *testing.T) {
+	forEachCommand(t, func(t *testing.T, c *registry.Command) {
+		if c.Summary == "" {
+			t.Errorf("%s has no summary", c.Name())
+		}
+		if strings.HasSuffix(c.Summary, ".") {
+			t.Errorf("%s: summary should not end with a period: %q", c.Name(), c.Summary)
+		}
+		if c.Example == "" {
+			t.Errorf("%s has no example invocation", c.Name())
+		}
+		if c.Run == nil {
+			t.Errorf("%s has no implementation", c.Name())
+		}
+		for _, f := range c.Flags {
+			if f.Usage == "" {
+				t.Errorf("%s: --%s has no usage string", c.Name(), f.Name)
+			}
+			if f.Type == registry.TypeEnum && len(f.Enum) == 0 {
+				t.Errorf("%s: --%s is an enum with no values", c.Name(), f.Name)
+			}
+			if f.Type != registry.TypeEnum && len(f.Enum) > 0 {
+				t.Errorf("%s: --%s declares values but is typed %q", c.Name(), f.Name, f.Type)
+			}
+		}
+	})
+}
+
+// TestArgsAreWellFormed asserts required positionals come first and only the
+// last one is variadic, so the usage line is unambiguous.
+func TestArgsAreWellFormed(t *testing.T) {
+	forEachCommand(t, func(t *testing.T, c *registry.Command) {
+		optionalSeen := false
+		for i, a := range c.Args {
+			if a.Name == "" {
+				t.Errorf("%s: positional argument %d has no name", c.Name(), i)
+			}
+			if a.Usage == "" {
+				t.Errorf("%s: positional argument %q has no usage string", c.Name(), a.Name)
+			}
+			if a.Required && optionalSeen {
+				t.Errorf("%s: required argument %q follows an optional one", c.Name(), a.Name)
+			}
+			if !a.Required {
+				optionalSeen = true
+			}
+			if a.Variadic && i != len(c.Args)-1 {
+				t.Errorf("%s: variadic argument %q is not last", c.Name(), a.Name)
+			}
+		}
+	})
+}
+
+// TestNamesAreNounVerb asserts the command surface stays uniform.
+func TestNamesAreNounVerb(t *testing.T) {
+	forEachCommand(t, func(t *testing.T, c *registry.Command) {
+		for _, seg := range c.Path {
+			if seg == "" {
+				t.Errorf("%s has an empty path segment", c.Name())
+			}
+			if seg != strings.ToLower(seg) {
+				t.Errorf("%s: path segment %q is not lowercase", c.Name(), seg)
+			}
+			if strings.ContainsAny(seg, " ._") {
+				t.Errorf("%s: path segment %q should be a single kebab-case word", c.Name(), seg)
+			}
+		}
+	})
+}
+
+// TestBuildDeclaresOnlyDocumentedTags catches a tag file added without
+// documenting what the tag means.
+func TestBuildDeclaresOnlyDocumentedTags(t *testing.T) {
+	if unknown := buildinfo.UnknownTags(); len(unknown) > 0 {
+		t.Errorf("build enables undocumented tag(s) %v; add them to buildinfo.KnownTags",
+			unknown)
+	}
+	for _, tag := range buildinfo.KnownTags {
+		if buildinfo.TagDescriptions[tag] == "" {
+			t.Errorf("tag %q has no description", tag)
+		}
+	}
+}
+
+// forEachCommand runs check against every command in this build. A build with
+// no commands is itself a failure: the registry is what the binary is.
+func forEachCommand(t *testing.T, check func(*testing.T, *registry.Command)) {
+	t.Helper()
+	cmds := cli.Registry().All()
+	if len(cmds) == 0 {
+		t.Fatal("this build registers no commands")
+	}
+	for _, c := range cmds {
+		t.Run(c.Name(), func(t *testing.T) { check(t, c) })
+	}
+}

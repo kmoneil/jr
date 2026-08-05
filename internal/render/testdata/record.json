@@ -1,0 +1,27 @@
+{
+  "issue": {
+    "components": {
+      "component": [],
+      "count": 0
+    },
+    "description": {
+      "format": "markdown",
+      "text": "## Repro\n\n```go\nclient.Do(req)  // returns err == nil on 5xx\n```\n\nAlso: a < b && c > d, and a literal ]]> in the text."
+    },
+    "key": "ENG-101",
+    "labels": {
+      "count": 2,
+      "label": [
+        "retry",
+        "transport"
+      ]
+    },
+    "status": {
+      "category": "in-progress",
+      "text": "In Progress"
+    },
+    "summary": "Retry logic drops the last error"
+  },
+  "kind": "issue.get",
+  "v": 1
+}

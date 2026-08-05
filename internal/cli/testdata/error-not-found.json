@@ -1,0 +1,12 @@
+{
+  "error": {
+    "code": "UNKNOWN_COMMAND",
+    "detail": "build profile ci, tags=none",
+    "exit": 5,
+    "exit-name": "NOT_FOUND",
+    "message": "no command named \"nope\" in this build",
+    "remedy": "run `jr schema` for the commands this build contains",
+    "retryable": false,
+    "v": 1
+  }
+}

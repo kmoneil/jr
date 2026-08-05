@@ -1,0 +1,22 @@
+#!/bin/sh
+# Pre-commit gate. Install with: make hooks
+#
+# Never bypass this with --no-verify. If a check is wrong, fix the check.
+set -e
+
+echo "pre-commit: gofumpt"
+unformatted=$(gofumpt -l .)
+if [ -n "$unformatted" ]; then
+	echo "not formatted:"
+	echo "$unformatted"
+	echo "run: make fmt"
+	exit 1
+fi
+
+echo "pre-commit: golangci-lint"
+golangci-lint run
+
+echo "pre-commit: go test"
+go test ./...
+
+echo "pre-commit: ok"

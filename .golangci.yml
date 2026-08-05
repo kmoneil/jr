@@ -1,0 +1,53 @@
+version: "2"
+
+run:
+  timeout: 5m
+  # Lint the tagged code too. A capability that only compiles under a build tag
+  # is still shipped code.
+  build-tags:
+    - tui
+    - prompt
+    - render
+    - browser
+    - clipboard
+    - mcp
+    - write
+    - admin
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - unconvert
+    - unparam
+    - godot
+    # This tool is HTTP-heavy and its failures must never be swallowed.
+    - bodyclose
+    - errorlint
+    - nilerr
+  settings:
+    godot:
+      scope: declarations
+      capital: false
+    errcheck:
+      check-type-assertions: true
+  exclusions:
+    rules:
+      # Golden-file helpers write and read testdata paths built from test input.
+      - path: _test\.go
+        linters:
+          - unparam
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/kmoneil/jira-cli

@@ -1,0 +1,43 @@
+# Plans & reviews
+_plans/
+_reviews/
+_tmp/
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# IDE
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Claude
+.claude/
+CLAUDE.md
+
+# Go
+vendor/
+bin/
+dist/
+coverage.out
+coverage.html
+*.test
+*.prof
+
+# Built binaries, if someone builds in place rather than into bin/
+/jr
+/jr-agent
+/jr-reader
+/jr-ci
+
+# Local credentials and state. Nothing under here is ever committed.
+*.pem
+*.key
+.netrc

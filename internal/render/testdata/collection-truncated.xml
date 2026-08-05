@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<result kind="issue.list" v="1">
+  <issues count="2" complete="false">
+    <issue key="ENG-101">
+      <summary>Retry logic drops the last error</summary>
+      <status category="in-progress">In Progress</status>
+      <assignee id="712020:8f3a" display="Ada Lovelace"/>
+      <updated>2026-08-04T11:32:07Z</updated>
+    </issue>
+    <issue key="ENG-102">
+      <summary>Tabs	and
+newlines in a summary</summary>
+      <status category="done">Done</status>
+      <assignee id="" display=""/>
+      <updated>2026-08-04T09:00:00Z</updated>
+    </issue>
+    <next-page-token>eyJvIjoyfQ</next-page-token>
+  </issues>
+</result>

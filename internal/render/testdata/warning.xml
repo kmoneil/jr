@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<warning v="1">
+  <code>RESULT_TRUNCATED</code>
+  <message>result set was truncated before it was exhausted</message>
+  <kind>issue.list</kind>
+  <count>2</count>
+  <next-page-token>eyJvIjoyfQ</next-page-token>
+  <remedy>resume with --page-token, or raise --limit</remedy>
+</warning>

@@ -1,0 +1,4 @@
+name	summary	mutating	destructive	kind
+contract	Dump the machine-readable output contract for every kind	false	false	contract
+schema	Describe every command this build contains	false	false	schema.commands
+version	Print the build identity and its compiled-in capabilities	false	false	version

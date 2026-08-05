@@ -1,0 +1,34 @@
+{
+  "complete": true,
+  "count": 2,
+  "issues": [
+    {
+      "assignee": {
+        "display": "Ada Lovelace",
+        "id": "712020:8f3a"
+      },
+      "key": "ENG-101",
+      "status": {
+        "category": "in-progress",
+        "text": "In Progress"
+      },
+      "summary": "Retry logic drops the last error",
+      "updated": "2026-08-04T11:32:07Z"
+    },
+    {
+      "assignee": {
+        "display": "",
+        "id": ""
+      },
+      "key": "ENG-102",
+      "status": {
+        "category": "done",
+        "text": "Done"
+      },
+      "summary": "Tabs\tand\nnewlines in a summary",
+      "updated": "2026-08-04T09:00:00Z"
+    }
+  ],
+  "kind": "issue.list",
+  "v": 1
+}

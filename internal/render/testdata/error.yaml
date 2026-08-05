@@ -1,0 +1,10 @@
+error:
+  code: JQL_SYNTAX
+  detail: project = ENG AND summary ~ "unclosed
+  exit: 2
+  exit-name: USAGE
+  message: Unclosed quote in --jql at position 34
+  remedy: Quote the whole expression in single quotes, or escape inner double quotes.
+  request-id: 2f1c9a4e-0b77-4f0e-9d3a-1a2b3c4d5e6f
+  retryable: false
+  v: 1

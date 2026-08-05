@@ -1,0 +1,11 @@
+{
+  "warning": {
+    "code": "RESULT_TRUNCATED",
+    "count": "2",
+    "kind": "issue.list",
+    "message": "result set was truncated before it was exhausted",
+    "next-page-token": "eyJvIjoyfQ",
+    "remedy": "resume with --page-token, or raise --limit",
+    "v": 1
+  }
+}

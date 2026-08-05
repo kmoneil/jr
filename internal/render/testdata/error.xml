@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<error v="1">
+  <code>JQL_SYNTAX</code>
+  <message>Unclosed quote in --jql at position 34</message>
+  <detail>project = ENG AND summary ~ "unclosed</detail>
+  <remedy>Quote the whole expression in single quotes, or escape inner double quotes.</remedy>
+  <retryable>false</retryable>
+  <exit>2</exit>
+  <exit-name>USAGE</exit-name>
+  <request-id>2f1c9a4e-0b77-4f0e-9d3a-1a2b3c4d5e6f</request-id>
+</error>
