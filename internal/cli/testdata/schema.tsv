@@ -12,5 +12,7 @@ contract	Dump the machine-readable output contract for every kind	false	false	co
 field.list	List every field this site has	false	false	field.list
 issue.get	Fetch one issue in full	false	false	issue.get
 issue.list	List issues matching a query	false	false	issue.list
+meta.createmeta	List the fields a new issue of one type requires	false	false	meta.createmeta
+meta.transitions	List the transitions available on an issue right now	false	false	meta.transitions
 schema	Describe every command this build contains	false	false	schema.commands
 version	Print the build identity and its compiled-in capabilities	false	false	version

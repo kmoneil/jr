@@ -18,6 +18,7 @@ Available Commands:
   field       Discover fields, including custom fields
   help        Help about any command
   issue       Work with issues
+  meta        Ask Jira what can be done to an issue
   schema      Describe every command this build contains
   version     Print the build identity and its compiled-in capabilities
 

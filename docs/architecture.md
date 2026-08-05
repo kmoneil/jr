@@ -42,14 +42,24 @@ issue to a sprint — lives in `workflow` or in the calling layer. This is what
 keeps each resource independently compilable, which is what makes compile-out
 work and what lets a new resource be added without touching an existing one.
 
-That rule is why **site metadata lives in `site`, not in the resource that
+That rule is why **Jira metadata lives in `site`, not in the resource that
 lists it.** `issue list --field "Story Points"` has to resolve a name to
-`customfield_10042`, and it cannot ask the field resource to do it. So `site`
-owns the catalogue — the fetch, the cache, and the resolution — and
-`resource/field` is the command surface over it. Issue types, statuses, and
-transitions belong there for the same reason. A resource reaches all of it
-through one `registry.Session.Metadata` call, so the cache is shared: two
-commands resolving the same name in the same day make one request between them.
+`customfield_10042`, and it cannot ask the field resource to do it; `issue move`
+will have to resolve a transition name to an id without asking the meta
+resource. So `site` owns the fetching and the resolution for fields, issue
+types, transitions, and create metadata, and `resource/field` and
+`resource/meta` are the command surfaces over them.
+
+A resource reaches all of it through one `registry.Session.Metadata` call, so
+the cache is shared: two commands resolving the same field name in the same day
+make one request between them.
+
+**Not all of it is cached, and that is a per-kind judgement.** The field
+catalogue and create metadata change when an administrator edits a screen, so a
+day-old answer is still the answer. An issue's available transitions change when
+the issue moves, so they are fetched every time and not memoized within a
+process either — two calls in one run can legitimately differ, and answering the
+second from the first would hide it.
 
 Four more rules, all enforced in `internal/lint/importgraph_test.go` against the
 real import graph from `go list`, so a build-tagged file cannot hide an import:
@@ -119,7 +129,7 @@ a token cannot reach a fixture file even if recording is interrupted.
 | `$XDG_CONFIG_HOME/jr/config.toml`       | Contexts, defaults. Hand-editable.                    | 0644 |
 | `$XDG_STATE_HOME/jr/credentials.toml`   | Stored credentials                                    | 0600 |
 | `$XDG_STATE_HOME/jr/`                   | Idempotency ledger, view history, last cursor         | —    |
-| `$XDG_CACHE_HOME/jr/<site>/`            | Field IDs, issue types, transitions, deployment probe | —    |
+| `$XDG_CACHE_HOME/jr/<site>/`            | Deployment probe, field catalogue, create metadata     | —    |
 
 The three are separate because they have different lifetimes and different
 backup expectations: config is hand-written and worth keeping, state is

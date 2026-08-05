@@ -234,14 +234,26 @@ sent for Jira to reject. The refusal carries the candidates, because an error
 that only says "unknown" leaves the caller to go and read a catalogue to find
 their typo.
 
-| Code              | Exit | Meaning                                              |
-| ----------------- | ---- | ----------------------------------------------------- |
-| `UNKNOWN_FIELD`   | 2    | No field by that id, name, or clause name. `detail` lists the near misses, each with its id. |
-| `AMBIGUOUS_FIELD` | 2    | Several fields share that name. `detail` lists every candidate with its id; pass the id. |
-| `INVALID_FIELD`   | 2    | The field resolved, but its id cannot be an element name or collides with one the command already emits. |
+| Code                   | Exit | Meaning                                          |
+| ---------------------- | ---- | ------------------------------------------------- |
+| `UNKNOWN_FIELD`        | 2    | No field by that id, name, or clause name. `detail` lists the near misses, each with its id. |
+| `AMBIGUOUS_FIELD`      | 2    | Several fields share that name. `detail` lists every candidate with its id; pass the id. |
+| `INVALID_FIELD`        | 2    | The field resolved, but its id cannot be an element name or collides with one the command already emits. |
+| `UNKNOWN_TRANSITION`   | 2    | The issue offers no such move *right now*. `detail` lists every transition it does offer, with its id and destination. |
+| `AMBIGUOUS_TRANSITION` | 2    | Two transitions share that name and lead to different statuses. `detail` lists both. |
+| `UNKNOWN_ISSUE_TYPE`   | 2 or 5 | The project offers no such type. `detail` lists the ones it does. Exit 5 when the answer came from a createmeta lookup, 2 when a type name was resolved before one. |
+| `AMBIGUOUS_ISSUE_TYPE` | 2    | Several types share that name; pass the id. |
+| `UNKNOWN_PROJECT`      | 5    | The project does not exist, or this credential may not create in it. |
 
-Resolution costs one request against a cold cache and none against a warm one.
-A command that names nothing to resolve makes no extra request at all.
+Field resolution costs one request against a cold cache and none against a warm
+one; a command that names nothing to resolve makes no extra request at all.
+
+**Transitions are never cached.** They depend on the issue's current status, so
+a stored copy answers the question as it stood when it was stored. Create
+metadata *is* cached, because it changes when an administrator edits a screen
+rather than when an issue moves. An `UNKNOWN_TRANSITION` therefore lists the
+whole available set rather than near matches: a move missing from it is far more
+often blocked from the current status than misspelled.
 
 An unparseable `--format` still produces a readable error: the diagnostic falls
 back to XML rather than failing twice.
