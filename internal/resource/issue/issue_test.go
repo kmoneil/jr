@@ -776,3 +776,52 @@ func TestKeysetRefusesAMisorderedServer(t *testing.T) {
 		t.Errorf("the remedy offers no fallback: %q", e.Remedy)
 	}
 }
+
+// TestBudgetStopsALongRun covers --max-requests, which is the brake on a
+// `--limit all` over a large project.
+//
+// Running out of budget is not a failure: it means there is more. The caller
+// gets the rows already fetched, an explicit complete="false", and a cursor to
+// carry on from — never an error that discards the work done so far.
+func TestBudgetStopsALongRun(t *testing.T) {
+	cassette, err := transport.LoadCassette(filepath.Join("testdata", "keyset.datacenter.json"))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	conn, err := transport.New(transport.Options{
+		BaseURL:     "https://recorded.invalid",
+		HTTPClient:  transport.NewReplayer(cassette).Client(),
+		Retries:     -1,
+		MaxRequests: 1,
+	})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+	client := &issue.Client{Transport: conn, Site: site.Info{Kind: site.DataCenter}}
+
+	result, err := client.List(t.Context(), issue.ListOptions{
+		Query: issue.QueryOptions{Project: "ENG"}, Limit: registry.Limit{All: true},
+		PageSize: 2, Fields: issue.DefaultFields(),
+	})
+	if err != nil {
+		t.Fatalf("a spent budget discarded the fetched rows: %v", err)
+	}
+	if len(result.Issues) != 2 {
+		t.Errorf("kept %d rows, want the page that was fetched", len(result.Issues))
+	}
+	if result.Complete {
+		t.Error("a budget-truncated result claimed to be complete")
+	}
+	if result.NextPageToken == "" {
+		t.Fatal("no way to resume after the budget ran out")
+	}
+
+	// The cursor is a keyset one, so resuming is still stable.
+	token, err := issue.DecodePageToken(result.NextPageToken, site.DataCenter)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if token.AfterKey == "" {
+		t.Errorf("the resume cursor is not a keyset cursor: %+v", token)
+	}
+}
