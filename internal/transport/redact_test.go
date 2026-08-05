@@ -79,20 +79,20 @@ func TestRedactedMarkerSurvivesEscaping(t *testing.T) {
 func TestRedactURL(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{
-			"https://acme.atlassian.net/rest/api/3/myself",
-			"https://acme.atlassian.net/rest/api/3/myself",
+			"https://acme.atlassian.invalid/rest/api/3/myself",
+			"https://acme.atlassian.invalid/rest/api/3/myself",
 		},
 		{
-			"https://ada:hunter2@acme.atlassian.net/rest/api/3/myself",
-			"https://ada:" + transport.Redacted + "@acme.atlassian.net/rest/api/3/myself",
+			"https://ada:hunter2@acme.atlassian.invalid/rest/api/3/myself",
+			"https://ada:" + transport.Redacted + "@acme.atlassian.invalid/rest/api/3/myself",
 		},
 		{
-			"https://acme.atlassian.net/x?token=" + theToken,
-			"https://acme.atlassian.net/x?token=" + transport.Redacted,
+			"https://acme.atlassian.invalid/x?token=" + theToken,
+			"https://acme.atlassian.invalid/x?token=" + transport.Redacted,
 		},
 		{
-			"https://acme.atlassian.net/x?jql=project+%3D+ENG&maxResults=50",
-			"https://acme.atlassian.net/x?jql=project+%3D+ENG&maxResults=50",
+			"https://acme.atlassian.invalid/x?jql=project+%3D+ENG&maxResults=50",
+			"https://acme.atlassian.invalid/x?jql=project+%3D+ENG&maxResults=50",
 		},
 	}
 	for _, tc := range cases {

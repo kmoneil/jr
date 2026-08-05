@@ -218,6 +218,12 @@ There are four ways in, and no flag takes a token as its value — an argument
 lands in the shell history and the process list, where anyone on the machine
 can read it.
 
+`auth login` verifies before it writes anything: it probes the deployment and
+fetches the account, so a wrong host, a missing context path, or a bad token is
+refused there rather than surfacing two commands later as something unrelated.
+It reports who you authenticated as. `--no-verify` skips the check, for
+preparing a configuration offline.
+
 ```console
 # 1. Pipe it.
 $ printf '%s' "$TOKEN" | jr auth login --site acme.atlassian.net \

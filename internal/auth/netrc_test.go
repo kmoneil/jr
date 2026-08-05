@@ -28,71 +28,71 @@ func TestNetrcFormats(t *testing.T) {
 	}{
 		{
 			"one line",
-			"machine acme.atlassian.net login ada@example.com password " + theToken + "\n",
-			"acme.atlassian.net", true, "ada@example.com", theToken,
+			"machine acme.atlassian.invalid login ada@example.com password " + theToken + "\n",
+			"acme.atlassian.invalid", true, "ada@example.com", theToken,
 		},
 		{
 			// The format is a token stream, not a line-oriented one: these two
 			// spellings are the same file.
 			"spread across lines",
-			"machine acme.atlassian.net\n  login ada@example.com\n  password " + theToken + "\n",
-			"acme.atlassian.net", true, "ada@example.com", theToken,
+			"machine acme.atlassian.invalid\n  login ada@example.com\n  password " + theToken + "\n",
+			"acme.atlassian.invalid", true, "ada@example.com", theToken,
 		},
 		{
 			"several machines",
 			"machine github.com login x password y\n" +
-				"machine acme.atlassian.net login ada password " + theToken + "\n",
-			"acme.atlassian.net", true, "ada", theToken,
+				"machine acme.atlassian.invalid login ada password " + theToken + "\n",
+			"acme.atlassian.invalid", true, "ada", theToken,
 		},
 		{
 			"the right machine is chosen, not the first",
-			"machine acme.atlassian.net login ada password " + theToken + "\n" +
-				"machine other.atlassian.net login bob password nope\n",
-			"other.atlassian.net", true, "bob", "nope",
+			"machine acme.atlassian.invalid login ada password " + theToken + "\n" +
+				"machine other.atlassian.invalid login bob password nope\n",
+			"other.atlassian.invalid", true, "bob", "nope",
 		},
 		{
 			"user is an accepted spelling of login",
-			"machine acme.atlassian.net user ada password " + theToken + "\n",
-			"acme.atlassian.net", true, "ada", theToken,
+			"machine acme.atlassian.invalid user ada password " + theToken + "\n",
+			"acme.atlassian.invalid", true, "ada", theToken,
 		},
 		{
 			"quoted password with spaces",
-			"machine acme.atlassian.net login ada password \"two words\"\n",
-			"acme.atlassian.net", true, "ada", "two words",
+			"machine acme.atlassian.invalid login ada password \"two words\"\n",
+			"acme.atlassian.invalid", true, "ada", "two words",
 		},
 		{
 			"comments are ignored",
-			"# a comment\nmachine acme.atlassian.net login ada password " + theToken +
+			"# a comment\nmachine acme.atlassian.invalid login ada password " + theToken +
 				" # trailing\n",
-			"acme.atlassian.net", true, "ada", theToken,
+			"acme.atlassian.invalid", true, "ada", theToken,
 		},
 		{
 			"default entry matches an unnamed host",
 			"machine github.com login x password y\ndefault login ada password " + theToken + "\n",
-			"acme.atlassian.net", true, "ada", theToken,
+			"acme.atlassian.invalid", true, "ada", theToken,
 		},
 		{
 			"an explicit entry beats default",
 			"default login fallback password fallbackpw\n" +
-				"machine acme.atlassian.net login ada password " + theToken + "\n",
-			"acme.atlassian.net", true, "ada", theToken,
+				"machine acme.atlassian.invalid login ada password " + theToken + "\n",
+			"acme.atlassian.invalid", true, "ada", theToken,
 		},
 		{
 			"host case is ignored",
-			"machine ACME.Atlassian.NET login ada password " + theToken + "\n",
-			"acme.atlassian.net", true, "ada", theToken,
+			"machine ACME.Atlassian.INVALID login ada password " + theToken + "\n",
+			"acme.atlassian.invalid", true, "ada", theToken,
 		},
 		{
 			"no match",
 			"machine github.com login x password y\n",
-			"acme.atlassian.net", false, "", "",
+			"acme.atlassian.invalid", false, "", "",
 		},
 		{
 			"an entry with no password is not a credential",
-			"machine acme.atlassian.net login ada\n",
-			"acme.atlassian.net", false, "", "",
+			"machine acme.atlassian.invalid login ada\n",
+			"acme.atlassian.invalid", false, "", "",
 		},
-		{"empty file", "", "acme.atlassian.net", false, "", ""},
+		{"empty file", "", "acme.atlassian.invalid", false, "", ""},
 	}
 
 	for _, tc := range cases {
@@ -125,13 +125,13 @@ func TestNetrcFormats(t *testing.T) {
 // which is common for Data Center.
 func TestNetrcMatchesOnHostNotURL(t *testing.T) {
 	p := auth.NetrcProvider{Path: writeNetrc(t,
-		"machine jira.acme.internal login ada password "+theToken+"\n")}
+		"machine jira.acme.invalid login ada password "+theToken+"\n")}
 
 	for _, site := range []string{
-		"jira.acme.internal",
-		"https://jira.acme.internal",
-		"https://jira.acme.internal/jira",
-		"https://jira.acme.internal/jira/",
+		"jira.acme.invalid",
+		"https://jira.acme.invalid",
+		"https://jira.acme.invalid/jira",
+		"https://jira.acme.invalid/jira/",
 	} {
 		_, ok, err := p.Lookup(site)
 		if err != nil {
@@ -145,7 +145,7 @@ func TestNetrcMatchesOnHostNotURL(t *testing.T) {
 
 func TestMissingNetrcIsNotAnError(t *testing.T) {
 	p := auth.NetrcProvider{Path: filepath.Join(t.TempDir(), "nope")}
-	_, ok, err := p.Lookup("acme.atlassian.net")
+	_, ok, err := p.Lookup("acme.atlassian.invalid")
 	if err != nil {
 		t.Fatalf("lookup: %v", err)
 	}
@@ -158,25 +158,25 @@ func TestNetrcPathResolution(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".netrc")
 	if err := os.WriteFile(path,
-		[]byte("machine acme.atlassian.net login ada password "+theToken+"\n"),
+		[]byte("machine acme.atlassian.invalid login ada password "+theToken+"\n"),
 		0o600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 
 	// From HOME.
 	p := auth.NetrcProvider{Getenv: env(map[string]string{"HOME": dir})}
-	if _, ok, err := p.Lookup("acme.atlassian.net"); err != nil || !ok {
+	if _, ok, err := p.Lookup("acme.atlassian.invalid"); err != nil || !ok {
 		t.Errorf("HOME-based lookup failed: ok=%v err=%v", ok, err)
 	}
 
 	// NETRC wins over HOME.
 	other := filepath.Join(t.TempDir(), "custom")
 	if err := os.WriteFile(other,
-		[]byte("machine acme.atlassian.net login bob password other\n"), 0o600); err != nil {
+		[]byte("machine acme.atlassian.invalid login bob password other\n"), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	p = auth.NetrcProvider{Getenv: env(map[string]string{"HOME": dir, "NETRC": other})}
-	cred, ok, err := p.Lookup("acme.atlassian.net")
+	cred, ok, err := p.Lookup("acme.atlassian.invalid")
 	if err != nil || !ok {
 		t.Fatalf("NETRC lookup failed: ok=%v err=%v", ok, err)
 	}
@@ -191,7 +191,7 @@ func TestNetrcPathResolution(t *testing.T) {
 func FuzzNetrcDoesNotPanic(f *testing.F) {
 	for _, seed := range []string{
 		"", "machine", "machine acme login", "default",
-		"machine acme.atlassian.net login ada password x",
+		"machine acme.atlassian.invalid login ada password x",
 		"machine\nmachine\nmachine", `machine a login "unterminated`,
 		"macdef init\nsomething\n\nmachine a login b password c",
 		"\x00", "password", "login x",
@@ -205,7 +205,7 @@ func FuzzNetrcDoesNotPanic(f *testing.F) {
 			t.Skip()
 		}
 		p := auth.NetrcProvider{Path: path}
-		cred, ok, err := p.Lookup("acme.atlassian.net")
+		cred, ok, err := p.Lookup("acme.atlassian.invalid")
 		if err != nil {
 			t.Fatalf("a readable netrc produced an error: %v", err)
 		}

@@ -34,7 +34,7 @@ func configWith(t *testing.T, current string, contexts map[string]jctx.Context) 
 // the rest of the context.
 func TestPrecedence(t *testing.T) {
 	cfg := configWith(t, "work", map[string]jctx.Context{
-		"work": {Site: "ctx.atlassian.net", Project: "CTXPROJ", Board: "1"},
+		"work": {Site: "ctx.atlassian.invalid", Project: "CTXPROJ", Board: "1"},
 	})
 
 	cases := []struct {
@@ -47,35 +47,35 @@ func TestPrecedence(t *testing.T) {
 			"context only",
 			jctx.Overrides{},
 			nil,
-			"https://ctx.atlassian.net", "CTXPROJ", "1",
+			"https://ctx.atlassian.invalid", "CTXPROJ", "1",
 		},
 		{
 			"env beats context",
 			jctx.Overrides{},
 			map[string]string{
-				jctx.EnvSite: "env.atlassian.net", jctx.EnvProject: "ENVPROJ",
+				jctx.EnvSite: "env.atlassian.invalid", jctx.EnvProject: "ENVPROJ",
 			},
-			"https://env.atlassian.net", "ENVPROJ", "1",
+			"https://env.atlassian.invalid", "ENVPROJ", "1",
 		},
 		{
 			"flag beats env",
-			jctx.Overrides{Site: "flag.atlassian.net", Project: "FLAGPROJ"},
+			jctx.Overrides{Site: "flag.atlassian.invalid", Project: "FLAGPROJ"},
 			map[string]string{
-				jctx.EnvSite: "env.atlassian.net", jctx.EnvProject: "ENVPROJ",
+				jctx.EnvSite: "env.atlassian.invalid", jctx.EnvProject: "ENVPROJ",
 			},
-			"https://flag.atlassian.net", "FLAGPROJ", "1",
+			"https://flag.atlassian.invalid", "FLAGPROJ", "1",
 		},
 		{
 			"one field overridden leaves the others alone",
 			jctx.Overrides{Project: "OTHER"},
 			nil,
-			"https://ctx.atlassian.net", "OTHER", "1",
+			"https://ctx.atlassian.invalid", "OTHER", "1",
 		},
 		{
 			"board from env",
 			jctx.Overrides{},
 			map[string]string{jctx.EnvBoard: "99"},
-			"https://ctx.atlassian.net", "CTXPROJ", "99",
+			"https://ctx.atlassian.invalid", "CTXPROJ", "99",
 		},
 	}
 
@@ -103,10 +103,10 @@ func TestPrecedence(t *testing.T) {
 // omits the flag must not quietly promote itself to read-write.
 func TestReadOnlyIsAOneWayLatch(t *testing.T) {
 	readOnlyCtx := configWith(t, "audit", map[string]jctx.Context{
-		"audit": {Site: "acme.atlassian.net", ReadOnly: true},
+		"audit": {Site: "acme.atlassian.invalid", ReadOnly: true},
 	})
 	writableCtx := configWith(t, "work", map[string]jctx.Context{
-		"work": {Site: "acme.atlassian.net"},
+		"work": {Site: "acme.atlassian.invalid"},
 	})
 
 	cases := []struct {
@@ -159,7 +159,7 @@ func TestReadOnlyIsAOneWayLatch(t *testing.T) {
 // read-write.
 func TestReadOnlyEnvIsGenerous(t *testing.T) {
 	cfg := configWith(t, "work", map[string]jctx.Context{
-		"work": {Site: "acme.atlassian.net"},
+		"work": {Site: "acme.atlassian.invalid"},
 	})
 
 	on := []string{"1", "true", "TRUE", "yes", "y", "on", "readonly", "please"}
@@ -189,7 +189,7 @@ func TestReadOnlyEnvIsGenerous(t *testing.T) {
 
 func TestCheckWritable(t *testing.T) {
 	cfg := configWith(t, "audit", map[string]jctx.Context{
-		"audit": {Site: "acme.atlassian.net", ReadOnly: true},
+		"audit": {Site: "acme.atlassian.invalid", ReadOnly: true},
 	})
 	resolved, err := jctx.Resolve(cfg, jctx.Overrides{}, nil)
 	if err != nil {
@@ -208,7 +208,7 @@ func TestCheckWritable(t *testing.T) {
 	}
 
 	writable := configWith(t, "work", map[string]jctx.Context{
-		"work": {Site: "acme.atlassian.net"},
+		"work": {Site: "acme.atlassian.invalid"},
 	})
 	ok, err := jctx.Resolve(writable, jctx.Overrides{}, nil)
 	if err != nil {
@@ -221,8 +221,8 @@ func TestCheckWritable(t *testing.T) {
 
 func TestContextSelection(t *testing.T) {
 	cfg := configWith(t, "work", map[string]jctx.Context{
-		"work":     {Site: "work.atlassian.net", Project: "ENG"},
-		"personal": {Site: "personal.atlassian.net", Project: "HOME"},
+		"work":     {Site: "work.atlassian.invalid", Project: "ENG"},
+		"personal": {Site: "personal.atlassian.invalid", Project: "HOME"},
 	})
 
 	current, err := jctx.Resolve(cfg, jctx.Overrides{}, nil)
@@ -257,7 +257,7 @@ func TestContextSelection(t *testing.T) {
 
 func TestUnknownContextIsAnError(t *testing.T) {
 	cfg := configWith(t, "work", map[string]jctx.Context{
-		"work": {Site: "acme.atlassian.net"},
+		"work": {Site: "acme.atlassian.invalid"},
 	})
 	_, err := jctx.Resolve(cfg, jctx.Overrides{Context: "nope"}, nil)
 	if err == nil {
@@ -275,14 +275,14 @@ func TestUnknownContextIsAnError(t *testing.T) {
 // legitimate way to run against a site you have not made a context for.
 func TestNoContextIsUsable(t *testing.T) {
 	cfg := configWith(t, "", nil)
-	got, err := jctx.Resolve(cfg, jctx.Overrides{Site: "acme.atlassian.net"}, nil)
+	got, err := jctx.Resolve(cfg, jctx.Overrides{Site: "acme.atlassian.invalid"}, nil)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
 	if got.Name != "" {
 		t.Errorf("Name = %q, want empty", got.Name)
 	}
-	if got.Site != "https://acme.atlassian.net" {
+	if got.Site != "https://acme.atlassian.invalid" {
 		t.Errorf("Site = %q", got.Site)
 	}
 	if _, err := got.RequireSite(); err != nil {
@@ -295,7 +295,7 @@ func TestNoContextIsUsable(t *testing.T) {
 // proceed without one ask, and they exit 2 naming the flag.
 func TestProjectIsNeverMandatory(t *testing.T) {
 	cfg := configWith(t, "work", map[string]jctx.Context{
-		"work": {Site: "acme.atlassian.net"},
+		"work": {Site: "acme.atlassian.invalid"},
 	})
 	resolved, err := jctx.Resolve(cfg, jctx.Overrides{}, nil)
 	if err != nil {
@@ -339,7 +339,7 @@ func TestRequireSiteAndBoard(t *testing.T) {
 
 func TestFieldsOverride(t *testing.T) {
 	cfg := configWith(t, "work", map[string]jctx.Context{
-		"work": {Site: "acme.atlassian.net", Fields: []string{"summary", "status"}},
+		"work": {Site: "acme.atlassian.invalid", Fields: []string{"summary", "status"}},
 	})
 
 	fromContext, err := jctx.Resolve(cfg, jctx.Overrides{}, nil)
@@ -369,14 +369,14 @@ func TestFieldsOverride(t *testing.T) {
 }
 
 func TestResolveWithNilConfig(t *testing.T) {
-	got, err := jctx.Resolve(nil, jctx.Overrides{Site: "acme.atlassian.net"}, nil)
+	got, err := jctx.Resolve(nil, jctx.Overrides{Site: "acme.atlassian.invalid"}, nil)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
-	if got.Site != "https://acme.atlassian.net" {
+	if got.Site != "https://acme.atlassian.invalid" {
 		t.Errorf("Site = %q", got.Site)
 	}
-	if got.CredentialRef != "acme.atlassian.net" {
+	if got.CredentialRef != "acme.atlassian.invalid" {
 		t.Errorf("CredentialRef = %q", got.CredentialRef)
 	}
 }

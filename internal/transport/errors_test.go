@@ -208,10 +208,10 @@ func TestErrorNamesTheEndpoint(t *testing.T) {
 		Status: http.StatusNotFound,
 		Header: http.Header{},
 		Method: "GET",
-		URL:    "https://jira.corp.com/rest/api/2/search?jql=project+%3D+ENG",
+		URL:    "https://jira.corp.invalid/rest/api/2/search?jql=project+%3D+ENG",
 	})
 	detail := errs.Coerce(err).Detail
-	if !strings.Contains(detail, "GET https://jira.corp.com/rest/api/2/search") {
+	if !strings.Contains(detail, "GET https://jira.corp.invalid/rest/api/2/search") {
 		t.Errorf("the detail does not name the endpoint: %q", detail)
 	}
 }
@@ -230,7 +230,7 @@ func TestHTMLErrorPageIsRecognized(t *testing.T) {
 	err := transport.Err(&transport.Response{
 		Status: http.StatusNotFound, Header: header,
 		Body: []byte(tomcat), Method: "GET",
-		URL: "https://jira.corp.com/rest/api/2/search",
+		URL: "https://jira.corp.invalid/rest/api/2/search",
 	})
 
 	e := errs.Coerce(err)

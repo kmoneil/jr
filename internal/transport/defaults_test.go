@@ -343,7 +343,7 @@ func TestMalformedQueryInAFixtureIsMatchedLiterally(t *testing.T) {
 // call" is the main question debug output exists to answer, and a URL with no
 // password must not come back claiming one was redacted.
 func TestRedactURLWithUsernameOnly(t *testing.T) {
-	u, err := url.Parse("https://ada@acme.atlassian.net/x")
+	u, err := url.Parse("https://ada@acme.atlassian.invalid/x")
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -434,7 +434,7 @@ func TestTextTracerWritesHeaders(t *testing.T) {
 	tracer.Trace(transport.Event{
 		Kind:   transport.EventResponse,
 		Method: http.MethodGet,
-		URL:    "https://acme.atlassian.net/x",
+		URL:    "https://acme.atlassian.invalid/x",
 		Status: 200,
 		Header: http.Header{
 			"Zebra":        {"last"},

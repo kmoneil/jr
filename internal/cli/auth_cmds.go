@@ -12,6 +12,7 @@ import (
 	"github.com/kmoneil/jira-cli/internal/jctx"
 	"github.com/kmoneil/jira-cli/internal/registry"
 	"github.com/kmoneil/jira-cli/internal/render"
+	"github.com/kmoneil/jira-cli/internal/site"
 )
 
 // Output kinds owned by the auth commands.
@@ -58,13 +59,16 @@ waiting, because a headless build has no human to wait for.
 You do not have to log in at all: set ` + auth.EnvToken + `, plus ` + auth.EnvEmail + ` on
 Cloud, and every command uses it.
 
+The credential is verified against the site before anything is written: the
+deployment is probed and the account is fetched, so a wrong host, a wrong
+context path, or a bad token is refused here rather than surfacing two commands
+later as something that looks unrelated. --no-verify skips the check, for
+preparing a configuration offline.
+
 If no context exists yet, one is created for this site so the next command has
 somewhere to point. If contexts already exist, none are touched: the caller has
 a setup, and guessing which one this credential belongs to would be worse than
-doing nothing.
-
-This writes local state only. It does not contact Jira, so it does not prove the
-credential works: run ` + "`" + buildinfo.App + ` auth status` + "`" + ` for that.`),
+doing nothing.`),
 		Example: strings.Join([]string{
 			"printf '%s' \"$TOKEN\" | " + buildinfo.App +
 				" auth login --site acme.atlassian.net --email ada@example.com --token-stdin",
@@ -90,16 +94,22 @@ credential works: run ` + "`" + buildinfo.App + ` auth status` + "`" + ` for tha
 				Name: "scheme", Type: registry.TypeEnum, Enum: auth.Schemes(),
 				Usage: "authentication scheme; inferred from whether a user was given",
 			},
+			{
+				Name: "no-verify", Type: registry.TypeBool,
+				Usage: "store the credential without checking it against the site",
+			},
 		},
 		LocalState: true,
 		Outputs:    []registry.Output{{Kind: kindAuthStatus, Version: versionAuthStatus}},
-		ExitCodes:  []exitcode.Code{exitcode.Auth},
-		Run:        a.runAuthLogin,
+		ExitCodes: []exitcode.Code{
+			exitcode.Auth, exitcode.NotFound, exitcode.Permission, exitcode.Remote,
+		},
+		Run: a.runAuthLogin,
 	}
 }
 
-func (a *app) runAuthLogin(_ context.Context, inv *registry.Invocation) (*render.Doc, error) {
-	site, err := a.normalizeSite(inv.Flags.String("site"))
+func (a *app) runAuthLogin(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) {
+	siteURL, err := a.normalizeSite(inv.Flags.String("site"))
 	if err != nil {
 		return nil, err
 	}
@@ -139,16 +149,34 @@ func (a *app) runAuthLogin(_ context.Context, inv *registry.Invocation) (*render
 		return nil, err
 	}
 
+	// Verify before writing anything. Storing a credential that does not work,
+	// and creating a context pointing at a site that does not answer, is how a
+	// login reports success and every later command fails for reasons that look
+	// unrelated to it.
+	var account *site.Account
+	if !inv.Flags.Bool("no-verify") {
+		verified, err := a.verifyCredential(ctx, siteURL, cred)
+		if err != nil {
+			return nil, err
+		}
+		account = &verified
+	}
+
 	store, err := a.credentialStore()
 	if err != nil {
 		return nil, err
 	}
-	if err := store.Save(site, cred); err != nil {
+	if err := store.Save(siteURL, cred); err != nil {
 		return nil, err
 	}
 
 	cred.Source = store.Path
-	doc := authStatusDoc(site, cred, true, nil)
+	doc := authStatusDoc(siteURL, cred, true, nil)
+	if account != nil {
+		doc.Record.
+			Attr("account", account.ID).
+			Attr("display", account.Display)
+	}
 
 	// Storing a credential for a site and then having the next command report
 	// "no Jira site configured" is the tool accepting input and behaving as
@@ -156,7 +184,7 @@ func (a *app) runAuthLogin(_ context.Context, inv *registry.Invocation) (*render
 	// unambiguous, so make one; when there already are contexts the caller has
 	// a setup, and guessing which one this belongs to would be worse than
 	// doing nothing.
-	created, err := a.ensureContextFor(site)
+	created, err := a.ensureContextFor(siteURL)
 	if err != nil {
 		return nil, err
 	}

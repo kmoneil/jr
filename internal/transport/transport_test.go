@@ -69,8 +69,8 @@ func TestNewRejectsBadSites(t *testing.T) {
 	cases := map[string]string{
 		"empty":       "",
 		"whitespace":  "   ",
-		"no scheme":   "acme.atlassian.net",
-		"bad scheme":  "ftp://acme.atlassian.net",
+		"no scheme":   "acme.atlassian.invalid",
+		"bad scheme":  "ftp://acme.atlassian.invalid",
 		"file scheme": "file:///etc/passwd",
 	}
 	for name, site := range cases {
@@ -98,7 +98,7 @@ func TestAbsolutePathIsRefused(t *testing.T) {
 	c, _ := newTestClient(t, srv, transport.Options{})
 	_, err := c.Do(t.Context(), transport.Request{
 		Method: http.MethodGet,
-		Path:   "https://evil.example/steal",
+		Path:   "https://evil.invalid/steal",
 	})
 	if err == nil {
 		t.Fatal("an absolute path was accepted, which would send credentials off-site")

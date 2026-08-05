@@ -41,12 +41,12 @@ func TestContextLifecycle(t *testing.T) {
 	env := session(t)
 
 	mustRun(t, env, "context", "create", "work",
-		"--site", "acme.atlassian.net", "--project", "ENG", "--board", "42")
+		"--site", "acme.atlassian.invalid", "--project", "ENG", "--board", "42")
 	mustRun(t, env, "context", "create", "personal",
-		"--site", "personal.atlassian.net", "--project", "HOME")
+		"--site", "personal.atlassian.invalid", "--project", "HOME")
 
 	list := mustRun(t, env, "context", "list")
-	for _, want := range []string{"work", "personal", "https://acme.atlassian.net"} {
+	for _, want := range []string{"work", "personal", "https://acme.atlassian.invalid"} {
 		if !strings.Contains(list.stdout, want) {
 			t.Errorf("list is missing %q:\n%s", want, list.stdout)
 		}
@@ -95,7 +95,7 @@ func TestContextLifecycle(t *testing.T) {
 func TestContextShowExplainsTheEffectiveSettings(t *testing.T) {
 	env := session(t)
 	mustRun(t, env, "context", "create", "work",
-		"--site", "acme.atlassian.net", "--project", "ENG")
+		"--site", "acme.atlassian.invalid", "--project", "ENG")
 
 	got := mustRun(t, env, "context", "show", "--project", "OVERRIDE")
 	if !strings.Contains(got.stdout, `project="OVERRIDE"`) {
@@ -127,7 +127,7 @@ func TestContextErrors(t *testing.T) {
 	}{
 		{
 			"invalid name",
-			[]string{"context", "create", "Bad Name", "--site", "acme.atlassian.net"},
+			[]string{"context", "create", "Bad Name", "--site", "acme.atlassian.invalid"},
 			exitcode.Usage, "INVALID_CONTEXT_NAME",
 		},
 		{
@@ -177,7 +177,7 @@ func TestContextErrors(t *testing.T) {
 // log out.
 func TestAuthLifecycle(t *testing.T) {
 	env := session(t)
-	mustRun(t, env, "context", "create", "work", "--site", "acme.atlassian.net")
+	mustRun(t, env, "context", "create", "work", "--site", "acme.atlassian.invalid")
 
 	status := mustRun(t, env, "auth", "status")
 	if !strings.Contains(status.stdout, `authenticated="false"`) {
@@ -185,7 +185,7 @@ func TestAuthLifecycle(t *testing.T) {
 	}
 
 	login := runWithStdin(t, env, strings.NewReader(theToken),
-		"auth", "login", "--site", "acme.atlassian.net",
+		"auth", "login", "--no-verify", "--site", "acme.atlassian.invalid",
 		"--email", "ada@example.com", "--token-stdin")
 	if login.exit != exitcode.OK {
 		t.Fatalf("login: exit = %v\nstderr: %s", login.exit, login.stderr)
@@ -212,12 +212,12 @@ func TestAuthLifecycle(t *testing.T) {
 		t.Errorf("auth token did not produce a header value:\n%s", token.stdout)
 	}
 
-	blocked := run(t, env, "auth", "logout", "--site", "acme.atlassian.net")
+	blocked := run(t, env, "auth", "logout", "--site", "acme.atlassian.invalid")
 	if blocked.exit != exitcode.Blocked {
 		t.Errorf("logout without --yes exited %v", blocked.exit)
 	}
 
-	mustRun(t, env, "auth", "logout", "--site", "acme.atlassian.net", "--yes")
+	mustRun(t, env, "auth", "logout", "--site", "acme.atlassian.invalid", "--yes")
 	status = mustRun(t, env, "auth", "status")
 	if !strings.Contains(status.stdout, `authenticated="false"`) {
 		t.Errorf("the credential survived logout:\n%s", status.stdout)
@@ -228,9 +228,9 @@ func TestAuthLifecycle(t *testing.T) {
 // that holds in XML and leaks in JSON is not a redaction.
 func TestAuthStatusNeverRevealsTheToken(t *testing.T) {
 	env := session(t)
-	mustRun(t, env, "context", "create", "work", "--site", "acme.atlassian.net")
+	mustRun(t, env, "context", "create", "work", "--site", "acme.atlassian.invalid")
 	runWithStdin(t, env, strings.NewReader(theToken),
-		"auth", "login", "--site", "acme.atlassian.net", "--token-stdin")
+		"auth", "login", "--no-verify", "--site", "acme.atlassian.invalid", "--token-stdin")
 
 	for _, format := range []string{"tsv", "xml", "json", "yaml"} {
 		got := mustRun(t, env, "auth", "status", "--format", format)
@@ -247,9 +247,9 @@ func TestAuthStatusNeverRevealsTheToken(t *testing.T) {
 // on: supply a token in the environment and nothing on disk has to change.
 func TestCredentialFromEnvironmentBeatsTheStore(t *testing.T) {
 	env := session(t)
-	mustRun(t, env, "context", "create", "work", "--site", "acme.atlassian.net")
+	mustRun(t, env, "context", "create", "work", "--site", "acme.atlassian.invalid")
 	runWithStdin(t, env, strings.NewReader("stored-token"),
-		"auth", "login", "--site", "acme.atlassian.net", "--token-stdin")
+		"auth", "login", "--no-verify", "--site", "acme.atlassian.invalid", "--token-stdin")
 
 	env["JIRA_API_TOKEN"] = "env-token"
 	got := mustRun(t, env, "auth", "status")
@@ -264,7 +264,7 @@ func TestLogoutCannotRemoveAnEnvironmentCredential(t *testing.T) {
 	env := session(t)
 	env["JIRA_API_TOKEN"] = theToken
 
-	got := run(t, env, "auth", "logout", "--site", "acme.atlassian.net", "--yes")
+	got := run(t, env, "auth", "logout", "--site", "acme.atlassian.invalid", "--yes")
 	if got.exit != exitcode.NotFound {
 		t.Errorf("exit = %v, want %v\nstderr: %s", got.exit, exitcode.NotFound, got.stderr)
 	}
@@ -277,8 +277,8 @@ func TestLogoutCannotRemoveAnEnvironmentCredential(t *testing.T) {
 // an argument lands in the shell history and the process list.
 func TestTokenIsNotAcceptedOnTheCommandLine(t *testing.T) {
 	env := session(t)
-	got := run(t, env, "auth", "login",
-		"--site", "acme.atlassian.net", "--token", theToken)
+	got := run(t, env, "auth", "login", "--no-verify",
+		"--site", "acme.atlassian.invalid", "--token", theToken)
 	if got.exit != exitcode.Usage {
 		t.Errorf("exit = %v, want %v", got.exit, exitcode.Usage)
 	}
@@ -290,7 +290,7 @@ func TestTokenIsNotAcceptedOnTheCommandLine(t *testing.T) {
 func TestLoginRejectsEmptyStdin(t *testing.T) {
 	env := session(t)
 	got := runWithStdin(t, env, strings.NewReader("   \n"),
-		"auth", "login", "--site", "acme.atlassian.net", "--token-stdin")
+		"auth", "login", "--no-verify", "--site", "acme.atlassian.invalid", "--token-stdin")
 	if got.exit != exitcode.Usage {
 		t.Errorf("exit = %v, want %v\nstderr: %s", got.exit, exitcode.Usage, got.stderr)
 	}
@@ -303,9 +303,9 @@ func TestLoginRejectsEmptyStdin(t *testing.T) {
 // with one fails authentication in a way that looks like a wrong token.
 func TestLoginTrimsTheToken(t *testing.T) {
 	env := session(t)
-	mustRun(t, env, "context", "create", "work", "--site", "acme.atlassian.net")
+	mustRun(t, env, "context", "create", "work", "--site", "acme.atlassian.invalid")
 	if got := runWithStdin(t, env, strings.NewReader(theToken+"\n"),
-		"auth", "login", "--site", "acme.atlassian.net", "--token-stdin"); got.exit != exitcode.OK {
+		"auth", "login", "--no-verify", "--site", "acme.atlassian.invalid", "--token-stdin"); got.exit != exitcode.OK {
 		t.Fatalf("login: %v\n%s", got.exit, got.stderr)
 	}
 
@@ -320,7 +320,7 @@ func TestLoginTrimsTheToken(t *testing.T) {
 func TestCredentialFileIsNotWorldReadable(t *testing.T) {
 	env := session(t)
 	runWithStdin(t, env, strings.NewReader(theToken),
-		"auth", "login", "--site", "acme.atlassian.net", "--token-stdin")
+		"auth", "login", "--no-verify", "--site", "acme.atlassian.invalid", "--token-stdin")
 
 	path := filepath.Join(env["XDG_STATE_HOME"], "jr", "credentials.toml")
 	info, err := os.Stat(path)
@@ -336,9 +336,9 @@ func TestCredentialFileIsNotWorldReadable(t *testing.T) {
 // separate at all.
 func TestConfigFileNeverContainsACredential(t *testing.T) {
 	env := session(t)
-	mustRun(t, env, "context", "create", "work", "--site", "acme.atlassian.net")
+	mustRun(t, env, "context", "create", "work", "--site", "acme.atlassian.invalid")
 	runWithStdin(t, env, strings.NewReader(theToken),
-		"auth", "login", "--site", "acme.atlassian.net", "--token-stdin")
+		"auth", "login", "--no-verify", "--site", "acme.atlassian.invalid", "--token-stdin")
 
 	data, err := os.ReadFile(filepath.Join(env["XDG_CONFIG_HOME"], "jr", "config.toml"))
 	if err != nil {
@@ -353,7 +353,7 @@ func TestConfigFileNeverContainsACredential(t *testing.T) {
 func TestReadOnlyContextIsReportedAsSuch(t *testing.T) {
 	env := session(t)
 	mustRun(t, env, "context", "create", "audit",
-		"--site", "acme.atlassian.net", "--readonly")
+		"--site", "acme.atlassian.invalid", "--readonly")
 
 	got := mustRun(t, env, "context", "show")
 	if !strings.Contains(got.stdout, `readonly="true"`) {
@@ -369,7 +369,7 @@ func TestReadOnlyContextIsReportedAsSuch(t *testing.T) {
 
 func TestReadOnlyEnvIsVisible(t *testing.T) {
 	env := session(t)
-	mustRun(t, env, "context", "create", "work", "--site", "acme.atlassian.net")
+	mustRun(t, env, "context", "create", "work", "--site", "acme.atlassian.invalid")
 	env["JIRA_READONLY"] = "1"
 
 	got := mustRun(t, env, "context", "show")
@@ -410,7 +410,7 @@ func TestNoContextIsAUsableState(t *testing.T) {
 func TestConfigIsHandEditable(t *testing.T) {
 	env := session(t)
 	mustRun(t, env, "context", "create", "work",
-		"--site", "acme.atlassian.net", "--project", "ENG")
+		"--site", "acme.atlassian.invalid", "--project", "ENG")
 
 	data, err := os.ReadFile(filepath.Join(env["XDG_CONFIG_HOME"], "jr", "config.toml"))
 	if err != nil {
@@ -420,7 +420,7 @@ func TestConfigIsHandEditable(t *testing.T) {
 	if !strings.HasPrefix(text, "#") {
 		t.Errorf("the config has no explanatory header:\n%s", text)
 	}
-	for _, want := range []string{"current", "[contexts.work]", "acme.atlassian.net", "ENG"} {
+	for _, want := range []string{"current", "[contexts.work]", "acme.atlassian.invalid", "ENG"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("the config is missing %q:\n%s", want, text)
 		}
@@ -439,7 +439,7 @@ func TestHandEditedConfigIsRead(t *testing.T) {
 current = "byhand"
 
 [contexts.byhand]
-site = "hand.atlassian.net"
+site = "hand.atlassian.invalid"
 project = "HAND"
 readonly = true
 `
@@ -460,15 +460,15 @@ readonly = true
 // writes to disk or a shell where quoting a pipeline is awkward.
 func TestTokenFile(t *testing.T) {
 	env := session(t)
-	mustRun(t, env, "context", "create", "work", "--site", "acme.atlassian.net")
+	mustRun(t, env, "context", "create", "work", "--site", "acme.atlassian.invalid")
 
 	path := filepath.Join(t.TempDir(), "token")
 	if err := os.WriteFile(path, []byte(theToken+"\n"), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 
-	got := run(t, env, "auth", "login",
-		"--site", "acme.atlassian.net", "--email", "ada@example.com",
+	got := run(t, env, "auth", "login", "--no-verify",
+		"--site", "acme.atlassian.invalid", "--email", "ada@example.com",
 		"--token-file", path)
 	if got.exit != exitcode.OK {
 		t.Fatalf("exit = %v\nstderr: %s", got.exit, got.stderr)
@@ -487,7 +487,7 @@ func TestTokenFile(t *testing.T) {
 func TestTokenFileDashMeansStdin(t *testing.T) {
 	env := session(t)
 	got := runWithStdin(t, env, strings.NewReader(theToken),
-		"auth", "login", "--site", "acme.atlassian.net", "--token-file", "-")
+		"auth", "login", "--no-verify", "--site", "acme.atlassian.invalid", "--token-file", "-")
 	if got.exit != exitcode.OK {
 		t.Fatalf("exit = %v\nstderr: %s", got.exit, got.stderr)
 	}
@@ -497,7 +497,7 @@ func TestTokenFileDashMeansStdin(t *testing.T) {
 // reads as a hang: the command says what it needs instead of waiting.
 func TestNoTokenSourceIsRefusedWithEveryOption(t *testing.T) {
 	env := session(t)
-	got := run(t, env, "auth", "login", "--site", "acme.atlassian.net")
+	got := run(t, env, "auth", "login", "--no-verify", "--site", "acme.atlassian.invalid")
 	if got.exit != exitcode.Usage {
 		t.Fatalf("exit = %v, want %v\nstderr: %s", got.exit, exitcode.Usage, got.stderr)
 	}
@@ -521,7 +521,7 @@ func TestAmbiguousTokenSourceIsRefused(t *testing.T) {
 	}
 
 	got := runWithStdin(t, env, strings.NewReader("other"),
-		"auth", "login", "--site", "acme.atlassian.net",
+		"auth", "login", "--no-verify", "--site", "acme.atlassian.invalid",
 		"--token-stdin", "--token-file", path)
 	if got.exit != exitcode.Usage {
 		t.Errorf("exit = %v, want %v", got.exit, exitcode.Usage)
@@ -534,8 +534,8 @@ func TestAmbiguousTokenSourceIsRefused(t *testing.T) {
 
 func TestMissingTokenFileIsAUsageError(t *testing.T) {
 	env := session(t)
-	got := run(t, env, "auth", "login",
-		"--site", "acme.atlassian.net", "--token-file", "/nonexistent/token")
+	got := run(t, env, "auth", "login", "--no-verify",
+		"--site", "acme.atlassian.invalid", "--token-file", "/nonexistent/token")
 	if got.exit != exitcode.Usage {
 		t.Errorf("exit = %v, want %v", got.exit, exitcode.Usage)
 	}
@@ -552,7 +552,7 @@ func TestLoginCreatesTheFirstContext(t *testing.T) {
 	env := session(t)
 
 	got := runWithStdin(t, env, strings.NewReader(theToken),
-		"auth", "login", "--site", "jira.corp.com", "--token-stdin")
+		"auth", "login", "--no-verify", "--site", "jira.corp.invalid", "--token-stdin")
 	if got.exit != exitcode.OK {
 		t.Fatalf("login: exit = %v\nstderr: %s", got.exit, got.stderr)
 	}
@@ -563,13 +563,13 @@ func TestLoginCreatesTheFirstContext(t *testing.T) {
 	}
 
 	list := mustRun(t, env, "context", "list")
-	if !strings.Contains(list.stdout, "https://jira.corp.com") {
+	if !strings.Contains(list.stdout, "https://jira.corp.invalid") {
 		t.Errorf("no context was created:\n%s", list.stdout)
 	}
 
 	// And the site now resolves, which is the whole point.
 	show := mustRun(t, env, "context", "show")
-	if !strings.Contains(show.stdout, `site="https://jira.corp.com"`) {
+	if !strings.Contains(show.stdout, `site="https://jira.corp.invalid"`) {
 		t.Errorf("the site does not resolve after login:\n%s", show.stdout)
 	}
 }
@@ -580,10 +580,10 @@ func TestLoginCreatesTheFirstContext(t *testing.T) {
 func TestLoginDoesNotTouchExistingContexts(t *testing.T) {
 	env := session(t)
 	mustRun(t, env, "context", "create", "work",
-		"--site", "acme.atlassian.net", "--project", "ENG")
+		"--site", "acme.atlassian.invalid", "--project", "ENG")
 
 	got := runWithStdin(t, env, strings.NewReader(theToken),
-		"auth", "login", "--site", "other.atlassian.net", "--token-stdin")
+		"auth", "login", "--no-verify", "--site", "other.atlassian.invalid", "--token-stdin")
 	if got.exit != exitcode.OK {
 		t.Fatalf("login: exit = %v\nstderr: %s", got.exit, got.stderr)
 	}
@@ -592,7 +592,7 @@ func TestLoginDoesNotTouchExistingContexts(t *testing.T) {
 	}
 
 	list := mustRun(t, env, "context", "list")
-	if strings.Contains(list.stdout, "other.atlassian.net") {
+	if strings.Contains(list.stdout, "other.atlassian.invalid") {
 		t.Errorf("login added a context:\n%s", list.stdout)
 	}
 	show := mustRun(t, env, "context", "show")
@@ -605,16 +605,16 @@ func TestLoginDoesNotTouchExistingContexts(t *testing.T) {
 // first label would not be a usable context name.
 func TestContextNameIsDerivedFromTheHost(t *testing.T) {
 	cases := map[string]string{
-		"jira.corp.com":      "jira",
-		"acme.atlassian.net": "acme",
-		"127.0.0.1:8080":     "default",
-		"localhost:8080":     "localhost",
+		"jira.corp.invalid":      "jira",
+		"acme.atlassian.invalid": "acme",
+		"127.0.0.1:8080":         "default",
+		"localhost:8080":         "localhost",
 	}
 	for host, want := range cases {
 		t.Run(host, func(t *testing.T) {
 			env := session(t)
 			got := runWithStdin(t, env, strings.NewReader(theToken),
-				"auth", "login", "--site", host, "--token-stdin")
+				"auth", "login", "--no-verify", "--site", host, "--token-stdin")
 			if got.exit != exitcode.OK {
 				t.Fatalf("login: exit = %v\nstderr: %s", got.exit, got.stderr)
 			}

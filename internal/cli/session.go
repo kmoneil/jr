@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/kmoneil/jira-cli/internal/auth"
 	"github.com/kmoneil/jira-cli/internal/buildinfo"
@@ -180,4 +181,35 @@ func (a *app) jiraSession() (registry.Session, error) {
 		return nil, err
 	}
 	return s, nil
+}
+
+// verifyCredential proves a credential works against a site before it is
+// stored.
+//
+// Two questions, in order: is this really a Jira API — which catches a wrong
+// host or a missing context path — and does this credential authenticate. The
+// deployment probe answers anonymously on most instances and so proves nothing
+// about the token, which is why the account fetch follows it.
+//
+// The probe is not cached here. Caching a result gathered with a credential that
+// might be about to be rejected would leave a wrong answer on disk for a day.
+func (a *app) verifyCredential(
+	ctx context.Context, siteURL string, cred auth.Credential,
+) (site.Account, error) {
+	client, err := transport.New(transport.Options{
+		BaseURL:   siteURL,
+		Auth:      authorizerFor(cred),
+		Retries:   a.retries,
+		UserAgent: userAgent(),
+		Tracer:    a.tracer(),
+	})
+	if err != nil {
+		return site.Account{}, err
+	}
+
+	info, err := site.Probe(ctx, client, time.Now())
+	if err != nil {
+		return site.Account{}, err
+	}
+	return site.Whoami(ctx, client, info)
 }

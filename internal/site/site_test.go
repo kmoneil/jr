@@ -39,10 +39,10 @@ func (s *stubDoer) Do(context.Context, transport.Request) (*transport.Response, 
 	}, nil
 }
 
-const cloudInfo = `{"baseUrl":"https://acme.atlassian.net","version":"1001.0.0",
+const cloudInfo = `{"baseUrl":"https://acme.atlassian.invalid","version":"1001.0.0",
 	"versionNumbers":[1001,0,0],"deploymentType":"Cloud"}`
 
-const dcInfo = `{"baseUrl":"https://jira.acme.internal","version":"9.12.7",
+const dcInfo = `{"baseUrl":"https://jira.acme.invalid","version":"9.12.7",
 	"versionNumbers":[9,12,7],"deploymentType":"Server"}`
 
 func TestProbeIdentifiesBothDeployments(t *testing.T) {
@@ -131,7 +131,7 @@ func newResolver(t *testing.T, doer *stubDoer, now time.Time) *site.Resolver {
 	t.Helper()
 	return &site.Resolver{
 		Client: doer,
-		Cache:  &site.Cache{Dir: filepath.Join(t.TempDir(), "acme.atlassian.net")},
+		Cache:  &site.Cache{Dir: filepath.Join(t.TempDir(), "acme.atlassian.invalid")},
 		Now:    func() time.Time { return now },
 	}
 }

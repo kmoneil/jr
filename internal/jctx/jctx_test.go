@@ -115,14 +115,14 @@ func TestSiteCacheIsOnePathElement(t *testing.T) {
 		t.Fatalf("DefaultPaths: %v", err)
 	}
 	cases := map[string]string{
-		"acme.atlassian.net":         "acme.atlassian.net",
-		"https://acme.atlassian.net": "acme.atlassian.net",
-		"http://acme.atlassian.net/": "acme.atlassian.net",
-		"ACME.Atlassian.NET":         "acme.atlassian.net",
-		"jira.acme.internal:8080":    "jira.acme.internal_8080",
-		"jira.acme.internal/jira":    "jira.acme.internal_jira",
-		"../../../etc/passwd":        ".._.._.._etc_passwd",
-		"":                           "unknown",
+		"acme.atlassian.invalid":         "acme.atlassian.invalid",
+		"https://acme.atlassian.invalid": "acme.atlassian.invalid",
+		"http://acme.atlassian.invalid/": "acme.atlassian.invalid",
+		"ACME.Atlassian.INVALID":         "acme.atlassian.invalid",
+		"jira.acme.invalid:8080":         "jira.acme.invalid_8080",
+		"jira.acme.invalid/jira":         "jira.acme.invalid_jira",
+		"../../../etc/passwd":            ".._.._.._etc_passwd",
+		"":                               "unknown",
 	}
 	for site, want := range cases {
 		got := paths.SiteCache(site)
@@ -138,16 +138,16 @@ func TestSiteCacheIsOnePathElement(t *testing.T) {
 
 func TestNormalizeSite(t *testing.T) {
 	cases := map[string]string{
-		"acme.atlassian.net":         "https://acme.atlassian.net",
-		"https://acme.atlassian.net": "https://acme.atlassian.net",
+		"acme.atlassian.invalid":         "https://acme.atlassian.invalid",
+		"https://acme.atlassian.invalid": "https://acme.atlassian.invalid",
 		// A bare hostname gets https; downgrading to http silently would be a
 		// security change nobody asked for.
-		"ACME.atlassian.net":      "https://ACME.atlassian.net",
-		"http://localhost:8080":   "http://localhost:8080",
-		"acme.atlassian.net/":     "https://acme.atlassian.net",
-		"jira.acme.internal/jira": "https://jira.acme.internal/jira",
-		"jira.acme.internal:8443": "https://jira.acme.internal:8443",
-		"  acme.atlassian.net  ":  "https://acme.atlassian.net",
+		"ACME.atlassian.invalid":     "https://ACME.atlassian.invalid",
+		"http://localhost:8080":      "http://localhost:8080",
+		"acme.atlassian.invalid/":    "https://acme.atlassian.invalid",
+		"jira.acme.invalid/jira":     "https://jira.acme.invalid/jira",
+		"jira.acme.invalid:8443":     "https://jira.acme.invalid:8443",
+		"  acme.atlassian.invalid  ": "https://acme.atlassian.invalid",
 	}
 	for in, want := range cases {
 		got, err := jctx.NormalizeSite(in)
@@ -160,7 +160,7 @@ func TestNormalizeSite(t *testing.T) {
 		}
 	}
 
-	for _, in := range []string{"", "   ", "ftp://acme.atlassian.net", "file:///etc/passwd", "-bad"} {
+	for _, in := range []string{"", "   ", "ftp://acme.atlassian.invalid", "file:///etc/passwd", "-bad"} {
 		if got, err := jctx.NormalizeSite(in); err == nil {
 			t.Errorf("NormalizeSite(%q) = %q, want an error", in, got)
 		} else if errs.ExitOf(err) != exitcode.Usage {
@@ -221,13 +221,13 @@ func TestConfigRoundTrip(t *testing.T) {
 	}
 
 	if err := cfg.Set("work", jctx.Context{
-		Site: "acme.atlassian.net", Project: "ENG", Board: "42",
+		Site: "acme.atlassian.invalid", Project: "ENG", Board: "42",
 		Fields: []string{"summary", "status"},
 	}); err != nil {
 		t.Fatalf("set: %v", err)
 	}
 	if err := cfg.Set("audit", jctx.Context{
-		Site: "acme.atlassian.net", ReadOnly: true,
+		Site: "acme.atlassian.invalid", ReadOnly: true,
 	}); err != nil {
 		t.Fatalf("set: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestConfigRoundTrip(t *testing.T) {
 	if !ok {
 		t.Fatal("work was not saved")
 	}
-	if work.Site != "https://acme.atlassian.net" {
+	if work.Site != "https://acme.atlassian.invalid" {
 		t.Errorf("the site was not normalized on save: %q", work.Site)
 	}
 	if work.Project != "ENG" || work.Board != "42" {
@@ -271,7 +271,7 @@ func TestConfigNeverHoldsACredential(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if err := cfg.Set("work", jctx.Context{Site: "acme.atlassian.net"}); err != nil {
+	if err := cfg.Set("work", jctx.Context{Site: "acme.atlassian.invalid"}); err != nil {
 		t.Fatalf("set: %v", err)
 	}
 	if err := cfg.Save(); err != nil {
@@ -296,7 +296,7 @@ func TestConfigNeverHoldsACredential(t *testing.T) {
 func TestGetReturnsACopy(t *testing.T) {
 	cfg := newConfig(t)
 	if err := cfg.Set("work", jctx.Context{
-		Site: "acme.atlassian.net", Fields: []string{"summary"},
+		Site: "acme.atlassian.invalid", Fields: []string{"summary"},
 	}); err != nil {
 		t.Fatalf("set: %v", err)
 	}
@@ -314,7 +314,7 @@ func TestGetReturnsACopy(t *testing.T) {
 func TestUseAndDelete(t *testing.T) {
 	cfg := newConfig(t)
 	for _, name := range []string{"work", "personal"} {
-		if err := cfg.Set(name, jctx.Context{Site: "acme.atlassian.net"}); err != nil {
+		if err := cfg.Set(name, jctx.Context{Site: "acme.atlassian.invalid"}); err != nil {
 			t.Fatalf("set %s: %v", name, err)
 		}
 	}
@@ -354,7 +354,7 @@ func TestUseAndDelete(t *testing.T) {
 func TestDeletingCurrentAmongManyLeavesNoneSelected(t *testing.T) {
 	cfg := newConfig(t)
 	for _, name := range []string{"a", "b", "c"} {
-		if err := cfg.Set(name, jctx.Context{Site: "acme.atlassian.net"}); err != nil {
+		if err := cfg.Set(name, jctx.Context{Site: "acme.atlassian.invalid"}); err != nil {
 			t.Fatalf("set: %v", err)
 		}
 	}
@@ -372,10 +372,10 @@ func TestDeletingCurrentAmongManyLeavesNoneSelected(t *testing.T) {
 func TestLoadRejectsBadConfigs(t *testing.T) {
 	cases := map[string]string{
 		"malformed toml":   "this is not toml [[[",
-		"invalid name":     "[contexts.\"Bad Name\"]\nsite = \"acme.atlassian.net\"\n",
+		"invalid name":     "[contexts.\"Bad Name\"]\nsite = \"acme.atlassian.invalid\"\n",
 		"context no site":  "[contexts.work]\nproject = \"ENG\"\n",
 		"bad site":         "[contexts.work]\nsite = \"ftp://acme\"\n",
-		"dangling current": "current = \"nope\"\n[contexts.work]\nsite = \"acme.atlassian.net\"\n",
+		"dangling current": "current = \"nope\"\n[contexts.work]\nsite = \"acme.atlassian.invalid\"\n",
 	}
 	for name, content := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -399,7 +399,7 @@ func TestSaveIsAtomic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if err := cfg.Set("work", jctx.Context{Site: "acme.atlassian.net"}); err != nil {
+	if err := cfg.Set("work", jctx.Context{Site: "acme.atlassian.invalid"}); err != nil {
 		t.Fatalf("set: %v", err)
 	}
 	if err := cfg.Save(); err != nil {
@@ -420,10 +420,10 @@ func TestSaveIsAtomic(t *testing.T) {
 
 func TestCredentialRef(t *testing.T) {
 	cases := []struct{ site, credential, want string }{
-		{"acme.atlassian.net", "", "acme.atlassian.net"},
-		{"https://acme.atlassian.net", "", "acme.atlassian.net"},
-		{"https://jira.acme.internal/jira", "", "jira.acme.internal"},
-		{"acme.atlassian.net", "shared", "shared"},
+		{"acme.atlassian.invalid", "", "acme.atlassian.invalid"},
+		{"https://acme.atlassian.invalid", "", "acme.atlassian.invalid"},
+		{"https://jira.acme.invalid/jira", "", "jira.acme.invalid"},
+		{"acme.atlassian.invalid", "shared", "shared"},
 	}
 	for _, tc := range cases {
 		ctx := jctx.Context{Site: tc.site, Credential: tc.credential}

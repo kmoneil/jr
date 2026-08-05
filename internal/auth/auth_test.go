@@ -165,7 +165,7 @@ func TestEnvProvider(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			p := auth.EnvProvider{Getenv: env(tc.vars)}
-			cred, ok, err := p.Lookup("acme.atlassian.net")
+			cred, ok, err := p.Lookup("acme.atlassian.invalid")
 			if err != nil {
 				t.Fatalf("lookup: %v", err)
 			}
@@ -197,7 +197,7 @@ func TestHalfConfiguredEnvironmentIsLoud(t *testing.T) {
 	p := auth.EnvProvider{Getenv: env(map[string]string{
 		auth.EnvToken: theToken, auth.EnvAuthScheme: "basic",
 	})}
-	_, _, err := p.Lookup("acme.atlassian.net")
+	_, _, err := p.Lookup("acme.atlassian.invalid")
 	if err == nil {
 		t.Fatal("basic auth with no user was accepted from the environment")
 	}
@@ -213,7 +213,7 @@ func TestEnvProviderRejectsABadScheme(t *testing.T) {
 	p := auth.EnvProvider{Getenv: env(map[string]string{
 		auth.EnvToken: theToken, auth.EnvAuthScheme: "magic",
 	})}
-	if _, _, err := p.Lookup("acme.atlassian.net"); err == nil {
+	if _, _, err := p.Lookup("acme.atlassian.invalid"); err == nil {
 		t.Fatal("an unknown scheme in the environment was accepted")
 	}
 }
@@ -234,13 +234,13 @@ func TestFileStoreRoundTrip(t *testing.T) {
 	cred := auth.Credential{
 		Scheme: auth.Basic, User: "ada@example.com", Secret: auth.Secret(theToken),
 	}
-	if err := store.Save("https://acme.atlassian.net", cred); err != nil {
+	if err := store.Save("https://acme.atlassian.invalid", cred); err != nil {
 		t.Fatalf("save: %v", err)
 	}
 
 	// Stored by host, so two contexts pointing at the same site share one
 	// credential and a scheme change does not orphan it.
-	got, ok, err := store.Lookup("acme.atlassian.net")
+	got, ok, err := store.Lookup("acme.atlassian.invalid")
 	if err != nil {
 		t.Fatalf("lookup: %v", err)
 	}
@@ -258,7 +258,7 @@ func TestFileStoreRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hosts: %v", err)
 	}
-	if len(hosts) != 1 || hosts[0] != "acme.atlassian.net" {
+	if len(hosts) != 1 || hosts[0] != "acme.atlassian.invalid" {
 		t.Errorf("Hosts = %v", hosts)
 	}
 }
@@ -268,7 +268,7 @@ func TestFileStoreRoundTrip(t *testing.T) {
 func TestStoredCredentialIsNotWorldReadable(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "credentials.toml")
 	store := auth.FileStore{Path: path}
-	if err := store.Save("acme.atlassian.net", auth.Credential{
+	if err := store.Save("acme.atlassian.invalid", auth.Credential{
 		Scheme: auth.Bearer, Secret: auth.Secret(theToken),
 	}); err != nil {
 		t.Fatalf("save: %v", err)
@@ -295,14 +295,14 @@ func TestStoredCredentialIsNotWorldReadable(t *testing.T) {
 // TestOverlyOpenStoreIsRefused matters because reading it anyway and warning
 // would mean the credential is used, and stays exposed, every single time.
 func TestOverlyOpenStoreIsRefused(t *testing.T) {
-	content := "[credentials.\"acme.atlassian.net\"]\nscheme = \"bearer\"\ntoken = \"" +
+	content := "[credentials.\"acme.atlassian.invalid\"]\nscheme = \"bearer\"\ntoken = \"" +
 		theToken + "\"\n"
 
 	for _, perm := range []os.FileMode{0o644, 0o640, 0o604, 0o666} {
 		path := writeStore(t, content, perm)
 		store := auth.FileStore{Path: path}
 
-		_, _, err := store.Lookup("acme.atlassian.net")
+		_, _, err := store.Lookup("acme.atlassian.invalid")
 		if err == nil {
 			t.Errorf("a credential file at mode %04o was read", perm)
 			continue
@@ -323,7 +323,7 @@ func TestOverlyOpenStoreIsRefused(t *testing.T) {
 
 func TestMissingStoreIsNotAnError(t *testing.T) {
 	store := auth.FileStore{Path: filepath.Join(t.TempDir(), "nope.toml")}
-	_, ok, err := store.Lookup("acme.atlassian.net")
+	_, ok, err := store.Lookup("acme.atlassian.invalid")
 	if err != nil {
 		t.Fatalf("lookup: %v", err)
 	}
@@ -342,13 +342,13 @@ func TestMissingStoreIsNotAnError(t *testing.T) {
 func TestFileStoreDelete(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "credentials.toml")
 	store := auth.FileStore{Path: path}
-	if err := store.Save("acme.atlassian.net", auth.Credential{
+	if err := store.Save("acme.atlassian.invalid", auth.Credential{
 		Scheme: auth.Bearer, Secret: auth.Secret(theToken),
 	}); err != nil {
 		t.Fatalf("save: %v", err)
 	}
 
-	removed, err := store.Delete("https://acme.atlassian.net/")
+	removed, err := store.Delete("https://acme.atlassian.invalid/")
 	if err != nil {
 		t.Fatalf("delete: %v", err)
 	}
@@ -358,7 +358,7 @@ func TestFileStoreDelete(t *testing.T) {
 
 	// Removing one that is not there is not an error: the caller asked for it
 	// to be gone, and it is.
-	removed, err = store.Delete("acme.atlassian.net")
+	removed, err = store.Delete("acme.atlassian.invalid")
 	if err != nil {
 		t.Fatalf("delete again: %v", err)
 	}
@@ -369,9 +369,9 @@ func TestFileStoreDelete(t *testing.T) {
 
 func TestStoreRejectsAnUnknownScheme(t *testing.T) {
 	path := writeStore(t,
-		"[credentials.\"acme.atlassian.net\"]\nscheme = \"magic\"\ntoken = \"x\"\n", 0o600)
+		"[credentials.\"acme.atlassian.invalid\"]\nscheme = \"magic\"\ntoken = \"x\"\n", 0o600)
 	store := auth.FileStore{Path: path}
-	if _, _, err := store.Lookup("acme.atlassian.net"); err == nil {
+	if _, _, err := store.Lookup("acme.atlassian.invalid"); err == nil {
 		t.Fatal("a credential with an unknown scheme was returned")
 	}
 }
@@ -379,7 +379,7 @@ func TestStoreRejectsAnUnknownScheme(t *testing.T) {
 func TestStoreRejectsMalformedToml(t *testing.T) {
 	path := writeStore(t, "not toml [[[", 0o600)
 	store := auth.FileStore{Path: path}
-	if _, _, err := store.Lookup("acme.atlassian.net"); err == nil {
+	if _, _, err := store.Lookup("acme.atlassian.invalid"); err == nil {
 		t.Fatal("a malformed store loaded successfully")
 	}
 }
@@ -388,7 +388,7 @@ func TestStoreRejectsMalformedToml(t *testing.T) {
 func TestChainPrecedence(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "credentials.toml")
 	store := auth.FileStore{Path: path}
-	if err := store.Save("acme.atlassian.net", auth.Credential{
+	if err := store.Save("acme.atlassian.invalid", auth.Credential{
 		Scheme: auth.Bearer, Secret: auth.Secret("from-store"),
 	}); err != nil {
 		t.Fatalf("save: %v", err)
@@ -396,7 +396,7 @@ func TestChainPrecedence(t *testing.T) {
 
 	// With nothing in the environment, the store wins.
 	chain := auth.DefaultChain(env(map[string]string{"NETRC": "/nonexistent"}), path)
-	cred, err := chain.Resolve("acme.atlassian.net")
+	cred, err := chain.Resolve("acme.atlassian.invalid")
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
@@ -409,7 +409,7 @@ func TestChainPrecedence(t *testing.T) {
 	chain = auth.DefaultChain(env(map[string]string{
 		auth.EnvToken: "from-env", "NETRC": "/nonexistent",
 	}), path)
-	cred, err = chain.Resolve("acme.atlassian.net")
+	cred, err = chain.Resolve("acme.atlassian.invalid")
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
@@ -424,7 +424,7 @@ func TestMissingCredentialNamesEveryPlaceLookedIn(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "credentials.toml")
 	chain := auth.DefaultChain(env(map[string]string{"NETRC": "/nonexistent"}), path)
 
-	_, err := chain.Resolve("acme.atlassian.net")
+	_, err := chain.Resolve("acme.atlassian.invalid")
 	if err == nil {
 		t.Fatal("resolving with no credential anywhere succeeded")
 	}
@@ -447,7 +447,7 @@ func TestAuthorizerProducesHeaders(t *testing.T) {
 		Scheme: auth.Bearer, Secret: auth.Secret(theToken),
 	}}
 	headers, err := a.Authorize(t.Context(), auth.RequestInfo{
-		Method: "GET", URL: "https://acme.atlassian.net/rest/api/3/myself",
+		Method: "GET", URL: "https://acme.atlassian.invalid/rest/api/3/myself",
 	})
 	if err != nil {
 		t.Fatalf("authorize: %v", err)
