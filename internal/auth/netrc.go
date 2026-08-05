@@ -1,0 +1,215 @@
+package auth
+
+import (
+	"bufio"
+	"errors"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/kmoneil/jira-cli/internal/errs"
+)
+
+// NetrcProvider reads a credential from a .netrc file.
+//
+// It is last in the chain because .netrc is shared with curl, git, and
+// everything else: a match there is the least specific statement that this
+// credential is meant for this tool.
+type NetrcProvider struct {
+	// Path is the file to read. Empty means $NETRC, then ~/.netrc.
+	Path   string
+	Getenv Getenv
+}
+
+// Name implements Provider.
+func (NetrcProvider) Name() string { return ".netrc" }
+
+// Lookup implements Provider.
+func (p NetrcProvider) Lookup(site string) (Credential, bool, error) {
+	path := p.resolvePath()
+	if path == "" {
+		return Credential{}, false, nil
+	}
+
+	data, err := os.ReadFile(path) //nolint:gosec // the path is the user's own netrc.
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return Credential{}, false, nil
+		}
+		return Credential{}, false, errs.Auth("NETRC_UNREADABLE",
+			"cannot read %s", path).WithRemedy("check the file's permissions").Wrap(err)
+	}
+
+	entry, ok := parseNetrc(string(data), hostOf(site))
+	if !ok {
+		return Credential{}, false, nil
+	}
+	if entry.password == "" {
+		return Credential{}, false, nil
+	}
+
+	return Credential{
+		Scheme: inferScheme(entry.login),
+		User:   entry.login,
+		Secret: Secret(entry.password),
+		Source: path,
+	}, true, nil
+}
+
+func (p NetrcProvider) resolvePath() string {
+	if p.Path != "" {
+		return p.Path
+	}
+	getenv := p.Getenv
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+	if override := strings.TrimSpace(getenv("NETRC")); override != "" {
+		return override
+	}
+	home := strings.TrimSpace(getenv("HOME"))
+	if home == "" {
+		var err error
+		home, err = os.UserHomeDir()
+		if err != nil {
+			return ""
+		}
+	}
+	return filepath.Join(home, ".netrc")
+}
+
+type netrcEntry struct {
+	machine  string
+	login    string
+	password string
+}
+
+// parseNetrc finds the entry for a host.
+//
+// The format is a flat token stream, not a line-oriented one: `machine x login
+// y password z` on one line and spread across four are the same file. A default
+// entry, if present, matches any host not named explicitly, and is only used
+// when no explicit entry matched.
+func parseNetrc(content, host string) (netrcEntry, bool) {
+	var (
+		current    netrcEntry
+		fallback   netrcEntry
+		haveMatch  bool
+		haveFall   bool
+		inDefault  bool
+		collecting bool
+	)
+
+	commit := func() {
+		switch {
+		case !collecting:
+		case inDefault:
+			if !haveFall {
+				fallback, haveFall = current, true
+			}
+		case current.machine == host:
+			if !haveMatch {
+				current.machine = host
+				haveMatch = true
+				fallback = current
+			}
+		}
+	}
+
+	tokens := netrcTokens(content)
+	for i := 0; i < len(tokens); i++ {
+		switch tokens[i] {
+		case "machine":
+			commit()
+			if haveMatch {
+				return fallback, true
+			}
+			i++
+			if i >= len(tokens) {
+				return netrcEntry{}, false
+			}
+			current = netrcEntry{machine: strings.ToLower(tokens[i])}
+			inDefault, collecting = false, true
+
+		case "default":
+			commit()
+			if haveMatch {
+				return fallback, true
+			}
+			current = netrcEntry{}
+			inDefault, collecting = true, true
+
+		case "login", "user":
+			i++
+			if i < len(tokens) && collecting {
+				current.login = tokens[i]
+			}
+
+		case "password", "account":
+			i++
+			if i < len(tokens) && collecting && tokens[i-1] == "password" {
+				current.password = tokens[i]
+			}
+
+		case "macdef":
+			// A macro definition runs to a blank line. Skipping to the next
+			// keyword is enough, since a macro body cannot contain one at the
+			// start of a token.
+			i++
+		}
+	}
+	commit()
+
+	if haveMatch || haveFall {
+		return fallback, true
+	}
+	return netrcEntry{}, false
+}
+
+// netrcTokens splits on whitespace, honoring double-quoted values so a password
+// containing a space survives.
+func netrcTokens(content string) []string {
+	var out []string
+	scanner := bufio.NewScanner(strings.NewReader(content))
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if idx := strings.Index(line, "#"); idx >= 0 {
+			line = line[:idx]
+		}
+		out = append(out, splitQuoted(line)...)
+	}
+	return out
+}
+
+func splitQuoted(line string) []string {
+	var (
+		out     []string
+		current strings.Builder
+		quoted  bool
+		started bool
+	)
+	flush := func() {
+		if started {
+			out = append(out, current.String())
+			current.Reset()
+			started = false
+		}
+	}
+	for _, r := range line {
+		switch {
+		case r == '"':
+			quoted = !quoted
+			started = true
+		case !quoted && (r == ' ' || r == '\t'):
+			flush()
+		default:
+			current.WriteRune(r)
+			started = true
+		}
+	}
+	flush()
+	return out
+}

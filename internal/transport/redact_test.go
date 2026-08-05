@@ -131,11 +131,14 @@ func TestTokenNeverReachesDebugOutput(t *testing.T) {
 	var debug strings.Builder
 	c, err := transport.New(transport.Options{
 		BaseURL: srv.URL,
-		Auth: transport.AuthorizerFunc(func(_ context.Context, req *http.Request) error {
-			req.Header.Set("Authorization", "Bearer "+theToken)
-			req.Header.Set("Cookie", "JSESSIONID="+theToken)
-			return nil
-		}),
+		Auth: transport.AuthorizerFunc(
+			func(context.Context, transport.RequestInfo) (map[string]string, error) {
+				return map[string]string{
+					"Authorization": "Bearer " + theToken,
+					"Cookie":        "JSESSIONID=" + theToken,
+				}, nil
+			},
+		),
 		Retries: -1,
 		Tracer:  transport.NewTextTracer(&debug),
 	})
@@ -217,10 +220,11 @@ func TestRecorderRedactsAsItRecords(t *testing.T) {
 	c, err := transport.New(transport.Options{
 		BaseURL:    srv.URL,
 		HTTPClient: &http.Client{Transport: rec},
-		Auth: transport.AuthorizerFunc(func(_ context.Context, req *http.Request) error {
-			req.Header.Set("Authorization", "Bearer "+theToken)
-			return nil
-		}),
+		Auth: transport.AuthorizerFunc(
+			func(context.Context, transport.RequestInfo) (map[string]string, error) {
+				return map[string]string{"Authorization": "Bearer " + theToken}, nil
+			},
+		),
 	})
 	if err != nil {
 		t.Fatalf("new client: %v", err)

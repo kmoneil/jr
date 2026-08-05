@@ -31,7 +31,18 @@ type app struct {
 	reg    *registry.Registry
 	stdout io.Writer
 	stderr io.Writer
+	stdin  io.Reader
 	getenv func(string) string
+
+	// env holds the config file, credential store, and XDG paths, resolved
+	// once per invocation.
+	env environment
+
+	// Global flag values, shared by every command.
+	contextName string
+	site        string
+	project     string
+	readOnly    bool
 
 	// requestedFormat is the --format value, or the JIRA_FORMAT value, or
 	// empty when the caller expressed no preference and the per-content
@@ -53,7 +64,11 @@ type Options struct {
 	Registry *registry.Registry
 	Stdout   io.Writer
 	Stderr   io.Writer
-	Getenv   func(string) string
+	// Stdin supplies a credential to `auth login --token-stdin`. Nothing else
+	// reads it, and no command ever blocks on it: a headless build has no
+	// prompt to fall back to, so an empty stdin is an error rather than a wait.
+	Stdin  io.Reader
+	Getenv func(string) string
 }
 
 // Main runs one invocation and returns the exit status. It never calls
@@ -62,6 +77,7 @@ func Main(ctx context.Context, args []string, opt Options) exitcode.Code {
 	a := &app{
 		stdout: orElse[io.Writer](opt.Stdout, os.Stdout),
 		stderr: orElse[io.Writer](opt.Stderr, os.Stderr),
+		stdin:  orElse[io.Reader](opt.Stdin, os.Stdin),
 		getenv: opt.Getenv,
 	}
 	if a.getenv == nil {

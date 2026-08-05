@@ -1,0 +1,303 @@
+package cli
+
+import (
+	"context"
+	"strconv"
+	"strings"
+
+	"github.com/kmoneil/jira-cli/internal/auth"
+	"github.com/kmoneil/jira-cli/internal/buildinfo"
+	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jira-cli/internal/registry"
+	"github.com/kmoneil/jira-cli/internal/render"
+)
+
+// Output kinds owned by the auth commands.
+const (
+	kindAuthStatus    = "auth.status"
+	kindAuthToken     = "auth.token"
+	versionAuthStatus = 1
+	versionAuthToken  = 1
+)
+
+func (a *app) authCommands() []*registry.Command {
+	return []*registry.Command{
+		a.authLoginCommand(),
+		a.authLogoutCommand(),
+		a.authStatusCommand(),
+		a.authTokenCommand(),
+	}
+}
+
+func (a *app) authLoginCommand() *registry.Command {
+	return &registry.Command{
+		Path:    []string{"auth", "login"},
+		Summary: "Store a credential for a site",
+		Description: strings.TrimSpace(`
+Writes a credential to the credential store, which lives under the state
+directory at mode 0600 and is separate from the config file. The config file is
+meant to be hand-edited and kept in a dotfiles repository; a credential in it
+would be committed by the first person who tried.
+
+On Cloud, pair --email with an API token. On Data Center, either pair --user
+with a password, or supply a personal access token alone and it is used as a
+bearer token.
+
+The token is read from --token-stdin rather than a flag, because a token on the
+command line lands in the shell history and in the process list, where anyone on
+the machine can read it.
+
+This writes local state only. It does not contact Jira, so it does not prove the
+credential works: run ` + "`" + buildinfo.App + ` auth status` + "`" + ` for that.`),
+		Example: strings.Join([]string{
+			"printf '%s' \"$TOKEN\" | " + buildinfo.App +
+				" auth login --site acme.atlassian.net --email ada@example.com --token-stdin",
+			"printf '%s' \"$PAT\" | " + buildinfo.App +
+				" auth login --site jira.acme.internal --token-stdin",
+		}, "\n"),
+		Flags: []registry.Flag{
+			{
+				Name: "site", Type: registry.TypeString, Required: true,
+				Usage: "Jira site, e.g. acme.atlassian.net",
+			},
+			{Name: "email", Type: registry.TypeString, Usage: "Cloud account email"},
+			{Name: "user", Type: registry.TypeString, Usage: "Data Center username"},
+			{
+				Name: "token-stdin", Type: registry.TypeBool, Required: true,
+				Usage: "read the token from stdin",
+			},
+			{
+				Name: "scheme", Type: registry.TypeEnum, Enum: auth.Schemes(),
+				Usage: "authentication scheme; inferred from whether a user was given",
+			},
+		},
+		LocalState: true,
+		Outputs:    []registry.Output{{Kind: kindAuthStatus, Version: versionAuthStatus}},
+		ExitCodes:  []exitcode.Code{exitcode.Auth},
+		Run:        a.runAuthLogin,
+	}
+}
+
+func (a *app) runAuthLogin(_ context.Context, inv *registry.Invocation) (*render.Doc, error) {
+	site, err := a.normalizeSite(inv.Flags.String("site"))
+	if err != nil {
+		return nil, err
+	}
+
+	token, err := a.readToken()
+	if err != nil {
+		return nil, err
+	}
+	user := firstNonEmpty(inv.Flags.String("email"), inv.Flags.String("user"))
+
+	scheme := auth.Bearer
+	if user != "" {
+		scheme = auth.Basic
+	}
+	if requested := inv.Flags.String("scheme"); requested != "" {
+		if scheme, err = auth.ParseScheme(requested); err != nil {
+			return nil, err
+		}
+	}
+
+	cred := auth.Credential{Scheme: scheme, User: user, Secret: token}
+	if err := cred.Validate(); err != nil {
+		return nil, err
+	}
+
+	store, err := a.credentialStore()
+	if err != nil {
+		return nil, err
+	}
+	if err := store.Save(site, cred); err != nil {
+		return nil, err
+	}
+
+	cred.Source = store.Path
+	return authStatusDoc(site, cred, true, nil), nil
+}
+
+func (a *app) authLogoutCommand() *registry.Command {
+	return &registry.Command{
+		Path:    []string{"auth", "logout"},
+		Summary: "Remove a stored credential",
+		Description: strings.TrimSpace(`
+Deletes the credential this tool stored for a site. It cannot remove one that
+came from the environment or from .netrc, and says so if that is where the
+credential is coming from — otherwise ` + "`auth logout`" + ` would report success
+while the site stayed authenticated.`),
+		Example: buildinfo.App + " auth logout --site acme.atlassian.net --yes",
+		Flags: []registry.Flag{
+			{
+				Name: "site", Type: registry.TypeString, Required: true,
+				Usage: "Jira site to forget",
+			},
+			{Name: "yes", Type: registry.TypeBool, Usage: "confirm the removal"},
+		},
+		LocalState:  true,
+		Destructive: true,
+		Outputs:     []registry.Output{{Kind: kindAuthStatus, Version: versionAuthStatus}},
+		ExitCodes:   []exitcode.Code{exitcode.NotFound, exitcode.Blocked},
+		Run:         a.runAuthLogout,
+	}
+}
+
+func (a *app) runAuthLogout(_ context.Context, inv *registry.Invocation) (*render.Doc, error) {
+	site, err := a.normalizeSite(inv.Flags.String("site"))
+	if err != nil {
+		return nil, err
+	}
+	if err := requireYes(inv, "removing the credential for "+site); err != nil {
+		return nil, err
+	}
+
+	store, err := a.credentialStore()
+	if err != nil {
+		return nil, err
+	}
+	removed, err := store.Delete(site)
+	if err != nil {
+		return nil, err
+	}
+	if !removed {
+		return nil, errs.NotFound("NO_STORED_CREDENTIAL",
+			"no stored credential for %s", site).
+			WithRemedy("run `%s auth status` to see where its credential comes from",
+				buildinfo.App)
+	}
+
+	// Report what is left, so a credential still arriving from the environment
+	// is visible rather than a surprise on the next command.
+	remaining, found, lookupErr := a.chain().Lookup(site)
+	if lookupErr != nil {
+		return nil, lookupErr
+	}
+	doc := authStatusDoc(site, remaining, found, nil)
+	doc.Record.Attr("removed", "true")
+	return doc, nil
+}
+
+func (a *app) authStatusCommand() *registry.Command {
+	return &registry.Command{
+		Path:    []string{"auth", "status"},
+		Summary: "Report which credential a site would use, and where it comes from",
+		Description: strings.TrimSpace(`
+Reports the credential that would be used and the source it came from, without
+revealing it.
+
+Sources are tried in a fixed order: the environment first, so a CI job can
+override what is on disk without editing it; then this tool's credential store;
+then .netrc last, because it is shared with every other tool on the machine and
+is the least specific statement of intent.
+
+This does not contact Jira. It answers "which credential would be used", not
+"does that credential still work".`),
+		Example: strings.Join([]string{
+			buildinfo.App + " auth status",
+			buildinfo.App + " auth status --site acme.atlassian.net",
+		}, "\n"),
+		Flags: []registry.Flag{{
+			Name: "site", Type: registry.TypeString,
+			Usage: "site to check; defaults to the current context's",
+		}},
+		Outputs:   []registry.Output{{Kind: kindAuthStatus, Version: versionAuthStatus}},
+		ExitCodes: []exitcode.Code{exitcode.Auth},
+		Run:       a.runAuthStatus,
+	}
+}
+
+func (a *app) runAuthStatus(_ context.Context, inv *registry.Invocation) (*render.Doc, error) {
+	site, err := a.siteFor(inv.Flags.String("site"))
+	if err != nil {
+		return nil, err
+	}
+
+	chain := a.chain()
+	cred, found, err := chain.Lookup(site)
+	if err != nil {
+		return nil, err
+	}
+	return authStatusDoc(site, cred, found, chain.Sources()), nil
+}
+
+func (a *app) authTokenCommand() *registry.Command {
+	return &registry.Command{
+		Path:    []string{"auth", "token"},
+		Summary: "Print the credential for a site, for use in another tool",
+		Description: strings.TrimSpace(`
+Prints the Authorization header value a request to this site would carry.
+
+This deliberately reveals a secret. It exists so a script can hand the
+credential to curl or another client without re-implementing the credential
+lookup:
+
+    curl -H "Authorization: $(` + buildinfo.App + ` auth token)" ...
+
+Everywhere else in this tool a credential is redacted. Here it is the requested
+output, and it goes to stdout like any other result — so redirect it
+deliberately, and do not pass it through a command that logs its arguments.`),
+		Example: buildinfo.App + " auth token --site acme.atlassian.net",
+		Flags: []registry.Flag{{
+			Name: "site", Type: registry.TypeString,
+			Usage: "site to print the credential for; defaults to the current context's",
+		}},
+		Outputs:   []registry.Output{{Kind: kindAuthToken, Version: versionAuthToken}},
+		ExitCodes: []exitcode.Code{exitcode.Auth},
+		Run:       a.runAuthToken,
+	}
+}
+
+func (a *app) runAuthToken(_ context.Context, inv *registry.Invocation) (*render.Doc, error) {
+	site, err := a.siteFor(inv.Flags.String("site"))
+	if err != nil {
+		return nil, err
+	}
+	cred, err := a.chain().Resolve(site)
+	if err != nil {
+		return nil, err
+	}
+	header, err := cred.Header()
+	if err != nil {
+		return nil, err
+	}
+
+	n := render.El("token").
+		Attr("site", site).
+		Attr("scheme", string(cred.Scheme)).
+		Attr("source", cred.Source).
+		Leaf("authorization", header["Authorization"])
+	return render.Record(kindAuthToken, versionAuthToken, n), nil
+}
+
+// authStatusDoc renders a credential without revealing it. The value never
+// reaches this function: only the scheme, the user, and where it came from.
+func authStatusDoc(site string, cred auth.Credential, found bool, sources []string) *render.Doc {
+	n := render.El("auth").
+		Attr("site", site).
+		Attr("authenticated", strconv.FormatBool(found))
+
+	if found {
+		n.Attr("scheme", string(cred.Scheme)).
+			Attr("source", cred.Source)
+		if cred.User != "" {
+			n.Attr("user", cred.User)
+		}
+	}
+
+	items := make([]*render.Node, 0, len(sources))
+	for _, s := range sources {
+		items = append(items, render.El("source").SetText(s))
+	}
+	n.Child(render.ListEl("sources", "source", items...))
+	return render.Record(kindAuthStatus, versionAuthStatus, n)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if s := strings.TrimSpace(v); s != "" {
+			return s
+		}
+	}
+	return ""
+}

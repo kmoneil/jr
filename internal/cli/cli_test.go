@@ -3,6 +3,8 @@ package cli_test
 import (
 	"context"
 	"flag"
+	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,13 +34,50 @@ type result struct {
 	stderr string
 }
 
+// isolate points the three XDG roots at a temporary directory.
+//
+// Without it a test would read, and `context create` would write, the config of
+// whoever ran the suite. A test that can damage the developer's own setup is one
+// nobody runs twice.
+func isolate(t *testing.T, env map[string]string) map[string]string {
+	t.Helper()
+	out := map[string]string{}
+	maps.Copy(out, env)
+
+	dir := t.TempDir()
+	for _, key := range []string{"XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"} {
+		if _, set := out[key]; !set {
+			out[key] = filepath.Join(dir, strings.ToLower(strings.TrimSuffix(
+				strings.TrimPrefix(key, "XDG_"), "_HOME",
+			)))
+		}
+	}
+	if _, set := out["HOME"]; !set {
+		out["HOME"] = dir
+	}
+	// An inherited NETRC would make the credential chain depend on the machine
+	// the suite runs on.
+	if _, set := out["NETRC"]; !set {
+		out["NETRC"] = filepath.Join(dir, "nonexistent-netrc")
+	}
+	return out
+}
+
 func run(t *testing.T, env map[string]string, args ...string) result {
 	t.Helper()
+	return runWithStdin(t, env, nil, args...)
+}
+
+func runWithStdin(t *testing.T, env map[string]string, stdin io.Reader, args ...string) result {
+	t.Helper()
+	resolved := isolate(t, env)
+
 	var out, errOut strings.Builder
 	code := cli.Main(context.Background(), args, cli.Options{
 		Stdout: &out,
 		Stderr: &errOut,
-		Getenv: func(k string) string { return env[k] },
+		Stdin:  stdin,
+		Getenv: func(k string) string { return resolved[k] },
 	})
 	return result{exit: code, stdout: out.String(), stderr: errOut.String()}
 }
@@ -234,17 +273,46 @@ func TestBadEnvFormatIsAUsageError(t *testing.T) {
 
 // TestEveryFormatRendersEveryCommand asserts the flag is the contract: all four
 // formats work on every command, whatever the per-content default is.
+//
+// It goes through --describe because most commands need input to do anything,
+// and the point here is that the format flag is honored everywhere — not that
+// every command can run bare.
 func TestEveryFormatRendersEveryCommand(t *testing.T) {
 	for _, c := range cli.Registry().All() {
 		for _, f := range []string{"tsv", "xml", "json", "yaml"} {
-			args := append(strings.Split(c.UseLine(), " "), "--format", f)
+			args := append(strings.Split(c.UseLine(), " "), "--describe", "--format", f)
 			got := run(t, nil, args...)
 			if got.exit != exitcode.OK {
-				t.Errorf("%s --format %s: exit = %v\nstderr: %s",
+				t.Errorf("%s --describe --format %s: exit = %v\nstderr: %s",
 					c.UseLine(), f, got.exit, got.stderr)
 			}
 			if got.stdout == "" {
-				t.Errorf("%s --format %s produced no output", c.UseLine(), f)
+				t.Errorf("%s --describe --format %s produced no output", c.UseLine(), f)
+			}
+		}
+	}
+}
+
+// bareRunnable are the commands that produce a result with no input at all.
+// Anything else needs a site, a name, or a token, and says so.
+var bareRunnable = []string{"schema", "version", "contract", "context list", "context show"}
+
+// TestBareRunnableCommandsRenderInEveryFormat covers the real output path, as
+// opposed to the schema path --describe exercises.
+func TestBareRunnableCommandsRenderInEveryFormat(t *testing.T) {
+	for _, use := range bareRunnable {
+		if _, ok := cli.Registry().Lookup(strings.ReplaceAll(use, " ", ".")); !ok {
+			t.Errorf("%q is listed as bare-runnable but is not registered", use)
+			continue
+		}
+		for _, f := range []string{"tsv", "xml", "json", "yaml"} {
+			args := append(strings.Split(use, " "), "--format", f)
+			got := run(t, nil, args...)
+			if got.exit != exitcode.OK {
+				t.Errorf("%s --format %s: exit = %v\nstderr: %s", use, f, got.exit, got.stderr)
+			}
+			if got.stdout == "" {
+				t.Errorf("%s --format %s produced no output", use, f)
 			}
 		}
 	}

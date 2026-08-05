@@ -25,11 +25,14 @@ const (
 // `schema` can close over the live registry, and so two runs in one process
 // cannot collide.
 func (a *app) builtins() []*registry.Command {
-	return []*registry.Command{
+	out := []*registry.Command{
 		versionCommand(),
 		a.schemaCommand(),
 		a.contractCommand(),
 	}
+	out = append(out, a.authCommands()...)
+	out = append(out, a.contextCommands()...)
+	return out
 }
 
 func versionCommand() *registry.Command {

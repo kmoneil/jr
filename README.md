@@ -40,14 +40,19 @@ make build          # → bin/jr
 ## What works today
 
 ```
+jr context create|list|use|show|delete   # named site/project pairings
+jr auth login|logout|status|token        # credentials, per site
+
 jr version          # build identity and compiled-in capabilities
 jr schema           # every command this build contains, as data
 jr schema <name>    # one command in full: flags, args, exit codes, output kinds
 jr contract         # every output kind this build can emit, and its version
 ```
 
-Global: `--format tsv|xml|json|yaml`, `--describe`, `--limit` on collections.
-`JIRA_FORMAT` sets the default format.
+Global: `--format tsv|xml|json|yaml`, `--context`, `--site`, `--project`,
+`--readonly`, `--describe`, and `--limit` on collections. `JIRA_FORMAT`,
+`JIRA_CONTEXT`, `JIRA_SITE`, `JIRA_PROJECT`, and `JIRA_READONLY` set the same
+things from the environment.
 
 ```console
 $ jr schema
@@ -71,11 +76,15 @@ Nothing below is stubbed or partially wired — a flag that would silently no-op
 is not shipped at all.
 
 - All Jira resources: `issue`, `epic`, `sprint`, `board`, `project`, `user`,
-  `field`, `meta`.
-- `auth` and `context`. No credentials, no sites, no config file, so nothing
-  yet supplies the transport with a site to talk to.
+  `field`, `meta`. Contexts and credentials are configurable, but nothing yet
+  uses them to make a request.
 - `adf` — the package exists with its contract documented and no
   implementation.
+- OAuth, mTLS, and a system-keyring credential provider. The provider interface
+  is in place; a keyring implementation shells out, so it will arrive behind its
+  own build tag rather than in the reader profile.
+- Deployment auto-detection and the metadata cache. `$XDG_CACHE_HOME/jr/<site>/`
+  is resolved but nothing writes to it yet.
 - `jr jql validate` and `jr jql explain`. The JQL library is complete (see
   below) but `validate` is specified as a round trip to Jira's parse endpoint,
   and shipping a local-only check under that name would overclaim.
@@ -86,6 +95,49 @@ is not shipped at all.
   schemas land with the resources that define them.
 - The four build profiles produce identical binaries, because no tag currently
   gates any code. The machinery is tested; there is just nothing to exclude yet.
+
+### Contexts and credentials
+
+Contexts are kubectl-style, and a project is always a default rather than a
+requirement:
+
+```console
+$ jr context create work --site acme.atlassian.net --project ENG
+$ jr context create audit --site acme.atlassian.net --readonly
+$ jr context list
+name     current  site                        project  board  readonly
+audit    false    https://acme.atlassian.net                  true
+work     true     https://acme.atlassian.net  ENG             false
+
+$ jr context show --project OPS      # what would this invocation actually use?
+```
+
+`--readonly` is a **one-way latch**. Any of the flag, `JIRA_READONLY`, or a
+context created read-only turns it on, and nothing turns it off — a context
+created for auditing is a statement about what it is for, and an invocation that
+merely omits the flag must not quietly promote itself to read-write.
+
+Credentials never touch the config file. `config.toml` is meant to be
+hand-edited and kept in a dotfiles repository, so it holds a *reference*; the
+secret lives under the state directory at mode 0600, and is refused on read if
+it is readable by anyone else.
+
+```console
+$ printf '%s' "$TOKEN" | jr auth login --site acme.atlassian.net \
+      --email ada@example.com --token-stdin
+$ jr auth status
+```
+
+The token comes from stdin rather than a flag because an argument lands in the
+shell history and the process list. Sources are tried environment, then the
+store, then `.netrc` — the environment first so CI can override what is on disk
+without editing it, `.netrc` last because it is shared with every other tool on
+the machine.
+
+`auth.Secret` has `String` and `Format` methods that print `REDACTED`, so a
+`%+v` on a credential while debugging cannot leak one. `Reveal()` is the only
+way out and it is greppable. `jr auth token` is the single place a secret is the
+requested output.
 
 ### JQL
 

@@ -39,20 +39,31 @@ const DefaultTimeout = 30 * time.Second
 // returns more than this is either misbehaving or should have been streamed.
 const maxResponseBytes = 64 << 20
 
-// Authorizer applies credentials to an outgoing request.
+// RequestInfo is what an Authorizer is told about the call it is signing. It
+// carries no body and no headers, because nothing an Authorizer legitimately
+// does needs them.
+type RequestInfo struct {
+	Method string
+	// URL is the fully resolved target.
+	URL string
+}
+
+// Authorizer supplies the credential headers for a request.
 //
-// It is an interface so that transport never sees a credential store, and so
-// that internal/auth can supply any scheme — token, basic, OAuth, mTLS —
-// without this package learning about it.
+// It returns headers rather than mutating an *http.Request for two reasons.
+// It keeps net/http confined to this package, so the redaction rule has one
+// place to hold. And it means an Authorizer physically cannot rewrite the URL,
+// change the method, or drop the body — none of which supplying a credential
+// should be able to do.
 type Authorizer interface {
-	Authorize(ctx context.Context, req *http.Request) error
+	Authorize(ctx context.Context, req RequestInfo) (map[string]string, error)
 }
 
 // AuthorizerFunc adapts a function to Authorizer.
-type AuthorizerFunc func(ctx context.Context, req *http.Request) error
+type AuthorizerFunc func(ctx context.Context, req RequestInfo) (map[string]string, error)
 
 // Authorize implements Authorizer.
-func (f AuthorizerFunc) Authorize(ctx context.Context, req *http.Request) error {
+func (f AuthorizerFunc) Authorize(ctx context.Context, req RequestInfo) (map[string]string, error) {
 	return f(ctx, req)
 }
 
@@ -282,11 +293,18 @@ func (c *Client) attempt(ctx context.Context, r Request, target *url.URL,
 	}
 	req.Header.Set(HeaderRequestID, requestID)
 
-	// Authorization is applied last, so nothing above can overwrite it and
-	// nothing below reads it: the trace event is built from a redacted copy.
+	// Credentials are applied last, so nothing above can overwrite them, and
+	// nothing below reads them: the trace event is built from a redacted copy.
 	if c.auth != nil {
-		if err := c.auth.Authorize(ctx, req); err != nil {
+		creds, err := c.auth.Authorize(ctx, RequestInfo{
+			Method: r.Method,
+			URL:    target.String(),
+		})
+		if err != nil {
 			return nil, err
+		}
+		for name, value := range creds {
+			req.Header.Set(name, value)
 		}
 	}
 

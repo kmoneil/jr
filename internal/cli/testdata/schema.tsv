@@ -1,4 +1,13 @@
 name	summary	mutating	destructive	kind
+auth.login	Store a credential for a site	false	false	auth.status
+auth.logout	Remove a stored credential	false	true	auth.status
+auth.status	Report which credential a site would use, and where it comes from	false	false	auth.status
+auth.token	Print the credential for a site, for use in another tool	false	false	auth.token
+context.create	Create or replace a named site and project pairing	false	false	context.get
+context.delete	Delete a context	false	true	context.get
+context.list	List every configured context	false	false	context.list
+context.show	Show one context, or the effective settings for this invocation	false	false	context.get
+context.use	Select the context every command uses by default	false	false	context.get
 contract	Dump the machine-readable output contract for every kind	false	false	contract
 schema	Describe every command this build contains	false	false	schema.commands
 version	Print the build identity and its compiled-in capabilities	false	false	version

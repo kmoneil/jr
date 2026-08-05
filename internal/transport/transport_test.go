@@ -649,9 +649,11 @@ func TestAuthorizerErrorIsSurfaced(t *testing.T) {
 
 	want := errs.Auth("NO_CREDENTIALS", "no credentials for this site")
 	c, _ := newTestClient(t, srv, transport.Options{
-		Auth: transport.AuthorizerFunc(func(context.Context, *http.Request) error {
-			return want
-		}),
+		Auth: transport.AuthorizerFunc(
+			func(context.Context, transport.RequestInfo) (map[string]string, error) {
+				return nil, want
+			},
+		),
 	})
 	_, err := c.Do(t.Context(), transport.Request{Method: http.MethodGet, Path: "/x"})
 	if err == nil {

@@ -73,10 +73,18 @@ type Command struct {
 	Args []Arg
 
 	// Mutating marks a command that changes state in Jira. Every mutating
-	// command accepts --dry-run and requires the write tag.
+	// command accepts --dry-run, requires the write tag, and is refused by
+	// read-only mode.
 	Mutating bool
-	// Destructive marks a command that removes or closes something. It
-	// requires --yes in every build.
+	// LocalState marks a command that writes local config or credentials.
+	//
+	// It is deliberately not Mutating. Read-only mode and the write tag are
+	// about Jira; a build that could not create a context or store a
+	// credential would have no way to configure itself, which would make the
+	// reader profile useless rather than safe.
+	LocalState bool
+	// Destructive marks a command that removes or closes something, in Jira or
+	// locally. It requires --yes in every build.
 	Destructive bool
 	// Paginated marks a command that returns a collection the caller can
 	// bound with --limit.

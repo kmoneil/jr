@@ -100,11 +100,29 @@ a token cannot reach a fixture file even if recording is interrupted.
 
 ## Config, state, cache
 
-| Path                              | Contents                                              |
-| --------------------------------- | ----------------------------------------------------- |
-| `$XDG_CONFIG_HOME/jr/config.toml` | Contexts, defaults. Hand-editable.                    |
-| `$XDG_STATE_HOME/jr/`             | Idempotency ledger, view history, last cursor         |
-| `$XDG_CACHE_HOME/jr/<site>/`      | Field IDs, issue types, transitions, deployment probe |
+| Path                                    | Contents                                              | Mode |
+| --------------------------------------- | ----------------------------------------------------- | ---- |
+| `$XDG_CONFIG_HOME/jr/config.toml`       | Contexts, defaults. Hand-editable.                    | 0644 |
+| `$XDG_STATE_HOME/jr/credentials.toml`   | Stored credentials                                    | 0600 |
+| `$XDG_STATE_HOME/jr/`                   | Idempotency ledger, view history, last cursor         | —    |
+| `$XDG_CACHE_HOME/jr/<site>/`            | Field IDs, issue types, transitions, deployment probe | —    |
+
+The three are separate because they have different lifetimes and different
+backup expectations: config is hand-written and worth keeping, state is
+machine-written and worth keeping, cache is machine-written and disposable. One
+directory for all of them means a user who clears a cache loses their contexts.
+
+Credentials live under **state, not config**, and that placement is the point.
+The config is meant to be hand-edited, shared, and committed to a dotfiles
+repository. A credential in it would be published by the first person who tried.
+`config.toml` holds a credential *reference*; the store holds the secret, at
+mode 0600, and is refused on read if it is readable by anyone else — reading it
+anyway and warning would mean the credential is used, and stays exposed, every
+time.
+
+An XDG variable that is relative is ignored rather than resolved against the
+working directory, which would otherwise put a user's contexts somewhere
+different depending on where they ran the command.
 
 Metadata caching is a feature, not an optimization: resolving a custom field
 name to `customfield_10042` should not cost a round trip on every invocation.

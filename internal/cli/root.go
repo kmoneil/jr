@@ -76,6 +76,14 @@ and go to stderr.`),
 			strings.Join(render.FormatNames(), "|")))
 	root.PersistentFlags().BoolVar(&a.describe, "describe", false,
 		"print this command's schema instead of running it")
+	root.PersistentFlags().StringVar(&a.contextName, "context", "",
+		"use this context for one invocation, without selecting it")
+	root.PersistentFlags().StringVar(&a.site, "site", "",
+		"Jira site, overriding the context's")
+	root.PersistentFlags().StringVar(&a.project, "project", "",
+		"project key, overriding the context's")
+	root.PersistentFlags().BoolVar(&a.readOnly, "readonly", false,
+		"refuse any command that would change Jira")
 	root.Flags().BoolVar(&a.contract, "contract", false,
 		"dump the machine-readable output contract for every kind")
 
@@ -167,6 +175,12 @@ func (a *app) newLeaf(rc *registry.Command) *cobra.Command {
 	binder := bindFlags(cc, rc)
 
 	cc.Args = func(cmd *cobra.Command, args []string) error {
+		// --describe asks what this command needs. Requiring the caller to
+		// already supply it would make the question unanswerable for exactly
+		// the commands someone would ask it about.
+		if a.describe {
+			return nil
+		}
 		minArgs, maxArgs := rc.ArgBounds()
 		switch {
 		case len(args) < minArgs:

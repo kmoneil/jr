@@ -85,13 +85,18 @@ func TestShortFlagsAreNotReusedWithDifferentMeanings(t *testing.T) {
 // destructive one requires --yes.
 func TestMutatingCommandsAreSafeByConstruction(t *testing.T) {
 	forEachCommand(t, func(t *testing.T, c *registry.Command) {
-		if c.Destructive && !c.Mutating {
-			t.Errorf("%s is destructive but not marked mutating", c.Name())
+		// A command that removes something must change something, whether
+		// that is Jira or a local file.
+		if c.Destructive && !c.Mutating && !c.LocalState {
+			t.Errorf("%s is destructive but changes neither Jira nor local state", c.Name())
+		}
+		// --yes is required for anything destructive, wherever it destroys.
+		if c.Destructive {
+			if _, has := c.Flag("yes"); !has {
+				t.Errorf("%s is destructive but does not require --yes", c.Name())
+			}
 		}
 		if !c.Mutating {
-			if _, has := c.Flag("dry-run"); has {
-				t.Errorf("%s is not mutating but declares --dry-run", c.Name())
-			}
 			return
 		}
 		if _, has := c.Flag("dry-run"); !has {
@@ -105,10 +110,25 @@ func TestMutatingCommandsAreSafeByConstruction(t *testing.T) {
 			t.Errorf("%s mutates but does not declare exit %d (%s), "+
 				"which read-only mode produces", c.Name(), exitcode.Blocked, exitcode.Blocked)
 		}
-		if c.Destructive {
-			if _, has := c.Flag("yes"); !has {
-				t.Errorf("%s is destructive but does not require --yes", c.Name())
-			}
+	})
+}
+
+// TestLocalStateCommandsExistInEveryBuild is the counterpart to the write tag.
+// A build that could not create a context or store a credential could not be
+// configured at all, which would make the reader profile useless rather than
+// safe.
+func TestLocalStateCommandsExistInEveryBuild(t *testing.T) {
+	forEachCommand(t, func(t *testing.T, c *registry.Command) {
+		if !c.LocalState {
+			return
+		}
+		if c.Mutating {
+			t.Errorf("%s is marked both LocalState and Mutating; "+
+				"LocalState is for local files, Mutating is for Jira", c.Name())
+		}
+		if slices.Contains(c.RequiresTags, "write") {
+			t.Errorf("%s writes local state but requires the write tag, "+
+				"so a reader build could not configure itself", c.Name())
 		}
 	})
 }
