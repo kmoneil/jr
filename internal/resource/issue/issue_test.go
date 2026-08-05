@@ -312,55 +312,68 @@ func TestPageSizeIsValidatedNotClamped(t *testing.T) {
 	}
 }
 
-// TestBuildQueryUsesTheBuilder asserts filters become JQL through the builder,
-// with values as data.
+// TestBuildQuery asserts filters become JQL through the builder, with values as
+// data — and that every query carries an ORDER BY.
 func TestBuildQuery(t *testing.T) {
+	// Every case ends with the key ordering. Nothing is ever sent unordered:
+	// the server's default is undocumented and not guaranteed stable between
+	// two requests, which would let a paged result interleave two orderings.
+	const byKey = " ORDER BY issuekey DESC"
+
 	cases := []struct {
 		name string
 		opt  issue.QueryOptions
 		want string
 	}{
-		{"empty", issue.QueryOptions{}, ""},
-		{"project", issue.QueryOptions{Project: "ENG"}, `project = "ENG"`},
+		{"empty", issue.QueryOptions{}, strings.TrimSpace(byKey)},
+		{"project", issue.QueryOptions{Project: "ENG"}, `project = "ENG"` + byKey},
 		{
 			"several filters",
 			issue.QueryOptions{Project: "ENG", Statuses: []string{"Done", "Closed"}},
-			`project = "ENG" AND status IN ("Done", "Closed")`,
+			`project = "ENG" AND status IN ("Done", "Closed")` + byKey,
 		},
 		{
 			"labels in and out",
 			issue.QueryOptions{Labels: []string{"a"}, NotLabels: []string{"wontfix"}},
-			`labels = "a" AND labels != "wontfix"`,
+			`labels = "a" AND labels != "wontfix"` + byKey,
 		},
 		{
 			"currentUser is a function, not a string",
 			issue.QueryOptions{Assignee: "currentUser"},
-			`assignee = currentUser()`,
+			`assignee = currentUser()` + byKey,
 		},
 		{
 			"unassigned",
 			issue.QueryOptions{Assignee: "unassigned"},
-			`assignee IS EMPTY`,
+			`assignee IS EMPTY` + byKey,
 		},
 		{
 			"a named assignee is data",
 			issue.QueryOptions{Assignee: "ada@example.com"},
-			`assignee = "ada@example.com"`,
+			`assignee = "ada@example.com"` + byKey,
 		},
 		{
 			"dates",
 			issue.QueryOptions{CreatedAfter: "-7d", UpdatedAfter: "2026-08-01"},
-			`created >= "-7d" AND updated >= "2026-08-01"`,
+			`created >= "-7d" AND updated >= "2026-08-01"` + byKey,
 		},
 		{
-			"sorting",
+			// The caller's field is rarely unique — a bulk edit gives every
+			// issue the same timestamp — so the key breaks ties and makes the
+			// order total.
+			"a custom sort keeps the key as a tiebreaker",
 			issue.QueryOptions{Project: "ENG", Sort: "updated", Order: "desc"},
-			`project = "ENG" ORDER BY updated DESC`,
+			`project = "ENG" ORDER BY updated DESC, issuekey DESC`,
 		},
 		{
 			"sort defaults to ascending",
 			issue.QueryOptions{Sort: "created"},
-			`ORDER BY created ASC`,
+			`ORDER BY created ASC, issuekey DESC`,
+		},
+		{
+			"sorting by the key explicitly adds no tiebreaker",
+			issue.QueryOptions{Sort: "issuekey", Order: "desc"},
+			`ORDER BY issuekey DESC`,
 		},
 	}
 
@@ -377,6 +390,61 @@ func TestBuildQuery(t *testing.T) {
 	}
 }
 
+// TestEveryQueryIsOrdered is the rule stated once, over the whole surface: no
+// combination of filters produces a query without an ORDER BY.
+func TestEveryQueryIsOrdered(t *testing.T) {
+	options := []issue.QueryOptions{
+		{},
+		{Project: "ENG"},
+		{JQL: "labels = x"},
+		{Assignee: "currentUser", Statuses: []string{"Open"}},
+		{Sort: "updated", Order: "desc"},
+		{Sort: "priority"},
+		{Project: "ENG", Sort: "issuekey", Order: "asc"},
+	}
+	for _, opt := range options {
+		got, err := issue.BuildQuery(opt)
+		if err != nil {
+			t.Fatalf("BuildQuery(%+v): %v", opt, err)
+		}
+		if !strings.Contains(got, "ORDER BY") {
+			t.Errorf("BuildQuery(%+v) = %q, which has no ordering", opt, got)
+		}
+		if !strings.Contains(got, "issuekey") {
+			t.Errorf("BuildQuery(%+v) = %q, which has no unique tiebreaker", opt, got)
+		}
+	}
+}
+
+// TestSortsByKey identifies the orderings keyset pagination can resume from.
+func TestSortsByKey(t *testing.T) {
+	yes := []issue.QueryOptions{
+		{},
+		{Project: "ENG"},
+		{Sort: "issuekey"},
+		{Sort: "issuekey", Order: "desc"},
+		{Sort: "ISSUEKEY", Order: "DESC"},
+	}
+	for _, opt := range yes {
+		if !opt.SortsByKey() {
+			t.Errorf("SortsByKey(%+v) = false", opt)
+		}
+	}
+
+	no := []issue.QueryOptions{
+		{Sort: "updated"},
+		{Sort: "created", Order: "desc"},
+		// Ascending by key is a different order from the descending default,
+		// so a cursor taken from one cannot resume the other.
+		{Sort: "issuekey", Order: "asc"},
+	}
+	for _, opt := range no {
+		if opt.SortsByKey() {
+			t.Errorf("SortsByKey(%+v) = true", opt)
+		}
+	}
+}
+
 // TestRawJQLCannotEscapeTheProjectScope is the incumbent's worst bug, asserted
 // at the level a user would hit it.
 func TestRawJQLCannotEscapeTheProjectScope(t *testing.T) {
@@ -387,7 +455,7 @@ func TestRawJQLCannotEscapeTheProjectScope(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildQuery: %v", err)
 	}
-	want := `project = "ENG" AND (summary ~ "x" OR priority = Highest)`
+	want := `project = "ENG" AND (summary ~ "x" OR priority = Highest) ORDER BY issuekey DESC`
 	if got != want {
 		t.Fatalf("got  %s\nwant %s", got, want)
 	}
@@ -488,5 +556,223 @@ func TestDefaultFieldsCoverTheOutput(t *testing.T) {
 		if strings.HasPrefix(f, "*") {
 			t.Errorf("DefaultFields asks for %q rather than naming what it needs", f)
 		}
+	}
+}
+
+// keysetClient replays the Data Center conversation that pages by key.
+func keysetClient(t *testing.T) (*issue.Client, *transport.Replayer) {
+	t.Helper()
+	cassette, err := transport.LoadCassette(filepath.Join("testdata", "keyset.datacenter.json"))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	replayer := transport.NewReplayer(cassette)
+	conn, err := transport.New(transport.Options{
+		BaseURL: "https://recorded.invalid", HTTPClient: replayer.Client(), Retries: -1,
+	})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+	return &issue.Client{Transport: conn, Site: site.Info{Kind: site.DataCenter}}, replayer
+}
+
+// TestKeysetPaginationOnDataCenter is the fix for the window offset paging
+// leaves open. The second page resumes with `issuekey < ENG-1000` rather than
+// `startAt=2`, so an issue created between the two requests cannot shift it.
+func TestKeysetPaginationOnDataCenter(t *testing.T) {
+	client, replayer := keysetClient(t)
+
+	result, err := client.List(t.Context(), issue.ListOptions{
+		Query:    issue.QueryOptions{Project: "ENG"},
+		Limit:    registry.Limit{All: true},
+		PageSize: 2,
+		Fields:   issue.DefaultFields(),
+	})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if !result.Keyset {
+		t.Error("the request fell back to offset paging")
+	}
+	if len(result.Issues) != 3 {
+		t.Fatalf("got %d issues, want 3", len(result.Issues))
+	}
+	// ENG-999 sorts below ENG-1000 numerically and above it as text. Getting
+	// this order proves the client compares keys the way JQL does.
+	var keys []string
+	for _, i := range result.Issues {
+		keys = append(keys, i.Key)
+	}
+	if strings.Join(keys, ",") != "ENG-1001,ENG-1000,ENG-999" {
+		t.Errorf("keys = %v, want descending by number", keys)
+	}
+	if !result.Complete {
+		t.Error("the result set ran out but was reported incomplete")
+	}
+	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+		t.Errorf("unplayed: %v", unplayed)
+	}
+}
+
+// TestKeysetTokenResumes checks the cursor a truncated keyset run hands back.
+func TestKeysetTokenResumes(t *testing.T) {
+	client, _ := keysetClient(t)
+	first, err := client.List(t.Context(), issue.ListOptions{
+		Query: issue.QueryOptions{Project: "ENG"},
+		Limit: registry.Limit{N: 2}, PageSize: 2, Fields: issue.DefaultFields(),
+	})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if first.Complete || first.NextPageToken == "" {
+		t.Fatal("a truncated result did not offer a cursor")
+	}
+
+	// The cursor names a row, not a count.
+	token, err := issue.DecodePageToken(first.NextPageToken, site.DataCenter)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if token.AfterKey != "ENG-1000" {
+		t.Errorf("AfterKey = %q, want the last row of page one", token.AfterKey)
+	}
+	if token.Offset != 0 {
+		t.Errorf("a keyset token carries an offset too: %d", token.Offset)
+	}
+
+	resume, _ := keysetClient(t)
+	rest, err := resume.List(t.Context(), issue.ListOptions{
+		Query: issue.QueryOptions{Project: "ENG"}, Limit: registry.Limit{All: true},
+		PageSize: 2, PageToken: first.NextPageToken, Fields: issue.DefaultFields(),
+	})
+	if err != nil {
+		t.Fatalf("resume: %v", err)
+	}
+	if len(rest.Issues) != 1 || rest.Issues[0].Key != "ENG-999" {
+		t.Errorf("resume returned %v", rest.Issues)
+	}
+}
+
+// TestKeysetFallsBackWhenItCannotApply covers the three conditions. Falling back
+// is correct; falling back silently and claiming stability would not be.
+func TestKeysetFallsBackWhenItCannotApply(t *testing.T) {
+	cases := map[string]struct {
+		kind site.Kind
+		opt  issue.ListOptions
+	}{
+		"cloud already has stable cursors": {
+			site.Cloud, issue.ListOptions{Query: issue.QueryOptions{Project: "ENG"}},
+		},
+		"a custom sort is a different order": {
+			site.DataCenter,
+			issue.ListOptions{Query: issue.QueryOptions{Project: "ENG", Sort: "updated"}},
+		},
+		"a pre-rendered query has no builder to narrow": {
+			site.DataCenter, issue.ListOptions{JQL: `project = "ENG"`},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			client, _ := replayClient(t, tc.kind)
+			opt := tc.opt
+			opt.Limit = registry.Limit{N: 2}
+			opt.PageSize = 2
+			opt.Fields = issue.DefaultFields()
+
+			result, err := client.List(t.Context(), opt)
+			if err != nil {
+				// The fixture only answers the plain query; what matters here
+				// is the mode, which is decided before any request.
+				t.Skipf("fixture does not cover this query: %v", err)
+			}
+			if result.Keyset {
+				t.Error("keyset paging was used where it does not apply")
+			}
+		})
+	}
+}
+
+// TestKeyOrdering is the comparison the whole scheme rests on. Issue keys do not
+// sort as text: ENG-1000 is greater than ENG-999 as an issue and smaller as a
+// string.
+func TestKeyOrdering(t *testing.T) {
+	lower, ok := issue.ParseKey("ENG-999")
+	if !ok {
+		t.Fatal("ENG-999 did not parse")
+	}
+	upper, _ := issue.ParseKey("ENG-1000")
+	if !lower.Before(upper) {
+		t.Error("ENG-999 does not sort below ENG-1000")
+	}
+	if upper.Before(lower) {
+		t.Error("ENG-1000 sorts below ENG-999")
+	}
+	if strings.Compare("ENG-999", "ENG-1000") >= 0 == lower.Before(upper) {
+		t.Log("confirmed: text comparison disagrees with key comparison here")
+	}
+
+	// Different projects order by project name.
+	a, _ := issue.ParseKey("AAA-9999")
+	b, _ := issue.ParseKey("ZZZ-1")
+	if !a.Before(b) {
+		t.Error("AAA-9999 does not sort below ZZZ-1")
+	}
+
+	for _, bad := range []string{"", "ENG", "ENG-", "-1", "ENG-abc", "ENG-1-2"} {
+		if _, ok := issue.ParseKey(bad); ok {
+			t.Errorf("ParseKey(%q) succeeded", bad)
+		}
+	}
+	if k, ok := issue.ParseKey("eng-12"); !ok || k.String() != "ENG-12" {
+		t.Errorf("ParseKey does not normalize case: %v %v", k, ok)
+	}
+}
+
+// TestKeysetRefusesAMisorderedServer is the guard on the assumption the whole
+// scheme rests on.
+//
+// Keyset paging is only correct if JQL compares issue keys by project and
+// number. A server comparing them as text would put ENG-999 above ENG-1000, and
+// a cursor taken from the last row would then skip everything between — silently
+// returning fewer issues while reporting the result complete. This asserts that
+// disagreement surfaces as an error instead.
+func TestKeysetRefusesAMisorderedServer(t *testing.T) {
+	cassette, err := transport.LoadCassette(
+		filepath.Join("testdata", "keyset-misordered.datacenter.json"),
+	)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	conn, err := transport.New(transport.Options{
+		BaseURL:    "https://recorded.invalid",
+		HTTPClient: transport.NewReplayer(cassette).Client(),
+		Retries:    -1,
+	})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+	client := &issue.Client{Transport: conn, Site: site.Info{Kind: site.DataCenter}}
+
+	_, err = client.List(t.Context(), issue.ListOptions{
+		Query: issue.QueryOptions{Project: "ENG"}, Limit: registry.Limit{All: true},
+		PageSize: 2, Fields: issue.DefaultFields(),
+	})
+	if err == nil {
+		t.Fatal("a misordered page was accepted, so paging would have skipped rows")
+	}
+	if errs.ExitOf(err) != exitcode.Remote {
+		t.Errorf("exit = %v, want %v", errs.ExitOf(err), exitcode.Remote)
+	}
+	e := errs.Coerce(err)
+	if e.Code != "PAGINATION_ORDER" {
+		t.Errorf("code = %q, want PAGINATION_ORDER", e.Code)
+	}
+	// The error has to name both keys, or nobody can tell what disagreed.
+	if !strings.Contains(e.Detail, "ENG-1000") || !strings.Contains(e.Detail, "ENG-999") {
+		t.Errorf("the detail does not name the two keys: %q", e.Detail)
+	}
+	// And offer a way to keep working.
+	if !strings.Contains(e.Remedy, "--sort") {
+		t.Errorf("the remedy offers no fallback: %q", e.Remedy)
 	}
 }

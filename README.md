@@ -113,11 +113,30 @@ Exit 3 because the result set did not run out — the limit stopped it. The
 stderr warning carries a `next-page-token`, and passing it back to
 `--page-token` resumes exactly where it stopped.
 
+**Every query carries an `ORDER BY`.** Without one the ordering is the server's
+undocumented default, free to differ between two requests — so a paged result
+could interleave two orderings and nobody would see it. The default is
+`ORDER BY issuekey DESC`, because the key is the only field that is both unique
+and immutable. A `--sort` you supply keeps the key as a tiebreaker, since a
+bulk edit gives every issue the same timestamp and ties would otherwise break
+arbitrarily.
+
 **There is no offset flag, and the token is opaque on purpose.** Cloud pages by
-cursor; Data Center still pages by offset. The token wraps whichever the server
-actually uses, so the same flag works against both and a caller never holds an
-offset it could replay against an API that cannot honor one. A token minted
-against Cloud is refused against Data Center rather than read as offset zero.
+cursor. Data Center pages by **keyset** — the token names the last row seen and
+the next page resumes with `AND issuekey < "IDO-5225"`, not `startAt=50`. That
+matters: an offset cursor shifts when anyone creates an issue mid-run, so a
+long `--limit all` silently skips or repeats rows while reporting itself
+complete. A keyset cursor names a position in the data and cannot shift.
+
+Keyset needs the key ordering, so a `--sort` on another field falls back to
+offsets. The result says which was used. And because the whole scheme rests on
+JQL comparing keys by number rather than as text — `IDO-999` sorts *below*
+`IDO-1000`, which a string comparison gets backwards — each page is verified to
+start below its cursor. A server that disagrees is an error, not a quietly
+short result.
+
+A token minted against Cloud is refused against Data Center rather than read as
+offset zero.
 
 Which deployment a site is gets **detected, not declared** — probed once from
 `/rest/api/2/serverInfo` and cached for a day under `$XDG_CACHE_HOME`. A value

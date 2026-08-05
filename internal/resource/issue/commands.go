@@ -213,6 +213,9 @@ type QueryOptions struct {
 	UpdatedAfter  string
 	Sort          string
 	Order         string
+	// BeforeKey bounds the query below an issue key, which is how keyset
+	// pagination resumes. It is set by the client, never by a flag.
+	BeforeKey string
 }
 
 // BuildQuery turns filter flags into JQL.
@@ -260,18 +263,63 @@ func BuildQuery(opt QueryOptions) (string, error) {
 		b.Raw(opt.JQL)
 	}
 
-	if opt.Sort != "" {
-		dir, ok := jql.ParseDirection(orElse(opt.Order, "asc"))
-		if !ok {
-			return "", errs.Usage("INVALID_ORDER",
-				"--order does not accept %q", opt.Order).
-				WithDetail("valid values: asc, desc").
-				WithRemedy("sorting is --sort <field> plus --order asc|desc")
-		}
-		b.OrderBy(opt.Sort, dir)
+	// The keyset bound goes in as a clause like any other filter, so it is
+	// quoted and combined by the builder rather than spliced into a string.
+	if opt.BeforeKey != "" {
+		b.Clause(SortKey, jql.OpLt, jql.Text(opt.BeforeKey))
 	}
 
+	if err := addOrder(b, opt); err != nil {
+		return "", err
+	}
 	return b.Render()
+}
+
+// SortKey is the field results are ordered by when the caller names none.
+//
+// It is the issue key because pagination has to be stable, and the key is the
+// only field that is both unique and immutable. Ordering by a mutable field
+// such as updated means an issue edited mid-run moves between pages, and an
+// offset-paginated deployment then skips or repeats it — a result that is
+// quietly missing rows while reporting itself complete.
+const SortKey = "issuekey"
+
+// addOrder appends the ORDER BY clause.
+//
+// There is always one. Without it the order is whatever the server happens to
+// do, which is undocumented, free to change, and not guaranteed to be the same
+// between two requests — so a paged result could interleave two different
+// orderings and nobody would see it happen.
+func addOrder(b *jql.Builder, opt QueryOptions) error {
+	if opt.Sort == "" {
+		b.OrderBy(SortKey, jql.Desc)
+		return nil
+	}
+
+	dir, ok := jql.ParseDirection(orElse(opt.Order, "asc"))
+	if !ok {
+		return errs.Usage("INVALID_ORDER",
+			"--order does not accept %q", opt.Order).
+			WithDetail("valid values: asc, desc").
+			WithRemedy("sorting is --sort <field> plus --order asc|desc")
+	}
+	b.OrderBy(opt.Sort, dir)
+
+	// A caller's sort field is rarely unique — every issue updated in the same
+	// bulk edit shares a timestamp — so ties would break arbitrarily and
+	// differently each run. The key is the tiebreaker because it is the one
+	// field guaranteed to make the order total.
+	if !strings.EqualFold(opt.Sort, SortKey) {
+		b.OrderBy(SortKey, jql.Desc)
+	}
+	return nil
+}
+
+// SortsByKey reports whether these options leave the default key ordering in
+// place, which is what keyset pagination requires.
+func (o QueryOptions) SortsByKey() bool {
+	return o.Sort == "" || (strings.EqualFold(o.Sort, SortKey) &&
+		!strings.EqualFold(o.Order, "asc"))
 }
 
 // addUser handles the one value with a special meaning. currentUser is a JQL

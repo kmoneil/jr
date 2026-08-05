@@ -41,9 +41,14 @@ type Client struct {
 
 // ListOptions is one `issue list` request.
 type ListOptions struct {
-	// JQL is the fully rendered query. It is a string here because
-	// internal/jql owns building it, and this package must never concatenate
-	// one.
+	// Query is the structured filter set. The client renders it through the
+	// JQL builder each page, rather than being handed a finished string,
+	// because keyset pagination narrows the query itself — and narrowing a
+	// rendered string would mean concatenating JQL.
+	Query QueryOptions
+	// JQL overrides Query with an already-rendered query. It exists for tests
+	// and for a caller that has one in hand; a request using it cannot page by
+	// keyset, because there is no builder to narrow.
 	JQL string
 	// Limit is the caller's intent, decoupled from the page size.
 	Limit registry.Limit
@@ -59,6 +64,10 @@ type ListOptions struct {
 // whether it is complete.
 type ListResult struct {
 	Issues []Issue
+	// Keyset reports whether paging was stable. It is false when the request
+	// fell back to offsets, where an issue created mid-run shifts every later
+	// page.
+	Keyset bool
 	// Complete is true only if the result set is exhaustive. It is false when
 	// a limit or a budget cut it short, and then NextPageToken resumes.
 	Complete      bool
@@ -107,7 +116,7 @@ func (c *Client) List(ctx context.Context, opt ListOptions) (*ListResult, error)
 		return nil, err
 	}
 
-	out := &ListResult{}
+	out := &ListResult{Keyset: c.canKeyset(opt)}
 	for {
 		want := pageSize
 		if !opt.Limit.All {
@@ -139,7 +148,17 @@ func (c *Client) List(ctx context.Context, opt ListOptions) (*ListResult, error)
 		}
 		out.Issues = append(out.Issues, issues...)
 
-		next, last := c.advance(token, page, len(issues))
+		if out.Keyset {
+			// Verify the server ordered the way this client assumes. If JQL's
+			// key comparison differs from ours, a keyset cursor would silently
+			// skip or repeat rows; failing here turns that into a loud error
+			// rather than a result that is quietly missing issues.
+			if err := verifyDescendingBelow(issues, token.AfterKey); err != nil {
+				return nil, err
+			}
+		}
+
+		next, last := c.advance(out.Keyset, token, page, issues, want)
 		if last {
 			out.Complete = true
 			return out, nil
@@ -165,9 +184,23 @@ func (c *Client) List(ctx context.Context, opt ListOptions) (*ListResult, error)
 	return out, nil
 }
 
+// canKeyset reports whether this request can page by key rather than by offset.
+//
+// Three things have to hold. The deployment must be offset-paginated, since
+// Cloud's cursors are already stable. The query must be built here, so the
+// keyset bound can go through the builder. And the ordering must be the key
+// ordering, because a cursor is only meaningful in the order it was taken in.
+func (c *Client) canKeyset(opt ListOptions) bool {
+	return !c.Site.CursorPaginated() && opt.JQL == "" && opt.Query.SortsByKey()
+}
+
 // advance computes the token for the next page and reports whether this was the
 // last one.
-func (c *Client) advance(current PageToken, page *searchResponse, got int) (PageToken, bool) {
+func (c *Client) advance(
+	keyset bool, current PageToken, page *searchResponse, issues []Issue, want int,
+) (PageToken, bool) {
+	got := len(issues)
+
 	if c.Site.CursorPaginated() {
 		// Cloud is authoritative about the end: isLast, or no further token.
 		if (page.IsLast != nil && *page.IsLast) || page.NextPageToken == "" {
@@ -175,8 +208,16 @@ func (c *Client) advance(current PageToken, page *searchResponse, got int) (Page
 		}
 		return PageToken{Deployment: c.Site.Kind, Cursor: page.NextPageToken}, false
 	}
+	if got == 0 {
+		return PageToken{}, true
+	}
+	if keyset {
+		return c.advanceKeyset(page, issues, want)
+	}
 
-	// Data Center pages by offset and reports a total.
+	// Offset paging. The total is the cheapest way to know the end, and also
+	// the reason this mode is unstable: the count it is compared against
+	// changes as issues are created.
 	next := current.Offset + got
 	if page.StartAt != nil {
 		next = *page.StartAt + got
@@ -184,17 +225,91 @@ func (c *Client) advance(current PageToken, page *searchResponse, got int) (Page
 	if page.Total != nil && next >= *page.Total {
 		return PageToken{}, true
 	}
+	return PageToken{Deployment: c.Site.Kind, Offset: next}, false
+}
+
+// advanceKeyset computes the next keyset cursor from the last row of a page.
+func (c *Client) advanceKeyset(page *searchResponse, issues []Issue, want int) (PageToken, bool) {
+	got := len(issues)
 	if got == 0 {
 		return PageToken{}, true
 	}
-	return PageToken{Deployment: c.Site.Kind, Offset: next}, false
+	// A short page means the result set ran out: with a keyset bound there is
+	// no offset arithmetic to second-guess it.
+	if got < want {
+		return PageToken{}, true
+	}
+	if page.Total != nil && got >= *page.Total {
+		return PageToken{}, true
+	}
+	return PageToken{
+		Deployment: c.Site.Kind,
+		AfterKey:   issues[got-1].Key,
+	}, false
+}
+
+// verifyDescendingBelow checks that a keyset page really is ordered the way this
+// client assumed, and really does start below the cursor.
+//
+// It exists because the whole scheme rests on JQL comparing issue keys by
+// project and number. If a server compared them as text instead, "IDO-1000"
+// would sort below "IDO-999" and pages would silently skip issues. This turns
+// that into an error naming the two keys.
+func verifyDescendingBelow(issues []Issue, afterKey string) error {
+	bound, hasBound := ParseKey(afterKey)
+
+	var previous Key
+	for i, issue := range issues {
+		key, ok := ParseKey(issue.Key)
+		if !ok {
+			return errs.Remote("UNPARSEABLE_KEY",
+				"Jira returned an issue key this client cannot order").
+				WithDetail("%q", issue.Key).
+				WithRemedy("re-run with --sort updated to page by offset instead")
+		}
+		if hasBound && !key.Before(bound) {
+			return errs.Remote("PAGINATION_ORDER",
+				"Jira returned an issue at or above the page cursor").
+				WithDetail("cursor %s, got %s", bound, key).
+				WithRemedy("this client's key ordering disagrees with the server's; " +
+					"re-run with --sort updated to page by offset instead")
+		}
+		if i > 0 && !key.Before(previous) {
+			return errs.Remote("PAGINATION_ORDER",
+				"Jira returned issues out of descending key order").
+				WithDetail("%s followed %s", key, previous).
+				WithRemedy("this client's key ordering disagrees with the server's; " +
+					"re-run with --sort updated to page by offset instead")
+		}
+		previous = key
+	}
+	return nil
+}
+
+// renderQuery builds the JQL for one page.
+//
+// A keyset bound is added through the builder rather than appended to a
+// rendered string, because appending would be concatenating JQL — the one thing
+// this project does not do.
+func renderQuery(opt ListOptions, token PageToken) (string, error) {
+	if opt.JQL != "" {
+		return opt.JQL, nil
+	}
+	q := opt.Query
+	q.BeforeKey = token.AfterKey
+	return BuildQuery(q)
 }
 
 func (c *Client) fetch(
 	ctx context.Context, opt ListOptions, token PageToken, want int,
 ) (*searchResponse, error) {
+	jqlText, err := renderQuery(opt, token)
+	if err != nil {
+		return nil, err
+	}
+
 	query := url.Values{}
-	query.Set("jql", opt.JQL)
+	query.Set("jql", jqlText)
 	query.Set("maxResults", strconv.Itoa(want))
 	if len(opt.Fields) > 0 {
 		query.Set("fields", strings.Join(opt.Fields, ","))
@@ -211,6 +326,7 @@ func (c *Client) fetch(
 	if err != nil {
 		return nil, err
 	}
+
 	if err := transport.Err(resp); err != nil {
 		return nil, err
 	}
