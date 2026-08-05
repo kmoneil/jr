@@ -825,3 +825,134 @@ func TestBudgetStopsALongRun(t *testing.T) {
 		t.Errorf("the resume cursor is not a keyset cursor: %+v", token)
 	}
 }
+
+// TestRequestedFieldsReachTheOutput is the fix for a flag that did nothing.
+//
+// --field changed what was fetched and not what was shown, so a caller asking
+// for a custom field got the default output and no indication the request had
+// been discarded.
+func TestRequestedFieldsReachTheOutput(t *testing.T) {
+	cassette, err := transport.LoadCassette(filepath.Join("testdata", "fields.cloud.json"))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	conn, err := transport.New(transport.Options{
+		BaseURL: "https://recorded.invalid", HTTPClient: transport.NewReplayer(cassette).Client(),
+		Retries: -1,
+	})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+	client := &issue.Client{Transport: conn, Site: site.Info{Kind: site.Cloud}}
+
+	requested := []string{"customfield_10042", "duedate"}
+	result, err := client.List(t.Context(), issue.ListOptions{
+		Query: issue.QueryOptions{Project: "ENG"}, Limit: registry.Limit{All: true},
+		PageSize: 10, Fields: append(issue.DefaultFields(), requested...),
+	})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(result.Issues) != 3 {
+		t.Fatalf("got %d issues", len(result.Issues))
+	}
+
+	// Jira serves custom fields in several shapes; each reduces to one cell.
+	want := []string{"5", "High risk", "A, B"}
+	for i, issued := range result.Issues {
+		if len(issued.Extra) != 2 {
+			t.Fatalf("%s carries %d extra fields, want 2", issued.Key, len(issued.Extra))
+		}
+		if issued.Extra[0].Value != want[i] {
+			t.Errorf("%s customfield_10042 = %q, want %q",
+				issued.Key, issued.Extra[0].Value, want[i])
+		}
+	}
+
+	// A field the server did not return is present and empty, so "no value" is
+	// distinguishable from "I asked for something that does not exist".
+	if result.Issues[1].Extra[1].ID != "duedate" || result.Issues[1].Extra[1].Value != "" {
+		t.Errorf("a missing field was dropped rather than reported empty: %+v",
+			result.Issues[1].Extra)
+	}
+
+	// And they reach the rendered output, in both shapes.
+	var xml strings.Builder
+	if err := render.Write(&xml, issue.ListDoc(result), render.XML); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if !strings.Contains(xml.String(), "<customfield_10042>5</customfield_10042>") {
+		t.Errorf("the requested field is not in the XML:\n%s", xml.String())
+	}
+
+	// The default format is TSV, so a column has to appear there too or the
+	// flag still looks like it did nothing.
+	columns := append(issue.ListColumns(), issue.ExtraColumns(requested)...)
+	node := result.Issues[0].Node()
+	for _, col := range columns {
+		if _, ok := node.Lookup(col.Path); !ok {
+			t.Errorf("column %q resolves to nothing", col.Header)
+		}
+	}
+}
+
+// TestFieldsAreAdditive stops --field from silently blanking the default
+// output. Replacing the default set would make every row look unassigned with
+// an unknown status.
+func TestFieldsAreAdditive(t *testing.T) {
+	got := issue.DefaultFields()
+	with := issue.ListColumns()
+	_ = with
+
+	fields := append(issue.DefaultFields(), issue.ExtraFieldNames([]string{"customfield_1"})...)
+	for _, needed := range got {
+		found := false
+		for _, f := range fields {
+			if f == needed {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("requesting an extra field dropped %q from the request", needed)
+		}
+	}
+	if len(fields) != len(got)+1 {
+		t.Errorf("got %d fields, want the defaults plus one", len(fields))
+	}
+}
+
+func TestExtraFieldNamesSkipsNativeOnes(t *testing.T) {
+	// Naming a field the tool already reports changes nothing, so it must not
+	// become a duplicate column or a duplicate element.
+	got := issue.ExtraFieldNames([]string{"summary", "status", "customfield_1", "customfield_1"})
+	if len(got) != 1 || got[0] != "customfield_1" {
+		t.Errorf("ExtraFieldNames = %v, want just the non-native one, deduplicated", got)
+	}
+}
+
+// TestFieldNamesAreValidated covers what cannot be rendered yet. Guessing at a
+// field name would either send Jira something it rejects opaquely or produce an
+// element name that is not valid XML.
+func TestFieldNamesAreValidated(t *testing.T) {
+	for _, ok := range []string{"customfield_10042", "duedate", "timespent", "summary"} {
+		if err := issue.ValidateFieldNames([]string{ok}); err != nil {
+			t.Errorf("ValidateFieldNames(%q) = %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"Story Points", "", "cf[10042]", "field-name", "1field", "key"} {
+		err := issue.ValidateFieldNames([]string{bad})
+		if err == nil {
+			t.Errorf("ValidateFieldNames(%q) was accepted", bad)
+			continue
+		}
+		if errs.ExitOf(err) != exitcode.Usage {
+			t.Errorf("%q exits %v, want %v", bad, errs.ExitOf(err), exitcode.Usage)
+		}
+	}
+	// The error has to say what to pass instead.
+	err := issue.ValidateFieldNames([]string{"Story Points"})
+	if !strings.Contains(errs.Coerce(err).Remedy, "id") {
+		t.Errorf("the remedy does not point at ids: %q", errs.Coerce(err).Remedy)
+	}
+}

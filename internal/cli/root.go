@@ -242,6 +242,15 @@ func (a *app) newLeaf(rc *registry.Command) *cobra.Command {
 		}
 		inv.Format = format
 
+		// A command's own validation runs before anything is written, which
+		// matters for a streaming command: its header goes out before its body
+		// runs, so a flag rejected later would arrive after output had started.
+		if rc.Validate != nil {
+			if err := rc.Validate(inv); err != nil {
+				return err
+			}
+		}
+
 		if rc.Streams() {
 			return a.stream(cmd.Context(), rc, inv)
 		}

@@ -7,6 +7,8 @@ package issue
 
 import (
 	"encoding/json"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,6 +38,16 @@ type Issue struct {
 	Created  string
 	Updated  string
 	Labels   []string
+	// Extra holds fields the caller asked for with --field that this package
+	// has no native shape for. They are carried through rather than dropped:
+	// a field that was fetched and then discarded is a flag that did nothing.
+	Extra []ExtraField
+}
+
+// ExtraField is one field requested by id and reduced to a scalar.
+type ExtraField struct {
+	ID    string
+	Value string
 }
 
 // Status is an issue's workflow state, plus the category the state belongs to.
@@ -214,8 +226,9 @@ func (r rawIssue) convert() (Issue, error) {
 	return out, nil
 }
 
-// decodeIssues converts a page of raw issues.
-func decodeIssues(raw []json.RawMessage) ([]Issue, error) {
+// decodeIssues converts a page of raw issues. extras names the fields the
+// caller asked for beyond the default set.
+func decodeIssues(raw []json.RawMessage, extras []string) ([]Issue, error) {
 	out := make([]Issue, 0, len(raw))
 	for i, data := range raw {
 		var r rawIssue
@@ -229,9 +242,92 @@ func decodeIssues(raw []json.RawMessage) ([]Issue, error) {
 		if err != nil {
 			return nil, err
 		}
+		issue.Extra = extraFields(data, extras)
 		out = append(out, issue)
 	}
 	return out, nil
+}
+
+// extraFields pulls the requested non-default fields out of the raw payload.
+//
+// It decodes the issue a second time rather than capturing the field object
+// alongside the typed one: two struct fields sharing a JSON tag makes
+// encoding/json ignore both, which silently empties every typed field.
+//
+// A field the server did not return is reported as present-and-empty rather
+// than omitted, so a caller can tell "this issue has no value for it" from "I
+// asked for something that does not exist" — the latter shows up as empty on
+// every row.
+func extraFields(data json.RawMessage, names []string) []ExtraField {
+	if len(names) == 0 {
+		return nil
+	}
+	var envelope struct {
+		Fields map[string]json.RawMessage `json:"fields"`
+	}
+	if err := json.Unmarshal(data, &envelope); err != nil {
+		return nil
+	}
+	fields := envelope.Fields
+
+	out := make([]ExtraField, 0, len(names))
+	for _, name := range names {
+		out = append(out, ExtraField{ID: name, Value: scalarize(fields[name])})
+	}
+	return out
+}
+
+// scalarize reduces a field value to one cell.
+//
+// Jira custom fields arrive in several shapes: a bare string or number, a
+// {"value": …} for a select, a {"displayName": …} for a user, or an array of
+// those for a multi-select. Anything that does not reduce is emitted as compact
+// JSON rather than dropped — an unreadable value in the output is still better
+// than a silently missing one.
+func scalarize(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var v any
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return strings.TrimSpace(string(raw))
+	}
+	return scalarizeValue(v, raw)
+}
+
+func scalarizeValue(v any, raw json.RawMessage) string {
+	switch t := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return t
+	case bool:
+		return strconv.FormatBool(t)
+	case float64:
+		return strconv.FormatFloat(t, 'f', -1, 64)
+	case []any:
+		parts := make([]string, 0, len(t))
+		for _, item := range t {
+			parts = append(parts, scalarizeValue(item, nil))
+		}
+		return strings.Join(parts, ", ")
+	case map[string]any:
+		// The keys Jira uses to name the human-readable side of a structured
+		// value, most specific first.
+		for _, key := range []string{"value", "name", "displayName", "key"} {
+			if inner, ok := t[key].(string); ok && inner != "" {
+				return inner
+			}
+		}
+	}
+	if len(raw) > 0 {
+		return strings.Join(strings.Fields(string(raw)), " ")
+	}
+	compact, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
+	return string(compact)
 }
 
 // Node renders one issue.
@@ -263,7 +359,86 @@ func (i Issue) Node() *render.Node {
 		labels = append(labels, render.El("label").SetText(l))
 	}
 	n.Child(render.ListEl("labels", "label", labels...))
+
+	// A requested field becomes an element named for its id, so it addresses
+	// like any other: `--format json` gives "customfield_10042": "3", and a
+	// TSV column path is just the id.
+	for _, f := range i.Extra {
+		n.Leaf(f.ID, f.Value)
+	}
 	return n
+}
+
+// nativeFields are the fields this package models itself. A caller naming one
+// of these with --field changes nothing, because it is already in the output.
+var nativeFields = map[string]bool{
+	"summary": true, "status": true, "assignee": true, "reporter": true,
+	"priority": true, "issuetype": true, "project": true,
+	"created": true, "updated": true, "labels": true,
+}
+
+// reservedNames are the element and attribute names an issue already uses. A
+// requested field cannot take one of them without colliding.
+var reservedNames = map[string]bool{
+	"key": true, "id": true, "summary": true, "status": true, "assignee": true,
+	"type": true, "priority": true, "project": true,
+	"created": true, "updated": true, "labels": true,
+}
+
+// fieldID is what --field accepts: a field id, e.g. customfield_10042 or
+// duedate.
+var fieldID = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
+
+// ValidateFieldNames rejects a --field value this tool cannot render.
+//
+// Field *names* — "Story Points" — are not accepted yet. Resolving one to its
+// id needs the field catalogue, and guessing would either send Jira something
+// it rejects opaquely or produce an element name that is not valid XML. Saying
+// so is better than either.
+func ValidateFieldNames(requested []string) error {
+	for _, name := range requested {
+		switch {
+		case !fieldID.MatchString(name):
+			return errs.Usage("INVALID_FIELD", "%q is not a field id", name).
+				WithDetail("a field id looks like customfield_10042 or duedate").
+				WithRemedy("field names are not resolved yet; pass the id, " +
+					"which the Jira admin field screen shows")
+		case reservedNames[name] && !nativeFields[name]:
+			return errs.Usage("INVALID_FIELD",
+				"%q collides with a field this tool already reports", name)
+		}
+	}
+	return nil
+}
+
+// ExtraFieldNames returns the requested fields that are not already reported
+// natively, deduplicated and in the order given.
+func ExtraFieldNames(requested []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(requested))
+	for _, name := range requested {
+		if nativeFields[name] || seen[name] {
+			continue
+		}
+		seen[name] = true
+		out = append(out, name)
+	}
+	return out
+}
+
+// ExtraColumns returns the TSV columns for requested fields, appended after the
+// defaults.
+//
+// Without these, --field would change the XML and leave TSV — the default
+// format — looking exactly as it did before, which is the same as doing
+// nothing.
+func ExtraColumns(requested []string) []render.Column {
+	extras := ExtraFieldNames(requested)
+	out := make([]render.Column, 0, len(extras))
+	for _, name := range extras {
+		out = append(out, render.Column{Header: name, Path: name})
+	}
+	return out
 }
 
 // ListColumns is the default TSV column set for `issue list`.

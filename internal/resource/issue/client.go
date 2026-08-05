@@ -166,7 +166,7 @@ func (c *Client) ListStream(
 		}
 		out.Requests++
 
-		issues, err := decodeIssues(page.Issues)
+		issues, err := decodeIssues(page.Issues, ExtraFieldNames(opt.Fields))
 		if err != nil {
 			return nil, err
 		}

@@ -19,7 +19,7 @@ func (a *app) stream(ctx context.Context, rc *registry.Command, inv *registry.In
 		return err
 	}
 
-	spec := streamSpec(rc)
+	spec := streamSpec(rc, inv)
 	out, err := render.NewStream(a.stdout, format, spec)
 	if err != nil {
 		return err
@@ -55,12 +55,20 @@ func (a *app) stream(ctx context.Context, rc *registry.Command, inv *registry.In
 }
 
 // streamSpec builds the collection description from the command's declaration.
-func streamSpec(rc *registry.Command) render.StreamSpec {
+//
+// Columns can depend on the invocation — a caller asking for an extra field
+// wants a column for it — and they are needed before the first page, because
+// the header goes out ahead of the rows.
+func streamSpec(rc *registry.Command, inv *registry.Invocation) render.StreamSpec {
+	columns := rc.Columns
+	if rc.ColumnsFor != nil {
+		columns = rc.ColumnsFor(inv)
+	}
 	return render.StreamSpec{
 		Kind:    rc.Kind(),
 		Version: rc.KindVersion(),
 		Name:    rc.CollectionName,
-		Columns: rc.Columns,
+		Columns: columns,
 	}
 }
 

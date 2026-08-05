@@ -92,7 +92,8 @@ filters, so an OR inside it cannot escape the project scope.`),
 			},
 			{
 				Name: "field", Type: registry.TypeString, Repeatable: true,
-				Usage: "field to request from Jira; repeat for several",
+				Usage: "extra field id to include, e.g. customfield_10042; " +
+					"added to the default set, repeat for several",
 			},
 			{
 				Name: "page-size", Type: registry.TypeInt,
@@ -107,6 +108,8 @@ filters, so an OR inside it cannot escape the project scope.`),
 		NeedsJira:      true,
 		CollectionName: "issues",
 		Columns:        ListColumns(),
+		ColumnsFor:     listColumnsFor,
+		Validate:       validateList,
 		Outputs:        []registry.Output{{Kind: KindList, Version: VersionList}},
 		ExitCodes: []exitcode.Code{
 			exitcode.Partial, exitcode.Auth, exitcode.NotFound,
@@ -182,13 +185,26 @@ func runList(
 	}, nil
 }
 
-// requestedFields returns what to ask Jira for. An empty list means the default
-// set, which is everything the output contract's columns need.
+// requestedFields returns what to ask Jira for.
+//
+// --field is additive. Replacing the default set instead would mean
+// `--field customfield_10042` silently blanked the status and assignee columns,
+// which looks like every issue is unassigned rather than like a flag that
+// narrowed the request.
 func requestedFields(requested []string) []string {
-	if len(requested) > 0 {
-		return requested
-	}
-	return DefaultFields()
+	return append(DefaultFields(), ExtraFieldNames(requested)...)
+}
+
+// validateList rejects flags the generic machinery cannot check, before the
+// stream opens and its header is written.
+func validateList(inv *registry.Invocation) error {
+	return ValidateFieldNames(inv.Flags.StringSlice("field"))
+}
+
+// listColumnsFor appends a column per requested field, so asking for one
+// changes the default TSV output rather than only the structured formats.
+func listColumnsFor(inv *registry.Invocation) []render.Column {
+	return append(ListColumns(), ExtraColumns(inv.Flags.StringSlice("field"))...)
 }
 
 // DefaultFields is what `issue list` asks Jira for.

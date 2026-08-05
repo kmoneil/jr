@@ -118,6 +118,28 @@ Progress goes to stderr **only when stderr is a terminal**. Piped or redirected,
 nothing is emitted, so a machine sees the same bytes whether or not someone is
 watching.
 
+### Fields
+
+`--field` adds to the default set rather than replacing it, and what you ask
+for reaches the output — including the TSV columns, which is the default
+format:
+
+```console
+$ jr issue list --limit 2 --field customfield_10042
+key      status  assignee  updated               summary   customfield_10042
+ENG-250  Open              2026-08-01T09:15:00Z  issue 250  5
+```
+
+A custom field arrives from Jira in several shapes — a number, `{"value": …}`
+for a select, an array for a multi-select — and each reduces to one cell.
+Anything that will not reduce is emitted as compact JSON rather than dropped. A
+field the server did not return is present and empty, so "no value" is
+distinguishable from "I asked for something that does not exist".
+
+Field *names* are not resolved yet, only ids. `--field "Story Points"` is
+refused with what to pass instead, rather than being sent for Jira to reject
+opaquely. Name resolution needs `jr field list` and the metadata cache.
+
 ### Pagination
 
 `--limit` is what you want; the page size is transport tuning. The client pages

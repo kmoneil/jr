@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/kmoneil/jira-cli/internal/cli"
+	"github.com/kmoneil/jira-cli/internal/errs"
 	"github.com/kmoneil/jira-cli/internal/exitcode"
 	"github.com/kmoneil/jira-cli/internal/registry"
 	"github.com/kmoneil/jira-cli/internal/render"
@@ -137,5 +138,43 @@ func TestEmptyStreamedResultStillHasAHeader(t *testing.T) {
 	}
 	if !strings.HasPrefix(got.stdout, "key\tname") {
 		t.Errorf("an empty result produced no header:\n%q", got.stdout)
+	}
+}
+
+// TestValidateRunsBeforeAnyOutput is what makes a streaming command able to
+// reject a flag at all. The header goes out before the body runs, so a check
+// that happened inside the command would arrive after bytes were already on
+// stdout.
+func TestValidateRunsBeforeAnyOutput(t *testing.T) {
+	r := registry.New()
+	r.Register(&registry.Command{
+		Path:           []string{"fake", "list"},
+		Summary:        "Refuse before writing",
+		Example:        "jr fake list",
+		Paginated:      true,
+		CollectionName: "things",
+		Columns:        []render.Column{{Header: "key", Path: "@key"}},
+		Outputs:        []registry.Output{{Kind: "fake.list", Version: 1}},
+		ExitCodes:      []exitcode.Code{exitcode.Partial},
+		Validate: func(*registry.Invocation) error {
+			return errs.Usage("REFUSED", "not today")
+		},
+		Stream: func(
+			_ context.Context, _ *registry.Invocation, out *render.Stream,
+		) (registry.StreamResult, error) {
+			_ = out.Write(render.El("thing").Attr("key", "K-1"))
+			return registry.StreamResult{Complete: true}, nil
+		},
+	})
+
+	got := runStream(t, r, "fake", "list")
+	if got.exit != exitcode.Usage {
+		t.Errorf("exit = %v, want %v", got.exit, exitcode.Usage)
+	}
+	if got.stdout != "" {
+		t.Errorf("output was written before the command was refused:\n%q", got.stdout)
+	}
+	if !strings.Contains(got.stderr, "REFUSED") {
+		t.Errorf("stderr does not carry the refusal:\n%s", got.stderr)
 	}
 }

@@ -97,6 +97,11 @@ type Command struct {
 	// has to be opened — and its header written — before the first page lands.
 	CollectionName string
 	Columns        []render.Column
+	// ColumnsFor computes the columns for one invocation, for a command whose
+	// output shape depends on its flags. It is consulted instead of Columns
+	// when set; Columns remains the documented default that `jr schema`
+	// reports.
+	ColumnsFor func(inv *Invocation) []render.Column
 	// NeedsJira marks a command that talks to the configured site. The CLI
 	// layer builds a Session for it; a command without this never resolves a
 	// credential and never probes the deployment.
@@ -116,6 +121,15 @@ type Command struct {
 	// implementation depends on a tagged package without declaring the tag
 	// fails the registry test.
 	RequiresTags []string
+
+	// Validate checks an invocation before any output begins.
+	//
+	// It exists because a streaming command opens its stream — and writes its
+	// header — before it runs, so a flag it would have rejected has to be
+	// caught earlier or the rejection arrives after bytes are already out. It
+	// is also where a command puts a check the generic flag machinery cannot
+	// express.
+	Validate func(inv *Invocation) error
 
 	// Exactly one of Run and Stream is set. Stream is for a command that emits
 	// a collection; Run is for one that emits a record.
