@@ -2,6 +2,7 @@ package issue_test
 
 import (
 	"context"
+	"io"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -1352,10 +1353,18 @@ const catalogueJSON = `[
 type stubSession struct {
 	doer *stubDoer
 	meta *site.Metadata
+	// conn and kind are set when a test needs the command to reach a recorded
+	// conversation rather than only the catalogue.
+	conn *transport.Client
+	kind site.Kind
 }
 
 func (s *stubSession) Connect(context.Context) (*transport.Client, site.Info, error) {
-	return nil, site.Info{Kind: site.Cloud}, nil
+	kind := s.kind
+	if kind == "" {
+		kind = site.Cloud
+	}
+	return s.conn, site.Info{Kind: kind}, nil
 }
 
 func (s *stubSession) Metadata(context.Context) (*site.Metadata, error) {
@@ -1365,8 +1374,8 @@ func (s *stubSession) Metadata(context.Context) (*site.Metadata, error) {
 	return s.meta, nil
 }
 
-func (s *stubSession) Project() string                 { return "" }
-func (s *stubSession) RequireProject() (string, error) { return "", nil }
+func (s *stubSession) Project() string                 { return "ENG" }
+func (s *stubSession) RequireProject() (string, error) { return "ENG", nil }
 func (s *stubSession) Board() string                   { return "" }
 func (s *stubSession) CheckWritable(string) error      { return nil }
 
@@ -1382,6 +1391,511 @@ func (s *stubDoer) Do(context.Context, transport.Request) (*transport.Response, 
 	return &transport.Response{
 		Status: 200,
 		Body:   []byte(s.body),
+		Header: map[string][]string{"Content-Type": {"application/json"}},
+	}, nil
+}
+
+// TestListRunsAsARegisteredCommand exercises the layer a user actually
+// invokes. Every other test here drives Client directly, which left runList
+// and runGet at zero coverage — and "the test covered the function and not the
+// command wrapper above it" is exactly how `mcp serve` shipped broken.
+func TestListRunsAsARegisteredCommand(t *testing.T) {
+	// The two deployments produce genuinely different conversations from the
+	// same invocation: the command always adds ORDER BY issuekey DESC, which
+	// makes Data Center page by keyset and leaves Cloud on its cursor. That is
+	// why they need separate fixtures rather than one shared one.
+	for _, tc := range []struct {
+		kind    site.Kind
+		fixture string
+		keys    string
+	}{
+		{site.Cloud, "command.cloud.json", "ENG-101,ENG-102,ENG-103"},
+		{site.DataCenter, "keyset.datacenter.json", "ENG-1001,ENG-1000,ENG-999"},
+	} {
+		t.Run(string(tc.kind), func(t *testing.T) {
+			cmd, ok := registry.Lookup("issue.list")
+			if !ok {
+				t.Fatal("issue list is not registered")
+			}
+
+			conn, replayer := replayConn(t, tc.fixture)
+			flags := registry.NewFlags()
+			flags.SetInt("page-size", 2)
+			inv := &registry.Invocation{
+				Jira: &stubSession{
+					doer: &stubDoer{body: catalogueJSON}, conn: conn, kind: tc.kind,
+				},
+				Flags: flags, Limit: registry.Limit{All: true},
+				Stderr: io.Discard, Progress: registry.NoProgress,
+			}
+
+			if err := cmd.Validate(t.Context(), inv); err != nil {
+				t.Fatalf("validate: %v", err)
+			}
+
+			var buf strings.Builder
+			stream, err := render.NewStream(&buf, render.TSV, render.StreamSpec{
+				Kind: cmd.Kind(), Version: cmd.KindVersion(),
+				Name: cmd.CollectionName, Columns: cmd.ColumnsFor(inv),
+			})
+			if err != nil {
+				t.Fatalf("stream: %v", err)
+			}
+			result, err := cmd.Stream(t.Context(), inv, stream)
+			if err != nil {
+				t.Fatalf("run: %v", err)
+			}
+			if err := stream.Close(result.Complete, result.NextPageToken); err != nil {
+				t.Fatalf("close: %v", err)
+			}
+
+			if !result.Complete {
+				t.Error("an exhausted result set was reported incomplete")
+			}
+			lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+			if lines[0] != "key\tstatus\tassignee\tupdated\tsummary" {
+				t.Errorf("header = %q", lines[0])
+			}
+
+			var keys []string
+			for _, line := range lines[1:] {
+				keys = append(keys, strings.SplitN(line, "\t", 2)[0])
+			}
+			if strings.Join(keys, ",") != tc.keys {
+				t.Errorf("keys = %v, want %s", keys, tc.keys)
+			}
+			if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+				t.Errorf("the fixture has interactions this test never used: %v", unplayed)
+			}
+		})
+	}
+}
+
+// TestRequestedFieldsReachTheRequestThroughTheCommand joins the two halves the
+// --field bug fell between: the name is resolved during validation, and the id
+// it resolved to is what the command actually asks Jira for.
+func TestRequestedFieldsReachTheRequestThroughTheCommand(t *testing.T) {
+	cmd, _ := registry.Lookup("issue.list")
+
+	conn, _ := replayConn(t, "command.cloud.json")
+	flags := registry.NewFlags()
+	flags.SetInt("page-size", 2)
+	flags.SetString("field", "Story Points")
+	inv := &registry.Invocation{
+		Jira: &stubSession{
+			doer: &stubDoer{body: catalogueJSON}, conn: conn, kind: site.Cloud,
+		},
+		Flags: flags, Limit: registry.Limit{All: true},
+		Stderr: io.Discard, Progress: registry.NoProgress,
+	}
+
+	if err := cmd.Validate(t.Context(), inv); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	// The column is the resolved id, and it is appended rather than replacing
+	// the defaults.
+	columns := cmd.ColumnsFor(inv)
+	if got := columns[len(columns)-1].Header; got != "customfield_10042" {
+		t.Errorf("last column = %q, want the resolved id", got)
+	}
+	if len(columns) != len(issue.ListColumns())+1 {
+		t.Errorf("got %d columns, want the defaults plus one", len(columns))
+	}
+
+	// The request is not asserted here — the fixture has no customfield in its
+	// recorded query, so running would be a fixture miss. That the id reaches
+	// the request is covered by TestRequestedFieldsReachTheOutput at the client
+	// level; what this adds is that Validate is what puts it there.
+	if ids := resolvedFieldIDs(inv); strings.Join(ids, ",") != "customfield_10042" {
+		t.Errorf("validation resolved %v, want the id", ids)
+	}
+}
+
+// resolvedFieldIDs reads what validation left on the invocation, via the
+// columns it produces — the value itself is unexported on purpose.
+func resolvedFieldIDs(inv *registry.Invocation) []string {
+	cmd, _ := registry.Lookup("issue.list")
+	var out []string
+	for _, col := range cmd.ColumnsFor(inv)[len(issue.ListColumns()):] {
+		out = append(out, col.Header)
+	}
+	return out
+}
+
+// TestGetRunsAsARegisteredCommand is the same for the record command.
+func TestGetRunsAsARegisteredCommand(t *testing.T) {
+	for _, kind := range deployments {
+		t.Run(string(kind), func(t *testing.T) {
+			cmd, ok := registry.Lookup("issue.get")
+			if !ok {
+				t.Fatal("issue get is not registered")
+			}
+
+			conn, _ := replayConn(t, "get."+string(kind)+".json")
+			inv := &registry.Invocation{
+				Jira: &stubSession{
+					doer: &stubDoer{body: catalogueJSON}, conn: conn, kind: kind,
+				},
+				Args: []string{"ENG-101"}, Flags: registry.NewFlags(),
+				Stderr: io.Discard, Progress: registry.NoProgress,
+			}
+
+			if err := cmd.Validate(t.Context(), inv); err != nil {
+				t.Fatalf("validate: %v", err)
+			}
+			doc, err := cmd.Run(t.Context(), inv)
+			if err != nil {
+				t.Fatalf("run: %v", err)
+			}
+			// A command that returns a kind it did not declare is rejected at
+			// runtime, so the declaration has to match what actually comes out.
+			if !cmd.Emits(doc.Kind, doc.Version) {
+				t.Errorf("emitted %s v%d, which the command does not declare",
+					doc.Kind, doc.Version)
+			}
+			if err := doc.Validate(); err != nil {
+				t.Errorf("validate: %v", err)
+			}
+		})
+	}
+}
+
+// TestListWithoutASessionFailsLoudly covers the guard. A resource that
+// dereferenced a nil session would panic in production rather than fail here.
+func TestListWithoutASessionFailsLoudly(t *testing.T) {
+	cmd, _ := registry.Lookup("issue.list")
+	inv := &registry.Invocation{
+		Flags: registry.NewFlags(), Limit: registry.Limit{All: true},
+		Progress: registry.NoProgress,
+	}
+	stream, err := render.NewStream(io.Discard, render.TSV, render.StreamSpec{
+		Kind: cmd.Kind(), Version: cmd.KindVersion(),
+		Name: cmd.CollectionName, Columns: cmd.Columns,
+	})
+	if err != nil {
+		t.Fatalf("stream: %v", err)
+	}
+	if _, err := cmd.Stream(t.Context(), inv, stream); err == nil {
+		t.Error("issue list ran without a session")
+	} else if code := errs.Coerce(err).Code; code != "NO_SESSION" {
+		t.Errorf("code = %q, want NO_SESSION", code)
+	}
+
+	get, _ := registry.Lookup("issue.get")
+	if _, err := get.Run(t.Context(), &registry.Invocation{
+		Args: []string{"ENG-1"}, Flags: registry.NewFlags(),
+	}); err == nil {
+		t.Error("issue get ran without a session")
+	}
+}
+
+// TestStatusCategoryFallsBackToTheName covers the Data Center versions that
+// send a category name and no key. Without the fallback every status on those
+// servers reports as unknown, which is the field an automated caller branches
+// on.
+func TestStatusCategoryFallsBackToTheName(t *testing.T) {
+	for _, tc := range []struct{ key, name, want string }{
+		{"new", "", issue.CategoryToDo},
+		{"undefined", "", issue.CategoryToDo},
+		{"indeterminate", "", issue.CategoryInProgress},
+		{"done", "", issue.CategoryDone},
+		{"", "To Do", issue.CategoryToDo},
+		{"", "New", issue.CategoryToDo},
+		{"", "In Progress", issue.CategoryInProgress},
+		{"", "Done", issue.CategoryDone},
+		{"", "Complete", issue.CategoryDone},
+		{"", "", issue.CategoryUnknown},
+		{"", "Invented By A Plugin", issue.CategoryUnknown},
+	} {
+		body := `{"issues":[{"id":"1","key":"ENG-1","fields":{"summary":"s",` +
+			`"status":{"name":"X","statusCategory":{"key":"` + tc.key +
+			`","name":"` + tc.name + `"}},"labels":[]}}],"total":1}`
+		got := decodeOne(t, body)
+		if got.Status.Category != tc.want {
+			t.Errorf("category(%q, %q) = %q, want %q",
+				tc.key, tc.name, got.Status.Category, tc.want)
+		}
+	}
+}
+
+// TestCustomFieldShapesAllReduceToOneCell covers what Jira puts in a custom
+// field. Every shape has to become one cell, because a column that sometimes
+// holds an object is a column nothing can parse.
+func TestCustomFieldShapesAllReduceToOneCell(t *testing.T) {
+	for _, tc := range []struct{ raw, want string }{
+		{`5`, "5"},
+		{`5.5`, "5.5"},
+		{`"plain"`, "plain"},
+		{`true`, "true"},
+		{`null`, ""},
+		{`{"value":"By Value"}`, "By Value"},
+		{`{"name":"By Name"}`, "By Name"},
+		{`{"displayName":"By Display"}`, "By Display"},
+		{`{"key":"BY-KEY"}`, "BY-KEY"},
+		{`["a","b"]`, "a, b"},
+		{`[{"value":"x"},{"value":"y"}]`, "x, y"},
+		{`[]`, ""},
+		// An object that does not reduce is emitted as compact JSON rather than
+		// dropped: an unreadable value in the output beats a silently missing
+		// one. An empty *array* is different — it has nothing to render, so ""
+		// is the value rather than a claim that there is none.
+		{`{}`, "{}"},
+		{`{"unexpected":{"nested":1}}`, `{"unexpected":{"nested":1}}`},
+	} {
+		body := `{"issues":[{"id":"1","key":"ENG-1","fields":{"summary":"s",` +
+			`"status":{"name":"X","statusCategory":{"key":"new"}},"labels":[],` +
+			`"customfield_10042":` + tc.raw + `}}],"total":1}`
+		got := decodeOne(t, body, "customfield_10042")
+		if len(got.Extra) != 1 {
+			t.Errorf("%s produced %d extra fields", tc.raw, len(got.Extra))
+			continue
+		}
+		if got.Extra[0].Value != tc.want {
+			t.Errorf("%s reduced to %q, want %q", tc.raw, got.Extra[0].Value, tc.want)
+		}
+	}
+}
+
+// decodeOne runs one response body through the client and returns the issue,
+// so a decoding table stays readable.
+func decodeOne(t *testing.T, body string, fields ...string) issue.Issue {
+	t.Helper()
+	// Client takes a Doer, so a decoding table needs no HTTP client and no
+	// cassette — just an answer.
+	client := &issue.Client{
+		Transport: &stubDoer{body: body}, Site: site.Info{Kind: site.DataCenter},
+	}
+	result, err := client.List(t.Context(), issue.ListOptions{
+		JQL: `project = "ENG"`, Limit: registry.Limit{N: 1}, PageSize: 1,
+		Fields: append(issue.DefaultFields(), fields...),
+	})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(result.Issues) != 1 {
+		t.Fatalf("got %d issues, want 1", len(result.Issues))
+	}
+	return result.Issues[0]
+}
+
+// replayConn builds a transport backed by a recorded conversation.
+func replayConn(t *testing.T, fixture string) (*transport.Client, *transport.Replayer) {
+	t.Helper()
+	cassette, err := transport.LoadCassette(filepath.Join("testdata", fixture))
+	if err != nil {
+		t.Fatalf("load %s: %v", fixture, err)
+	}
+	replayer := transport.NewReplayer(cassette)
+	conn, err := transport.New(transport.Options{
+		BaseURL: "https://recorded.invalid", HTTPClient: replayer.Client(), Retries: -1,
+	})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+	return conn, replayer
+}
+
+// TestKeyCompareIsTotalAndNumeric is the invariant that IDO-999 is below
+// IDO-1000 as an issue and above it as a string. Every branch matters: the
+// project comparison is what keeps the order total across projects, and getting
+// it wrong produces a silently short result rather than an error.
+func TestKeyCompareIsTotalAndNumeric(t *testing.T) {
+	key := func(s string) issue.Key {
+		t.Helper()
+		k, ok := issue.ParseKey(s)
+		if !ok {
+			t.Fatalf("ParseKey(%q) failed", s)
+		}
+		return k
+	}
+
+	for _, tc := range []struct {
+		a, b string
+		want int
+	}{
+		{"IDO-999", "IDO-1000", -1},
+		{"IDO-1000", "IDO-999", 1},
+		{"IDO-1", "IDO-1", 0},
+		{"ABC-1", "XYZ-1", -1},
+		{"XYZ-1", "ABC-1", 1},
+		// The project wins over the number, so a high number in an early
+		// project still sorts first.
+		{"ABC-9999", "XYZ-1", -1},
+		// Parsing upper-cases, so case is not part of the order.
+		{"eng-1", "ENG-1", 0},
+	} {
+		if got := key(tc.a).Compare(key(tc.b)); got != tc.want {
+			t.Errorf("%s.Compare(%s) = %d, want %d", tc.a, tc.b, got, tc.want)
+		}
+		if got := key(tc.a).Before(key(tc.b)); got != (tc.want < 0) {
+			t.Errorf("%s.Before(%s) = %v, want %v", tc.a, tc.b, got, tc.want < 0)
+		}
+	}
+
+	// And the text ordering it exists to avoid really does disagree.
+	if "IDO-1000" >= "IDO-999" {
+		t.Fatal("this test's premise is wrong")
+	}
+	if key("IDO-1000").Before(key("IDO-999")) {
+		t.Error("keys are being compared as text")
+	}
+}
+
+// TestPageTokenStringIsTheEncodedForm keeps the debugging rendering from being
+// the decoded one, which would invite a caller to build a token by hand.
+func TestPageTokenStringIsTheEncodedForm(t *testing.T) {
+	token := issue.PageToken{Deployment: "cloud", Cursor: "CURSOR-PAGE-2"}
+	got := token.String()
+	if got == "" {
+		t.Fatal("String is empty")
+	}
+	if strings.Contains(got, "CURSOR-PAGE-2") {
+		t.Errorf("String exposes the raw cursor: %q", got)
+	}
+	// It round-trips, so what is printed is what can be passed back.
+	back, err := issue.DecodePageToken(got, site.Cloud)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if back.Cursor != token.Cursor {
+		t.Errorf("round trip gave %q, want %q", back.Cursor, token.Cursor)
+	}
+}
+
+// TestAFieldWhoseIdCollidesIsRefused covers the second half of checkRenderable.
+// A field whose id is a name an issue already uses would overwrite it in the
+// output rather than appearing beside it.
+func TestAFieldWhoseIdCollidesIsRefused(t *testing.T) {
+	catalogue := &site.Catalogue{Fields: []site.Field{
+		{ID: "key", Name: "Issue Key"},
+		{ID: "components", Name: "Components"},
+	}}
+
+	// "key" is a name an issue node already uses and is not one this package
+	// models, so it has nowhere to go.
+	for _, input := range []string{"key", "Issue Key"} {
+		_, err := issue.ResolveFields(catalogue, []string{input})
+		if err == nil {
+			t.Errorf("ResolveFields(%q) was accepted", input)
+			continue
+		}
+		e := errs.Coerce(err)
+		if e.Code != "INVALID_FIELD" {
+			t.Errorf("%q code = %q, want INVALID_FIELD", input, e.Code)
+		}
+		if !strings.Contains(e.Message, "already reports") {
+			t.Errorf("%q message does not say why: %q", input, e.Message)
+		}
+	}
+
+	// A field this package *does* model is accepted and then dropped, because
+	// asking for it changes nothing — it is already in the output, and adding
+	// it again would mean a duplicate column and a duplicate element.
+	resolved, err := issue.ResolveFields(catalogue, []string{"components"})
+	if err != nil {
+		t.Fatalf("a natively-reported field was refused: %v", err)
+	}
+	if got := issue.ExtraFieldNames(resolved); len(got) != 0 {
+		t.Errorf("ExtraFieldNames = %v, want the native field dropped", got)
+	}
+	if got := issue.ExtraColumns(resolved); len(got) != 0 {
+		t.Errorf("ExtraColumns = %v, want no duplicate column", got)
+	}
+}
+
+// TestAFailureMidRunIsNotAPartialSuccess covers the honesty property at the
+// seam between pages. A run that fetched one page and then failed must return
+// the error, not the rows it happened to get with complete unset — a caller
+// that saw rows and no error would treat a truncated set as the whole answer.
+func TestAFailureMidRunIsNotAPartialSuccess(t *testing.T) {
+	client := &issue.Client{
+		Transport: &failingDoer{
+			ok: `{"issues":[{"id":"1","key":"ENG-1001","fields":{"summary":"s",` +
+				`"status":{"name":"X","statusCategory":{"key":"new"}},"labels":[]}},` +
+				`{"id":"2","key":"ENG-1000","fields":{"summary":"s",` +
+				`"status":{"name":"X","statusCategory":{"key":"new"}},"labels":[]}}],` +
+				`"total":10,"startAt":0,"maxResults":2}`,
+			failAfter: 1,
+		},
+		Site: site.Info{Kind: site.DataCenter},
+	}
+
+	var seen int
+	_, err := client.ListStream(t.Context(), issue.ListOptions{
+		Query:    issue.QueryOptions{Project: "ENG"},
+		Limit:    registry.Limit{All: true},
+		PageSize: 2,
+		Fields:   issue.DefaultFields(),
+	}, func(page []issue.Issue, _ int) error {
+		seen += len(page)
+		return nil
+	})
+
+	if err == nil {
+		t.Fatal("a failure on the second page was reported as success")
+	}
+	// The rows from the first page did reach the callback — a streaming command
+	// has already written them — which is exactly why the error must propagate.
+	if seen != 2 {
+		t.Errorf("saw %d rows before the failure, want 2", seen)
+	}
+	if code := errs.Coerce(err).Code; code == "" {
+		t.Errorf("the failure carries no structured code: %v", err)
+	}
+}
+
+// TestACallbackFailureStopsTheRun covers the other direction: a stream that
+// cannot be written to must stop the paging rather than keep spending requests
+// on rows nobody will receive.
+func TestACallbackFailureStopsTheRun(t *testing.T) {
+	doer := &failingDoer{
+		ok: `{"issues":[{"id":"1","key":"ENG-1001","fields":{"summary":"s",` +
+			`"status":{"name":"X","statusCategory":{"key":"new"}},"labels":[]}}],` +
+			`"total":10,"startAt":0,"maxResults":1}`,
+	}
+	client := &issue.Client{Transport: doer, Site: site.Info{Kind: site.DataCenter}}
+
+	sentinel := errs.Runtime("BROKEN_PIPE", "downstream went away")
+	_, err := client.ListStream(t.Context(), issue.ListOptions{
+		Query:    issue.QueryOptions{Project: "ENG"},
+		Limit:    registry.Limit{All: true},
+		PageSize: 1,
+		Fields:   issue.DefaultFields(),
+	}, func([]issue.Issue, int) error { return sentinel })
+
+	if err == nil {
+		t.Fatal("a write failure was swallowed")
+	}
+	if code := errs.Coerce(err).Code; code != "BROKEN_PIPE" {
+		t.Errorf("code = %q, want the callback's own error to propagate", code)
+	}
+	if doer.calls != 1 {
+		t.Errorf("made %d requests after the callback failed, want 1", doer.calls)
+	}
+}
+
+// failingDoer answers successfully failAfter times and then returns a server
+// error, so a failure part-way through a paged run can be staged.
+type failingDoer struct {
+	ok        string
+	failAfter int
+	calls     int
+}
+
+func (f *failingDoer) Do(
+	context.Context, transport.Request,
+) (*transport.Response, error) {
+	f.calls++
+	if f.failAfter > 0 && f.calls > f.failAfter {
+		return &transport.Response{
+			Status: 500,
+			Body:   []byte(`{"errorMessages":["upstream exploded"]}`),
+			Header: map[string][]string{"Content-Type": {"application/json"}},
+		}, nil
+	}
+	return &transport.Response{
+		Status: 200,
+		Body:   []byte(f.ok),
 		Header: map[string][]string{"Content-Type": {"application/json"}},
 	}, nil
 }

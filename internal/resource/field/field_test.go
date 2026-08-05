@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kmoneil/jira-cli/internal/errs"
 	"github.com/kmoneil/jira-cli/internal/exitcode"
 	"github.com/kmoneil/jira-cli/internal/registry"
 	"github.com/kmoneil/jira-cli/internal/render"
@@ -207,4 +208,50 @@ func (s *stubDoer) Do(context.Context, transport.Request) (*transport.Response, 
 		Body:   []byte(s.body),
 		Header: map[string][]string{"Content-Type": {"application/json"}},
 	}, nil
+}
+
+// TestListWithoutASessionFailsLoudly covers the guard. A resource that
+// dereferenced a nil session would panic in production rather than fail here.
+func TestListWithoutASessionFailsLoudly(t *testing.T) {
+	cmd, _ := registry.Lookup("field.list")
+	inv := &registry.Invocation{
+		Flags: registry.NewFlags(), Limit: registry.Limit{All: true},
+		Progress: registry.NoProgress,
+	}
+	stream, err := render.NewStream(io.Discard, render.TSV, render.StreamSpec{
+		Kind: cmd.Kind(), Version: cmd.KindVersion(),
+		Name: cmd.CollectionName, Columns: cmd.Columns,
+	})
+	if err != nil {
+		t.Fatalf("stream: %v", err)
+	}
+	if _, err := cmd.Stream(t.Context(), inv, stream); err == nil {
+		t.Error("field list ran without a session")
+	} else if code := errs.Coerce(err).Code; code != "NO_SESSION" {
+		t.Errorf("code = %q, want NO_SESSION", code)
+	}
+}
+
+// TestListSurfacesAFetchFailure covers the path where the catalogue cannot be
+// read. A command that swallowed it would print an empty catalogue and exit 0,
+// which reads as "this site has no fields".
+func TestListSurfacesAFetchFailure(t *testing.T) {
+	cmd, _ := registry.Lookup("field.list")
+	inv := &registry.Invocation{
+		Jira:  &stubSession{doer: &stubDoer{body: `<html>gateway timeout</html>`}},
+		Flags: registry.NewFlags(), Limit: registry.Limit{All: true},
+		Progress: registry.NoProgress,
+	}
+	stream, err := render.NewStream(io.Discard, render.TSV, render.StreamSpec{
+		Kind: cmd.Kind(), Version: cmd.KindVersion(),
+		Name: cmd.CollectionName, Columns: cmd.Columns,
+	})
+	if err != nil {
+		t.Fatalf("stream: %v", err)
+	}
+	if _, err := cmd.Stream(t.Context(), inv, stream); err == nil {
+		t.Error("an unreadable catalogue was reported as an empty one")
+	} else if code := errs.Coerce(err).Code; code != "MALFORMED_FIELD_LIST" {
+		t.Errorf("code = %q, want MALFORMED_FIELD_LIST", code)
+	}
 }

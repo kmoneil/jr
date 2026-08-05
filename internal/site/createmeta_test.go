@@ -360,3 +360,207 @@ func (r *routingDoer) Do(
 		Header: map[string][]string{"Content-Type": {"application/json"}},
 	}, nil
 }
+
+// TestAllowedValuesCoverEveryShape covers the several ways Jira describes a
+// constrained value. A shape that reduces to nothing is dropped rather than
+// rendered as an empty string, because an empty cell in a list of choices reads
+// as a choice.
+func TestAllowedValuesCoverEveryShape(t *testing.T) {
+	body := `{"projects":[{"key":"ENG","issuetypes":[{"id":"1","name":"Bug","fields":{
+		"named":{"required":false,"name":"Named","schema":{"type":"option"},
+		         "allowedValues":[{"id":"1","name":"By Name"}]},
+		"valued":{"required":false,"name":"Valued","schema":{"type":"option"},
+		          "allowedValues":[{"id":"2","value":"By Value"}]},
+		"idonly":{"required":false,"name":"Id Only","schema":{"type":"option"},
+		          "allowedValues":[{"id":"3"}]},
+		"bare":{"required":false,"name":"Bare","schema":{"type":"option"},
+		        "allowedValues":["a bare string"]},
+		"empty":{"required":false,"name":"Empty","schema":{"type":"option"},
+		         "allowedValues":[{}]}
+	}}]}]}`
+
+	meta, err := site.FetchCreateMeta(t.Context(),
+		&routingDoer{routes: map[string]string{"/rest/api/2/issue/createmeta": body}},
+		site.Info{Kind: site.DataCenter}, "ENG", "Bug")
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+
+	want := map[string][]string{
+		"named":  {"By Name"},
+		"valued": {"By Value"},
+		"idonly": {"3"},
+		"bare":   {"a bare string"},
+		"empty":  {},
+	}
+	for _, f := range meta.Fields {
+		expected, ok := want[f.ID]
+		if !ok {
+			t.Errorf("unexpected field %q", f.ID)
+			continue
+		}
+		if strings.Join(f.AllowedValues, ",") != strings.Join(expected, ",") {
+			t.Errorf("%s allowed values = %v, want %v", f.ID, f.AllowedValues, expected)
+		}
+	}
+}
+
+// TestCloudPagesEveryField is the one that would fail silently. A project with
+// more fields than a page holds would otherwise report a short list — and a
+// short list of *required* fields is a create that fails on a field the caller
+// was never told about.
+func TestCloudPagesEveryField(t *testing.T) {
+	doer := &sequencingDoer{bodies: []string{
+		cloudIssueTypesJSON,
+		`{"total":4,"isLast":false,"values":[
+			{"fieldId":"a","name":"A","required":true,"schema":{"type":"string"}},
+			{"fieldId":"b","name":"B","required":false,"schema":{"type":"string"}}]}`,
+		`{"total":4,"isLast":true,"values":[
+			{"fieldId":"c","name":"C","required":true,"schema":{"type":"string"}},
+			{"fieldId":"d","name":"D","required":false,"schema":{"type":"string"}}]}`,
+	}}
+
+	meta, err := site.FetchCreateMeta(t.Context(), doer, site.Info{Kind: site.Cloud}, "ENG", "Bug")
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+	if len(meta.Fields) != 4 {
+		t.Fatalf("got %d fields across pages, want 4: %+v", len(meta.Fields), meta.Fields)
+	}
+	// Required first, so the sort spans pages rather than being applied per
+	// page and leaving an optional field above a required one.
+	if !meta.Fields[0].Required || !meta.Fields[1].Required {
+		t.Errorf("required fields did not sort to the top across pages: %+v", meta.Fields)
+	}
+}
+
+// TestCloudPagesIssueTypes covers the same trap one endpoint earlier: a project
+// with more types than a page holds must not lose the one being resolved.
+func TestCloudPagesIssueTypes(t *testing.T) {
+	doer := &sequencingDoer{bodies: []string{
+		`{"total":3,"isLast":false,"values":[{"id":"1","name":"Bug"}]}`,
+		`{"total":3,"isLast":false,"values":[{"id":"2","name":"Story"}]}`,
+		`{"total":3,"isLast":true,"values":[{"id":"3","name":"Epic"}]}`,
+	}}
+
+	types, err := site.FetchIssueTypes(t.Context(), doer, site.Info{Kind: site.Cloud}, "ENG")
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+	if len(types) != 3 {
+		t.Fatalf("got %d types across pages, want 3: %+v", len(types), types)
+	}
+	if _, err := site.ResolveIssueType(types, "Epic"); err != nil {
+		t.Errorf("a type on the last page did not resolve: %v", err)
+	}
+}
+
+// TestPagingStopsOnAnEmptyPage stops a server that never sets isLast from
+// spinning forever. A loop bounded only by what the server claims is a loop the
+// server controls.
+func TestPagingStopsOnAnEmptyPage(t *testing.T) {
+	doer := &sequencingDoer{bodies: []string{
+		`{"total":99,"isLast":false,"values":[{"id":"1","name":"Bug"}]}`,
+		`{"total":99,"isLast":false,"values":[]}`,
+	}}
+
+	types, err := site.FetchIssueTypes(t.Context(), doer, site.Info{Kind: site.Cloud}, "ENG")
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+	if len(types) != 1 {
+		t.Errorf("got %d types, want the one that arrived", len(types))
+	}
+	if doer.calls != 2 {
+		t.Errorf("made %d requests, want 2 — a page that added nothing ends the loop", doer.calls)
+	}
+}
+
+// TestResolveIssueTypeRefusesEmpty covers the guard, and the shape of the
+// refusal when a project offers nothing to suggest.
+func TestResolveIssueTypeRefusesEmpty(t *testing.T) {
+	if _, err := site.ResolveIssueType(nil, "  "); err == nil {
+		t.Error("an empty issue type was accepted")
+	} else if code := errs.Coerce(err).Code; code != "INVALID_ISSUE_TYPE" {
+		t.Errorf("code = %q, want INVALID_ISSUE_TYPE", code)
+	}
+
+	_, err := site.ResolveIssueType(nil, "Bug")
+	if err == nil {
+		t.Fatal("a type resolved against an empty project")
+	}
+	e := errs.Coerce(err)
+	if e.Code != "UNKNOWN_ISSUE_TYPE" || e.Detail != "" {
+		t.Errorf("got %q / %q, want UNKNOWN_ISSUE_TYPE with nothing to suggest",
+			e.Code, e.Detail)
+	}
+}
+
+// TestMalformedFieldMetaIsRefused covers a field described in a shape this tool
+// cannot read. Skipping it would produce a create screen missing a required
+// field, which fails later and somewhere else.
+func TestMalformedFieldMetaIsRefused(t *testing.T) {
+	body := `{"projects":[{"key":"ENG","issuetypes":[{"id":"1","name":"Bug",
+		"fields":{"summary":"not an object"}}]}]}`
+	_, err := site.FetchCreateMeta(t.Context(),
+		&routingDoer{routes: map[string]string{"/rest/api/2/issue/createmeta": body}},
+		site.Info{Kind: site.DataCenter}, "ENG", "Bug")
+	if err == nil {
+		t.Fatal("a field described as a string was accepted")
+	}
+	if code := errs.Coerce(err).Code; code != "MALFORMED_FIELD_META" {
+		t.Errorf("code = %q, want MALFORMED_FIELD_META", code)
+	}
+}
+
+// TestCreateMetaRefusesAnUnusableBody covers both deployments' decode guards.
+func TestCreateMetaRefusesAnUnusableBody(t *testing.T) {
+	for _, tc := range []struct {
+		kind  site.Kind
+		route string
+	}{
+		{site.DataCenter, "/rest/api/2/issue/createmeta"},
+		{site.Cloud, "/rest/api/3/issue/createmeta/ENG/issuetypes"},
+	} {
+		doer := &routingDoer{routes: map[string]string{tc.route: `<html>not jira</html>`}}
+		_, err := site.FetchCreateMeta(t.Context(), doer, site.Info{Kind: tc.kind}, "ENG", "Bug")
+		if err == nil {
+			t.Fatalf("%s accepted an HTML body", tc.kind)
+		}
+		if code := errs.Coerce(err).Code; code != "MALFORMED_CREATEMETA" {
+			t.Errorf("%s code = %q, want MALFORMED_CREATEMETA", tc.kind, code)
+		}
+	}
+}
+
+// TestRefreshBustsTheCreateMetaCache covers --refresh, so somebody who just
+// changed a screen does not have to wait out the TTL.
+func TestRefreshBustsTheCreateMetaCache(t *testing.T) {
+	dir := t.TempDir()
+	doer := &routingDoer{routes: map[string]string{
+		"/rest/api/2/issue/createmeta": dcCreateMetaJSON,
+	}}
+
+	if _, err := dcMetadataAt(doer, dir, testNow).CreateMeta(t.Context(), "ENG", "Bug"); err != nil {
+		t.Fatalf("first: %v", err)
+	}
+	forced := dcMetadataAt(doer, dir, testNow.Add(time.Minute))
+	forced.Refresh = true
+	if _, err := forced.CreateMeta(t.Context(), "ENG", "Bug"); err != nil {
+		t.Fatalf("second: %v", err)
+	}
+	if doer.calls != 2 {
+		t.Errorf("--refresh reused the cache: %d calls, want 2", doer.calls)
+	}
+
+	// Past the TTL measured from the entry --refresh wrote, not from the first
+	// one: an entry exactly at the TTL is still fresh, because the check is
+	// strictly greater.
+	stale := dcMetadataAt(doer, dir, testNow.Add(2*site.DefaultTTL))
+	if _, err := stale.CreateMeta(t.Context(), "ENG", "Bug"); err != nil {
+		t.Fatalf("third: %v", err)
+	}
+	if doer.calls != 3 {
+		t.Errorf("an expired entry was reused: %d calls, want 3", doer.calls)
+	}
+}

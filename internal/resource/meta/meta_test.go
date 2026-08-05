@@ -3,9 +3,11 @@ package meta_test
 import (
 	"context"
 	"io"
+	"net/url"
 	"strings"
 	"testing"
 
+	"github.com/kmoneil/jira-cli/internal/errs"
 	"github.com/kmoneil/jira-cli/internal/exitcode"
 	"github.com/kmoneil/jira-cli/internal/registry"
 	"github.com/kmoneil/jira-cli/internal/render"
@@ -248,8 +250,9 @@ func runStream(
 // stubSession is a registry.Session backed by a stubbed transport, so a command
 // is exercised with no auth, no config, and no network.
 type stubSession struct {
-	doer *stubDoer
-	meta *site.Metadata
+	doer   *stubDoer
+	record *recordingDoer
+	meta   *site.Metadata
 }
 
 func (s *stubSession) Connect(context.Context) (*transport.Client, site.Info, error) {
@@ -258,7 +261,11 @@ func (s *stubSession) Connect(context.Context) (*transport.Client, site.Info, er
 
 func (s *stubSession) Metadata(context.Context) (*site.Metadata, error) {
 	if s.meta == nil {
-		s.meta = &site.Metadata{Client: s.doer, Info: site.Info{Kind: site.DataCenter}}
+		var client site.Doer = s.doer
+		if s.record != nil {
+			client = s.record
+		}
+		s.meta = &site.Metadata{Client: client, Info: site.Info{Kind: site.DataCenter}}
 	}
 	return s.meta, nil
 }
@@ -279,6 +286,166 @@ func (s *stubDoer) Do(context.Context, transport.Request) (*transport.Response, 
 	return &transport.Response{
 		Status: 200,
 		Body:   []byte(s.body),
+		Header: map[string][]string{"Content-Type": {"application/json"}},
+	}, nil
+}
+
+// TestBadIssueKeyIsRefusedBeforeAnyRequest covers the local check. A 404 for a
+// malformed key reads like a missing issue rather than a typo, and the value
+// reaches a URL path — so it is refused here, before the stream opens and its
+// header is written.
+func TestBadIssueKeyIsRefusedBeforeAnyRequest(t *testing.T) {
+	cmd, ok := registry.Lookup("meta.transitions")
+	if !ok {
+		t.Fatal("meta transitions is not registered")
+	}
+
+	for _, bad := range []string{
+		"", "foo", "ENG", "ENG-", "-101", "ENG_101", "../../admin",
+		"ENG-101/../../admin", "eng 101", "ENG-1.5",
+	} {
+		doer := &stubDoer{body: transitionsJSON}
+		inv := &registry.Invocation{
+			Jira: &stubSession{doer: doer}, Args: []string{bad},
+			Flags: registry.NewFlags(),
+		}
+		err := cmd.Validate(t.Context(), inv)
+		if err == nil {
+			t.Errorf("Validate(%q) accepted a malformed key", bad)
+			continue
+		}
+		if errs.ExitOf(err) != exitcode.Usage {
+			t.Errorf("%q exits %v, want %v", bad, errs.ExitOf(err), exitcode.Usage)
+		}
+		if code := errs.Coerce(err).Code; code != "INVALID_KEY" {
+			t.Errorf("%q code = %q, want INVALID_KEY", bad, code)
+		}
+		// Nothing was sent, so a typo costs no round trip.
+		if doer.calls != 0 {
+			t.Errorf("%q reached the network %d times", bad, doer.calls)
+		}
+	}
+
+	// A key with no arguments at all is refused rather than panicking on
+	// Args[0], because Validate runs before cobra's arity check in some paths.
+	inv := &registry.Invocation{Flags: registry.NewFlags()}
+	if err := cmd.Validate(t.Context(), inv); err == nil {
+		t.Error("a missing key was accepted")
+	}
+}
+
+func TestGoodIssueKeysAreAccepted(t *testing.T) {
+	cmd, _ := registry.Lookup("meta.transitions")
+	for _, ok := range []string{"ENG-1", "ENG-101", "A-1", "PROJ_X-42", "eng-1"} {
+		inv := &registry.Invocation{Args: []string{ok}, Flags: registry.NewFlags()}
+		if err := cmd.Validate(t.Context(), inv); err != nil {
+			t.Errorf("Validate(%q) = %v", ok, err)
+		}
+	}
+}
+
+// TestCreateMetaDefaultsToTheContextProject covers --project being a default
+// rather than a requirement, and the refusal when there is no default either.
+func TestCreateMetaDefaultsToTheContextProject(t *testing.T) {
+	cmd, ok := registry.Lookup("meta.createmeta")
+	if !ok {
+		t.Fatal("meta createmeta is not registered")
+	}
+
+	// No --project: the context's project is used.
+	doer := &recordingDoer{body: dcCreateMetaJSON}
+	flags := registry.NewFlags()
+	flags.SetString("type", "Bug")
+	inv := &registry.Invocation{
+		Jira:  &stubSession{doer: &stubDoer{body: dcCreateMetaJSON}, record: doer},
+		Flags: flags, Limit: registry.Limit{All: true},
+		Stderr: io.Discard, Progress: registry.NoProgress,
+	}
+	stream, err := render.NewStream(io.Discard, render.TSV, render.StreamSpec{
+		Kind: cmd.Kind(), Version: cmd.KindVersion(),
+		Name: cmd.CollectionName, Columns: cmd.Columns,
+	})
+	if err != nil {
+		t.Fatalf("stream: %v", err)
+	}
+	if _, err := cmd.Stream(t.Context(), inv, stream); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if got := doer.query.Get("projectKeys"); got != "ENG" {
+		t.Errorf("asked for project %q, want the context's ENG", got)
+	}
+}
+
+// TestCommandsWithoutASessionFailLoudly covers the guard every command carries.
+// A resource that dereferenced a nil session would panic in production rather
+// than fail in its own tests.
+func TestCommandsWithoutASessionFailLoudly(t *testing.T) {
+	for _, name := range []string{"meta.transitions", "meta.createmeta"} {
+		cmd, _ := registry.Lookup(name)
+		inv := &registry.Invocation{
+			Args: []string{"ENG-1"}, Flags: registry.NewFlags(),
+			Limit: registry.Limit{All: true}, Progress: registry.NoProgress,
+		}
+		stream, err := render.NewStream(io.Discard, render.TSV, render.StreamSpec{
+			Kind: cmd.Kind(), Version: cmd.KindVersion(),
+			Name: cmd.CollectionName, Columns: cmd.Columns,
+		})
+		if err != nil {
+			t.Fatalf("stream: %v", err)
+		}
+		if _, err := cmd.Stream(t.Context(), inv, stream); err == nil {
+			t.Errorf("%s ran without a session", name)
+		} else if code := errs.Coerce(err).Code; code != "NO_SESSION" {
+			t.Errorf("%s code = %q, want NO_SESSION", name, code)
+		}
+	}
+}
+
+func TestCreateMetaDocIsWellFormed(t *testing.T) {
+	created, err := site.FetchCreateMeta(t.Context(),
+		&stubDoer{body: dcCreateMetaJSON}, site.Info{Kind: site.DataCenter}, "ENG", "Bug")
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+
+	doc := meta.CreateMetaDoc(created, true)
+	if err := doc.Validate(); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+
+	var xml strings.Builder
+	if err := render.Write(&xml, doc, render.XML); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	for _, want := range []string{
+		`<field id="summary" required="true"`,
+		`<name>Summary</name>`,
+		`<type>string</type>`,
+		`has-default="true"`,
+		`<allowed-value>High</allowed-value>`,
+	} {
+		if !strings.Contains(xml.String(), want) {
+			t.Errorf("the output does not contain %s:\n%s", want, xml.String())
+		}
+	}
+}
+
+// recordingDoer remembers the last query it was asked for, so a test can assert
+// what reached the wire rather than only what came back.
+type recordingDoer struct {
+	body  string
+	query url.Values
+	calls int
+}
+
+func (r *recordingDoer) Do(
+	_ context.Context, req transport.Request,
+) (*transport.Response, error) {
+	r.calls++
+	r.query = req.Query
+	return &transport.Response{
+		Status: 200,
+		Body:   []byte(r.body),
 		Header: map[string][]string{"Content-Type": {"application/json"}},
 	}, nil
 }

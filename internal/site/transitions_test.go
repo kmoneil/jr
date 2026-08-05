@@ -204,3 +204,93 @@ func loadTransitions(t *testing.T) *site.Transitions {
 	}
 	return got
 }
+
+// TestTransitionIdsSurviveOddServers covers the ordering fallbacks. Jira sends
+// numeric ids, but a plugin can send anything, and the order still has to be
+// total — an unstable order means a paged or diffed result changes between runs
+// for no reason a caller can see.
+func TestTransitionIdsSurviveOddServers(t *testing.T) {
+	body := `{"transitions":[
+		{"id":"31","name":"c","to":{"id":"1","name":"Open"}},
+		{"id":"2","name":"a","to":{"id":"1","name":"Open"}},
+		{"id":"custom-b","name":"e","to":{"id":"1","name":"Open"}},
+		{"id":"99999999999999999999","name":"f","to":{"id":"1","name":"Open"}},
+		{"id":"custom-a","name":"d","to":{"id":"1","name":"Open"}},
+		{"id":"11","name":"b","to":{"id":"1","name":"Open"}}
+	]}`
+	got, err := site.FetchTransitions(t.Context(),
+		&stubDoer{body: body}, site.Info{Kind: site.Cloud}, "ENG-1")
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+
+	var ids []string
+	for _, item := range got.Items {
+		ids = append(ids, item.ID)
+	}
+	// Numeric ids first and in numeric order; everything else after, in text
+	// order. An id long enough to overflow falls back to text rather than
+	// wrapping to a small number and sorting first.
+	want := "2,11,31,99999999999999999999,custom-a,custom-b"
+	if strings.Join(ids, ",") != want {
+		t.Errorf("ids = %v\nwant %s", ids, want)
+	}
+}
+
+// TestStatusCategoryFallsBackToTheName covers the Data Center versions that
+// send a category name and no key. Without the fallback every status on those
+// servers reports as unknown, which is the field an automated caller branches
+// on.
+func TestStatusCategoryFallsBackToTheName(t *testing.T) {
+	for _, tc := range []struct{ key, name, want string }{
+		{"new", "", site.CategoryToDo},
+		{"undefined", "", site.CategoryToDo},
+		{"indeterminate", "", site.CategoryInProgress},
+		{"done", "", site.CategoryDone},
+		{"", "To Do", site.CategoryToDo},
+		{"", "New", site.CategoryToDo},
+		{"", "In Progress", site.CategoryInProgress},
+		{"", "Done", site.CategoryDone},
+		{"", "Complete", site.CategoryDone},
+		{"", "", site.CategoryUnknown},
+		{"", "Something A Plugin Invented", site.CategoryUnknown},
+	} {
+		if got := site.NormalizeCategory(tc.key, tc.name); got != tc.want {
+			t.Errorf("NormalizeCategory(%q, %q) = %q, want %q",
+				tc.key, tc.name, got, tc.want)
+		}
+	}
+}
+
+// TestResolveRefusesEmptyInput covers the guard that would otherwise let an
+// empty --transition match a transition whose name is also empty.
+func TestResolveRefusesEmptyInput(t *testing.T) {
+	transitions := loadTransitions(t)
+	for _, input := range []string{"", "   "} {
+		if _, err := transitions.Resolve(input); err == nil {
+			t.Errorf("Resolve(%q) was accepted", input)
+		} else if code := errs.Coerce(err).Code; code != "INVALID_TRANSITION" {
+			t.Errorf("Resolve(%q) code = %q, want INVALID_TRANSITION", input, code)
+		}
+	}
+}
+
+// TestTransitionsEscapeTheIssueKey covers a caller's argument reaching a URL
+// path. JoinPath cleans ".." rather than refusing it, so an unescaped key
+// holding separators would resolve to a different endpoint on the same host.
+func TestTransitionsEscapeTheIssueKey(t *testing.T) {
+	doer := &pathRecordingDoer{stubDoer: stubDoer{body: `{"transitions":[]}`}}
+	if _, err := site.FetchTransitions(t.Context(), doer,
+		site.Info{Kind: site.Cloud}, "../../admin"); err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+	// The key contributes exactly one path segment however it is spelled.
+	// "..%2F..%2Fadmin" cannot traverse; "../../admin" would.
+	if got, want := strings.Count(doer.path, "/"), 6; got != want {
+		t.Errorf("path %q has %d segments, want %d — the key escaped its own",
+			doer.path, got, want)
+	}
+	if !strings.HasSuffix(doer.path, "/transitions") {
+		t.Errorf("path = %q, want it to still end at the transitions endpoint", doer.path)
+	}
+}
