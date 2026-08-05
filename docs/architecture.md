@@ -15,6 +15,7 @@ internal/
   jql/                     # AST, builder, renderer, tokenizer
   adf/                     # ADF ⇄ markdown, golden-tested
   site/                    # deployment probe and the per-site metadata cache
+  idem/                    # the idempotency ledger: what a mutation already did
   commands/                # links every resource in, so their inits run
   resource/                # one isolated package per Jira resource
   workflow/                # operations spanning more than one resource
@@ -124,12 +125,13 @@ a token cannot reach a fixture file even if recording is interrupted.
 
 ## Config, state, cache
 
-| Path                                    | Contents                                              | Mode |
-| --------------------------------------- | ----------------------------------------------------- | ---- |
-| `$XDG_CONFIG_HOME/jr/config.toml`       | Contexts, defaults. Hand-editable.                    | 0644 |
-| `$XDG_STATE_HOME/jr/credentials.toml`   | Stored credentials                                    | 0600 |
-| `$XDG_STATE_HOME/jr/`                   | Idempotency ledger, view history, last cursor         | —    |
-| `$XDG_CACHE_HOME/jr/<site>/`            | Deployment probe, field catalogue, create metadata     | —    |
+| Path                                  | Contents                                           | Mode |
+| ------------------------------------- | -------------------------------------------------- | ---- |
+| `$XDG_CONFIG_HOME/jr/config.toml`     | Contexts, defaults. Hand-editable.                 | 0644 |
+| `$XDG_STATE_HOME/jr/credentials.toml` | Stored credentials                                 | 0600 |
+| `$XDG_STATE_HOME/jr/idempotency.toml` | What a mutating request already did                | 0600 |
+| `$XDG_STATE_HOME/jr/`                 | View history, last cursor                          | —    |
+| `$XDG_CACHE_HOME/jr/<site>/`          | Deployment probe, field catalogue, create metadata | —    |
 
 The three are separate because they have different lifetimes and different
 backup expectations: config is hand-written and worth keeping, state is
@@ -139,7 +141,7 @@ directory for all of them means a user who clears a cache loses their contexts.
 Credentials live under **state, not config**, and that placement is the point.
 The config is meant to be hand-edited, shared, and committed to a dotfiles
 repository. A credential in it would be published by the first person who tried.
-`config.toml` holds a credential *reference*; the store holds the secret, at
+`config.toml` holds a credential _reference_; the store holds the secret, at
 mode 0600, and is refused on read if it is readable by anyone else — reading it
 anyway and warning would mean the credential is used, and stays exposed, every
 time.
@@ -147,6 +149,18 @@ time.
 An XDG variable that is relative is ignored rather than resolved against the
 working directory, which would otherwise put a user's contexts somewhere
 different depending on where they ran the command.
+
+**The idempotency ledger is state, not cache, and the distinction is the
+point.** Everything under cache can be re-fetched, so losing it costs a round
+trip. The ledger cannot be re-derived from anywhere, and losing it means a
+retried create makes a second issue. It is the one file here where a corrupt
+read is an error rather than a miss, for the same reason.
+
+Writes to it are serialized with an `O_EXCL` lock file, because the promise is
+that two processes racing with one key cannot both be told they claimed it, and
+a read-modify-write of a shared file without a lock gives exactly that. A lock
+older than `idem.LockStale` is presumed abandoned and broken; age is the only
+usable signal, since a pid means nothing across containers or after a reboot.
 
 Metadata caching is a feature, not an optimization: resolving a custom field
 name to `customfield_10042` should not cost a round trip on every invocation.

@@ -92,7 +92,7 @@ never going to appear in the TSV body.
 
 The trade is that a malformed row cannot be caught before its predecessors have
 been written. The column specification is validated before the header, so a bad
-*specification* emits nothing; a bad *row* leaves partial output and a non-zero
+_specification_ emits nothing; a bad _row_ leaves partial output and a non-zero
 exit. Piping to `head` closes the pipe and the process exits 141, which is
 ordinary Unix behavior and not an error.
 
@@ -234,29 +234,54 @@ sent for Jira to reject. The refusal carries the candidates, because an error
 that only says "unknown" leaves the caller to go and read a catalogue to find
 their typo.
 
-| Code                   | Exit | Meaning                                          |
-| ---------------------- | ---- | ------------------------------------------------- |
-| `UNKNOWN_FIELD`        | 2    | No field by that id, name, or clause name. `detail` lists the near misses, each with its id. |
-| `AMBIGUOUS_FIELD`      | 2    | Several fields share that name. `detail` lists every candidate with its id; pass the id. |
-| `INVALID_FIELD`        | 2    | The field resolved, but its id cannot be an element name or collides with one the command already emits. |
-| `UNKNOWN_TRANSITION`   | 2    | The issue offers no such move *right now*. `detail` lists every transition it does offer, with its id and destination. |
-| `AMBIGUOUS_TRANSITION` | 2    | Two transitions share that name and lead to different statuses. `detail` lists both. |
+| Code                   | Exit   | Meaning                                                                                                                                                             |
+| ---------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UNKNOWN_FIELD`        | 2      | No field by that id, name, or clause name. `detail` lists the near misses, each with its id.                                                                        |
+| `AMBIGUOUS_FIELD`      | 2      | Several fields share that name. `detail` lists every candidate with its id; pass the id.                                                                            |
+| `INVALID_FIELD`        | 2      | The field resolved, but its id cannot be an element name or collides with one the command already emits.                                                            |
+| `UNKNOWN_TRANSITION`   | 2      | The issue offers no such move _right now_. `detail` lists every transition it does offer, with its id and destination.                                              |
+| `AMBIGUOUS_TRANSITION` | 2      | Two transitions share that name and lead to different statuses. `detail` lists both.                                                                                |
 | `UNKNOWN_ISSUE_TYPE`   | 2 or 5 | The project offers no such type. `detail` lists the ones it does. Exit 5 when the answer came from a createmeta lookup, 2 when a type name was resolved before one. |
-| `AMBIGUOUS_ISSUE_TYPE` | 2    | Several types share that name; pass the id. |
-| `UNKNOWN_PROJECT`      | 5    | The project does not exist, or this credential may not create in it. |
+| `AMBIGUOUS_ISSUE_TYPE` | 2      | Several types share that name; pass the id.                                                                                                                         |
+| `UNKNOWN_PROJECT`      | 5      | The project does not exist, or this credential may not create in it.                                                                                                |
 
 Field resolution costs one request against a cold cache and none against a warm
 one; a command that names nothing to resolve makes no extra request at all.
 
 **Transitions are never cached.** They depend on the issue's current status, so
 a stored copy answers the question as it stood when it was stored. Create
-metadata *is* cached, because it changes when an administrator edits a screen
+metadata _is_ cached, because it changes when an administrator edits a screen
 rather than when an issue moves. An `UNKNOWN_TRANSITION` therefore lists the
 whole available set rather than near matches: a move missing from it is far more
 often blocked from the current status than misspelled.
 
 An unparseable `--format` still produces a readable error: the diagnostic falls
 back to XML rather than failing twice.
+
+### Idempotency
+
+A mutating command that carries an idempotency key records `(site, key)` before
+it sends anything, and the outcome afterwards. A repeat with the same key
+returns the original result rather than making a second one.
+
+| Code                      | Exit | Meaning                                                                                                                                                                                    |
+| ------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `IDEMPOTENCY_KEY_REUSED`  | 7    | The key was already used for a different operation. Answering one with the other's result would be worse than refusing.                                                                    |
+| `INVALID_IDEMPOTENCY_KEY` | 2    | 1 to 128 characters of letters, digits, and `. _ : -`.                                                                                                                                     |
+| `LEDGER_INVALID`          | 1    | The ledger could not be parsed. It is refused rather than ignored: everywhere else an unreadable cache is a miss because the cost is a round trip, and here the cost is a duplicate issue. |
+| `LEDGER_LOCKED`           | 1    | Another run is writing the ledger and did not finish.                                                                                                                                      |
+
+An attempt that claimed a key and then died leaves the claim pending, and a
+retry inside `idem.StaleClaim` is **refused** rather than allowed. The first
+request may have been processed, so "I do not know" has to behave like "it
+happened" — allowing it is the duplicate this exists to prevent. Past that
+window the claim is handed over, and the caller is told the earlier attempt's
+outcome is unknown rather than being left to assume nothing happened.
+
+Without a key, an identical request that succeeded within 60s produces a
+structured **warning** on stderr and nothing else. It is not blocked: two
+deliberate identical creates are a legitimate thing to want, and a caller who
+did not ask for idempotency does not silently get it.
 
 ## Stability policy
 

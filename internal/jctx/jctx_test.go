@@ -109,6 +109,31 @@ func TestCredentialsLiveOutsideTheConfigDirectory(t *testing.T) {
 	}
 }
 
+// TestTheIdempotencyLedgerLivesUnderState is the same distinction applied to
+// the other file that must survive. A cache is disposable by definition, and
+// losing this one means a retried create makes a second issue — so it must not
+// sit anywhere a "clear the cache" would reach.
+func TestTheIdempotencyLedgerLivesUnderState(t *testing.T) {
+	paths, err := jctx.DefaultPaths(env(map[string]string{"HOME": "/home/ada"}))
+	if err != nil {
+		t.Fatalf("DefaultPaths: %v", err)
+	}
+	ledger := paths.IdempotencyFile()
+	if !strings.HasPrefix(ledger, paths.State) {
+		t.Errorf("the ledger %q is not under the state directory %q", ledger, paths.State)
+	}
+	if strings.HasPrefix(ledger, paths.Cache) {
+		t.Errorf("the ledger %q sits inside the cache directory %q", ledger, paths.Cache)
+	}
+	if strings.HasPrefix(ledger, paths.Config) {
+		t.Errorf("the ledger %q sits inside the config directory %q", ledger, paths.Config)
+	}
+	// And it is not the credential store, which has stricter rules of its own.
+	if ledger == paths.CredentialsFile() {
+		t.Error("the ledger and the credential store are the same file")
+	}
+}
+
 func TestSiteCacheIsOnePathElement(t *testing.T) {
 	paths, err := jctx.DefaultPaths(env(map[string]string{"HOME": "/home/ada"}))
 	if err != nil {

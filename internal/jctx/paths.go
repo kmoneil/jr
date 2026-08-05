@@ -100,6 +100,16 @@ func (p Paths) CredentialsFile() string {
 	return filepath.Join(p.State, "credentials.toml")
 }
 
+// IdempotencyFile is the ledger of what a mutating request already did.
+//
+// It is under state, not cache, and the distinction is the whole point: a cache
+// is disposable by definition, and losing this one means a retried create makes
+// a second issue. Everything under cache can be re-fetched; this cannot be
+// re-derived from anywhere.
+func (p Paths) IdempotencyFile() string {
+	return filepath.Join(p.State, "idempotency.toml")
+}
+
 // SiteCache is the cache directory for one site's metadata: field ids, issue
 // types, transitions, and the deployment probe.
 func (p Paths) SiteCache(site string) string {
