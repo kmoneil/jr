@@ -2085,3 +2085,72 @@ func TestAllProjectsLiftsTheContextProject(t *testing.T) {
 		t.Errorf("project = %q, want the context's", got.Project)
 	}
 }
+
+// TestTheRecordedListingPagesToTheEnd replays a conversation a Cloud instance
+// actually had, which is what the other listing tests here cannot do.
+//
+// They page against a constructed fixture, and that fixture is worth keeping:
+// it holds an unassigned issue, a status in every category, and a page that
+// ends exactly on a boundary — shapes a sandbox will not produce on request.
+// What it cannot establish is that the request is one Jira accepts, because its
+// author decided both halves of the exchange.
+//
+// This one establishes exactly that and little else. The replayer matches on
+// path and query, so reaching the third page means the URL this code builds —
+// the endpoint, the field list, the token round-trip, the ORDER BY — is the one
+// a real server answered three times in a row.
+func TestTheRecordedListingPagesToTheEnd(t *testing.T) {
+	path := filepath.Join("testdata", "list-recorded.cloud.json")
+	cassette, err := transport.LoadCassette(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !cassette.Evidence() {
+		t.Fatal("list-recorded.cloud.json is not a recording, so replaying it " +
+			"proves nothing about the API")
+	}
+
+	replayer := transport.NewReplayer(cassette)
+	conn, err := transport.New(transport.Options{
+		BaseURL: "https://recorded.invalid", HTTPClient: replayer.Client(), Retries: -1,
+	})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+	client := &issue.Client{
+		Transport: conn, Site: site.Info{Kind: site.Cloud, Version: "test"},
+	}
+
+	// The options that produced the recording: what `issue list --project OPS
+	// --page-size 4 --limit all` builds, ORDER BY included.
+	result, err := client.List(t.Context(), issue.ListOptions{
+		JQL:      `project = "OPS" ORDER BY issuekey DESC`,
+		Limit:    registry.Limit{All: true},
+		PageSize: 4,
+		Fields:   issue.DefaultFields(),
+	})
+	if err != nil {
+		t.Fatalf("the request this code builds is not the one the server "+
+			"answered: %v", err)
+	}
+
+	if len(result.Issues) != 10 {
+		t.Errorf("got %d issues, want all 10 across three pages", len(result.Issues))
+	}
+	if !result.Complete {
+		t.Error("an exhausted listing was reported incomplete")
+	}
+	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+		t.Errorf("a recorded page was never requested: %v", unplayed)
+	}
+
+	// Descending by key, and by key rather than by text: OPS-10 is above OPS-9
+	// as an issue and below it as a string.
+	var keys []string
+	for _, i := range result.Issues {
+		keys = append(keys, i.Key)
+	}
+	if keys[0] != "OPS-10" || keys[len(keys)-1] != "OPS-1" {
+		t.Errorf("keys = %v, want OPS-10 first and OPS-1 last", keys)
+	}
+}

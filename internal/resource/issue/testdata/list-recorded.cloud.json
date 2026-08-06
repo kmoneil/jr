@@ -1,0 +1,270 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/search/jql",
+        "query": "fields=summary%2Cstatus%2Cassignee%2Creporter%2Cpriority%2Cissuetype%2Cproject%2Ccreated%2Cupdated%2Clabels&jql=project+%3D+%22OPS%22+ORDER+BY+issuekey+DESC&maxResults=4"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Atl-Request-Id": [
+            "00000000-0000-0000-0000-000000000000"
+          ],
+          "Atl-Traceid": [
+            "a3303a2396ad42329b0d40f54c15b9cc"
+          ],
+          "Cache-Control": [
+            "no-cache, no-store, no-transform"
+          ],
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Date": [
+            "Thu, 06 Aug 2026 17:51:21 GMT"
+          ],
+          "Nel": [
+            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=349;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "Report-To": [
+            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
+          ],
+          "Server": [
+            "AtlassianEdge"
+          ],
+          "Server-Timing": [
+            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=102,cdn-upstream-fbl;dur=419,atl-edge;dur=281,atl-edge-internal;dur=37,atl-edge-upstream;dur=244,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW56-P7\",cdn-rid;desc=\"sMepAV_nxtaRzfYcxXcJeXgu-EDKa5ljp5QhD1gERPpI4qJ8Pa7oIA==\",cdn-downstream-fbl;dur=424"
+          ],
+          "Set-Cookie": [
+            "REDACTED"
+          ],
+          "Strict-Transport-Security": [
+            "max-age=63072000; includeSubDomains; preload"
+          ],
+          "Timing-Allow-Origin": [
+            "*"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "Via": [
+            "1.1 d62a11a730cccecb0a33b1a5320b9948.cloudfront.net (CloudFront)"
+          ],
+          "X-Aaccountid": [
+            "000000%3A00000000-0000-0000-0000-000000000000"
+          ],
+          "X-Amz-Cf-Id": [
+            "sMepAV_nxtaRzfYcxXcJeXgu-EDKa5ljp5QhD1gERPpI4qJ8Pa7oIA=="
+          ],
+          "X-Amz-Cf-Pop": [
+            "DFW56-P7"
+          ],
+          "X-Arequestid": [
+            "7818d4640a63be4c98df73abd9ba5f66"
+          ],
+          "X-Cache": [
+            "Miss from cloudfront"
+          ],
+          "X-Content-Type-Options": [
+            "nosniff"
+          ],
+          "X-Ratelimit-Limit": [
+            "350"
+          ],
+          "X-Ratelimit-Remaining": [
+            "349"
+          ],
+          "X-Xss-Protection": [
+            "1; mode=block"
+          ]
+        },
+        "body": "{\"issues\":[{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10009\",\"self\":\"https://recorded.invalid/rest/api/3/issue/10009\",\"key\":\"OPS-10\",\"fields\":{\"summary\":\"Finalize Documentation for the Project\",\"issuetype\":{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10003\",\"id\":\"10003\",\"description\":\"Tasks track small, distinct pieces of work.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Task\",\"subtask\":false,\"avatarId\":10318,\"entityId\":\"00000000-0000-0000-0000-000000000000\",\"hierarchyLevel\":0},\"created\":\"2026-08-06T11:30:39.194-0500\",\"project\":{\"self\":\"https://recorded.invalid/rest/api/3/project/10000\",\"id\":\"10000\",\"key\":\"OPS\",\"name\":\"Operations\",\"projectTypeKey\":\"software\",\"simplified\":true,\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"}},\"reporter\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"assignee\":null,\"priority\":null,\"updated\":\"2026-08-06T11:30:39.831-0500\",\"status\":{\"self\":\"https://recorded.invalid/rest/api/3/status/10002\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"In Review\",\"id\":\"10002\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"}},\"labels\":[]}},{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10008\",\"self\":\"https://recorded.invalid/rest/api/3/issue/10008\",\"key\":\"OPS-9\",\"fields\":{\"summary\":\"Optimize Performance of the Application\",\"issuetype\":{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10003\",\"id\":\"10003\",\"description\":\"Tasks track small, distinct pieces of work.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Task\",\"subtask\":false,\"avatarId\":10318,\"entityId\":\"00000000-0000-0000-0000-000000000000\",\"hierarchyLevel\":0},\"created\":\"2026-08-06T11:30:38.350-0500\",\"project\":{\"self\":\"https://recorded.invalid/rest/api/3/project/10000\",\"id\":\"10000\",\"key\":\"OPS\",\"name\":\"Operations\",\"projectTypeKey\":\"software\",\"simplified\":true,\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"}},\"reporter\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"assignee\":null,\"priority\":null,\"updated\":\"2026-08-06T11:30:39.005-0500\",\"status\":{\"self\":\"https://recorded.invalid/rest/api/3/status/10000\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"To Do\",\"id\":\"10000\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"blue-gray\",\"name\":\"To Do\"}},\"labels\":[]}},{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10007\",\"self\":\"https://recorded.invalid/rest/api/3/issue/10007\",\"key\":\"OPS-8\",\"fields\":{\"summary\":\"Develop Transaction History Feature\",\"issuetype\":{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10003\",\"id\":\"10003\",\"description\":\"Tasks track small, distinct pieces of work.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Task\",\"subtask\":false,\"avatarId\":10318,\"entityId\":\"00000000-0000-0000-0000-000000000000\",\"hierarchyLevel\":0},\"created\":\"2026-08-06T11:30:37.600-0500\",\"project\":{\"self\":\"https://recorded.invalid/rest/api/3/project/10000\",\"id\":\"10000\",\"key\":\"OPS\",\"name\":\"Operations\",\"projectTypeKey\":\"software\",\"simplified\":true,\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"}},\"reporter\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"assignee\":null,\"priority\":null,\"updated\":\"2026-08-06T11:30:38.173-0500\",\"status\":{\"self\":\"https://recorded.invalid/rest/api/3/status/10000\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"To Do\",\"id\":\"10000\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"blue-gray\",\"name\":\"To Do\"}},\"labels\":[]}},{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10006\",\"self\":\"https://recorded.invalid/rest/api/3/issue/10006\",\"key\":\"OPS-7\",\"fields\":{\"summary\":\"Create Wallet Integration\",\"issuetype\":{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10003\",\"id\":\"10003\",\"description\":\"Tasks track small, distinct pieces of work.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Task\",\"subtask\":false,\"avatarId\":10318,\"entityId\":\"00000000-0000-0000-0000-000000000000\",\"hierarchyLevel\":0},\"created\":\"2026-08-06T11:30:36.768-0500\",\"project\":{\"self\":\"https://recorded.invalid/rest/api/3/project/10000\",\"id\":\"10000\",\"key\":\"OPS\",\"name\":\"Operations\",\"projectTypeKey\":\"software\",\"simplified\":true,\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"}},\"reporter\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"assignee\":null,\"priority\":null,\"updated\":\"2026-08-06T11:30:37.409-0500\",\"status\":{\"self\":\"https://recorded.invalid/rest/api/3/status/10001\",\"description\":\"This work item is being actively worked on at the moment by the assignee.\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"In Progress\",\"id\":\"10001\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"}},\"labels\":[]}}],\"nextPageToken\":\"EAQY/IHOwf0zIidwcm9qZWN0ID0gIk9QUyIgT1JERVIgQlkgaXNzdWVrZXkgREVTQyoCW10yIFRFTkFOVF9OT1RfRk9VTkRfSU5fVEVOQU5UX1NUT1JF\",\"isLast\":false}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/search/jql",
+        "query": "fields=summary%2Cstatus%2Cassignee%2Creporter%2Cpriority%2Cissuetype%2Cproject%2Ccreated%2Cupdated%2Clabels&jql=project+%3D+%22OPS%22+ORDER+BY+issuekey+DESC&maxResults=4&nextPageToken=EAQY%2FIHOwf0zIidwcm9qZWN0ID0gIk9QUyIgT1JERVIgQlkgaXNzdWVrZXkgREVTQyoCW10yIFRFTkFOVF9OT1RfRk9VTkRfSU5fVEVOQU5UX1NUT1JF"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Atl-Request-Id": [
+            "00000000-0000-0000-0000-000000000000"
+          ],
+          "Atl-Traceid": [
+            "23ea24038b6440b591c6cc7b9e10f569"
+          ],
+          "Cache-Control": [
+            "no-cache, no-store, no-transform"
+          ],
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Date": [
+            "Thu, 06 Aug 2026 17:51:22 GMT"
+          ],
+          "Nel": [
+            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=348;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "Report-To": [
+            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
+          ],
+          "Server": [
+            "AtlassianEdge"
+          ],
+          "Server-Timing": [
+            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=104,cdn-upstream-fbl;dur=324,atl-edge;dur=185,atl-edge-internal;dur=20,atl-edge-upstream;dur=164,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW56-P7\",cdn-rid;desc=\"PuDv6ChaFPzofOUZpK4B28XSfx5-jfgfl-pa41bCf93eY5laeeBX5g==\",cdn-downstream-fbl;dur=329"
+          ],
+          "Set-Cookie": [
+            "REDACTED"
+          ],
+          "Strict-Transport-Security": [
+            "max-age=63072000; includeSubDomains; preload"
+          ],
+          "Timing-Allow-Origin": [
+            "*"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "Via": [
+            "1.1 d62a11a730cccecb0a33b1a5320b9948.cloudfront.net (CloudFront)"
+          ],
+          "X-Aaccountid": [
+            "000000%3A00000000-0000-0000-0000-000000000000"
+          ],
+          "X-Amz-Cf-Id": [
+            "PuDv6ChaFPzofOUZpK4B28XSfx5-jfgfl-pa41bCf93eY5laeeBX5g=="
+          ],
+          "X-Amz-Cf-Pop": [
+            "DFW56-P7"
+          ],
+          "X-Arequestid": [
+            "16db9f98b901664fbecb6c6188c04b46"
+          ],
+          "X-Cache": [
+            "Miss from cloudfront"
+          ],
+          "X-Content-Type-Options": [
+            "nosniff"
+          ],
+          "X-Ratelimit-Limit": [
+            "350"
+          ],
+          "X-Ratelimit-Remaining": [
+            "348"
+          ],
+          "X-Xss-Protection": [
+            "1; mode=block"
+          ]
+        },
+        "body": "{\"issues\":[{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10005\",\"self\":\"https://recorded.invalid/rest/api/3/issue/10005\",\"key\":\"OPS-6\",\"fields\":{\"summary\":\"Set Up Notifications for Users\",\"issuetype\":{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10003\",\"id\":\"10003\",\"description\":\"Tasks track small, distinct pieces of work.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Task\",\"subtask\":false,\"avatarId\":10318,\"entityId\":\"00000000-0000-0000-0000-000000000000\",\"hierarchyLevel\":0},\"created\":\"2026-08-06T11:30:35.940-0500\",\"project\":{\"self\":\"https://recorded.invalid/rest/api/3/project/10000\",\"id\":\"10000\",\"key\":\"OPS\",\"name\":\"Operations\",\"projectTypeKey\":\"software\",\"simplified\":true,\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"}},\"reporter\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"assignee\":null,\"priority\":null,\"updated\":\"2026-08-06T11:30:36.593-0500\",\"status\":{\"self\":\"https://recorded.invalid/rest/api/3/status/10000\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"To Do\",\"id\":\"10000\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"blue-gray\",\"name\":\"To Do\"}},\"labels\":[]}},{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10004\",\"self\":\"https://recorded.invalid/rest/api/3/issue/10004\",\"key\":\"OPS-5\",\"fields\":{\"summary\":\"Post-Launch Review and Feedback Collection\",\"issuetype\":{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10001\",\"id\":\"10001\",\"description\":\"Epics track collections of related bugs, stories, and tasks.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Epic\",\"subtask\":false,\"avatarId\":10307,\"entityId\":\"00000000-0000-0000-0000-000000000000\",\"hierarchyLevel\":1},\"created\":\"2026-08-06T11:30:35.279-0500\",\"project\":{\"self\":\"https://recorded.invalid/rest/api/3/project/10000\",\"id\":\"10000\",\"key\":\"OPS\",\"name\":\"Operations\",\"projectTypeKey\":\"software\",\"simplified\":true,\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"}},\"reporter\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"assignee\":null,\"priority\":null,\"updated\":\"2026-08-06T11:30:35.662-0500\",\"status\":{\"self\":\"https://recorded.invalid/rest/api/3/status/10003\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"Done\",\"id\":\"10003\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/3\",\"id\":3,\"key\":\"done\",\"colorName\":\"green\",\"name\":\"Done\"}},\"labels\":[]}},{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10003\",\"self\":\"https://recorded.invalid/rest/api/3/issue/10003\",\"key\":\"OPS-4\",\"fields\":{\"summary\":\"Prepare for Project Launch\",\"issuetype\":{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10001\",\"id\":\"10001\",\"description\":\"Epics track collections of related bugs, stories, and tasks.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Epic\",\"subtask\":false,\"avatarId\":10307,\"entityId\":\"00000000-0000-0000-0000-000000000000\",\"hierarchyLevel\":1},\"created\":\"2026-08-06T11:30:34.699-0500\",\"project\":{\"self\":\"https://recorded.invalid/rest/api/3/project/10000\",\"id\":\"10000\",\"key\":\"OPS\",\"name\":\"Operations\",\"projectTypeKey\":\"software\",\"simplified\":true,\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"}},\"reporter\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"assignee\":null,\"priority\":null,\"updated\":\"2026-08-06T11:30:35.080-0500\",\"status\":{\"self\":\"https://recorded.invalid/rest/api/3/status/10000\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"To Do\",\"id\":\"10000\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"blue-gray\",\"name\":\"To Do\"}},\"labels\":[]}},{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10002\",\"self\":\"https://recorded.invalid/rest/api/3/issue/10002\",\"key\":\"OPS-3\",\"fields\":{\"summary\":\"Conduct User Testing for the Platform\",\"issuetype\":{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10001\",\"id\":\"10001\",\"description\":\"Epics track collections of related bugs, stories, and tasks.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Epic\",\"subtask\":false,\"avatarId\":10307,\"entityId\":\"00000000-0000-0000-0000-000000000000\",\"hierarchyLevel\":1},\"created\":\"2026-08-06T11:30:34.118-0500\",\"project\":{\"self\":\"https://recorded.invalid/rest/api/3/project/10000\",\"id\":\"10000\",\"key\":\"OPS\",\"name\":\"Operations\",\"projectTypeKey\":\"software\",\"simplified\":true,\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"}},\"reporter\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"assignee\":null,\"priority\":null,\"updated\":\"2026-08-06T11:30:34.493-0500\",\"status\":{\"self\":\"https://recorded.invalid/rest/api/3/status/10001\",\"description\":\"This work item is being actively worked on at the moment by the assignee.\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"In Progress\",\"id\":\"10001\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"}},\"labels\":[]}}],\"nextPageToken\":\"EAgY5oTOwf0zIidwcm9qZWN0ID0gIk9QUyIgT1JERVIgQlkgaXNzdWVrZXkgREVTQyoCW10yIFRFTkFOVF9OT1RfRk9VTkRfSU5fVEVOQU5UX1NUT1JF\",\"isLast\":false}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/search/jql",
+        "query": "fields=summary%2Cstatus%2Cassignee%2Creporter%2Cpriority%2Cissuetype%2Cproject%2Ccreated%2Cupdated%2Clabels&jql=project+%3D+%22OPS%22+ORDER+BY+issuekey+DESC&maxResults=4&nextPageToken=EAgY5oTOwf0zIidwcm9qZWN0ID0gIk9QUyIgT1JERVIgQlkgaXNzdWVrZXkgREVTQyoCW10yIFRFTkFOVF9OT1RfRk9VTkRfSU5fVEVOQU5UX1NUT1JF"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Atl-Request-Id": [
+            "00000000-0000-0000-0000-000000000000"
+          ],
+          "Atl-Traceid": [
+            "3913020615f74850bdbd93f364311c99"
+          ],
+          "Cache-Control": [
+            "no-cache, no-store, no-transform"
+          ],
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Date": [
+            "Thu, 06 Aug 2026 17:51:22 GMT"
+          ],
+          "Nel": [
+            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=347;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "Report-To": [
+            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
+          ],
+          "Server": [
+            "AtlassianEdge"
+          ],
+          "Server-Timing": [
+            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=103,cdn-upstream-fbl;dur=308,atl-edge;dur=169,atl-edge-internal;dur=18,atl-edge-upstream;dur=151,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW56-P7\",cdn-rid;desc=\"okFqWNfMXSpRJTz9HCKsGML_M8-i8u3S1uAqcMV9eB0hu-AhDyqCTA==\",cdn-downstream-fbl;dur=313"
+          ],
+          "Set-Cookie": [
+            "REDACTED"
+          ],
+          "Strict-Transport-Security": [
+            "max-age=63072000; includeSubDomains; preload"
+          ],
+          "Timing-Allow-Origin": [
+            "*"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "Via": [
+            "1.1 d62a11a730cccecb0a33b1a5320b9948.cloudfront.net (CloudFront)"
+          ],
+          "X-Aaccountid": [
+            "000000%3A00000000-0000-0000-0000-000000000000"
+          ],
+          "X-Amz-Cf-Id": [
+            "okFqWNfMXSpRJTz9HCKsGML_M8-i8u3S1uAqcMV9eB0hu-AhDyqCTA=="
+          ],
+          "X-Amz-Cf-Pop": [
+            "DFW56-P7"
+          ],
+          "X-Arequestid": [
+            "83b01bc1e85b4174bc8cebb9a3099f1a"
+          ],
+          "X-Cache": [
+            "Miss from cloudfront"
+          ],
+          "X-Content-Type-Options": [
+            "nosniff"
+          ],
+          "X-Ratelimit-Limit": [
+            "350"
+          ],
+          "X-Ratelimit-Remaining": [
+            "347"
+          ],
+          "X-Xss-Protection": [
+            "1; mode=block"
+          ]
+        },
+        "body": "{\"issues\":[{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10001\",\"self\":\"https://recorded.invalid/rest/api/3/issue/10001\",\"key\":\"OPS-2\",\"fields\":{\"summary\":\"Implement Market Analysis Tools\",\"issuetype\":{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10001\",\"id\":\"10001\",\"description\":\"Epics track collections of related bugs, stories, and tasks.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Epic\",\"subtask\":false,\"avatarId\":10307,\"entityId\":\"00000000-0000-0000-0000-000000000000\",\"hierarchyLevel\":1},\"created\":\"2026-08-06T11:30:33.553-0500\",\"project\":{\"self\":\"https://recorded.invalid/rest/api/3/project/10000\",\"id\":\"10000\",\"key\":\"OPS\",\"name\":\"Operations\",\"projectTypeKey\":\"software\",\"simplified\":true,\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"}},\"reporter\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"assignee\":null,\"priority\":null,\"updated\":\"2026-08-06T11:30:33.903-0500\",\"status\":{\"self\":\"https://recorded.invalid/rest/api/3/status/10002\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"In Review\",\"id\":\"10002\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"}},\"labels\":[]}},{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10000\",\"self\":\"https://recorded.invalid/rest/api/3/issue/10000\",\"key\":\"OPS-1\",\"fields\":{\"summary\":\"Implement User Authentication\",\"issuetype\":{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10001\",\"id\":\"10001\",\"description\":\"Epics track collections of related bugs, stories, and tasks.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Epic\",\"subtask\":false,\"avatarId\":10307,\"entityId\":\"00000000-0000-0000-0000-000000000000\",\"hierarchyLevel\":1},\"created\":\"2026-08-06T11:30:32.634-0500\",\"project\":{\"self\":\"https://recorded.invalid/rest/api/3/project/10000\",\"id\":\"10000\",\"key\":\"OPS\",\"name\":\"Operations\",\"projectTypeKey\":\"software\",\"simplified\":true,\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"}},\"reporter\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"assignee\":null,\"priority\":null,\"updated\":\"2026-08-06T11:30:33.332-0500\",\"status\":{\"self\":\"https://recorded.invalid/rest/api/3/status/10000\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"To Do\",\"id\":\"10000\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"blue-gray\",\"name\":\"To Do\"}},\"labels\":[]}}],\"isLast\":true}"
+      }
+    }
+  ]
+}
