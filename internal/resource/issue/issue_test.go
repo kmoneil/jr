@@ -450,6 +450,11 @@ func TestSortsByKey(t *testing.T) {
 
 // TestRawJQLCannotEscapeTheProjectScope is the incumbent's worst bug, asserted
 // at the level a user would hit it.
+//
+// The fragment here brings no parentheses of its own, which is why this passing
+// was not enough: one pair of parentheses contains a fragment only if the
+// fragment's own parentheses balance. That case is
+// TestAnUnbalancedFragmentIsRefusedBeforeItIsSent.
 func TestRawJQLCannotEscapeTheProjectScope(t *testing.T) {
 	got, err := issue.BuildQuery(issue.QueryOptions{
 		Project: "ENG",
@@ -466,6 +471,79 @@ func TestRawJQLCannotEscapeTheProjectScope(t *testing.T) {
 	// returns every Highest issue in every project the caller can see.
 	if got == `project = "ENG" AND summary ~ "x" OR priority = Highest` {
 		t.Fatal("raw JQL escaped the project scope")
+	}
+}
+
+// TestAnUnbalancedFragmentIsRefusedBeforeItIsSent covers the other half of the
+// containment guarantee.
+//
+// Wrapping is not containment on its own. `a) OR (1=1` closes the wrapper and
+// opens a new group after it, and because AND binds tighter than OR the query
+// below reads as `(project = "ENG" AND a) OR (1=1)`:
+//
+//	project = "ENG" AND (a) OR (1=1) ORDER BY issuekey DESC
+//
+// Nothing about the result would say so. It comes back complete, at the
+// declared schema version, holding every issue in every project the credential
+// can see.
+//
+// The refusal has to come from Validate rather than from BuildQuery: issue list
+// streams, so a rejection raised in the body would arrive after the TSV header
+// was already on stdout.
+func TestAnUnbalancedFragmentIsRefusedBeforeItIsSent(t *testing.T) {
+	cmd, ok := registry.Lookup("issue.list")
+	if !ok {
+		t.Fatal("issue list is not registered")
+	}
+
+	validate := func(fragment string) error {
+		flags := registry.NewFlags()
+		flags.SetString("jql", fragment)
+		return cmd.Validate(t.Context(), &registry.Invocation{
+			Jira:  &stubSession{project: "ENG"},
+			Flags: flags, Limit: registry.Limit{N: 50},
+			Progress: registry.NoProgress,
+		})
+	}
+
+	refused := map[string]struct{ fragment, code string }{
+		// Both of these balance at zero and go negative along the way, which is
+		// the case a count of parentheses would call fine.
+		"closes the wrapper and reopens": {`a) OR (1=1`, "JQL_SYNTAX"},
+		"closes and reopens under AND":   {`a) AND (b`, "JQL_SYNTAX"},
+		"leads with the close":           {`) OR (1=1`, "JQL_SYNTAX"},
+		"never closes what it opens":     {`(project = ENG`, "JQL_SYNTAX"},
+		// Not unbalanced, but it would reach Jira as the clause `(   )`. A flag
+		// that was passed and does nothing is not silently dropped.
+		"blank": {"   ", "EMPTY_JQL"},
+	}
+	for name, tc := range refused {
+		t.Run(name, func(t *testing.T) {
+			err := validate(tc.fragment)
+			if err == nil {
+				t.Fatalf("issue list accepted %q", tc.fragment)
+			}
+			if code := errs.Coerce(err).Code; code != tc.code {
+				t.Errorf("code = %q, want %q", code, tc.code)
+			}
+			if got := errs.ExitOf(err); got != exitcode.Usage {
+				t.Errorf("exit = %v, want %v", got, exitcode.Usage)
+			}
+		})
+	}
+
+	// The guard refuses what cannot be contained, not what is merely
+	// parenthesized. A fragment carrying balanced groups of its own is ordinary
+	// input and stays accepted.
+	for _, ok := range []string{
+		`labels IN (retry, transport)`,
+		`(priority = Highest OR labels = urgent) AND status != Done`,
+		`summary ~ "x" OR priority = Highest`,
+		"", // --jql unset: harvest records every string flag, passed or not
+	} {
+		if err := validate(ok); err != nil {
+			t.Errorf("%q was refused: %v", ok, err)
+		}
 	}
 }
 

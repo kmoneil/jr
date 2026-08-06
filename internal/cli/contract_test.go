@@ -7,6 +7,7 @@ import (
 
 	"github.com/kmoneil/jira-cli/internal/buildinfo"
 	"github.com/kmoneil/jira-cli/internal/cli"
+	"github.com/kmoneil/jira-cli/internal/errs"
 	"github.com/kmoneil/jira-cli/internal/exitcode"
 	"github.com/kmoneil/jira-cli/internal/registry"
 	"github.com/kmoneil/jira-cli/internal/render"
@@ -43,6 +44,89 @@ func TestNoBannedFlags(t *testing.T) {
 			}
 		}
 	})
+}
+
+// jqlReportsRatherThanRefuses names the commands that accept a raw JQL fragment
+// and deliberately do not refuse a malformed one, with the reason each does not.
+//
+// The list is the point of the test, like notYetGating in internal/lint. A new
+// command that takes --jql and forgets to validate it fails here, and cannot be
+// quieted except by writing down why it is exempt.
+var jqlReportsRatherThanRefuses = map[string]string{
+	"jql.validate": "whether the query parses is the question it exists to " +
+		"answer; refusing the input would refuse to report on it. It answers " +
+		"valid=\"false\" at exit 0, which TestAMalformedQueryIsAResultNotAnError " +
+		"and TestAQueryThatCannotLexCostsNoRoundTrip assert",
+}
+
+// malformedFragments are fragments no command may combine into a query it
+// sends.
+//
+// The first two are the escape. A fragment carrying its own unbalanced
+// parenthesis closes the wrapper the builder puts around it and opens a new
+// group after it, and because AND binds tighter than OR,
+// `project = "ENG" AND (a) OR (1=1)` reads as `(project = "ENG" AND a) OR
+// (1=1)` — the project scope is gone, and the result reports itself complete.
+// Both balance at zero, so counting parentheses would call them fine.
+var malformedFragments = []string{
+	`a) OR (1=1`,
+	`a) AND (b`,
+	`) OR (1=1`,
+	`(project = ENG`,
+	`   `,
+}
+
+// TestRawJQLIsRefusedWhereverItIsAccepted is the finding underneath the finding
+// that produced it.
+//
+// `jr jql explain` called jql.Validate and `jr issue list` did not, so the
+// surface that describes what would be sent refused a fragment the surface that
+// sends it accepted. Nothing compared them, which is why they were free to
+// drift and did. This compares them: for one fragment, every command that takes
+// it must reach the same verdict, by the same code.
+func TestRawJQLIsRefusedWhereverItIsAccepted(t *testing.T) {
+	var takesJQL []*registry.Command
+	for _, c := range cli.Registry().All() {
+		if slices.ContainsFunc(c.Flags, func(f registry.Flag) bool {
+			return f.Name == "jql"
+		}) && jqlReportsRatherThanRefuses[c.Name()] == "" {
+			takesJQL = append(takesJQL, c)
+		}
+	}
+	// Two surfaces is the whole point. One would be an agreement with itself,
+	// and none would be an assertion that ran nothing.
+	if len(takesJQL) < 2 {
+		t.Fatalf("only %d command takes a raw --jql; this build cannot show "+
+			"two surfaces agreeing", len(takesJQL))
+	}
+
+	for _, fragment := range malformedFragments {
+		t.Run(fragment, func(t *testing.T) {
+			verdicts := map[string][]string{}
+			for _, c := range takesJQL {
+				flags := registry.NewFlags()
+				flags.SetString("jql", fragment)
+				err := c.Validate(t.Context(), &registry.Invocation{
+					Flags: flags, Limit: registry.Limit{N: registry.DefaultLimit},
+					Progress: registry.NoProgress,
+				})
+				if err == nil {
+					t.Errorf("%s accepted %q", c.Name(), fragment)
+					verdicts["accepted"] = append(verdicts["accepted"], c.Name())
+					continue
+				}
+				if got := errs.ExitOf(err); got != exitcode.Usage {
+					t.Errorf("%s refused %q with exit %v, want %v",
+						c.Name(), fragment, got, exitcode.Usage)
+				}
+				code := errs.Coerce(err).Code
+				verdicts[code] = append(verdicts[code], c.Name())
+			}
+			if len(verdicts) > 1 {
+				t.Errorf("the surfaces disagree about %q: %v", fragment, verdicts)
+			}
+		})
+	}
 }
 
 // TestShortFlagLettersAppearInTheirNames enforces the rule that makes short

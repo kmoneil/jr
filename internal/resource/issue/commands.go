@@ -104,7 +104,9 @@ A result cut short by --limit or by --max-requests is never reported as
 complete. It exits 3, says so on stderr, and carries a token to resume from.
 
 Raw JQL from --jql is always parenthesized before being combined with the other
-filters, so an OR inside it cannot escape the project scope.`),
+filters, so an OR inside it cannot escape the project scope. A fragment whose
+own parentheses do not balance is refused rather than sent, because wrapping
+contains only a fragment that balances.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue list --project ENG --status 'In Progress'",
 			buildinfo.App + " issue list --jql 'labels IN (retry, transport)' --limit all",
@@ -261,20 +263,17 @@ func requestedFields(resolved []string) []string {
 // the rest of the invocation.
 const resolvedFieldsKey = "issue.fields"
 
-// validateFields resolves --field against the site's catalogue and leaves the
-// ids on the invocation.
+// validateList refuses a --jql fragment that cannot be contained and the one
+// invocation that is a sweep rather than a query, then resolves the field
+// names.
 //
-// It happens here rather than in the command body because the columns are
-// computed from those ids before the body runs — a streaming command's header
-// goes out first — and because a name that resolves to nothing has to be
-// refused before any bytes reach stdout.
-// validateList refuses the one invocation that is a sweep rather than a query,
-// then resolves the field names.
-//
-// Both have to happen here rather than in the body: this is a streaming
+// All three have to happen here rather than in the body: this is a streaming
 // command, so its header — and its columns — go out before the body runs, and a
 // rejection from inside it would arrive after bytes were already on stdout.
 func validateList(ctx context.Context, inv *registry.Invocation) error {
+	if err := refuseUncontainableJQL(inv); err != nil {
+		return err
+	}
 	if err := refuseUnconstrainedSweep(inv); err != nil {
 		return err
 	}
@@ -282,6 +281,36 @@ func validateList(ctx context.Context, inv *registry.Invocation) error {
 		return err
 	}
 	return validateFields(ctx, inv)
+}
+
+// refuseUncontainableJQL holds the guarantee --help states: a fragment from
+// --jql is parenthesized before it is combined with the other filters, so an OR
+// inside it cannot escape the project scope.
+//
+// One pair of parentheses only contains a fragment whose own parentheses
+// balance. `a) OR (1=1` closes the wrapper and opens a new group after it:
+//
+//	project = "ENG" AND (a) OR (1=1) ORDER BY issuekey DESC
+//
+// AND binds tighter than OR, so Jira reads that as
+// `(project = "ENG" AND a) OR (1=1)`. The scope is gone, and the result comes
+// back as an ordinary complete document — wider than was asked for, and
+// reporting itself as if it were not.
+//
+// jql.Validate is what `jr jql explain` already calls on the same input, which
+// is why it refused this fragment while `issue list` sent it. The surface that
+// describes the query and the surface that sends it have to agree about it.
+//
+// An empty value is the flag being unset: harvest records every string flag
+// whether or not it was passed, so "" and "not given" are the same value here.
+// A blank-but-not-empty fragment is a real one and is refused, because
+// `--jql '   '` would otherwise reach Jira as the clause `(   )`.
+func refuseUncontainableJQL(inv *registry.Invocation) error {
+	fragment := inv.Flags.String("jql")
+	if fragment == "" {
+		return nil
+	}
+	return jql.Validate(fragment)
 }
 
 // refuseUnconstrainedSweep stops `issue list --limit all` with nothing set.
@@ -319,6 +348,13 @@ var constrainingFlags = []string{
 	"--updated-after",
 }
 
+// validateFields resolves --field against the site's catalogue and leaves the
+// ids on the invocation.
+//
+// It happens here rather than in the command body because the columns are
+// computed from those ids before the body runs — a streaming command's header
+// goes out first — and because a name that resolves to nothing has to be
+// refused before any bytes reach stdout.
 func validateFields(ctx context.Context, inv *registry.Invocation) error {
 	requested := inv.Flags.StringSlice("field")
 	if len(requested) == 0 {
