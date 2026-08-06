@@ -96,15 +96,23 @@ func TestAbsolutePathIsRefused(t *testing.T) {
 	defer srv.Close()
 
 	c, _ := newTestClient(t, srv, transport.Options{})
-	_, err := c.Do(t.Context(), transport.Request{
-		Method: http.MethodGet,
-		Path:   "https://evil.invalid/steal",
-	})
-	if err == nil {
-		t.Fatal("an absolute path was accepted, which would send credentials off-site")
-	}
-	if !strings.Contains(err.Error(), "relative") {
-		t.Errorf("unhelpful error: %v", err)
+	// The second spelling names a host and carries no scheme, so url.URL.IsAbs
+	// is false for it. JoinPath would drop the host and send /steal to the
+	// configured site — safe, and not what the path said.
+	for _, path := range []string{
+		"https://evil.invalid/steal",
+		"//evil.invalid/steal",
+	} {
+		_, err := c.Do(t.Context(), transport.Request{
+			Method: http.MethodGet,
+			Path:   path,
+		})
+		if err == nil {
+			t.Fatalf("%q was accepted, which would send credentials off-site", path)
+		}
+		if !strings.Contains(err.Error(), "relative") {
+			t.Errorf("unhelpful error for %q: %v", path, err)
+		}
 	}
 }
 

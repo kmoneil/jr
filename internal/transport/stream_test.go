@@ -375,14 +375,43 @@ func TestRelativeRefusesAnotherHost(t *testing.T) {
 			want: "/secure/attachment/1/a.txt",
 		},
 		{
-			name: "a relative value is already what we want",
-			raw:  "/rest/api/2/attachment/content/1",
-			want: "/rest/api/2/attachment/content/1",
+			// A path beginning with "/" is resolved against the origin by every
+			// HTTP client, so it already carries the context path and gets the
+			// same trim the absolute spelling gets. Reading it as relative to
+			// the base is what produced /jira/jira/secure/....
+			name: "root-relative, carrying the context path",
+			raw:  "/jira/secure/attachment/10042/report.pdf",
+			want: "/secure/attachment/10042/report.pdf",
+		},
+		{
+			// No scheme, but it names a host: the scheme is inherited from the
+			// base, which is what protocol-relative means.
+			name: "protocol-relative on the configured site",
+			raw:  "//jira.acme.invalid/jira/secure/attachment/1/a.txt",
+			want: "/secure/attachment/1/a.txt",
 		},
 		{
 			name: "a query survives",
 			raw:  "https://jira.acme.invalid/jira/secure/attachment/1/a.txt?v=2",
 			want: "/secure/attachment/1/a.txt?v=2",
+		},
+		{
+			name: "a query survives the root-relative spelling too",
+			raw:  "/jira/secure/attachment/1/a.txt?v=2",
+			want: "/secure/attachment/1/a.txt?v=2",
+		},
+		{
+			// A trailing slash is a trailing empty segment, and is ordinary.
+			// Only an interior one is refused.
+			name: "a trailing slash",
+			raw:  "/jira/secure/dir/",
+			want: "/secure/dir/",
+		},
+		{
+			// A colon anywhere but the first segment is not a scheme.
+			name: "a colon past the first segment",
+			raw:  "/jira/secure/a:b",
+			want: "/secure/a:b",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -403,6 +432,37 @@ func TestRelativeRefusesAnotherHost(t *testing.T) {
 		{"a different port", "https://jira.acme.invalid:8443/jira/a", "OFF_SITE_URL"},
 		{"outside the context path", "https://jira.acme.invalid/other/a", "OFF_SITE_URL"},
 		{"nothing at all", "  ", "NO_URL"},
+		// The protocol-relative spellings of the four host refusals above.
+		// url.URL.IsAbs is false for every one of them, so before the host test
+		// moved above the relative early return they were not refused at all —
+		// //evil.invalid/steal came back as the path /steal.
+		{"another host, no scheme", "//evil.invalid/steal", "OFF_SITE_URL"},
+		{"a subdomain, no scheme", "//x.jira.acme.invalid/jira/a", "OFF_SITE_URL"},
+		{"a different port, no scheme", "//jira.acme.invalid:8443/jira/a", "OFF_SITE_URL"},
+		{"userinfo pointing elsewhere", "//jira.acme.invalid@evil.invalid/a", "OFF_SITE_URL"},
+		// Root-relative and outside the context path. The absolute spelling of
+		// this is refused two lines up; the two have to agree.
+		{"root-relative, outside the context path", "/other/a", "OFF_SITE_URL"},
+		{"root-relative, no context path at all", "/rest/api/2/attachment/content/1", "OFF_SITE_URL"},
+		// /jiraxyz is not inside /jira. A prefix match would say it is and hand
+		// back /xyz/a, a path on the site the server never named.
+		{"a context path that only starts the same", "/jiraxyz/a", "OFF_SITE_URL"},
+		{"the same, spelled absolutely", "https://jira.acme.invalid/jiraxyz/a", "OFF_SITE_URL"},
+		// A dot segment is inside the context path when the check looks at it
+		// and outside once JoinPath has cleaned it. The encoded spellings
+		// decode to the same segments, which is why the check reads the decoded
+		// path.
+		{"climbing out with ..", "/jira/../../secure/x", "OFF_SITE_URL"},
+		{"climbing out, absolute", "https://jira.acme.invalid/jira/../secure/x", "OFF_SITE_URL"},
+		{"climbing out, percent-encoded", "/jira/..%2f..%2fsecure/x", "OFF_SITE_URL"},
+		{"climbing out, encoded dots", "/jira/%2e%2e/x", "OFF_SITE_URL"},
+		// /jira//x is inside the context path and trims to //x, which re-parsed
+		// names the host x.
+		{"an empty segment after the context path", "/jira//x", "OFF_SITE_URL"},
+		// A colon in the first segment of a relative reference re-parses as a
+		// scheme, so the returned path is one resolve cannot send.
+		{"a colon in the first segment", `"%3A`, "MALFORMED_URL"},
+		{"a bare scheme-like value", "a:b", "OFF_SITE_URL"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := client.Relative(tc.raw)
@@ -435,5 +495,93 @@ func TestRelativeDoesNotEchoTheURL(t *testing.T) {
 		if strings.Contains(text, secret) {
 			t.Errorf("the refusal echoed the query: %q", text)
 		}
+	}
+}
+
+// TestRelativeOnASiteWithNoContextPath is the other half of the context-path
+// rule, and the common case: Cloud is served from the root.
+//
+// With no context path there is nothing to trim and nothing to contain, so a
+// root-relative value the server supplied is already the path to send. The same
+// value against a site under /jira is refused, because there it names something
+// outside the site rather than something inside it.
+func TestRelativeOnASiteWithNoContextPath(t *testing.T) {
+	client, err := transport.New(transport.Options{BaseURL: "https://jira.acme.invalid"})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	for raw, want := range map[string]string{
+		"/rest/api/2/attachment/content/1":                    "/rest/api/2/attachment/content/1",
+		"https://jira.acme.invalid/secure/attachment/1/a.txt": "/secure/attachment/1/a.txt",
+		"//jira.acme.invalid/secure/attachment/1/a.txt":       "/secure/attachment/1/a.txt",
+		"https://jira.acme.invalid/secure/a.txt?v=2":          "/secure/a.txt?v=2",
+	} {
+		got, err := client.Relative(raw)
+		if err != nil {
+			t.Errorf("Relative(%q): %v", raw, err)
+			continue
+		}
+		if got != want {
+			t.Errorf("Relative(%q) = %q, want %q", raw, got, want)
+		}
+	}
+
+	if _, err := client.Relative("//evil.invalid/steal"); err == nil {
+		t.Error("a protocol-relative off-site URL was accepted")
+	}
+}
+
+// TestBothSpellingsOfOneURLReachOneTarget is the assertion neither half of the
+// context-path defect is visible without.
+//
+// Data Center reports an attachment's content URL, and the same attachment can
+// be described absolutely or as a root-relative path. Both name one file. Before
+// the fix the absolute spelling had the context path trimmed and the relative
+// one did not, so resolve joined it onto a base that already carried it and the
+// request went to /jira/jira/secure/... — a 404 that surfaces as a missing
+// attachment rather than as an error naming the cause.
+//
+// This goes through Do rather than through resolve, because what matters is the
+// path that reaches the server.
+func TestBothSpellingsOfOneURLReachOneTarget(t *testing.T) {
+	var got []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = append(got, r.URL.RequestURI())
+		_, _ = fmt.Fprint(w, "file contents")
+	}))
+	defer srv.Close()
+
+	client, err := transport.New(transport.Options{BaseURL: srv.URL + "/jira"})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	for _, raw := range []string{
+		srv.URL + "/jira/secure/attachment/10042/report.pdf",
+		"/jira/secure/attachment/10042/report.pdf",
+	} {
+		path, err := client.Relative(raw)
+		if err != nil {
+			t.Fatalf("Relative(%q): %v", raw, err)
+		}
+		resp, err := client.Do(t.Context(), transport.Request{
+			Method: transport.MethodGet, Path: path, Stream: true,
+		})
+		if err != nil {
+			t.Fatalf("do(%q): %v", path, err)
+		}
+		_, _ = io.Copy(io.Discard, resp.Stream)
+		resp.Close()
+	}
+
+	want := "/jira/secure/attachment/10042/report.pdf"
+	for _, u := range got {
+		if u != want {
+			t.Errorf("the server was asked for %q, want %q", u, want)
+		}
+	}
+	if len(got) != 2 {
+		t.Fatalf("the server saw %d requests, want 2", len(got))
 	}
 }

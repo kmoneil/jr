@@ -548,7 +548,11 @@ func (c *Client) resolve(r Request) (*url.URL, error) {
 	if err != nil {
 		return nil, errs.Runtime("BAD_REQUEST", "%q is not a valid path", r.Path).Wrap(err)
 	}
-	if ref.IsAbs() {
+	// IsAbs is Scheme != "", so it alone would let `//host/path` through: that
+	// names a host and carries no scheme. JoinPath would then drop the host and
+	// send the path to the configured site, which is safe and is not what the
+	// value said. A path that names anywhere is not relative.
+	if ref.IsAbs() || ref.Host != "" {
 		// A caller passing an absolute URL would silently escape the
 		// configured site, which is how a credential ends up sent to the
 		// wrong host.
@@ -652,9 +656,40 @@ func newRequestID() string {
 // — and the value comes from the server, so it is not a caller's mistake to
 // make. Scheme, host, and port must all match the configured site.
 //
-// A relative value is returned unchanged, so a caller can pass whatever the API
-// gave it without first working out which shape it got.
+// One rule decides what a value means, and it is the one every HTTP client
+// uses: the reference is resolved against the site's origin. So a value naming
+// a host is checked against the site whether or not it carries a scheme, and a
+// path beginning with "/" is a complete server path — it already carries the
+// context path if it is inside it, and gets the same trim an absolute URL does.
+// Reading such a path as relative to the base instead is what made one URL
+// spelled two ways produce two different requests, one of them a 404 with the
+// context path in it twice.
+//
+// A reference naming neither a host nor an absolute path is relative to the
+// base, which is what resolve joins it onto, and is returned as given.
 func (c *Client) Relative(raw string) (string, error) {
+	out, err := c.relative(raw)
+	if err != nil {
+		return "", err
+	}
+
+	// A postcondition, because the returned string is the whole contract:
+	// resolve parses it again and refuses anything naming a scheme or a host.
+	// A reference whose first segment holds a colon re-parses as a scheme, so
+	// `"%3A` came back as `%22:` — accepted here and refused one layer down,
+	// which is this function failing at the one thing it exists for. Refusing
+	// rather than prefixing "./" keeps it from repairing a server's value.
+	ref, err := url.Parse(out)
+	if err != nil || ref.Scheme != "" || ref.Host != "" {
+		return "", errs.Remote("MALFORMED_URL",
+			"the server supplied a URL this tool cannot turn into a request path")
+	}
+	return out, nil
+}
+
+// relative is Relative without the postcondition, so the checks read in the
+// order they apply rather than around a deferred one.
+func (c *Client) relative(raw string) (string, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
 		return "", errs.Runtime("NO_URL", "the server supplied no URL to follow")
@@ -668,31 +703,54 @@ func (c *Client) Relative(raw string) (string, error) {
 		return "", errs.Remote("MALFORMED_URL",
 			"the server supplied a URL this tool cannot parse").Wrap(err)
 	}
-	if !ref.IsAbs() {
-		return ref.RequestURI(), nil
+
+	// A protocol-relative reference inherits the base's scheme — that is what
+	// makes it a reference to a host rather than a path. Filling it in before
+	// the checks also keeps sameHost's port defaulting honest: with no scheme
+	// it cannot tell 443 from nothing, and the same host would compare unequal.
+	if ref.Scheme == "" && ref.Host != "" {
+		ref.Scheme = c.base.Scheme
 	}
 
-	if !strings.EqualFold(ref.Scheme, c.base.Scheme) || !sameHost(ref, c.base) {
-		return "", errs.Remote("OFF_SITE_URL",
-			"the server pointed at another host, and this tool will not follow it").
-			WithDetail("configured %s, supplied %s", c.base.Host, ref.Host).
-			WithRemedy("report this: a credential is not sent anywhere but the " +
-				"configured site")
+	// Scheme and host are checked before anything decides the value is
+	// relative. url.URL.IsAbs is Scheme != "", so `//evil.invalid/steal` is not
+	// absolute by that test while still naming another host — and taking the
+	// relative path out of it rewrites a pointer at somebody else's server into
+	// a path on our own. No credential left the site either way, because
+	// RequestURI drops the host; two spellings of "go elsewhere" getting
+	// opposite treatments is the defect.
+	if ref.Scheme != "" && !strings.EqualFold(ref.Scheme, c.base.Scheme) {
+		return "", offSite("the server pointed at another scheme, and this "+
+			"tool will not follow it",
+			"configured %s, supplied %s", c.base.Scheme, ref.Scheme)
+	}
+	if ref.Host != "" && !sameHost(ref, c.base) {
+		return "", offSite("the server pointed at another host, and this tool "+
+			"will not follow it",
+			"configured %s, supplied %s", c.base.Host, ref.Host)
+	}
+
+	if seg, odd := oddSegment(ref.Path); odd {
+		return "", offSite("the server supplied a URL this tool will not "+
+			"resolve on its behalf", "the segment %q in %s", seg, ref.Path)
+	}
+
+	path := ref.EscapedPath()
+	if ref.Host == "" && ref.Scheme == "" && !strings.HasPrefix(path, "/") {
+		return ref.RequestURI(), nil
 	}
 
 	// The site may be served under a context path — a Data Center instance
 	// often is — and the base already carries it. Returning the whole path
 	// would repeat it; returning the remainder keeps resolve's JoinPath honest.
-	path := ref.EscapedPath()
-	if base := c.base.EscapedPath(); base != "" && base != "/" {
-		if !strings.HasPrefix(path, base) {
-			return "", errs.Remote("OFF_SITE_URL",
-				"the server pointed outside the configured context path").
-				WithDetail("configured %s, supplied %s", base, path).
-				WithRemedy("report this: a credential is not sent anywhere but " +
-					"the configured site")
+	if base := strings.TrimSuffix(c.base.EscapedPath(), "/"); base != "" {
+		rest, ok := underPath(path, base)
+		if !ok {
+			return "", offSite("the server pointed outside the configured "+
+				"context path",
+				"configured %s, supplied %s", base, path)
 		}
-		path = strings.TrimPrefix(path, base)
+		path = rest
 	}
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
@@ -701,6 +759,58 @@ func (c *Client) Relative(raw string) (string, error) {
 		path += "?" + ref.RawQuery
 	}
 	return path, nil
+}
+
+// offSite is the refusal for a server-supplied URL that points away from the
+// configured site. The detail names the one part that differs and never the
+// whole URL, which can carry userinfo or a signed query parameter.
+func offSite(message, detail string, args ...any) error {
+	return errs.Remote("OFF_SITE_URL", "%s", message).
+		WithDetail(detail, args...).
+		WithRemedy("report this: a credential is not sent anywhere but the " +
+			"configured site")
+}
+
+// oddSegment finds a path segment this tool will not resolve on the server's
+// behalf, and reports whether it found one.
+//
+// "." and ".." are cleaned by resolve's JoinPath — after the containment check
+// has already looked at the path — so /jira/../../secure/x passes a check it
+// then leaves anyway. An empty interior segment is the same escape spelled
+// differently: /jira//x is inside the context path and trims to //x, which
+// re-parsed names the host x rather than the path /x. Neither is normalised
+// here, because normalising is this tool deciding what the server meant.
+//
+// A leading empty segment is every absolute path, and a trailing one is a
+// trailing slash. Only an interior one is odd.
+//
+// The argument is the decoded path, so ..%2f and %2e%2e arrive as segments
+// rather than as a way past this.
+func oddSegment(p string) (string, bool) {
+	segs := strings.Split(p, "/")
+	for i, seg := range segs {
+		switch {
+		case seg == "." || seg == "..":
+			return seg, true
+		case seg == "" && i > 0 && i < len(segs)-1:
+			return seg, true
+		}
+	}
+	return "", false
+}
+
+// underPath reports whether path is inside base, and returns the remainder.
+//
+// The comparison is by segment. A plain prefix match would read /jiraxyz/a as
+// inside /jira and hand back a path the server never named.
+func underPath(path, base string) (string, bool) {
+	if path == base {
+		return "/", true
+	}
+	if rest, ok := strings.CutPrefix(path, base+"/"); ok {
+		return "/" + rest, true
+	}
+	return "", false
 }
 
 // sameHost compares two URLs by host and port, defaulting the port from the
