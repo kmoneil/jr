@@ -54,7 +54,7 @@ var CloudAccountID = regexp.MustCompile(
 // CloudAccountIDEncoded matches only the percent-encoded form, so it can be
 // replaced with a percent-encoded stand-in.
 //
-// A rule that rewrote `70121%3A5faf...` to `000000:00000000-...` produced a
+// A rule that rewrote `61403%3A9d2c...` to `000000:00000000-...` produced a
 // recording no request could ever match: the tool escapes the separator when it
 // builds the query, so the replayer looked for `%3A` and the cassette held a
 // literal colon. Scrubbing must not change how a value is encoded — only what

@@ -15,9 +15,9 @@ import (
 // with every kind of identifier a recording picks up.
 const realish = `{"self":"https://acme.atlassian.invalid/rest/api/3/project/10001",
 "key":"KAN","name":"Software Team",
-"lead":{"self":"https://acme.atlassian.invalid/rest/api/3/user?accountId=70121%3A5faf8262-12ed-40d0-9358-e554f3352c5a",
-"accountId":"70121:5faf8262-12ed-40d0-9358-e554f3352c5a",
-"emailAddress":"kevin@acme.invalid","displayName":"Kevin O'Neil",
+"lead":{"self":"https://acme.atlassian.invalid/rest/api/3/user?accountId=61403%3A9d2c7ab4-3e51-4f80-a26b-5c8917e0d3f2",
+"accountId":"61403:9d2c7ab4-3e51-4f80-a26b-5c8917e0d3f2",
+"emailAddress":"rowan@acme.invalid","displayName":"Rowan O'Keefe",
 "avatarUrls":{"48x48":"https://acme.atlassian.invalid/rest/api/3/universal_avatar/view/type/project/avatar/10412"}}}`
 
 func recorded(body string) *transport.Cassette {
@@ -26,7 +26,7 @@ func recorded(body string) *transport.Cassette {
 		Interactions: []transport.Interaction{{
 			Request: transport.RecordedRequest{
 				Method: "GET", Path: "/rest/api/3/project/search",
-				Query: "accountId=70121%3A5faf8262-12ed-40d0-9358-e554f3352c5a",
+				Query: "accountId=61403%3A9d2c7ab4-3e51-4f80-a26b-5c8917e0d3f2",
 			},
 			Response: transport.RecordedResponse{Status: 200, Body: body},
 		}},
@@ -37,7 +37,7 @@ func sandboxScrubber() transport.Scrubber {
 	return transport.Scrubber{
 		Replace: map[string]string{
 			"acme.atlassian.invalid": "recorded.invalid",
-			"Kevin O'Neil":           "Ada Lovelace",
+			"Rowan O'Keefe":          "Ada Lovelace",
 			"KAN":                    "ENG",
 			"Software Team":          "Engineering",
 		},
@@ -59,8 +59,8 @@ func TestNothingIdentifyingSurvivesAScrub(t *testing.T) {
 
 	rendered := c.Interactions[0].Response.Body + c.Interactions[0].Request.Query
 	for _, gone := range []string{
-		"acme.atlassian.invalid", "Kevin", "O'Neil", "KAN", "Software Team",
-		"kevin@acme.invalid", "5faf8262", "universal_avatar",
+		"acme.atlassian.invalid", "Rowan", "O'Keefe", "KAN", "Software Team",
+		"rowan@acme.invalid", "9d2c7ab4", "universal_avatar",
 	} {
 		if strings.Contains(rendered, gone) {
 			t.Errorf("%q survived the scrub", gone)
@@ -88,7 +88,7 @@ func TestAPercentEncodedIdentifierIsScrubbed(t *testing.T) {
 	c := recorded(realish)
 	sandboxScrubber().Scrub(c)
 
-	if q := c.Interactions[0].Request.Query; strings.Contains(q, "5faf8262") {
+	if q := c.Interactions[0].Request.Query; strings.Contains(q, "9d2c7ab4") {
 		t.Errorf("the percent-encoded id survived in the query: %q", q)
 	}
 }
@@ -98,10 +98,10 @@ func TestAPercentEncodedIdentifierIsScrubbed(t *testing.T) {
 // let a real five-digit one through.
 func TestAShortAccountPrefixIsScrubbed(t *testing.T) {
 	for _, id := range []string{
-		"70121:5faf8262-12ed-40d0-9358-e554f3352c5a",
-		"5:5faf8262-12ed-40d0-9358-e554f3352c5a",
-		"557058:f58131cb-b67d-43c7-b30d-6b58d40bd077",
-		"5b10a2844c20165700ede21e",
+		"61403:9d2c7ab4-3e51-4f80-a26b-5c8917e0d3f2",
+		"5:9d2c7ab4-3e51-4f80-a26b-5c8917e0d3f2",
+		"418902:c7a4e10d-2f63-4b58-9e07-1d84af6b2e93",
+		"6c21b3955d31276811fed32f",
 	} {
 		got := transport.CloudAccountID.ReplaceAllString(id, "SCRUBBED")
 		if strings.Contains(got, "-") || got == id {
@@ -123,7 +123,7 @@ func TestResidueDoesNotShareThePatternItGuards(t *testing.T) {
 	// a guard sharing that pattern would report nothing. This is the shape an
 	// identifier takes once an encoding the scrubber did not anticipate has
 	// pulled the rest of it apart.
-	const bare = `{"id":"5faf8262-12ed-40d0-9358-e554f3352c5a"}`
+	const bare = `{"id":"9d2c7ab4-3e51-4f80-a26b-5c8917e0d3f2"}`
 
 	if transport.CloudAccountID.MatchString(bare) {
 		t.Fatal("the premise is gone: CloudAccountID now matches a bare UUID, " +
@@ -295,8 +295,8 @@ func TestAPageTokenStillPairsAfterScrubbing(t *testing.T) {
 // `:`. The recording looks right and every test that uses it fails with
 // FIXTURE_MISS, which reads like a bug in the code under test.
 func TestScrubbingDoesNotChangeHowAValueIsEncoded(t *testing.T) {
-	c := recorded(`{"accountId":"70121:5faf8262-12ed-40d0-9358-e554f3352c5a"}`)
-	c.Interactions[0].Request.Query = "accountId=70121%3A5faf8262-12ed-40d0-9358-e554f3352c5a"
+	c := recorded(`{"accountId":"61403:9d2c7ab4-3e51-4f80-a26b-5c8917e0d3f2"}`)
+	c.Interactions[0].Request.Query = "accountId=61403%3A9d2c7ab4-3e51-4f80-a26b-5c8917e0d3f2"
 
 	sandboxScrubber().Scrub(c)
 
