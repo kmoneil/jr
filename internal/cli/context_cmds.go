@@ -523,6 +523,11 @@ func resolvedDoc(r *jctx.Resolved, configPath string) *render.Doc {
 		Attr("readonly", strconv.FormatBool(r.ReadOnly)).
 		Attr("credential", r.CredentialRef).
 		Attr("effective", "true")
+	if r.APIVersion != 0 {
+		// Only when forced. An absent attribute means the probe decided, which
+		// is the case worth saying nothing about.
+		n.Attr("api-version", strconv.Itoa(r.APIVersion))
+	}
 
 	fields := make([]*render.Node, 0, len(r.Fields))
 	for _, f := range r.Fields {

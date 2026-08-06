@@ -1,14 +1,22 @@
 // Package site describes the Jira instance a context points at.
 //
-// Deployment kind and API version are detected, never declared. The incumbent
+// Deployment kind and API version are detected, not declared. The incumbent
 // freezes them into config at init time, and they go stale the moment the
 // server is upgraded — which surfaces much later as an endpoint that used to
 // work returning 404.
+//
+// There is one escape hatch, and it is deliberately awkward: an operator can
+// force a version with --api-version, which skips the probe entirely. It is for
+// the instance whose serverInfo cannot be read at all — behind a proxy that
+// mangles it — where the alternative is no way in. A version an operator states
+// is a declaration; a version this package works out on its own would be a
+// guess, and it does not make one.
 package site
 
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,6 +54,14 @@ type Info struct {
 	ProbedAt time.Time `json:"probedAt"`
 	// Cached reports whether this came from disk rather than the network.
 	Cached bool `json:"-"`
+	// Declared is the API version an operator forced, or zero.
+	//
+	// The probe is right almost always, and §5.3 keeps this for the case where
+	// it cannot run: an instance behind something that mangles serverInfo has
+	// no other way in. It is a declaration and not a guess — the operator is
+	// stating what their instance serves, which is the one thing this tool
+	// will not work out on its own.
+	Declared int `json:"-"`
 }
 
 // APIBase is the REST prefix for this deployment.
@@ -53,10 +69,33 @@ type Info struct {
 // Cloud has moved to v3 for most endpoints; Data Center is still v2. Choosing
 // between them is exactly why the probe exists.
 func (i Info) APIBase() string {
+	if i.Declared != 0 {
+		return "/rest/api/" + strconv.Itoa(i.Declared)
+	}
 	if i.Kind == Cloud {
 		return "/rest/api/3"
 	}
 	return "/rest/api/2"
+}
+
+// Declare builds the Info an operator asked for, skipping the probe.
+//
+// The version implies the deployment because in practice it is the deployment:
+// v3 is Cloud's, v2 is what Data Center serves. That mapping is a guess when a
+// tool makes it and a statement when an operator does, which is the whole
+// difference — the probe exists so this is never inferred, and this exists so a
+// site whose probe cannot run is still usable.
+func Declare(version int) (Info, error) {
+	switch version {
+	case 2:
+		return Info{Kind: DataCenter, Declared: 2}, nil
+	case 3:
+		return Info{Kind: Cloud, Declared: 3}, nil
+	}
+	return Info{}, errs.Usage("INVALID_API_VERSION",
+		"--api-version accepts 2 or 3, not %d", version).
+		WithDetail("Cloud serves v3; Data Center serves v2").
+		WithRemedy("omit it and let the deployment probe decide")
 }
 
 // AgileBase is the prefix for the Agile API, which boards, sprints, and epics

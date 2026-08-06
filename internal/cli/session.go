@@ -148,6 +148,13 @@ func (s *session) Idempotency() *idem.Ledger {
 func (s *session) probe(
 	ctx context.Context, client *transport.Client, siteURL string,
 ) (site.Info, error) {
+	// A declared version skips the probe rather than overriding its answer.
+	// The point of the escape hatch is a site whose serverInfo cannot be read
+	// at all, so asking it anyway would fail before the override could help.
+	if v := s.resolved.APIVersion; v != 0 {
+		return site.Declare(v)
+	}
+
 	resolver := &site.Resolver{Client: client, Refresh: s.app.refresh}
 
 	if paths, err := s.app.resolvePaths(); err == nil {

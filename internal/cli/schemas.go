@@ -131,7 +131,11 @@ func contextSchema(resolved bool) *render.Schema {
 		s.Attrs = append(s.Attrs,
 			render.Field{Name: "effective", Type: render.TypeBool, Optional: true},
 			// `context delete` reuses this kind to report what it removed.
-			render.Field{Name: "deleted", Type: render.TypeBool, Optional: true})
+			render.Field{Name: "deleted", Type: render.TypeBool, Optional: true},
+			// Present only when --api-version or JIRA_API_VERSION forced one.
+			// Absent means the deployment probe decided, which is the case
+			// worth saying nothing about.
+			render.Field{Name: "api-version", Type: render.TypeInt, Optional: true})
 		s.Children = append(s.Children,
 			render.Child{Schema: render.Leaf("config", render.TypeString)})
 	}

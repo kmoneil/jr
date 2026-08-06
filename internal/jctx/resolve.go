@@ -3,6 +3,7 @@ package jctx
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/kmoneil/jira-cli/internal/errs"
@@ -15,6 +16,9 @@ const (
 	EnvProject  = "JIRA_PROJECT"
 	EnvBoard    = "JIRA_BOARD"
 	EnvReadOnly = "JIRA_READONLY"
+	// EnvAPIVersion forces the REST version for every command in a shell, which
+	// is the only bearable way to work with an instance whose probe cannot run.
+	EnvAPIVersion = "JIRA_API_VERSION"
 )
 
 // Overrides are the per-invocation flag values that take precedence over the
@@ -28,6 +32,8 @@ type Overrides struct {
 	Fields  []string
 	// ReadOnly forces read-only mode on. It cannot force it off: see Resolved.
 	ReadOnly bool
+	// APIVersion forces the REST version, skipping the deployment probe.
+	APIVersion string
 }
 
 // Resolved is the effective configuration for one invocation.
@@ -50,6 +56,10 @@ type Resolved struct {
 
 	// CredentialRef is the key the credential store is asked for.
 	CredentialRef string
+
+	// APIVersion is the REST version an operator forced, or zero for the
+	// probe's answer. See site.Declare for why a declaration is not a guess.
+	APIVersion int
 
 	// SiteSource says where Site came from, so an error about it can be acted
 	// on without a second command.
@@ -129,6 +139,26 @@ func Resolve(cfg *Config, over Overrides, getenv Getenv) (*Resolved, error) {
 		r.Fields = slices.Clone(over.Fields)
 	default:
 		r.Fields = slices.Clone(ctx.Fields)
+	}
+
+	if v := firstNonEmpty(over.APIVersion, getenv(EnvAPIVersion)); v != "" {
+		n, err := strconv.Atoi(strings.TrimSpace(v))
+		if err != nil {
+			return nil, errs.Usage("INVALID_API_VERSION",
+				"--api-version accepts 2 or 3, not %q", v).
+				WithRemedy("omit it and let the deployment probe decide")
+		}
+		if n != 2 && n != 3 {
+			// Checked here rather than by calling into site, which would add a
+			// package dependency for a two-value range. site.Declare checks it
+			// again for its own callers; the mapping from version to deployment
+			// still lives there and only there.
+			return nil, errs.Usage("INVALID_API_VERSION",
+				"--api-version accepts 2 or 3, not %d", n).
+				WithDetail("Cloud serves v3; Data Center serves v2").
+				WithRemedy("omit it and let the deployment probe decide")
+		}
+		r.APIVersion = n
 	}
 
 	if r.Site != "" {

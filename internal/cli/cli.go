@@ -43,6 +43,7 @@ type app struct {
 	site        string
 	project     string
 	board       string
+	apiVersion  string
 	readOnly    bool
 	debug       bool
 	refresh     bool

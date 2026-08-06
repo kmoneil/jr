@@ -53,11 +53,12 @@ func (a *app) config() (*jctx.Config, error) {
 // resolve computes the effective settings from flags, environment, and context.
 func (a *app) resolve(cfg *jctx.Config) (*jctx.Resolved, error) {
 	return jctx.Resolve(cfg, jctx.Overrides{
-		Context:  a.contextName,
-		Site:     a.site,
-		Project:  a.project,
-		Board:    a.board,
-		ReadOnly: a.readOnly,
+		Context:    a.contextName,
+		Site:       a.site,
+		Project:    a.project,
+		Board:      a.board,
+		APIVersion: a.apiVersion,
+		ReadOnly:   a.readOnly,
 	}, a.getenv)
 }
 

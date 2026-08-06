@@ -98,7 +98,7 @@
     </kind>
     <kind name="context.get" v="1" emitters="context.create,context.delete,context.edit,context.show,context.use">
       <element name="context">
-        <attributes count="9">
+        <attributes count="10">
           <attribute name="name" type="string" optional="false"/>
           <attribute name="current" type="bool" optional="false"/>
           <attribute name="site" type="string" optional="false"/>
@@ -108,6 +108,7 @@
           <attribute name="credential" type="string" optional="false"/>
           <attribute name="effective" type="bool" optional="true"/>
           <attribute name="deleted" type="bool" optional="true"/>
+          <attribute name="api-version" type="int" optional="true"/>
         </attributes>
         <elements count="2">
           <element name="fields" list-of="field" optional="false" repeated="false">

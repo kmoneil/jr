@@ -382,7 +382,9 @@ renders the request as the command built it, before the transport attaches one.
 | `INVALID_DURATION`        | 2    | Not a Jira duration. The format is a count of `w`, `d`, `h`, or `m`, largest first. Nothing is converted between them: a working week is a site setting. |
 | `SELF_LINK`               | 2    | Both ends of a link are the same issue. |
 | `SELF_EPIC`               | 2    | An epic was named as one of the issues to move into it. |
-| `NOTHING_TO_EDIT`         | 2    | `issue edit` was given no field to change. |
+| `NOTHING_TO_EDIT`         | 2    | An edit was given nothing to change — `issue edit` with no field, `context edit` with no setting. |
+| `CONFLICTING_EDIT`        | 2    | `context edit` was asked to set and clear the same setting. Both at once has no single right answer, and picking one would make the result depend on an implementation detail nobody can see. |
+| `INVALID_API_VERSION`     | 2    | `--api-version` accepts 2 or 3. Cloud serves v3; Data Center serves v2. |
 | `TOO_MANY_ISSUES`         | 2    | More issues than the agile API moves at once. It is refused rather than split across requests: two requests can half-succeed, and the outcome would be neither moved nor not moved. |
 | `DESTINATION_EXISTS`      | 7    | A download would replace a file that is already there. It refuses rather than overwriting, because a download that silently replaced a file is indistinguishable from one that worked, and the file it replaced is not recoverable. `--force` allows it. |
 | `OFF_SITE_URL`            | 1    | The server pointed at a host other than the configured site, and this tool will not follow it. Data Center reports an attachment's content as an absolute URL; following it on trust is how a credential reaches a host nobody chose. The refusal never echoes the URL — one can carry userinfo or a signed parameter. |
