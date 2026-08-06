@@ -41,6 +41,12 @@ build:
 	@mkdir -p $(BIN)
 	go build -tags "$(TAGS_FULL)" -ldflags "$(LDFLAGS)" -o $(BIN)/$(BINARY) $(PKG)
 
+## build: full human build, every capability for macOS
+.PHONY: build-mac
+build-mac:
+	@mkdir -p $(BIN)
+	GOOS=darwin GOARCH=amd64 go build -tags "$(TAGS_FULL)" -ldflags "$(LDFLAGS)" -o $(BIN)/$(BINARY)-mac $(PKG)
+
 ## build-agent: no TTY assumptions, no interactivity, no browser, no clipboard
 .PHONY: build-agent
 build-agent:
@@ -61,7 +67,7 @@ build-ci:
 
 ## build-all: every shipped profile
 .PHONY: build-all
-build-all: build build-agent build-reader build-ci
+build-all: build build-mac build-agent build-reader build-ci
 
 ## size: assert the reader build stays under its budget
 .PHONY: size
