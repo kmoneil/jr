@@ -401,3 +401,21 @@ func (s *stubSession) RequireProject() (string, error) {
 func (s *stubSession) RequireBoard() (string, error) {
 	return "", errs.Usage("NO_BOARD", "this command needs a board and none is set")
 }
+
+// TestTheCloudFixturesAreRecordings pins these to a conversation that happened.
+//
+// They replayed unchanged when the recording replaced them, which is the good
+// outcome and also the reason to nail them down: a fixture that was right by
+// luck looks exactly like one that was right by evidence, and only one of them
+// stays right when the API moves.
+func TestTheCloudFixturesAreRecordings(t *testing.T) {
+	for _, name := range []string{"parse.cloud.json", "invalid.cloud.json"} {
+		cassette, err := transport.LoadCassette(filepath.Join("testdata", name))
+		if err != nil {
+			t.Fatalf("load %s: %v", name, err)
+		}
+		if !cassette.Evidence() {
+			t.Errorf("%s is no longer a recording", name)
+		}
+	}
+}

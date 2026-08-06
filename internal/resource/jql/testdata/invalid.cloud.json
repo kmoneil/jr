@@ -1,6 +1,6 @@
 {
   "deployment": "cloud",
-  "source": "constructed",
+  "source": "recorded",
   "interactions": [
     {
       "request": {
@@ -12,11 +12,83 @@
       "response": {
         "status": 200,
         "header": {
+          "Atl-Request-Id": [
+            "00000000-0000-0000-0000-000000000000"
+          ],
+          "Atl-Traceid": [
+            "e701eecdc8bd46559ebc94cb50af47b6"
+          ],
+          "Cache-Control": [
+            "no-cache, no-store, no-transform"
+          ],
           "Content-Type": [
-            "application/json"
+            "application/json;charset=UTF-8"
+          ],
+          "Date": [
+            "Thu, 06 Aug 2026 17:50:10 GMT"
+          ],
+          "Nel": [
+            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=198;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "Report-To": [
+            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
+          ],
+          "Server": [
+            "AtlassianEdge"
+          ],
+          "Server-Timing": [
+            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=1,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=92,atl-edge;dur=55,atl-edge-internal;dur=16,atl-edge-upstream;dur=39,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW59-P7\",cdn-rid;desc=\"puzhinVxo8EN387swco_TW65V0UNoX2XXQePJtFCX6EAPnzflcJbHA==\",cdn-downstream-fbl;dur=98"
+          ],
+          "Set-Cookie": [
+            "REDACTED"
+          ],
+          "Strict-Transport-Security": [
+            "max-age=63072000; includeSubDomains; preload"
+          ],
+          "Timing-Allow-Origin": [
+            "*"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "Via": [
+            "1.1 87664bd1936b3817ff2d0d7de304a3cc.cloudfront.net (CloudFront)"
+          ],
+          "X-Aaccountid": [
+            "000000%3A00000000-0000-0000-0000-000000000000"
+          ],
+          "X-Amz-Cf-Id": [
+            "puzhinVxo8EN387swco_TW65V0UNoX2XXQePJtFCX6EAPnzflcJbHA=="
+          ],
+          "X-Amz-Cf-Pop": [
+            "DFW59-P7"
+          ],
+          "X-Arequestid": [
+            "b014f15fdf2ffdc43db81cdc1866e73e"
+          ],
+          "X-Cache": [
+            "Miss from cloudfront"
+          ],
+          "X-Content-Type-Options": [
+            "nosniff"
+          ],
+          "X-Ratelimit-Limit": [
+            "200"
+          ],
+          "X-Ratelimit-Remaining": [
+            "198"
+          ],
+          "X-Xss-Protection": [
+            "1; mode=block"
           ]
         },
-        "body": "{\"queries\":[{\"query\":\"project = ENG status = Open\",\"errors\":[\"Error in the JQL Query: Expecting either 'OR' or 'AND' but got 'status'. (line 1, character 15)\"]}]}"
+        "body": "{\"queries\":[{\"query\":\"project = ENG status = Open\",\"errors\":[\"Error in the JQL Query: Expecting either 'OR' or 'AND' but got 'status'. (line 1, character 15)\"],\"warnings\":[]}]}"
       }
     }
   ]
