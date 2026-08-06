@@ -1,0 +1,35 @@
+{
+  "deployment": "datacenter",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/agile/1.0/epic/ENG-42"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"id\":10101,\"key\":\"ENG-42\",\"self\":\"https://jira.acme.invalid/rest/agile/1.0/epic/10101\",\"name\":\"Retry path\",\"summary\":\"Make the transport retry safely\",\"color\":{\"key\":\"color_4\"},\"done\":false}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/agile/1.0/epic/10101"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"id\":10101,\"key\":\"ENG-42\",\"self\":\"https://jira.acme.invalid/rest/agile/1.0/epic/10101\",\"name\":\"Retry path\",\"summary\":\"Make the transport retry safely\",\"color\":{\"key\":\"color_4\"},\"done\":false}"
+      }
+    }
+  ]
+}

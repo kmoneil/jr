@@ -1,0 +1,37 @@
+{
+  "deployment": "cloud",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/agile/1.0/board/99/epic",
+        "query": "maxResults=50&startAt=0"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"maxResults\":50,\"startAt\":0,\"total\":3,\"isLast\":false,\"values\":[{\"id\":10200,\"key\":\"ENG-1000\",\"self\":\"https://jira.acme.invalid/rest/agile/1.0/epic/10200\",\"name\":\"Output contract\",\"summary\":\"Version every kind\",\"color\":{\"key\":\"color_9\"},\"done\":false},{\"id\":10101,\"key\":\"ENG-42\",\"self\":\"https://jira.acme.invalid/rest/agile/1.0/epic/10101\",\"name\":\"Retry path\",\"summary\":\"Make the transport retry safely\",\"color\":{\"key\":\"color_4\"},\"done\":false}]}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/agile/1.0/board/99/epic",
+        "query": "maxResults=50&startAt=2"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"maxResults\":50,\"startAt\":2,\"total\":3,\"isLast\":true,\"values\":[{\"id\":10099,\"key\":\"ENG-7\",\"self\":\"https://jira.acme.invalid/rest/agile/1.0/epic/10099\",\"name\":\"Keyset pagination\",\"summary\":\"Stop paging by offset\",\"color\":{\"key\":\"color_1\"},\"done\":true}]}"
+      }
+    }
+  ]
+}
