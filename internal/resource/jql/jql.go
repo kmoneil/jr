@@ -269,7 +269,11 @@ func (c *Client) checkSearch(ctx context.Context, query string) (Result, error) 
 	path := c.Site.APIBase() + "/search"
 
 	body, err := json.Marshal(map[string]any{
-		"jql": query, "maxResults": 0, "validateQuery": "strict",
+		// validateQuery is a boolean here. "strict" is Cloud's spelling on its
+		// own parse endpoint, and sending it to Data Center is a deserialization
+		// error that arrives as `valid="false"` — a working query reported
+		// broken, which is the worst answer this command can give.
+		"jql": query, "maxResults": 0, "validateQuery": true,
 	})
 	if err != nil {
 		return Result{}, errs.Runtime("ENCODE_FAILED",
