@@ -294,6 +294,12 @@ layer from the command's declaration, not by each command, so a verb cannot ship
 having forgotten them. Both happen before any network call, so a blocked command
 costs nothing and cannot half-happen.
 
+The two are relaxed differently for `--dry-run`, and the asymmetry is
+deliberate. A missing `--yes` is a step the caller has not taken yet, so a
+preview is allowed — you look at the request in order to decide whether to
+confirm it. A read-only context is a statement about what that context is *for*,
+so the latch stays one-way and a dry run is refused too.
+
 `--dry-run` emits kind `dry-run` v1: the request itself, with its method, path,
 query, and body verbatim. It is built from the same `transport.Request` the
 command was about to send, so the preview and the real thing cannot drift, and
@@ -303,7 +309,7 @@ renders the request as the command built it, before the transport attaches one.
 | Code                      | Exit | Meaning                                    |
 | ------------------------- | ---- | ------------------------------------------- |
 | `READ_ONLY`               | 10   | A context, `--readonly`, or `JIRA_READONLY` forbids changing Jira. It is a one-way latch; nothing turns it off. |
-| `CONFIRMATION_REQUIRED`   | 10   | A destructive command was run without `--yes`. |
+| `CONFIRMATION_REQUIRED`   | 10   | A destructive command was run without `--yes`. Not raised for `--dry-run`: a preview is not the thing being confirmed, and you look at it in order to decide. |
 | `IDEMPOTENT_IN_FLIGHT`    | 7    | Another run holds this key and has not finished; it may already have done the work. |
 | `UNSUPPORTED_ON_DEPLOYMENT` | 2  | The flag is real but this deployment cannot honor it — `--description` against Cloud, which needs an ADF body this tool does not yet build. |
 | `CONFLICTING_LABEL_FLAGS` | 2    | `--label` replaces the whole set, so it cannot be combined with `--add-label` or `--remove-label`. |

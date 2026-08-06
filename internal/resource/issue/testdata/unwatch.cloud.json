@@ -1,0 +1,36 @@
+{
+  "deployment": "cloud",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/myself"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"accountId\": \"712020:8f3a\", \"displayName\": \"Ada Lovelace\", \"active\": true}"
+      }
+    },
+    {
+      "request": {
+        "method": "DELETE",
+        "path": "/rest/api/3/issue/ENG-101/watchers",
+        "query": "accountId=712020%3A8f3a"
+      },
+      "response": {
+        "status": 204,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": ""
+      }
+    }
+  ]
+}

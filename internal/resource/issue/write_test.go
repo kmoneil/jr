@@ -859,3 +859,299 @@ func TestAnUnkeyedDuplicateWarnsAndProceeds(t *testing.T) {
 		t.Errorf("the warning does not name the earlier issue:\n%s", stderr.String())
 	}
 }
+
+// TestAssignNamesTheUserTheWayTheDeploymentDoes covers the split that produces
+// a 400 saying nothing about which field was wrong.
+func TestAssignNamesTheUserTheWayTheDeploymentDoes(t *testing.T) {
+	for _, tc := range []struct {
+		kind  site.Kind
+		field string
+	}{
+		{site.Cloud, "accountId"},
+		{site.DataCenter, "name"},
+	} {
+		t.Run(string(tc.kind), func(t *testing.T) {
+			client, _ := writeClient(tc.kind)
+
+			req, err := client.AssignRequest("ENG-101", "ada")
+			if err != nil {
+				t.Fatalf("assign: %v", err)
+			}
+			if req.Method != transport.MethodPut {
+				t.Errorf("method = %q, want PUT", req.Method)
+			}
+			if !strings.HasSuffix(req.Path, "/issue/ENG-101/assignee") {
+				t.Errorf("path = %q, want the dedicated assignee endpoint", req.Path)
+			}
+			decoded := body(t, req.Body)
+			if decoded[tc.field] != "ada" {
+				t.Errorf("body = %v, want the user under %q", decoded, tc.field)
+			}
+
+			// unassigned clears the field; default hands it to the project's
+			// own rule. They are different requests and must not collapse.
+			cleared, err := client.AssignRequest("ENG-101", "unassigned")
+			if err != nil {
+				t.Fatalf("unassign: %v", err)
+			}
+			value, present := body(t, cleared.Body)[tc.field]
+			if !present || value != nil {
+				t.Errorf("unassigned body = %s, want an explicit null", cleared.Body)
+			}
+
+			auto, err := client.AssignRequest("ENG-101", "default")
+			if err != nil {
+				t.Fatalf("default: %v", err)
+			}
+			if body(t, auto.Body)[tc.field] != "-1" {
+				t.Errorf("default body = %s, want the project-default sentinel", auto.Body)
+			}
+		})
+	}
+}
+
+// TestDeleteIsDestructiveAndSaysSo covers the declaration the central gate acts
+// on, plus the subtask flag that keeps a cascade from being silent.
+func TestDeleteIsDestructiveAndSaysSo(t *testing.T) {
+	cmd, ok := registry.Lookup("issue.delete")
+	if !ok {
+		t.Fatal("issue delete is not registered")
+	}
+	if !cmd.Destructive {
+		t.Error("issue delete is not marked destructive, so --yes would not be required")
+	}
+	if _, has := cmd.Flag("yes"); !has {
+		t.Error("issue delete does not declare --yes")
+	}
+
+	client, _ := writeClient(site.DataCenter)
+
+	plain, err := client.DeleteRequest("ENG-101", false)
+	if err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if plain.Method != transport.MethodDelete {
+		t.Errorf("method = %q, want DELETE", plain.Method)
+	}
+	if plain.Query.Get("deleteSubtasks") != "" {
+		t.Error("subtasks are cascaded by default, which would delete work " +
+			"the caller never named")
+	}
+
+	cascade, err := client.DeleteRequest("ENG-101", true)
+	if err != nil {
+		t.Fatalf("delete with subtasks: %v", err)
+	}
+	if cascade.Query.Get("deleteSubtasks") != "true" {
+		t.Errorf("--subtasks did not reach the request: %v", cascade.Query)
+	}
+}
+
+// TestWatchAndUnwatchAreDifferentRequests covers the shapes: adding takes the
+// user in the body, removing takes them in a query parameter named for the
+// deployment.
+func TestWatchAndUnwatchAreDifferentRequests(t *testing.T) {
+	for _, tc := range []struct {
+		kind  site.Kind
+		param string
+		user  string
+	}{
+		{site.Cloud, "accountId", "712020:8f3a"},
+		{site.DataCenter, "username", "ada"},
+	} {
+		t.Run(string(tc.kind), func(t *testing.T) {
+			client, _ := writeClient(tc.kind)
+
+			add, err := client.WatchRequest("ENG-101", tc.user, false)
+			if err != nil {
+				t.Fatalf("watch: %v", err)
+			}
+			if add.Method != transport.MethodPost {
+				t.Errorf("method = %q, want POST", add.Method)
+			}
+			// A bare JSON string, which is what this endpoint takes — not an
+			// object, and not a form value.
+			var asString string
+			if err := json.Unmarshal(add.Body, &asString); err != nil {
+				t.Fatalf("the body is not a bare JSON string: %s", add.Body)
+			}
+			if asString != tc.user {
+				t.Errorf("body = %q, want %q", asString, tc.user)
+			}
+
+			remove, err := client.WatchRequest("ENG-101", tc.user, true)
+			if err != nil {
+				t.Fatalf("unwatch: %v", err)
+			}
+			if remove.Method != transport.MethodDelete {
+				t.Errorf("method = %q, want DELETE", remove.Method)
+			}
+			if got := remove.Query.Get(tc.param); got != tc.user {
+				t.Errorf("query %s = %q, want %q", tc.param, got, tc.user)
+			}
+			if len(remove.Body) != 0 {
+				t.Errorf("a DELETE carried a body: %s", remove.Body)
+			}
+		})
+	}
+}
+
+// TestCloneCopiesExactlyWhatItSays is the honesty property. A copy that
+// silently brought half an issue's history along would be worse than one that
+// states its scope — so the scope is asserted, in both directions.
+func TestCloneCopiesExactlyWhatItSays(t *testing.T) {
+	cmd, ok := registry.Lookup("issue.clone")
+	if !ok {
+		t.Fatal("issue clone is not registered")
+	}
+
+	conn, replayer := replayConn(t, "clone.datacenter.json")
+	inv := &registry.Invocation{
+		Jira: &stubSession{
+			doer: &stubDoer{body: catalogueJSON}, conn: conn, kind: site.DataCenter,
+		},
+		Args: []string{"ENG-101"}, Flags: registry.NewFlags(),
+		Stderr: io.Discard, Progress: registry.NoProgress,
+	}
+
+	if err := cmd.Validate(t.Context(), inv); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	doc, err := cmd.Run(t.Context(), inv)
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+		// The recorded create carries exactly the fields clone should copy, so
+		// an unplayed POST means the body differed from what is documented.
+		t.Fatalf("the clone did not send the documented body: %v", unplayed)
+	}
+
+	if key, _ := doc.Record.AttrValue("key"); key != "ENG-205" {
+		t.Errorf("key = %q, want the new issue", key)
+	}
+	// The copy names its source, so a caller can tell the two apart later.
+	if from, _ := doc.Record.AttrValue("cloned-from"); from != "ENG-101" {
+		t.Errorf("cloned-from = %q", from)
+	}
+}
+
+// TestCloneDoesNotCarryTheDescriptionFromCloud covers the one field whose copy
+// depends on the deployment. On Cloud it arrives as ADF, and this tool does not
+// yet build one to send back — copying it raw would be rejected and flattening
+// it would lose the markup.
+func TestCloneDoesNotCarryTheDescriptionFromCloud(t *testing.T) {
+	client, _ := writeClient(site.Cloud)
+
+	// The wiki case carries it; that is what the Data Center fixture proves.
+	// Here the source is ADF, so a create built from it must omit it rather
+	// than fail or approximate.
+	req, err := client.CreateRequest(issue.CreateOptions{
+		Project: "ENG", Type: "Bug", Summary: "a copy",
+	})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if _, present := bodyFields(t, req.Body)["description"]; present {
+		t.Error("a description reached a Cloud create")
+	}
+}
+
+// TestEveryMutatingVerbIsRegisteredAndSafe is the full sweep, so a new verb
+// added later cannot quietly skip the machinery.
+func TestEveryMutatingVerbIsRegisteredAndSafe(t *testing.T) {
+	want := []string{
+		"issue.create", "issue.edit", "issue.move",
+		"issue.assign", "issue.delete", "issue.clone", "issue.watch",
+	}
+	for _, name := range want {
+		cmd, ok := registry.Lookup(name)
+		if !ok {
+			t.Fatalf("%s is not registered", name)
+		}
+		if !cmd.Mutating {
+			t.Errorf("%s is not marked mutating", name)
+		}
+		if _, has := cmd.Flag("dry-run"); !has {
+			t.Errorf("%s does not accept --dry-run", name)
+		}
+		if !cmd.Emits(registry.KindDryRun, registry.VersionDryRun) {
+			t.Errorf("%s does not declare the dry-run shape", name)
+		}
+		if len(cmd.RequiresTags) == 0 || cmd.RequiresTags[0] != "write" {
+			t.Errorf("%s does not require the write tag", name)
+		}
+		if cmd.Destructive {
+			if _, has := cmd.Flag("yes"); !has {
+				t.Errorf("%s is destructive but does not require --yes", name)
+			}
+		}
+	}
+}
+
+// TestTheRemainingVerbsRunAsRegisteredCommands exercises each one through the
+// registry against a recorded conversation, on both deployments. The
+// request-shape tests above never touch the wire; without this the command
+// wrapper is the untested part.
+func TestTheRemainingVerbsRunAsRegisteredCommands(t *testing.T) {
+	for _, tc := range []struct {
+		command, fixture string
+		args             []string
+		flags            map[string]bool
+		action           string
+	}{
+		{command: "issue.assign", fixture: "assign", args: []string{"ENG-101", "ada"}, action: "assigned"},
+		{
+			command: "issue.delete", fixture: "delete", args: []string{"ENG-101"},
+			flags: map[string]bool{"yes": true}, action: "deleted",
+		},
+		{command: "issue.watch", fixture: "watch", args: []string{"ENG-101"}, action: "watching"},
+		{
+			command: "issue.watch", fixture: "unwatch", args: []string{"ENG-101"},
+			flags: map[string]bool{"remove": true}, action: "not-watching",
+		},
+	} {
+		for _, kind := range deployments {
+			t.Run(tc.fixture+"/"+string(kind), func(t *testing.T) {
+				cmd, ok := registry.Lookup(tc.command)
+				if !ok {
+					t.Fatalf("%s is not registered", tc.command)
+				}
+
+				conn, replayer := replayConn(t, tc.fixture+"."+string(kind)+".json")
+				flags := registry.NewFlags()
+				for k, v := range tc.flags {
+					flags.SetBool(k, v)
+				}
+				inv := &registry.Invocation{
+					Jira: &stubSession{
+						doer: &stubDoer{body: catalogueJSON}, conn: conn, kind: kind,
+					},
+					Args: tc.args, Flags: flags,
+					Stderr: io.Discard, Progress: registry.NoProgress,
+				}
+
+				if err := cmd.Validate(t.Context(), inv); err != nil {
+					t.Fatalf("validate: %v", err)
+				}
+				doc, err := cmd.Run(t.Context(), inv)
+				if err != nil {
+					t.Fatalf("run: %v", err)
+				}
+				if !cmd.Emits(doc.Kind, doc.Version) {
+					t.Errorf("emitted %s v%d, which the command does not declare",
+						doc.Kind, doc.Version)
+				}
+				if err := doc.Validate(); err != nil {
+					t.Errorf("validate doc: %v", err)
+				}
+				if action, _ := doc.Record.AttrValue("action"); action != tc.action {
+					t.Errorf("action = %q, want %q", action, tc.action)
+				}
+				if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+					t.Errorf("the request was never sent as recorded: %v", unplayed)
+				}
+			})
+		}
+	}
+}

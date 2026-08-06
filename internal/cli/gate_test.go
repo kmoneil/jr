@@ -161,3 +161,37 @@ func runGated(
 	})
 	return result{exit: code, stdout: out.String(), stderr: errOut.String()}
 }
+
+// TestADryRunNeedsNoConfirmation covers the split between the two gates. --yes
+// confirms an irreversible action; a preview is not one, and refusing to show
+// the request until it has been confirmed inverts the order a caller works in.
+func TestADryRunNeedsNoConfirmation(t *testing.T) {
+	var ran bool
+	got := runGated(t, fakeMutating(&ran, true), nil, "fake", "write", "--dry-run")
+
+	if got.exit != exitcode.OK {
+		t.Fatalf("exit = %v, want %v\nstderr: %s", got.exit, exitcode.OK, got.stderr)
+	}
+	if !ran {
+		t.Error("a dry run of a destructive command was refused")
+	}
+}
+
+// TestReadOnlyIsNotRelaxedForADryRun is the deliberate asymmetry. A missing
+// --yes is a step the caller has not taken; a read-only context is a statement
+// about what that context is for, and the latch stays one-way.
+func TestReadOnlyIsNotRelaxedForADryRun(t *testing.T) {
+	var ran bool
+	got := runGated(t, fakeMutating(&ran, true), nil,
+		"fake", "write", "--dry-run", "--readonly")
+
+	if got.exit != exitcode.Blocked {
+		t.Errorf("exit = %v, want %v", got.exit, exitcode.Blocked)
+	}
+	if ran {
+		t.Error("a read-only context allowed a mutating command to run")
+	}
+	if !strings.Contains(got.stderr, "READ_ONLY") {
+		t.Errorf("stderr does not carry the code: %s", got.stderr)
+	}
+}

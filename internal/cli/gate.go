@@ -17,20 +17,25 @@ import (
 // Both refusals happen before Validate and before any network call, so a
 // blocked command costs nothing and cannot half-happen.
 func (a *app) gate(rc *registry.Command, inv *registry.Invocation) error {
-	// Confirmation first. A destructive command in read-only mode should say
-	// the more specific thing — that it needs confirmation it will never get —
-	// only after read-only has had its say, so the order below is deliberate:
-	// read-only is the broader refusal and comes second precisely because a
-	// missing --yes is the easier thing to fix.
-	if rc.Destructive && !inv.Flags.Bool("yes") {
+	// A preview is not the thing being confirmed. --yes exists to confirm an
+	// irreversible action, and refusing to *show* the request until it has been
+	// confirmed inverts the order a caller works in: you look at what would
+	// happen in order to decide whether to allow it.
+	if rc.Destructive && !inv.Flags.Bool("dry-run") && !inv.Flags.Bool("yes") {
 		return errs.Blocked("CONFIRMATION_REQUIRED",
 			"%s needs confirmation", rc.UseLine()).
-			WithRemedy("pass --yes")
+			WithRemedy("pass --yes, or --dry-run to see the request first")
 	}
 
 	if !rc.Mutating {
 		return nil
 	}
+
+	// Read-only is *not* relaxed for a dry run, and the asymmetry is deliberate.
+	// A missing --yes is a step the caller has not taken yet; a read-only
+	// context is a statement about what that context is for. The latch stays
+	// one-way, and a caller who wants to plan a change uses a context that
+	// permits one.
 	if inv.Jira == nil {
 		// A mutating command with no session cannot reach Jira anyway, and
 		// failing here would hide the real problem behind a policy message.

@@ -1,0 +1,37 @@
+{
+  "deployment": "datacenter",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/issue/ENG-101",
+        "query": "fields=summary%2Cstatus%2Cassignee%2Creporter%2Cpriority%2Cissuetype%2Cproject%2Ccreated%2Cupdated%2Clabels%2Cdescription%2Cresolution%2Cparent%2Ccomponents%2CfixVersions"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"id\": \"1\", \"key\": \"ENG-101\", \"fields\": {\"summary\": \"Retry drops the last error\", \"status\": {\"name\": \"Open\", \"statusCategory\": {\"key\": \"new\", \"name\": \"Open\"}}, \"assignee\": {\"name\": \"ada\", \"displayName\": \"Ada Lovelace\"}, \"reporter\": {\"name\": \"bob\", \"displayName\": \"Bob\"}, \"priority\": {\"name\": \"High\"}, \"issuetype\": {\"name\": \"Bug\"}, \"project\": {\"key\": \"ENG\"}, \"created\": \"2026-08-01T09:15:00.000+0000\", \"updated\": \"2026-08-04T11:32:07.000+0000\", \"labels\": [\"retry\", \"transport\"], \"description\": \"the original description\", \"resolution\": {\"name\": \"Fixed\"}, \"parent\": {\"key\": \"ENG-1\"}}}"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/2/issue",
+        "body": "{\"fields\":{\"description\":\"the original description\",\"issuetype\":{\"name\":\"Bug\"},\"labels\":[\"retry\",\"transport\"],\"parent\":{\"key\":\"ENG-1\"},\"priority\":{\"name\":\"High\"},\"project\":{\"key\":\"ENG\"},\"summary\":\"Retry drops the last error\"}}"
+      },
+      "response": {
+        "status": 201,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"id\": \"10005\", \"key\": \"ENG-205\"}"
+      }
+    }
+  ]
+}
