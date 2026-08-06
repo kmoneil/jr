@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <result kind="contract" v="1">
-  <kinds count="29" complete="true">
+  <kinds count="31" complete="true">
     <kind name="auth.status" v="1" emitters="auth.login,auth.logout,auth.status"/>
     <kind name="auth.token" v="1" emitters="auth.token"/>
     <kind name="board.get" v="1" emitters="board.get"/>
@@ -16,6 +16,8 @@
     <kind name="issue.link.list" v="1" emitters="issue.link.list"/>
     <kind name="issue.list" v="1" emitters="issue.list"/>
     <kind name="issue.worklog.list" v="1" emitters="issue.worklog.list"/>
+    <kind name="jql.explain" v="1" emitters="jql.explain"/>
+    <kind name="jql.validate" v="1" emitters="jql.validate"/>
     <kind name="meta.createmeta" v="1" emitters="meta.createmeta"/>
     <kind name="meta.transitions" v="1" emitters="meta.transitions"/>
     <kind name="project.components" v="1" emitters="project.components"/>

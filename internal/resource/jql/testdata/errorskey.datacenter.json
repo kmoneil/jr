@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/2/search",
+        "body": "{\"jql\":\"project = ENG status = Open\",\"maxResults\":0,\"validateQuery\":\"strict\"}"
+      },
+      "response": {
+        "status": 400,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"errorMessages\":[],\"errors\":{\"jql\":\"The value 'Opne' does not exist for the field 'status'.\"}}"
+      }
+    }
+  ]
+}

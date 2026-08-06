@@ -258,6 +258,28 @@ often blocked from the current status than misspelled.
 An unparseable `--format` still produces a readable error: the diagnostic falls
 back to XML rather than failing twice.
 
+### Verdicts
+
+A command whose whole product is a judgement reports it and exits 0, even when
+the judgement is negative. `jr jql validate` on a query that does not parse
+exits 0 with `valid="false"` and the reasons attached.
+
+That is deliberate and it is the opposite of the rule everywhere else, so it is
+worth being explicit. An exit code cannot carry a list, and the reasons are what
+the command is for — an agent checking a query before it acts needs to know
+which field was wrong and where. Exiting non-zero would suppress stdout and
+collapse Jira's own error text, positions included, into a single line of prose.
+
+Branch on the attribute, not the status. A non-zero exit from one of these means
+the question could not be answered at all: no credential, no network, a 500.
+
+The verdict also records who reached it. `method="parse"` is Cloud's parse
+endpoint, `method="search"` is Data Center's zero-row search, and
+`method="local"` means this tool decided without asking — the query did not lex,
+or its parentheses did not balance. The three are not the same claim, and a
+consumer that treats them as one is trusting a lexer with a question only the
+server can answer.
+
 ### Refusals the server sends
 
 Most of the above are decided before a request goes out. One is not, and it is

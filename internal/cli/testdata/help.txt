@@ -20,6 +20,7 @@ Available Commands:
   field       Discover fields, including custom fields
   help        Help about any command
   issue       Work with issues
+  jql         Validate and explain JQL without executing it
   meta        Ask Jira what can be done to an issue
   project     Inspect projects
   schema      Describe every command this build contains

@@ -84,10 +84,10 @@ document that nothing checks eventually becomes.
 
 | Profile  | Commands | Not present                                   |
 | -------- | -------- | --------------------------------------------- |
-| `full`   | 54       | —                                             |
-| `agent`  | 52       | `completion`, `sprint close`                  |
-| `reader` | 35       | the above, plus the 17 mutating verbs         |
-| `ci`     | 34       | the above, plus `mcp serve`                   |
+| `full`   | 56       | —                                             |
+| `agent`  | 54       | `completion`, `sprint close`                  |
+| `reader` | 37       | the above, plus the 17 mutating verbs         |
+| `ci`     | 36       | the above, plus `mcp serve`                   |
 
 `make test-profiles` runs the whole suite under every shipped tag set, and the
 contract tests inside it assert the surface directly: no mutating command

@@ -1,0 +1,22 @@
+{
+  "deployment": "cloud",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/3/jql/parse",
+        "query": "validation=strict",
+        "body": "{\"queries\":[\"project = ENG status = Open\"]}"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"queries\":[{\"query\":\"project = ENG status = Open\",\"errors\":[\"Error in the JQL Query: Expecting either 'OR' or 'AND' but got 'status'. (line 1, character 15)\"]}]}"
+      }
+    }
+  ]
+}

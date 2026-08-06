@@ -1,0 +1,22 @@
+{
+  "deployment": "cloud",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/3/jql/parse",
+        "query": "validation=strict",
+        "body": "{\"queries\":[\"project = ENG AND status = Open\"]}"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"queries\":[{\"query\":\"project = ENG AND status = Open\",\"structure\":{\"where\":{\"clauses\":[]}}}]}"
+      }
+    }
+  ]
+}
