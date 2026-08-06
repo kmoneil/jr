@@ -36,21 +36,33 @@ The split is per content shape rather than one format everywhere, and that was
 settled by measuring rather than by taste. `issue list --limit 100`, rendered
 from the same document in each format:
 
-| Format | Bytes  | Tokens | vs TSV  | Tokens/row |
-| ------ | ------ | ------ | ------- | ---------- |
-| `tsv`  | 7,977  | 2,930  | 1.00x   | 29.3       |
-| `xml`  | 35,030 | 12,755 | 4.35x   | 127.5      |
-| `json` | 45,088 | 15,959 | 5.45x   | 159.6      |
-| `yaml` | 33,085 | 12,866 | 4.39x   | 128.7      |
+| Format | Bytes  | Tokens (proxy) | vs TSV  | Tokens/row |
+| ------ | ------ | -------------- | ------- | ---------- |
+| `tsv`  | 7,977  | 2,930          | 1.00x   | 29.3       |
+| `xml`  | 35,030 | 12,755         | 4.35x   | 127.5      |
+| `json` | 45,088 | 15,959         | 5.45x   | 159.6      |
+| `yaml` | 33,085 | 12,866         | 4.39x   | 128.7      |
 
 The same document as a single record, `issue get`:
 
-| Format | Bytes | Tokens | vs TSV |
-| ------ | ----- | ------ | ------ |
-| `tsv`  | 592   | 218    | 1.00x  |
-| `xml`  | 791   | 264    | 1.21x  |
-| `json` | 842   | 295    | 1.35x  |
-| `yaml` | 683   | 241    | 1.11x  |
+| Format | Bytes | Tokens (proxy) | vs TSV |
+| ------ | ----- | -------------- | ------ |
+| `tsv`  | 592   | 218            | 1.00x  |
+| `xml`  | 791   | 264            | 1.21x  |
+| `json` | 842   | 295            | 1.35x  |
+| `yaml` | 683   | 241            | 1.11x  |
+
+**The token columns are a proxy and are labelled as one.** They were counted
+with `cl100k_base`, which is OpenAI's tokenizer, not the one any Claude model
+uses — it undercounts Claude by roughly 15-20% on prose and by more on
+structured text, which is exactly the shape being measured here. The bytes are
+exact, and they put the structured formats at 4.15-5.65x TSV against the
+proxy's 4.35-5.45x — the same band and the same conclusion, reached
+independently. They do not agree on the figure, and they disagree on whether
+XML or YAML is the cheaper of the two. So the *decision* stands on the bytes;
+the token columns are corroboration, and neither is a Claude token count. Run
+`make cost` with credentials to replace them with one — it counts through
+Anthropic's own `count_tokens` endpoint.
 
 A hundred rows is where framing compounds: a structured format spells every
 field name once per row, and TSV spells it once for the whole result. That is
@@ -88,12 +100,15 @@ travel is the garbage: YAML allocates 22x the payload to read it, and 14,831
 allocations per page is a number that shows up in a run that pages a hundred
 times, or on a runtime with a small heap.
 
-Measured 2026-08-06, tokens with `cl100k_base`, against a payload built from the
-summaries Jira Cloud actually returned for the sandbox's sample project.
-`o200k_base` differs by under 1% on every token row above, which is the useful
-part: the ratio is a property of the framing, not of whose vocabulary is
-counting. Parse figures are a Go benchmark on one machine, so their ratios
-carry and their absolute times do not. Reproduce both with `make cost`.
+Measured 2026-08-06 against a payload built from the summaries Jira Cloud
+actually returned for the sandbox's sample project. `o200k_base` differs from
+`cl100k_base` by under 1% on every token row above, and the byte ratios land in
+the same band again — three counts of the same thing, agreeing on the shape.
+That is the useful part: the ratio is a property of the framing rather than of
+whose vocabulary is counting, which is also why a proxy tokenizer was enough to
+decide §12.2 and is not enough to publish a number. Parse figures are a Go
+benchmark on one machine, so their ratios carry and their absolute times do
+not. Reproduce all of it with `make cost`.
 
 Neither table is the enforced part. `TestFormatCostFavoursTSVForCollections`
 asserts the ratio the default rests on, with no tokenizer and no network, so a

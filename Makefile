@@ -104,18 +104,36 @@ test-profiles:
 		go test -tags "$$tags" ./...; \
 	done
 
-## cost: measure what each output format costs, in tokens
+## cost: measure what each output format costs, in tokens and in latency
 #
-# Deliberately not part of `make ci`. It fetches a tokenizer, and nothing in
-# the test suite is allowed to touch the network. The relationship the default
-# rests on is asserted by TestFormatCostFavoursTSVForCollections, which needs
-# neither; this prints the number behind it.
+# Deliberately not part of `make ci`. It calls the Anthropic API — count_tokens
+# for the real Claude token counts, and a streamed request per format for
+# time-to-first-token — and nothing in the test suite is allowed to touch the
+# network. The relationship the default rests on is asserted by
+# TestFormatCostFavoursTSVForCollections, which needs neither a key nor a
+# network; this prints the numbers behind it.
+#
+# Needs ANTHROPIC_API_KEY, or a profile from `ant auth login`. Note an *empty*
+# ANTHROPIC_API_KEY still wins the credential race and shadows a profile — the
+# check below treats empty as unset for that reason.
+#
+# COST_ARGS passes flags through:
+#   make cost COST_ARGS=--skip-latency   # token counts only; nothing billed
+#   make cost COST_ARGS="--reps 9"       # more latency samples
+COST_ARGS ?=
 .PHONY: cost
 cost:
 	@command -v uv >/dev/null || { \
 		echo "uv is not installed: https://docs.astral.sh/uv/getting-started/"; \
 		exit 1; }
-	@uv run scripts/format-cost.py
+	@if [ -z "$$ANTHROPIC_API_KEY" ]; then \
+		echo "ANTHROPIC_API_KEY is unset or empty."; \
+		echo "Export a key, or run \`ant auth login\` and re-run with"; \
+		echo "  env -u ANTHROPIC_API_KEY make cost"; \
+		echo "so the empty variable does not shadow the profile."; \
+		exit 1; \
+	fi
+	@uv run scripts/format-cost.py $(COST_ARGS)
 
 ## cover: run tests with a coverage profile
 .PHONY: cover
