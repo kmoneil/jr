@@ -1,6 +1,10 @@
 package transport_test
 
 import (
+	"bytes"
+	"encoding/base64"
+	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -161,5 +165,121 @@ func TestAReservedHostIsNotResidue(t *testing.T) {
 		if strings.HasPrefix(r, "host ") {
 			t.Errorf("a reserved host was reported as residue: %s", r)
 		}
+	}
+}
+
+// TestAnIdentifierInsideABase64TokenIsScrubbed is the third instance of one
+// bug, and the reason the scrubber now decodes.
+//
+// A Cloud page token is a base64 protobuf carrying the JQL that produced it, so
+// the project key a caller searched for rides inside every one. A literal
+// replacement cannot see it and neither could the residue guard, which is how a
+// real key reached a recording that both halves called clean. The first two
+// instances were a percent-encoded colon and a bare UUID; the shared shape is
+// an encoding standing between the guard and the identifier.
+func TestAnIdentifierInsideABase64TokenIsScrubbed(t *testing.T) {
+	// A real token, as recorded, with the real project key inside it.
+	const token = "EAIY9N3uwP0zIidwcm9qZWN0ID0gIlNBTTEiIE9SREVSIEJZIGlzc3Vla2V5IERFU0Mq" +
+		"AltdMiBURU5BTlRfTk9UX0ZPVU5EX0lOX1RFTkFOVF9TVE9SRQ=="
+
+	c := recorded(`{"nextPageToken":"` + token + `"}`)
+	c.Interactions[0].Request.Query = "nextPageToken=" + token
+
+	// The premise: the key is genuinely invisible to a text scan beforehand.
+	if strings.Contains(token, "SAM1") {
+		t.Fatal("the premise is gone: the key is visible in the token as text, " +
+			"so this no longer proves anything about decoding")
+	}
+
+	transport.Scrubber{Replace: map[string]string{"SAM1": "OPS"}}.Scrub(c)
+
+	for _, where := range []string{
+		c.Interactions[0].Response.Body, c.Interactions[0].Request.Query,
+	} {
+		for _, run := range regexp.MustCompile(`[A-Za-z0-9+/_-]{24,}={0,2}`).FindAllString(where, -1) {
+			decoded, _ := base64.StdEncoding.DecodeString(run + strings.Repeat("=", (4-len(run)%4)%4))
+			if bytes.Contains(decoded, []byte("SAM1")) {
+				t.Errorf("the key survived inside the token: %q", decoded)
+			}
+			if bytes.Contains(decoded, []byte("OPS")) {
+				return // rewritten, re-encoded, and still a token.
+			}
+		}
+	}
+	t.Error("the token was not rewritten at all")
+}
+
+// TestEncodedResidueNamesWhatTheTextScanCannotSee gives the guard the same
+// reach. Scrubbing is driven by rules somebody wrote; the guard exists for the
+// case where those rules were incomplete, and it cannot do that job for encoded
+// values unless it decodes too.
+func TestEncodedResidueNamesWhatTheTextScanCannotSee(t *testing.T) {
+	encoded := base64.StdEncoding.EncodeToString(
+		[]byte(`project = "SECRET1" ORDER BY issuekey DESC padding-padding`),
+	)
+
+	c := recorded(`{"nextPageToken":"` + encoded + `"}`)
+	c.Interactions[0].Request.Query = ""
+
+	if len(c.Residue()) > 0 {
+		t.Fatal("the premise is gone: the text scan already sees inside base64")
+	}
+	if got := c.EncodedResidue([]string{"SECRET1"}); len(got) == 0 {
+		t.Error("the guard did not report an identifier hiding inside base64")
+	}
+}
+
+// TestDecodingDoesNotFlagOrdinaryOpaqueValues keeps the decode from making the
+// report noisy. A hash or a random id will often decode without error into
+// bytes that mean nothing, and a guard that reports those is one nobody reads.
+func TestDecodingDoesNotFlagOrdinaryOpaqueValues(t *testing.T) {
+	c := recorded(`{"etag":"a94a8fe5ccb19ba61c4c0873d391e987982fbbd3",
+		"sig":"MEUCIQDx8Zq2vK3nR7tYwLpHcVfGjNbXsAoQeTyUiPkLmNhGdw"}`)
+	c.Interactions[0].Request.Query = ""
+
+	if got := c.EncodedResidue([]string{"SAM1", "KAN"}); len(got) > 0 {
+		t.Errorf("ordinary opaque values were reported: %v", got)
+	}
+}
+
+// TestAPageTokenStillPairsAfterScrubbing is the invariant that re-encoding put
+// at risk, and it is the one that decides whether a paged recording replays.
+//
+// A token appears twice: plain in the response that issued it, percent-escaped
+// in the query of the request that spends it. The replayer matches a request by
+// its query, so the two copies have to come out of the scrub still describing
+// the same token. The first version matched only unescaped characters, which
+// stopped the run before its `%3D%3D` padding and rewrote the two copies to
+// different strings — a paged fixture that replayed fine until page two.
+func TestAPageTokenStillPairsAfterScrubbing(t *testing.T) {
+	const token = "EAIY9N3uwP0zIidwcm9qZWN0ID0gIlNBTTEiIE9SREVSIEJZIGlzc3Vla2V5IERFU0Mq" +
+		"AltdMiBURU5BTlRfTk9UX0ZPVU5EX0lOX1RFTkFOVF9TVE9SRQ=="
+
+	c := recorded(`{"nextPageToken":"` + token + `"}`)
+	// Exactly how the next request carries it: escaped, padding and all.
+	c.Interactions[0].Request.Query = "maxResults=2&nextPageToken=" + url.QueryEscape(token)
+
+	transport.Scrubber{Replace: map[string]string{"SAM1": "OPS"}}.Scrub(c)
+
+	issued := regexp.MustCompile(`"nextPageToken":"([^"]*)"`).
+		FindStringSubmatch(c.Interactions[0].Response.Body)
+	spent := regexp.MustCompile(`nextPageToken=(.*)$`).
+		FindStringSubmatch(c.Interactions[0].Request.Query)
+	if issued == nil || spent == nil {
+		t.Fatal("the scrub destroyed the token fields entirely")
+	}
+
+	unescaped, err := url.QueryUnescape(spent[1])
+	if err != nil {
+		t.Fatalf("the query is no longer decodable: %v", err)
+	}
+	if unescaped != issued[1] {
+		t.Errorf("the two copies diverged, so page two would never match:\n"+
+			" issued: %q\n  spent: %q", issued[1], unescaped)
+	}
+
+	// And it is still a token, not a mangled string.
+	if _, err := base64.StdEncoding.DecodeString(issued[1]); err != nil {
+		t.Errorf("the rewritten token is not valid base64: %v", err)
 	}
 }

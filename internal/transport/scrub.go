@@ -1,7 +1,10 @@
 package transport
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -95,7 +98,9 @@ func (s Scrubber) text(in string) string {
 	for _, rule := range s.Patterns {
 		out = rule.Match.ReplaceAllString(out, rule.With)
 	}
-	return out
+	// Last, because it re-encodes: anything the plain rules were going to
+	// rewrite has already been rewritten in the visible text.
+	return s.scrubEncoded(out)
 }
 
 // longestFirst orders the literals so a longer one is applied before any
@@ -237,4 +242,143 @@ func PrettyBody(body string) string {
 		return body
 	}
 	return string(out)
+}
+
+// base64Run matches a token long enough to be worth decoding, in either
+// alphabet, and *including* any percent-encoding around it.
+//
+// The percent-encoding is not an embellishment. The same page token appears
+// twice in a recording — once in a response body as plain base64, once in the
+// next request's query where `+`, `/`, and `=` are escaped. Matching only the
+// unescaped characters stopped the run before its `%3D%3D` padding, so the two
+// copies were re-encoded to different strings and the replayer, which matches a
+// request by its query, could no longer pair them.
+var base64Run = regexp.MustCompile(
+	`(?:[A-Za-z0-9+/_-]|%2[BbFf]){24,}(?:=|%3[Dd]){0,2}`,
+)
+
+// percentEscaped reports whether a matched run was written in escaped form, and
+// therefore has to be written back that way.
+var percentEscaped = regexp.MustCompile(`%(?:2[BbFf]|3[Dd])`)
+
+// decodeBase64 returns the decoded bytes of a run that is base64 and carries
+// readable content, and reports whether it was one.
+//
+// "Readable" is the test that matters. A hex id or a random string will often
+// decode without error into bytes that mean nothing, and treating those as text
+// would produce noise in every recording. A Jira page token decodes to a
+// protobuf with the JQL sitting in it as plain ASCII, which is exactly the case
+// worth catching.
+func decodeBase64(run string) ([]byte, bool) {
+	for _, enc := range []*base64.Encoding{
+		base64.StdEncoding, base64.RawStdEncoding,
+		base64.URLEncoding, base64.RawURLEncoding,
+	} {
+		out, err := enc.DecodeString(run)
+		if err != nil || len(out) == 0 {
+			continue
+		}
+		if printableRun(out) >= 8 {
+			return out, true
+		}
+	}
+	return nil, false
+}
+
+// printableRun returns the length of the longest run of printable ASCII.
+func printableRun(b []byte) int {
+	best, run := 0, 0
+	for _, c := range b {
+		if c >= 0x20 && c < 0x7f {
+			run++
+			if run > best {
+				best = run
+			}
+		} else {
+			run = 0
+		}
+	}
+	return best
+}
+
+// scrubEncoded rewrites identifiers hidden inside base64.
+//
+// A Cloud page token is a protobuf carrying the JQL that produced it, so the
+// project key a caller searched for is inside every one — invisible to a text
+// replacement and to a guard that scans text. This decodes each run, applies
+// the literal rules, and re-encodes only when something changed.
+//
+// Re-encoding produces a token no server would accept, which does not matter:
+// inside a fixture a token only has to match the one recorded beside it, and
+// the replayer compares it as an opaque string.
+func (s Scrubber) scrubEncoded(in string) string {
+	return base64Run.ReplaceAllStringFunc(in, func(run string) string {
+		escaped := percentEscaped.MatchString(run)
+
+		unescaped := run
+		if escaped {
+			u, err := url.QueryUnescape(run)
+			if err != nil {
+				return run
+			}
+			unescaped = u
+		}
+
+		decoded, ok := decodeBase64(unescaped)
+		if !ok {
+			return run
+		}
+		rewritten := decoded
+		for _, from := range longestFirst(s.Replace) {
+			rewritten = bytes.ReplaceAll(rewritten, []byte(from), []byte(s.Replace[from]))
+		}
+		if bytes.Equal(rewritten, decoded) {
+			return run
+		}
+
+		// Re-encoded, then escaped again if that is how it was found. A
+		// replacement changes the payload length, so the padding is whatever the
+		// new bytes need rather than whatever was there before.
+		out := base64.StdEncoding.EncodeToString(rewritten)
+		if escaped {
+			out = url.QueryEscape(out)
+		}
+		return out
+	})
+}
+
+// EncodedResidue reports identifiers hiding inside base64 in a cassette.
+//
+// It is separate from Residue for the same reason the residue patterns are
+// separate from the scrubber's: this looks for a thing the other one cannot
+// see, and folding them together would let one blind spot cover both.
+func (c *Cassette) EncodedResidue(suspect []string) []string {
+	var out []string
+	seen := map[string]bool{}
+
+	for _, in := range c.Interactions {
+		for _, text := range []string{
+			in.Request.Path, in.Request.Query, in.Request.Body, in.Response.Body,
+		} {
+			for _, run := range base64Run.FindAllString(text, -1) {
+				if u, err := url.QueryUnescape(run); err == nil {
+					run = u
+				}
+				decoded, ok := decodeBase64(run)
+				if !ok {
+					continue
+				}
+				for _, want := range suspect {
+					if want == "" || !bytes.Contains(decoded, []byte(want)) {
+						continue
+					}
+					if !seen[want] {
+						seen[want] = true
+						out = append(out, "encoded "+want)
+					}
+				}
+			}
+		}
+	}
+	return out
 }

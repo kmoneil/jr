@@ -62,10 +62,18 @@ func (a *app) recorder(siteURL string) (*transport.Recorder, func()) {
 			return
 		}
 
+		// Everything the caller asked to rename is, by their own account, an
+		// identifier — so it is also exactly what to hunt for inside an encoded
+		// value, where neither the replacement nor the text scan can reach. A
+		// Cloud page token is a base64 protobuf holding the JQL that produced
+		// it, and a project key rode out inside one before this existed.
+		residue := cassette.Residue()
+		residue = append(residue, cassette.EncodedResidue(a.scrubTargets())...)
+
 		// Reported rather than refused. These are shapes that *carry* identity,
 		// not proof of a leak — a summary can legitimately contain an address —
 		// and a recording nobody looks at is the failure this guards against.
-		if residue := cassette.Residue(); len(residue) > 0 {
+		if len(residue) > 0 {
 			warnf(a, "%s still names %d identifier(s); read it before committing:",
 				path, len(residue))
 			for _, r := range residue {
@@ -104,6 +112,21 @@ func (a *app) scrubber(siteURL string) transport.Scrubber {
 			{Match: transport.EmailAddress, With: "ada@example.invalid"},
 		},
 	}
+}
+
+// scrubTargets lists the literals the caller named, which are the values worth
+// looking for inside an encoded field. The host is deliberately not among them:
+// it appears in a self link in every response and would report on every
+// recording, and a report that always fires is one nobody reads.
+func (a *app) scrubTargets() []string {
+	var out []string
+	for _, pair := range strings.Split(a.getenv(EnvRecordScrub), ",") {
+		from, _, ok := strings.Cut(strings.TrimSpace(pair), "=")
+		if from = strings.TrimSpace(from); ok && from != "" {
+			out = append(out, from)
+		}
+	}
+	return out
 }
 
 // hostOnly reduces a site URL to its host, which is the form that appears
