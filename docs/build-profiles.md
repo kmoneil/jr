@@ -11,16 +11,23 @@ converts a class of runtime bugs into link errors.
 
 ## Tags
 
-| Tag         | Includes                                                | Pulls in                |
-| ----------- | ------------------------------------------------------- | ----------------------- |
-| `tui`       | `jr ui`, interactive tables                             | `tview`, `tcell`        |
-| `prompt`    | Interactive prompts, the setup wizard, shell completion | `survey`                |
-| `render`    | ADF→terminal markdown rendering                         | `glamour`, `chroma`     |
-| `browser`   | `jr open`, the OAuth browser flow                       | `pkg/browser`           |
-| `clipboard` | Copying keys and URLs                                   | `xclip`/`xsel` shellout |
-| `mcp`       | `jr mcp serve`                                          | MCP SDK                 |
-| `write`     | All mutating commands                                   | `issue create/edit/move` |
-| `admin`     | Project, board, and sprint administration               | —                       |
+| Tag         | Intends to gate                                         | Gates today                    |
+| ----------- | ------------------------------------------------------- | ------------------------------ |
+| `write`     | All mutating commands                                   | the seven `issue` write verbs  |
+| `mcp`       | `jr mcp serve`                                          | `jr mcp serve`                 |
+| `prompt`    | Interactive prompts, the setup wizard, completion       | `jr completion`                |
+| `tui`       | `jr ui`, interactive tables                             | **nothing** — no `jr ui` yet   |
+| `render`    | ADF→terminal markdown rendering                         | **nothing** — `adf` is a stub  |
+| `browser`   | `jr open`, the OAuth browser flow                       | **nothing** — no OAuth yet     |
+| `clipboard` | Copying keys and URLs                                   | **nothing** — nothing copies   |
+| `admin`     | Project, board, and sprint administration               | **nothing** — no such commands |
+
+The right-hand column is not documentation that can drift.
+`internal/lint/tags_test.go` asserts it: a tag gating nothing must be listed in
+`notYetGating` with a reason, and a tag that starts gating something fails the
+test until it is taken off that list. A file that only records the tag is set,
+or a package that is nothing but a doc comment, does not count as gating — that
+would report exactly the reassurance the audit exists to withhold.
 
 The list lives in `internal/buildinfo.KnownTags`, with one `tag_<name>.go` file
 per tag. A tag enabled without an entry there fails
@@ -43,8 +50,25 @@ make build-all     # all four
 | `reader` | **Physically cannot mutate Jira.** The mutating commands are not in the binary.        |
 | `ci`     | Query only, smallest possible.                                                         |
 
-`make size` asserts the reader build stays under 12 MB and is the gate that
-keeps a terminal, display-server, or `os/exec` dependency from creeping in.
+`make size` asserts the reader build stays under 12 MB. It guards against a
+terminal, display-server, or `os/exec` dependency creeping in — it is **not** a
+measure of what a profile excludes, and it should not be read as one.
+
+Binary size is a poor proxy for compile-out. `full` and `agent` are currently
+the same number of bytes despite differing by a command, because the excluded
+code is smaller than the linker's section alignment absorbs. The guarantee that
+matters is the command surface, and that does differ:
+
+| Profile  | Commands | Not present                              |
+| -------- | -------- | ---------------------------------------- |
+| `full`   | 26       | —                                        |
+| `agent`  | 25       | `completion`                             |
+| `reader` | 18       | `completion`, the seven write verbs      |
+| `ci`     | 17       | the above, plus `mcp serve`              |
+
+`make test-profiles` runs the whole suite under every shipped tag set, and the
+contract tests inside it assert the surface directly: no mutating command
+survives in a build without `write`.
 
 ## Enforcement
 
