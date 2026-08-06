@@ -64,13 +64,43 @@ columns; `created`, the issue id, the status category, the assignee's account
 id and the labels are in the XML for every row and in the TSV for none of them.
 `--format xml` is how you get them, and it is one flag.
 
-Measured 2026-08-06 with `cl100k_base`, against a payload built from the
+### What the defaults cost the parser
+
+Tokens are what a payload costs the model that reads it. The other consumer is
+the process that reads it, which pays on every invocation whether or not a model
+is involved. The same hundred issues, decoded into typed structs:
+
+| Format | Time    | vs TSV | Throughput | Allocated | Allocations |
+| ------ | ------- | ------ | ---------- | --------- | ----------- |
+| `tsv`  | 13.7us  | 1.0x   | 583 MB/s   | 17.6 KB   | 102         |
+| `xml`  | 777us   | 56.8x  | 45 MB/s    | 337.0 KB  | 9,257       |
+| `json` | 325us   | 23.7x  | 139 MB/s   | 58.4 KB   | 853         |
+| `yaml` | 1,602us | 117.0x | 21 MB/s    | 741.5 KB  | 14,831      |
+
+The parse spread is an order of magnitude wider than the token spread — 4.35x
+becomes 56.8x — because a token count scales with the bytes and a parser scales
+with the structure. TSV is two splits and an unescape; XML is a state machine
+and an allocation per element.
+
+**Read that as a shape, not as a bill.** All four are dominated by one HTTP
+round trip, so no caller should pick a format for this reason alone. What does
+travel is the garbage: YAML allocates 22x the payload to read it, and 14,831
+allocations per page is a number that shows up in a run that pages a hundred
+times, or on a runtime with a small heap.
+
+Measured 2026-08-06, tokens with `cl100k_base`, against a payload built from the
 summaries Jira Cloud actually returned for the sandbox's sample project.
-`o200k_base` differs by under 1% on every row above, which is the useful part:
-the ratio is a property of the framing, not of whose vocabulary is counting.
-Reproduce with `make cost`. The relationship the default rests on is asserted
-by `TestFormatCostFavoursTSVForCollections`, which needs no tokenizer and no
-network.
+`o200k_base` differs by under 1% on every token row above, which is the useful
+part: the ratio is a property of the framing, not of whose vocabulary is
+counting. Parse figures are a Go benchmark on one machine, so their ratios
+carry and their absolute times do not. Reproduce both with `make cost`.
+
+Neither table is the enforced part. `TestFormatCostFavoursTSVForCollections`
+asserts the ratio the default rests on, with no tokenizer and no network, so a
+writer change cannot erode the premise quietly.
+`TestEveryFormatParsesBackToTheSameRows` decodes each format and holds it to the
+values it must recover — the only place in this repository that reads `jr`
+output back rather than writing it.
 
 ## Envelope
 

@@ -15,10 +15,11 @@ import (
 const module = "github.com/kmoneil/jira-cli"
 
 type pkg struct {
-	ImportPath  string
-	Imports     []string
-	TestImports []string
-	Deps        []string
+	ImportPath   string
+	Imports      []string
+	TestImports  []string
+	XTestImports []string
+	Deps         []string
 }
 
 // loadPackages asks the go tool for the real import graph rather than parsing
@@ -170,20 +171,68 @@ func TestFoundationPackagesStayLeaves(t *testing.T) {
 	}
 }
 
+// encoders are the packages that turn values into one of this tool's output
+// formats. Importing one outside render is how a second writer of the contract
+// gets built by accident.
+var encoders = []string{"encoding/xml", "gopkg.in/yaml.v3", "encoding/csv"}
+
+// decodeExceptions are the packages whose *tests* may import an encoder, and
+// why. Reading `jr` output back is not writing it, and a test that decodes what
+// the tool emitted is the only thing in the repository that checks the contract
+// from a consumer's side.
+//
+// The list exists because the check could not see test imports at all: `go
+// list` keeps them out of Imports, so any package could have imported yaml.v3
+// from a _test.go file and nothing would have said so. Recording the exception
+// is the point — a gap nobody wrote down is one nobody is deciding about.
+var decodeExceptions = map[string]string{
+	"internal/resource/issue": "BenchmarkParseCost and TestEveryFormatParsesBackToTheSameRows " +
+		"decode a rendered payload the way a consumer would",
+}
+
 // TestRenderIsTheOnlyWriterOfOutput asserts no package outside render decides
 // what the output looks like. The output contract is a public API, and it stays
 // reviewable only while it lives in one place.
 func TestRenderIsTheOnlyWriterOfOutput(t *testing.T) {
+	used := map[string]bool{}
+
 	for _, p := range loadPackages(t) {
 		self := short(p.ImportPath)
 		if self == "internal/render" || strings.HasPrefix(self, "cmd/") {
 			continue
 		}
 		for _, imp := range p.Imports {
-			switch imp {
-			case "encoding/xml", "gopkg.in/yaml.v3", "encoding/csv":
+			if slices.Contains(encoders, imp) {
 				t.Errorf("%s imports %s; only internal/render encodes output", self, imp)
 			}
+		}
+		// Test imports are held to the same rule, with a recorded exception
+		// list. Nothing in a test needs to *write* one of these formats — the
+		// goldens come from render — so an unlisted one is the same defect
+		// arriving through the back door.
+		for _, imp := range slices.Concat(p.TestImports, p.XTestImports) {
+			if !slices.Contains(encoders, imp) {
+				continue
+			}
+			why, allowed := decodeExceptions[self]
+			if !allowed {
+				t.Errorf("%s imports %s from a test; only internal/render encodes "+
+					"output. If the test decodes rather than encodes, add it to "+
+					"decodeExceptions with the reason", self, imp)
+				continue
+			}
+			used[self] = true
+			if why == "" {
+				t.Errorf("%s is in decodeExceptions with no reason", self)
+			}
+		}
+	}
+
+	// An exception nobody needs any more is a permission still standing.
+	for self := range decodeExceptions {
+		if !used[self] {
+			t.Errorf("decodeExceptions lists %s, whose tests no longer import an "+
+				"encoder; remove it", self)
 		}
 	}
 }
