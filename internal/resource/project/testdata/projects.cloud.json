@@ -5,7 +5,7 @@
       "request": {
         "method": "GET",
         "path": "/rest/api/3/project/search",
-        "query": "maxResults=50&orderBy=key&startAt=0"
+        "query": "expand=lead&maxResults=50&orderBy=key&startAt=0"
       },
       "response": {
         "status": 200,
@@ -21,7 +21,7 @@
       "request": {
         "method": "GET",
         "path": "/rest/api/3/project/search",
-        "query": "maxResults=50&orderBy=key&startAt=2"
+        "query": "expand=lead&maxResults=50&orderBy=key&startAt=2"
       },
       "response": {
         "status": 200,

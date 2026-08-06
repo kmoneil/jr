@@ -267,6 +267,11 @@ func (c *Client) listCloud(ctx context.Context) ([]Project, error) {
 				"startAt":    {strconv.Itoa(startAt)},
 				"maxResults": {"50"},
 				"orderBy":    {"key"},
+				// The lead is omitted unless expanded, on both deployments, and
+				// the default column set has a lead in it. Data Center reported
+				// forty projects with no lead, which was forty projects whose
+				// lead nobody had asked for.
+				"expand": {"lead"},
 			},
 		})
 		if err != nil {
@@ -305,6 +310,10 @@ func (c *Client) listDataCenter(ctx context.Context) ([]Project, error) {
 
 	resp, err := c.Transport.Do(ctx, transport.Request{
 		Method: transport.MethodGet, Path: path,
+		// The lead is omitted unless expanded, and the default column set has a
+		// lead in it. Forty projects reporting no lead is not forty projects
+		// without one.
+		Query: url.Values{"expand": {"lead"}},
 	})
 	if err != nil {
 		return nil, err

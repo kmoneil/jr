@@ -4,7 +4,8 @@
     {
       "request": {
         "method": "GET",
-        "path": "/rest/api/2/project"
+        "path": "/rest/api/2/project",
+        "query": "expand=lead"
       },
       "response": {
         "status": 200,
