@@ -30,6 +30,48 @@ command. The defaults are a convenience; `--format` is the contract.
 `JIRA_FORMAT` sets the default globally; `--format` overrides it. An
 unrecognized value is exit 2 listing the valid ones, never a silent fallback.
 
+### What the defaults cost
+
+The split is per content shape rather than one format everywhere, and that was
+settled by measuring rather than by taste. `issue list --limit 100`, rendered
+from the same document in each format:
+
+| Format | Bytes  | Tokens | vs TSV  | Tokens/row |
+| ------ | ------ | ------ | ------- | ---------- |
+| `tsv`  | 7,977  | 2,930  | 1.00x   | 29.3       |
+| `xml`  | 35,030 | 12,755 | 4.35x   | 127.5      |
+| `json` | 45,088 | 15,959 | 5.45x   | 159.6      |
+| `yaml` | 33,085 | 12,866 | 4.39x   | 128.7      |
+
+The same document as a single record, `issue get`:
+
+| Format | Bytes | Tokens | vs TSV |
+| ------ | ----- | ------ | ------ |
+| `tsv`  | 592   | 218    | 1.00x  |
+| `xml`  | 791   | 264    | 1.21x  |
+| `json` | 842   | 295    | 1.35x  |
+| `yaml` | 683   | 241    | 1.11x  |
+
+A hundred rows is where framing compounds: a structured format spells every
+field name once per row, and TSV spells it once for the whole result. That is
+9,825 tokens saved per hundred issues against XML, or 77%. One record has one
+of everything, so the multiple collapses to 1.21x — and what is left is that a
+record carries nested and mixed content a rectangular format has nowhere to
+put. The defaults follow the shape because the saving does.
+
+**The saving is on five columns, not on the issue.** TSV emits the declared
+columns; `created`, the issue id, the status category, the assignee's account
+id and the labels are in the XML for every row and in the TSV for none of them.
+`--format xml` is how you get them, and it is one flag.
+
+Measured 2026-08-06 with `cl100k_base`, against a payload built from the
+summaries Jira Cloud actually returned for the sandbox's sample project.
+`o200k_base` differs by under 1% on every row above, which is the useful part:
+the ratio is a property of the framing, not of whose vocabulary is counting.
+Reproduce with `make cost`. The relationship the default rests on is asserted
+by `TestFormatCostFavoursTSVForCollections`, which needs no tokenizer and no
+network.
+
 ## Envelope
 
 Every successful XML response:

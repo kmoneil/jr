@@ -407,6 +407,7 @@ make test           # the default build
 make test-profiles  # the suite under every shipped tag set
 make fuzz           # every fuzz target, FUZZTIME each (default 30s)
 make golden         # rewrite the output-contract golden files
+make cost           # what each format costs, in tokens (needs uv, and network)
 make lint fmt vet
 make ci             # everything CI enforces
 ```
@@ -420,11 +421,18 @@ on rather than quietly rewrite.
 
 ## Open questions
 
-Carried from the spec, still undecided:
+Carried from the spec:
 
-1. **TSV vs XML default for lists.** TSV wins on token cost; consistency across
-   commands may be worth the tokens. Decide by measuring a real 100-issue
-   payload.
+1. ~~**TSV vs XML default for lists.**~~ **Decided: TSV stays.** A hundred
+   issues cost 2,930 tokens as TSV and 12,755 as XML — 4.35x, or 9,825 tokens
+   saved per page. The same document as a single record is 1.21x, because one
+   record has one of everything and the framing has nothing to compound over.
+   That is why the default follows content shape instead of being one format
+   everywhere. Numbers and method in
+   [docs/output-contract.md](docs/output-contract.md#what-the-defaults-cost);
+   reproduce with `make cost`.
 2. **Whether `pkg/jira` is a supported public library** or an internal detail.
-3. **Write-side ADF.** Leaning toward a documented subset with loud rejection of
-   the rest — loud rejection beats silent mangling.
+   Still open; the import lint keeps it CLI-free either way.
+3. ~~**Write-side ADF.**~~ **Decided and shipped:** a documented subset with
+   loud rejection of the rest, via `--body-format text|markdown|adf`. Loud
+   rejection beat silent mangling.

@@ -104,6 +104,19 @@ test-profiles:
 		go test -tags "$$tags" ./...; \
 	done
 
+## cost: measure what each output format costs, in tokens
+#
+# Deliberately not part of `make ci`. It fetches a tokenizer, and nothing in
+# the test suite is allowed to touch the network. The relationship the default
+# rests on is asserted by TestFormatCostFavoursTSVForCollections, which needs
+# neither; this prints the number behind it.
+.PHONY: cost
+cost:
+	@command -v uv >/dev/null || { \
+		echo "uv is not installed: https://docs.astral.sh/uv/getting-started/"; \
+		exit 1; }
+	@uv run scripts/format-cost.py
+
 ## cover: run tests with a coverage profile
 .PHONY: cover
 cover:
