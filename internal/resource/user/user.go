@@ -7,9 +7,7 @@ package user
 
 import (
 	"context"
-	"encoding/json"
-	"net/url"
-	"sort"
+	"errors"
 	"strconv"
 	"strings"
 
@@ -74,49 +72,17 @@ type Client struct {
 }
 
 // User is one account, in the shape this tool reports.
-type User struct {
-	// ID is an accountId on Cloud and a username on Data Center. The two are
-	// not interchangeable, and this is the value every other command wants
-	// when it asks for a user.
-	ID      string
-	Display string
-	// Email is often absent on Cloud, where it is a privacy setting rather than
-	// a missing value. An empty string here means "not disclosed", which is not
-	// the same as "has none" — nothing infers one from the other.
-	Email  string
-	Active bool
-	// Kind distinguishes a person from an application or a customer account,
-	// where the server says. Assigning an issue to an app account is a mistake
-	// worth being able to see before making.
-	Kind string
-}
+//
+// It is site.User because `--assignee` has to resolve a name to the same value
+// this command reports, and two definitions of what a user is would be two
+// answers to that. The deployment split — accountId against username, `query`
+// against `username` — lives in internal/site with it.
+type User = site.User
 
-type rawUser struct {
-	AccountID   string `json:"accountId"`
-	AccountType string `json:"accountType"`
-	Name        string `json:"name"`
-	Key         string `json:"key"`
-	DisplayName string `json:"displayName"`
-	Email       string `json:"emailAddress"`
-	Active      bool   `json:"active"`
-}
-
-func (r rawUser) convert() User {
-	id := r.AccountID
-	if id == "" {
-		id = r.Name
-	}
-	if id == "" {
-		id = r.Key
-	}
-	return User{
-		ID: id, Display: r.DisplayName, Email: r.Email,
-		Active: r.Active, Kind: r.AccountType,
-	}
-}
-
-// Node renders one user.
-func (u User) Node() *render.Node {
+// Node renders one user. It is a function rather than a method because User
+// is site's type: how a user is reported is this resource's business, and
+// what a user is is not.
+func Node(u User) *render.Node {
 	return render.El("user").
 		Attr("id", u.ID).
 		Attr("active", strconv.FormatBool(u.Active)).
@@ -181,52 +147,8 @@ is not the same on both deployments.`),
 }
 
 // Search finds users matching a query.
-//
-// The parameter name differs by deployment: Cloud takes `query` and matches
-// display name and email, Data Center takes `username` and matches rather more
-// loosely. Sending the wrong one is not an error — it is an empty result, which
-// is why the split is here rather than left to a caller.
 func (c *Client) Search(ctx context.Context, query string, limit int) ([]User, error) {
-	param := "username"
-	if c.Site.Kind == site.Cloud {
-		param = "query"
-	}
-	path := c.Site.APIBase() + "/user/search"
-
-	resp, err := c.Transport.Do(ctx, transport.Request{
-		Method: transport.MethodGet,
-		Path:   path,
-		Query: url.Values{
-			param:        {query},
-			"maxResults": {strconv.Itoa(limit)},
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-	if err := transport.Err(resp); err != nil {
-		return nil, err
-	}
-
-	var raw []rawUser
-	if err := json.Unmarshal(resp.Body, &raw); err != nil {
-		return nil, errs.Remote("MALFORMED_USERS",
-			"%s did not return usable users", path).
-			WithRequestID(resp.RequestID).Wrap(err)
-	}
-
-	out := make([]User, 0, len(raw))
-	for _, r := range raw {
-		out = append(out, r.convert())
-	}
-	// Ordered so two runs agree; neither endpoint promises one.
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Display != out[j].Display {
-			return out[i].Display < out[j].Display
-		}
-		return out[i].ID < out[j].ID
-	})
-	return out, nil
+	return site.SearchUsers(ctx, c.Transport, c.Site, query, limit)
 }
 
 func runList(
@@ -255,7 +177,7 @@ func runList(
 		complete = false
 	}
 	for _, u := range users {
-		if err := out.Write(u.Node()); err != nil {
+		if err := out.Write(Node(u)); err != nil {
 			return registry.StreamResult{}, err
 		}
 	}
@@ -293,38 +215,18 @@ parameter differs with them, so passing one deployment's id to the other is a
 
 // Get reads one user.
 func (c *Client) Get(ctx context.Context, id string) (User, error) {
-	param := "username"
-	if c.Site.Kind == site.Cloud {
-		param = "accountId"
+	u, err := site.FetchUser(ctx, c.Transport, c.Site, id)
+	if err == nil {
+		return u, nil
 	}
-	path := c.Site.APIBase() + "/user"
-
-	resp, err := c.Transport.Do(ctx, transport.Request{
-		Method: transport.MethodGet,
-		Path:   path,
-		Query:  url.Values{param: {id}},
-	})
-	if err != nil {
-		return User{}, err
+	// The refusal names what a caller has to pass instead, which is the whole
+	// difficulty: the two deployments identify a user differently and the
+	// wrong one is an empty answer rather than an error.
+	if e, ok := errors.AsType[*errs.Error](err); ok && e.Code == "NO_SUCH_USER" {
+		return User{}, e.WithRemedy("Cloud identifies a user by accountId and " +
+			"Data Center by username; `" + buildinfo.App + " user list` reports the right one")
 	}
-	if err := transport.Err(resp); err != nil {
-		return User{}, err
-	}
-
-	var raw rawUser
-	if err := json.Unmarshal(resp.Body, &raw); err != nil {
-		return User{}, errs.Remote("MALFORMED_USER",
-			"%s did not return a usable user", path).
-			WithRequestID(resp.RequestID).Wrap(err)
-	}
-	converted := raw.convert()
-	if converted.ID == "" {
-		return User{}, errs.NotFound("NO_SUCH_USER", "no user %q on this site", id).
-			WithRequestID(resp.RequestID).
-			WithRemedy("Cloud identifies a user by accountId and Data Center by " +
-				"username; `" + buildinfo.App + " user list` reports the right one")
-	}
-	return converted, nil
+	return User{}, err
 }
 
 func runGet(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) {
@@ -336,7 +238,7 @@ func runGet(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) 
 	if err != nil {
 		return nil, err
 	}
-	return render.Record(KindGet, VersionGet, got.Node()), nil
+	return render.Record(KindGet, VersionGet, Node(got)), nil
 }
 
 func meCommand() *registry.Command {
@@ -379,10 +281,10 @@ func runMe(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	return render.Record(KindGet, VersionGet, User{
+	return render.Record(KindGet, VersionGet, Node(User{
 		ID: account.ID, Display: account.Display,
 		Email: account.Email, Active: account.Active,
-	}.Node()), nil
+	})), nil
 }
 
 // clientFor is the opening every command here shares.
@@ -403,7 +305,7 @@ func clientFor(
 func ListDoc(users []User, complete bool) *render.Doc {
 	items := make([]*render.Node, 0, len(users))
 	for _, u := range users {
-		items = append(items, u.Node())
+		items = append(items, Node(u))
 	}
 	return render.List(KindList, VersionList, &render.Collection{
 		Name: "users", Items: items, Complete: complete, Columns: ListColumns(),

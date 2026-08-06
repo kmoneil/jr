@@ -117,7 +117,8 @@ Cloud only: Data Center stores wiki markup, and there is no converter to it.`),
 			},
 			{
 				Name: "assignee", Short: "a", Type: registry.TypeString,
-				Usage: "assignee; the word currentUser resolves to the caller",
+				Usage: "assignee, by display name, email, or id; " +
+					"the word unassigned leaves it unset",
 			},
 			{
 				Name: "parent", Type: registry.TypeString,
@@ -143,7 +144,10 @@ Cloud only: Data Center stores wiki markup, and there is no converter to it.`),
 	}
 }
 
-func validateCreate(_ context.Context, inv *registry.Invocation) error {
+func validateCreate(ctx context.Context, inv *registry.Invocation) error {
+	if err := validateAssignee(ctx, inv, inv.Flags.String("assignee")); err != nil {
+		return err
+	}
 	if key := inv.Flags.String("idempotency-key"); key != "" {
 		if err := idem.ValidateKey(key); err != nil {
 			return err
@@ -296,7 +300,7 @@ func runCreate(ctx context.Context, inv *registry.Invocation) (*render.Doc, erro
 		Description: inv.Flags.String("description"),
 		Priority:    inv.Flags.String("priority"),
 		Labels:      inv.Flags.StringSlice("label"),
-		Assignee:    inv.Flags.String("assignee"),
+		Assignee:    resolvedAssignee(inv, inv.Flags.String("assignee")),
 		Parent:      inv.Flags.String("parent"),
 	})
 	if err != nil {
@@ -484,7 +488,8 @@ the flag leaves it as it was, which is a different thing.
 			},
 			{
 				Name: "assignee", Short: "a", Type: registry.TypeString,
-				Usage: "set the assignee; the word unassigned clears it",
+				Usage: "set the assignee, by display name, email, or id; " +
+					"the word unassigned clears it",
 			},
 			bodyFormatFlag(),
 			dryRunFlag(),
@@ -502,7 +507,10 @@ the flag leaves it as it was, which is a different thing.
 	}
 }
 
-func validateEdit(_ context.Context, inv *registry.Invocation) error {
+func validateEdit(ctx context.Context, inv *registry.Invocation) error {
+	if err := validateAssignee(ctx, inv, inv.Flags.String("assignee")); err != nil {
+		return err
+	}
 	if _, ok := ParseKey(inv.Args[0]); !ok {
 		return errs.Usage("INVALID_KEY", "%q is not an issue key", inv.Args[0]).
 			WithDetail("an issue key looks like ENG-123").
@@ -648,7 +656,7 @@ func runEdit(ctx context.Context, inv *registry.Invocation) (*render.Doc, error)
 		opt.Labels = labels
 	}
 	if assignee := inv.Flags.String("assignee"); assignee != "" {
-		opt.Assignee, opt.SetAssignee = assignee, true
+		opt.Assignee, opt.SetAssignee = resolvedAssignee(inv, assignee), true
 	}
 
 	req, err := client.EditRequest(opt)

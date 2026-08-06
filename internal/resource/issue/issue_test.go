@@ -1444,18 +1444,72 @@ func (s *stubSession) Idempotency() *idem.Ledger { return s.ledger }
 
 // stubDoer answers with a fixed body and counts how often it was asked, which
 // is what the "no extra request" assertions read.
+//
+// byPath overrides body for a request whose path contains the key. Metadata is
+// no longer one endpoint — resolving an assignee searches the user directory
+// while the field catalogue is a separate call — and a stub that answered the
+// same JSON to both handed the field list back as a list of users.
 type stubDoer struct {
-	body  string
-	calls int
+	body   string
+	byPath map[string]string
+	calls  int
 }
 
-func (s *stubDoer) Do(context.Context, transport.Request) (*transport.Response, error) {
+func (s *stubDoer) Do(_ context.Context, r transport.Request) (*transport.Response, error) {
 	s.calls++
+	body := s.body
+	for path, override := range s.byPath {
+		if strings.Contains(r.Path, path) {
+			body = override
+			break
+		}
+	}
 	return &transport.Response{
 		Status: 200,
-		Body:   []byte(s.body),
+		Body:   []byte(body),
 		Header: map[string][]string{"Content-Type": {"application/json"}},
 	}, nil
+}
+
+// directoryJSON is a user directory per deployment, for the commands that
+// resolve an assignee.
+//
+// The two carry different identifiers on purpose. Cloud names a user by
+// accountId and Data Center by name, and a fixture carrying both would hide
+// which one the code picked — which is how a /myself fixture once tested
+// nothing at all.
+var directoryJSON = map[site.Kind]string{
+	site.Cloud: `[
+ {
+  "accountId": "712020:8f3a",
+  "displayName": "Ada Lovelace",
+  "emailAddress": "ada@example.invalid",
+  "active": true
+ },
+ {
+  "accountId": "712020:9c1b",
+  "displayName": "Grace Hopper",
+  "emailAddress": "grace@example.invalid",
+  "active": true
+ }
+]`,
+
+	site.DataCenter: `[
+ {
+  "name": "ada",
+  "key": "ada",
+  "displayName": "Ada Lovelace",
+  "emailAddress": "ada@example.invalid",
+  "active": true
+ },
+ {
+  "name": "grace",
+  "key": "grace",
+  "displayName": "Grace Hopper",
+  "emailAddress": "grace@example.invalid",
+  "active": true
+ }
+]`,
 }
 
 // TestListRunsAsARegisteredCommand exercises the layer a user actually

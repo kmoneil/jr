@@ -244,9 +244,9 @@ func TestAMissingUserSaysWhichIdItWanted(t *testing.T) {
 
 // TestUserColumnsResolve keeps the default projection honest.
 func TestUserColumnsResolve(t *testing.T) {
-	node := user.User{
+	node := user.Node(user.User{
 		ID: "ada", Display: "Ada Lovelace", Email: "ada@example.invalid", Active: true,
-	}.Node()
+	})
 	for _, col := range user.ListColumns() {
 		if _, ok := node.Lookup(col.Path); !ok {
 			t.Errorf("column %q resolves to nothing", col.Header)

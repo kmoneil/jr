@@ -330,6 +330,8 @@ their typo.
 | `AMBIGUOUS_TRANSITION` | 2      | Two transitions share that name and lead to different statuses. `detail` lists both.                                                                                |
 | `UNKNOWN_ISSUE_TYPE`   | 2      | The project offers no such type. `detail` lists the ones it does. It used to be 2 or 5 depending on which lookup answered; the type name is now always resolved before the fields are fetched, so there is one path and one code. |
 | `AMBIGUOUS_ISSUE_TYPE` | 2      | Several types share that name; pass the id.                                                                                                                         |
+| `UNKNOWN_USER`         | 2      | No user with that display name, email, or id. `detail` lists the plausible near misses with their ids, and is absent where the search returned nothing that shares a word with what was typed. A partial match is a near miss, not a resolution. |
+| `AMBIGUOUS_USER`       | 2      | Several users share that display name. `detail` lists every candidate with its id, whether the account is inactive, and whether it is an app rather than a person.  |
 | `UNKNOWN_PROJECT`      | 5      | The project does not exist, or this credential may not create in it. Reported for either status the createmeta route answers an unaddressable project with — a 10.3 Data Center says 400, and 404 is equally plausible elsewhere. |
 
 Field resolution costs one request against a cold cache and none against a warm

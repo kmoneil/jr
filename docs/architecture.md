@@ -14,7 +14,7 @@ internal/
   jctx/                    # named contexts, resolution, precedence
   jql/                     # AST, builder, renderer, tokenizer
   adf/                     # ADF ⇄ markdown, golden-tested
-  site/                    # deployment probe and the per-site metadata cache
+  site/                    # deployment probe, per-site metadata cache, user directory
   idem/                    # the idempotency ledger: what a mutation already did
   commands/                # links every resource in, so their inits run
   resource/                # one isolated package per Jira resource
@@ -57,8 +57,15 @@ lists it.** `issue list --field "Story Points"` has to resolve a name to
 `customfield_10042`, and it cannot ask the field resource to do it; `issue move`
 will have to resolve a transition name to an id without asking the meta
 resource. So `site` owns the fetching and the resolution for fields, issue
-types, transitions, and create metadata, and `resource/field` and
-`resource/meta` are the command surfaces over them.
+types, transitions, create metadata, and the user directory, and
+`resource/field`, `resource/meta`, and `resource/user` are the command surfaces
+over them.
+
+`resource/user` is the clearest case: `issue assign ENG-1 "Ada Lovelace"` has to
+resolve a display name to an accountId, and `jr user list` reports the same
+value. Two definitions of what a user is would be two answers to that, so the
+type and the deployment split — accountId against username, `query` against
+`username` — live in `site` and the resource renders them.
 
 A resource reaches all of it through one `registry.Session.Metadata` call, so
 the cache is shared: two commands resolving the same field name in the same day
@@ -183,6 +190,11 @@ a token cannot reach a fixture file even if recording is interrupted.
 | `$XDG_STATE_HOME/jr/idempotency.toml` | What a mutating request already did                | 0600 |
 | `$XDG_STATE_HOME/jr/`                 | View history, last cursor                          | —    |
 | `$XDG_CACHE_HOME/jr/<site>/`          | Deployment probe, field catalogue, create metadata | —    |
+
+User resolution is deliberately not cached: the field catalogue is one
+immutable snapshot of a whole site, and this is one search per input. A cached
+answer would also outlive somebody leaving, which is exactly the account a
+caller must not still be assigning work to.
 
 The three are separate because they have different lifetimes and different
 backup expectations: config is hand-written and worth keeping, state is

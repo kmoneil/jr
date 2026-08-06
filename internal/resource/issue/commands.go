@@ -133,7 +133,8 @@ filters, so an OR inside it cannot escape the project scope.`),
 			},
 			{
 				Name: "assignee", Short: "a", Type: registry.TypeString,
-				Usage: "assignee; the word currentUser resolves to the caller",
+				Usage: "assignee, by display name, email, or id; " +
+					"the word currentUser resolves to the caller",
 			},
 			{
 				Name: "reporter", Type: registry.TypeString,
@@ -188,7 +189,8 @@ filters, so an OR inside it cannot escape the project scope.`),
 		Validate:       validateList,
 		Outputs:        []registry.Output{{Kind: KindList, Version: VersionList}},
 		ExitCodes: []exitcode.Code{
-			exitcode.Partial, exitcode.Auth, exitcode.NotFound,
+			// Usage covers an unresolvable --assignee as well as a bad flag.
+			exitcode.Partial, exitcode.Usage, exitcode.Auth, exitcode.NotFound,
 			exitcode.Permission, exitcode.RateLimit, exitcode.Remote,
 		},
 		Stream: runList,
@@ -274,6 +276,9 @@ const resolvedFieldsKey = "issue.fields"
 // rejection from inside it would arrive after bytes were already on stdout.
 func validateList(ctx context.Context, inv *registry.Invocation) error {
 	if err := refuseUnconstrainedSweep(inv); err != nil {
+		return err
+	}
+	if err := validateAssigneeFilter(ctx, inv, inv.Flags.String("assignee")); err != nil {
 		return err
 	}
 	return validateFields(ctx, inv)
@@ -400,7 +405,7 @@ func listQuery(inv *registry.Invocation) QueryOptions {
 		Labels:        inv.Flags.StringSlice("label"),
 		NotLabels:     inv.Flags.StringSlice("not-label"),
 		Types:         inv.Flags.StringSlice("type"),
-		Assignee:      inv.Flags.String("assignee"),
+		Assignee:      resolvedAssignee(inv, inv.Flags.String("assignee")),
 		Reporter:      inv.Flags.String("reporter"),
 		CreatedAfter:  inv.Flags.String("created-after"),
 		CreatedBefore: inv.Flags.String("created-before"),

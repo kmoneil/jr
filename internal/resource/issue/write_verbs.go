@@ -61,14 +61,21 @@ Assigns an issue, through the endpoint Jira provides for it rather than through
 a general edit — the two differ in what permission they need, and a caller who
 may assign is not always a caller who may edit.
 
-The user is named the way this deployment names one: an accountId on Cloud, a
-username on Data Center. The two are not interchangeable, and sending the wrong
-one is a 400 that says nothing about which field was wrong.
+The user is named by their display name, their email address, or the id this
+deployment identifies them by — an accountId on Cloud, a username on Data
+Center. A name is resolved against the directory before anything is sent, so a
+name matching nobody, or two people, is refused here rather than by a 400 that
+says nothing about which field was wrong.
+
+A name has to match exactly. A partial one is refused with what it nearly
+matched, because a short name that means one person today and a different one
+after somebody joins is worse than being asked to be specific.
 
 The word unassigned clears the assignee. The word default hands the issue to
-whatever the project's default assignee is, which is not the same thing.`),
+whatever the project's default assignee is, which is not the same thing. The
+word currentUser means whoever holds the credential, as it does on issue list.`),
 		Example: strings.Join([]string{
-			buildinfo.App + " issue assign ENG-101 ada",
+			buildinfo.App + " issue assign ENG-101 'Ada Lovelace'",
 			buildinfo.App + " issue assign ENG-101 unassigned",
 			buildinfo.App + " issue assign ENG-101 default --dry-run",
 		}, "\n"),
@@ -88,7 +95,7 @@ whatever the project's default assignee is, which is not the same thing.`),
 			registry.DryRunOutput(),
 		},
 		ExitCodes: writeExits(),
-		Validate:  func(_ context.Context, inv *registry.Invocation) error { return requireKey(inv) },
+		Validate:  validateAssign,
 		Run:       runAssign,
 	}
 }
@@ -130,13 +137,28 @@ func (c *Client) AssignRequest(key, assignee string) (transport.Request, error) 
 	}, nil
 }
 
+// validateAssign resolves the user before anything is sent, so a name that
+// names nobody — or two people — is refused here rather than by a 400 that
+// says which field was wrong and nothing else.
+func validateAssign(ctx context.Context, inv *registry.Invocation) error {
+	if err := requireKey(inv); err != nil {
+		return err
+	}
+	if len(inv.Args) < 2 {
+		return errs.Usage("INVALID_USER", "a user is required").
+			WithRemedy("pass a name, an id, or the word unassigned")
+	}
+	return validateAssignee(ctx, inv, inv.Args[1])
+}
+
 func runAssign(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) {
 	client, err := writeClientFor(ctx, inv, "issue assign")
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := client.AssignRequest(inv.Args[0], inv.Args[1])
+	assignee := resolvedAssignee(inv, inv.Args[1])
+	req, err := client.AssignRequest(inv.Args[0], assignee)
 	if err != nil {
 		return nil, err
 	}
@@ -147,10 +169,14 @@ func runAssign(ctx context.Context, inv *registry.Invocation) (*render.Doc, erro
 		return nil, err
 	}
 
+	// The id, not the name typed: `issue assign ENG-1 "Ada Lovelace"` and the
+	// same command with her accountId produce byte-identical output, which is
+	// the rule --field settled. How a request was spelled is not part of the
+	// contract.
 	return render.Record(KindAssign, VersionAssign, render.El("issue").
 		Attr("key", inv.Args[0]).
 		Attr("action", "assigned").
-		Leaf("assignee", inv.Args[1])), nil
+		Leaf("assignee", assignee)), nil
 }
 
 func deleteCommand() *registry.Command {

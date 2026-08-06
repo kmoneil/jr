@@ -1140,7 +1140,12 @@ func TestTheRemainingVerbsRunAsRegisteredCommands(t *testing.T) {
 		flags            map[string]bool
 		action           string
 	}{
-		{command: "issue.assign", fixture: "assign", args: []string{"ENG-101", "ada"}, action: "assigned"},
+		// A display name, which is what a caller has to hand — and which
+		// resolves to a different value on each deployment.
+		{
+			command: "issue.assign", fixture: "assign",
+			args: []string{"ENG-101", "Ada Lovelace"}, action: "assigned",
+		},
 		{
 			command: "issue.delete", fixture: "delete", args: []string{"ENG-101"},
 			flags: map[string]bool{"yes": true}, action: "deleted",
@@ -1165,7 +1170,11 @@ func TestTheRemainingVerbsRunAsRegisteredCommands(t *testing.T) {
 				}
 				inv := &registry.Invocation{
 					Jira: &stubSession{
-						doer: &stubDoer{body: catalogueJSON}, conn: conn, kind: kind,
+						doer: &stubDoer{
+							body:   catalogueJSON,
+							byPath: map[string]string{"/user/search": directoryJSON[kind]},
+						},
+						conn: conn, kind: kind,
 					},
 					Args: tc.args, Flags: flags,
 					Stderr: io.Discard, Progress: registry.NoProgress,
@@ -1234,5 +1243,55 @@ func TestDeleteNamesTheFlagThatWouldHaveWorked(t *testing.T) {
 	}
 	if remedy := errs.Coerce(err).Remedy; strings.Contains(remedy, "--subtasks") {
 		t.Errorf("the remedy repeats a flag already given: %q", remedy)
+	}
+}
+
+// TestCurrentUserMeansTheSameThingOnEveryCommand covers a word that used to
+// mean one thing on `issue list` and nothing on the verbs beside it.
+//
+// The filter renders JQL's own currentUser function and asks nobody. A write
+// verb has no function to render, so it resolves to the account behind the
+// credential — where it previously sent the literal word as an accountId and
+// got a 400 naming nothing.
+func TestCurrentUserMeansTheSameThingOnEveryCommand(t *testing.T) {
+	cmd, ok := registry.Lookup("issue.assign")
+	if !ok {
+		t.Fatal("issue assign is not registered")
+	}
+
+	// Whoami goes through the connection rather than the metadata client, so
+	// the cassette answers it — and answers it with an accountId and nothing
+	// else, because that is all Cloud sends.
+	conn, replayer := replayConn(t, "assign-currentuser.cloud.json")
+	inv := &registry.Invocation{
+		Jira: &stubSession{
+			doer: &stubDoer{body: catalogueJSON}, conn: conn, kind: site.Cloud,
+		},
+		Args: []string{"ENG-101", "currentUser"}, Flags: registry.NewFlags(),
+		Stderr: io.Discard, Progress: registry.NoProgress,
+	}
+
+	if err := cmd.Validate(t.Context(), inv); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	doc, err := cmd.Run(t.Context(), inv)
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+
+	var out strings.Builder
+	if err := render.Write(&out, doc, render.XML); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if !strings.Contains(out.String(), "712020:8f3a") {
+		t.Errorf("currentUser did not become an account id:\n%s", out.String())
+	}
+	if strings.Contains(out.String(), "currentUser") {
+		t.Errorf("the literal word reached the request:\n%s", out.String())
+	}
+	// The recorded PUT carries the account id, so an unplayed interaction here
+	// would mean the request that went out was not the one recorded.
+	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+		t.Errorf("the request sent was not the one recorded: %v", unplayed)
 	}
 }
