@@ -64,6 +64,14 @@ A resource reaches all of it through one `registry.Session.Metadata` call, so
 the cache is shared: two commands resolving the same field name in the same day
 make one request between them.
 
+**Query policy lives in `internal/jql` for the same reason.** The default
+`ORDER BY`, the key tiebreaker, and the keyset precondition are in
+`jql.AppendOrder` and `jql.SortsByKey` rather than in the resource that queries
+issues, because two commands now have to agree on them: `issue list`, which
+sends the query, and `jql explain`, which says what would be sent. A second copy
+would make the explanation a second implementation, and the two would disagree
+on the first change to either.
+
 **Not all of it is cached, and that is a per-kind judgement.** The field
 catalogue and create metadata change when an administrator edits a screen, so a
 day-old answer is still the answer. An issue's available transitions change when
