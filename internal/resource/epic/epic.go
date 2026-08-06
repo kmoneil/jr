@@ -379,6 +379,11 @@ func runGet(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) 
 // a URL path as anything else, and makes a typo cost no round trip. Ordering
 // keys is a different problem, and this resource deliberately does not do it —
 // see sorted.
+//
+// Both halves are checked against a character set. "../..-1" has a non-empty
+// project and a numeric part, and is not a key — accepting it here would leave
+// the safety of the request resting on whether the caller downstream remembered
+// to escape it.
 func ValidateRef(ref string) error {
 	if ref == "" {
 		return errs.Usage("INVALID_EPIC", "an epic key or id is required")
@@ -387,12 +392,33 @@ func ValidateRef(ref string) error {
 		return nil
 	}
 	project, number, found := strings.Cut(ref, "-")
-	if found && project != "" && number != "" && digits(number) {
+	if found && validProject(project) && digits(number) {
 		return nil
 	}
 	return errs.Usage("INVALID_EPIC", "%q is not an epic key or id", ref).
 		WithDetail("an epic is addressed as ENG-42 or as 10101").
 		WithRemedy("take it from `%s epic list`", buildinfo.App)
+}
+
+// validProject reports whether s can be a Jira project key: a leading letter,
+// then letters, digits, or underscores.
+//
+// This duplicates issue.ParseKey's rule, because resources never import each
+// other — the same trade the timestamp layouts in the sprint resource make. The
+// duplication is a charset, which is the kind of thing that does not drift.
+func validProject(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z':
+		case i > 0 && (r == '_' || (r >= '0' && r <= '9')):
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // ValidateBoardID rejects a board id this tool cannot address. The epic

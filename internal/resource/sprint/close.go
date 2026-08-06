@@ -11,6 +11,7 @@ package sprint
 import (
 	"context"
 	"encoding/json"
+	"net/url"
 	"strings"
 
 	"github.com/kmoneil/jira-cli/internal/buildinfo"
@@ -102,7 +103,11 @@ func (c *Client) CloseRequest(id string) (transport.Request, error) {
 	}
 	return transport.Request{
 		Method: transport.MethodPost,
-		Path:   c.Site.AgileBase() + "/sprint/" + id,
+		// Escaped even though ValidateID has already restricted it to digits.
+		// Every other path in this package is built the same way, and a guard
+		// that is only present where somebody judged it necessary is one that
+		// gets left out the next time somebody judges.
+		Path:   c.Site.AgileBase() + "/sprint/" + url.PathEscape(id),
 		Header: map[string][]string{"Content-Type": {"application/json"}},
 		Body:   body,
 	}, nil

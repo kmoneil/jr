@@ -113,18 +113,23 @@ FUZZTIME ?= 60s
 # the moment it is written. A target this sweep never ran is worse than useless:
 # it reads as coverage that does not exist.
 #
+# The sweep builds with TAGS_FULL for exactly that reason. It ran untagged until
+# internal/workflow grew fuzz targets behind the write tag, and `go test -list`
+# reported none — five minutes of green sweep over code it could not compile.
+# The full tag set is the only one that can reach every target there is.
+#
 # Output is captured rather than piped, because a pipe would discard the exit
 # status and the sweep would report success while a target was failing.
 ## fuzz: run every fuzz target for FUZZTIME each (default 60s)
 .PHONY: fuzz
 fuzz:
-	@echo "==> Fuzz sweep (FUZZTIME=$(FUZZTIME) per target)"
+	@echo "==> Fuzz sweep (FUZZTIME=$(FUZZTIME) per target, tags=$(TAGS_FULL))"
 	@failed=0; start=$$(date +%s); ran=0; \
-	for pkg in $$(go list ./...); do \
-		for target in $$(go test $$pkg -list 'Fuzz.*' 2>/dev/null | grep '^Fuzz' || true); do \
+	for pkg in $$(go list -tags "$(TAGS_FULL)" ./...); do \
+		for target in $$(go test -tags "$(TAGS_FULL)" $$pkg -list 'Fuzz.*' 2>/dev/null | grep '^Fuzz' || true); do \
 			ran=$$((ran + 1)); \
 			printf "    %-52s " "$${pkg#$(MODULE)/} $$target"; \
-			if out=$$(go test $$pkg -run=^$$ -fuzz="^$$target$$" -fuzztime=$(FUZZTIME) 2>&1); then \
+			if out=$$(go test -tags "$(TAGS_FULL)" $$pkg -run=^$$ -fuzz="^$$target$$" -fuzztime=$(FUZZTIME) 2>&1); then \
 				echo "$$out" | tail -1; \
 			else \
 				failed=1; echo "FAIL"; echo "$$out" | sed 's/^/        /'; \

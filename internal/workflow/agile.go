@@ -14,6 +14,7 @@ package workflow
 import (
 	"context"
 	"encoding/json"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -137,7 +138,7 @@ func runSprintAdd(ctx context.Context, inv *registry.Invocation) (*render.Doc, e
 	}
 
 	req, err := moveRequest(
-		client.site.AgileBase()+"/sprint/"+inv.Args[0]+"/issue", keys,
+		client.site.AgileBase()+"/sprint/"+url.PathEscape(inv.Args[0])+"/issue", keys,
 	)
 	if err != nil {
 		return nil, err
@@ -224,9 +225,13 @@ func runEpicAdd(ctx context.Context, inv *registry.Invocation) (*render.Doc, err
 	if err != nil {
 		return nil, err
 	}
+	ref, err := epicRef(inv.Args[0])
+	if err != nil {
+		return nil, err
+	}
 
 	req, err := moveRequest(
-		client.site.AgileBase()+"/epic/"+inv.Args[0]+"/issue", keys,
+		client.site.AgileBase()+"/epic/"+url.PathEscape(ref)+"/issue", keys,
 	)
 	if err != nil {
 		return nil, err
@@ -340,17 +345,27 @@ func parseIssueKeys(args []string) ([]string, error) {
 	return out, nil
 }
 
-// validEpicRef accepts what the agile API addresses an epic by: a key or an id.
-func validEpicRef(ref string) error {
-	if _, ok := issue.ParseKey(ref); ok {
-		return nil
+// epicRef canonicalizes what the agile API addresses an epic by: a key or an
+// id. The returned value is what goes in the path, so it is the parser's output
+// and never the caller's argument.
+func epicRef(ref string) (string, error) {
+	if key, ok := issue.ParseKey(ref); ok {
+		return key.String(), nil
 	}
-	if _, err := strconv.Atoi(ref); err == nil {
-		return nil
+	// Digits, not strconv.Atoi, which accepts a leading sign — "-42" is not an
+	// id, and "/rest/agile/1.0/epic/-42/issue" is not an endpoint.
+	if err := validNumericID("epic", ref); err == nil {
+		return ref, nil
 	}
-	return errs.Usage("INVALID_EPIC", "%q is not an epic key or id", ref).
+	return "", errs.Usage("INVALID_EPIC", "%q is not an epic key or id", ref).
 		WithDetail("an epic is addressed as ENG-42 or as 10101").
 		WithRemedy("take it from `%s epic list`", buildinfo.App)
+}
+
+// validEpicRef is the validation half of epicRef, for Command.Validate.
+func validEpicRef(ref string) error {
+	_, err := epicRef(ref)
+	return err
 }
 
 // validNumericID rejects an id this tool cannot address, so a typo costs no

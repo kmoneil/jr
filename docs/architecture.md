@@ -181,13 +181,20 @@ name to `customfield_10042` should not cost a round trip on every invocation.
 | --------------- | -------------------------------------------------------------- | --------------------------------------------------- |
 | `jql/`          | Table-driven, plus a fuzzer asserting no input escapes quoting | 100% of renderer branches                           |
 | `adf/`          | Golden files, round-trip property test                         | Corpus of ≥200 real documents                       |
-| `resource/*`    | Pure struct-in/struct-out unit tests                           | 90%                                                 |
+| `resource/*`    | Pure struct-in/struct-out unit tests, plus a fuzzer on anything that parses | 90%                                     |
 | `transport/`    | Recorded fixtures, Cloud + DC                                  | Every endpoint                                      |
 | Output contract | Golden files per kind, per format                              | Any diff requires a version bump in the same commit |
 | CLI surface     | Snapshot tests of `--help`, `schema`, exit codes               | Any diff is reviewed                                |
 | Architecture    | Import-graph assertions                                        | Every PR                                            |
 | Build profiles  | Matrix build of all profiles plus a size assertion             | Every PR                                            |
-| Fuzzing         | `make fuzz`, every target                                      | Every PR, 60s per target                            |
+| Fuzzing         | `make fuzz`, every target, built with the full tag set         | Every PR, 60s per target                            |
+
+**A parser guarantees its own output is safe.** An issue key, an epic
+reference, and a board id all end up as URL path segments. Most callers escape
+them and one did not, and the difference between the two was which author
+remembered — so what a parser accepts is safe unescaped, and the escaping is a
+second layer rather than the only one. Each of those parsers has a fuzz target
+asserting exactly that, with the inputs that used to get through as seeds.
 
 Recorded HTTP contract tests are mandatory, not optional. Pure-function unit
 tests would not have caught any of the incumbent bugs this project exists to
