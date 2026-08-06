@@ -44,6 +44,9 @@ func init() {
 // that failed, including a reused idempotency key.
 func writeExits() []exitcode.Code {
 	return []exitcode.Code{
+		// Usage covers a malformed key, a bad duration, and a body
+		// --body-format cannot read. Every write verb can produce one.
+		exitcode.Usage,
 		exitcode.Blocked, exitcode.Auth, exitcode.NotFound, exitcode.Permission,
 		exitcode.Conflict, exitcode.RateLimit, exitcode.Remote,
 	}
@@ -77,10 +80,15 @@ identical issues are a legitimate thing to want.
 
 --dry-run prints the exact request, body included, and sends nothing.
 
---description is sent as plain text. No markup is interpreted: **bold** reaches
-Jira as six characters. On Cloud the text is wrapped in the document structure
-the API requires, because containing text is exact where interpreting it is
-not.`),
+--description is sent as plain text by default. No markup is interpreted:
+**bold** reaches Jira as six characters. On Cloud the text is wrapped in the
+document structure the API requires, because containing text is exact where
+interpreting it is not.
+
+--body-format markdown converts it instead, refusing by name anything the
+subset cannot hold rather than approximating it. --body-format adf takes an
+Atlassian Document Format document as JSON and sends it as given. Both are
+Cloud only: Data Center stores wiki markup, and there is no converter to it.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue create --type Bug --summary 'Retry drops the last error'",
 			buildinfo.App + " issue create --type Task --summary Ship --idempotency-key deploy-42",
@@ -119,6 +127,7 @@ not.`),
 				Name: "idempotency-key", Type: registry.TypeString,
 				Usage: "make a retry safe: the same key returns the original issue",
 			},
+			bodyFormatFlag(),
 			dryRunFlag(),
 		},
 		Mutating:     true,
@@ -179,10 +188,10 @@ func (c *Client) CreateRequest(opt CreateOptions) (transport.Request, error) {
 	}
 
 	if opt.Description != "" {
-		// Contained, not converted: Cloud takes an ADF document where Data
-		// Center takes a string, and the text goes into one as plain text with
-		// no markup interpreted. See bodyValue.
-		value, err := bodyValue(c.Site.Kind, opt.Description)
+		// How the text is read is --body-format's answer, and every format
+		// ends in a document on Cloud and a string on Data Center. See
+		// bodyValue.
+		value, err := bodyValue(c.Site.Kind, opt.Description, c.BodyFormat)
 		if err != nil {
 			return transport.Request{}, err
 		}
@@ -445,7 +454,7 @@ the flag leaves it as it was, which is a different thing.
 
 --dry-run prints the exact request, body included, and sends nothing.
 
---description is plain text, exactly as on issue create.`),
+--description and --body-format work exactly as on issue create.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue edit ENG-101 --summary 'A better summary'",
 			buildinfo.App + " issue edit ENG-101 --add-label retry --remove-label wontfix",
@@ -477,6 +486,7 @@ the flag leaves it as it was, which is a different thing.
 				Name: "assignee", Short: "a", Type: registry.TypeString,
 				Usage: "set the assignee; the word unassigned clears it",
 			},
+			bodyFormatFlag(),
 			dryRunFlag(),
 		},
 		Mutating:     true,
@@ -565,7 +575,7 @@ func (c *Client) EditRequest(opt EditOptions) (transport.Request, error) {
 		fields["summary"] = opt.Summary
 	}
 	if opt.Description != "" {
-		value, err := bodyValue(c.Site.Kind, opt.Description)
+		value, err := bodyValue(c.Site.Kind, opt.Description, c.BodyFormat)
 		if err != nil {
 			return transport.Request{}, err
 		}

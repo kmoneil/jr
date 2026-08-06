@@ -631,7 +631,13 @@ func marked(n Node, where string) (string, error) {
 		if !ok || href == "" {
 			return "", unrepresentable(where, "a link with no address")
 		}
-		out = "[" + out + "](" + linkTarget(href) + ")"
+		target := linkTarget(href)
+		if title, ok := attrString(link.Attrs, "title"); ok && title != "" {
+			// Markdown's own title syntax. Dropping it would be a silent loss:
+			// it is what a reader sees on hover and it is not the address.
+			target += ` "` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(title) + `"`
+		}
+		out = "[" + out + "](" + target + ")"
 	}
 	return out, nil
 }

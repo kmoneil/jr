@@ -254,7 +254,7 @@ this tool does not decide how long anyone's day is.
 --started says when the work happened, which is not when it is being logged.
 It defaults to now, and takes an RFC 3339 timestamp otherwise.
 
---comment is plain text, exactly as on issue comment add.`),
+--comment and --body-format work exactly as on issue comment add.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue worklog add ENG-101 3h",
 			buildinfo.App + ` issue worklog add ENG-101 "1d 4h" --comment "pairing on the retry path"`,
@@ -273,6 +273,7 @@ It defaults to now, and takes an RFC 3339 timestamp otherwise.
 				Name: "comment", Type: registry.TypeString,
 				Usage: "a note about the work, as plain text",
 			},
+			bodyFormatFlag(),
 			dryRunFlag(),
 		},
 		Mutating:     true,
@@ -344,7 +345,7 @@ func (c *Client) WorklogAddRequest(
 		"started":   at.Format(jiraTimeLayout),
 	}
 	if comment != "" {
-		value, err := bodyValue(c.Site.Kind, comment)
+		value, err := bodyValue(c.Site.Kind, comment, c.BodyFormat)
 		if err != nil {
 			return transport.Request{}, err
 		}
@@ -395,7 +396,7 @@ func runWorklogAdd(ctx context.Context, inv *registry.Invocation) (*render.Doc, 
 			WithDetail("the entry may exist; list them before retrying").
 			Wrap(err)
 	}
-	logged, err := raw.convert(client.Body)
+	logged, err := raw.convert(echoMode(client.Body))
 	if err != nil {
 		return nil, err
 	}

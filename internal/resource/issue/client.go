@@ -42,6 +42,10 @@ type Client struct {
 	// the document instead. It lives here rather than on each options struct
 	// because every read that can carry a body answers the same question.
 	Body BodyMode
+	// BodyFormat says how a body a caller sent should be read: --body-format,
+	// empty for the default. Here for the same reason Body is — every write
+	// that takes a body answers the same question.
+	BodyFormat string
 }
 
 // ListOptions is one `issue list` request.

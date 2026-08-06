@@ -11,6 +11,7 @@ import (
 	"github.com/kmoneil/jira-cli/internal/exitcode"
 	"github.com/kmoneil/jira-cli/internal/registry"
 	"github.com/kmoneil/jira-cli/internal/render"
+	"github.com/kmoneil/jira-cli/internal/resource/issue"
 	"github.com/kmoneil/jira-cli/internal/site"
 	"github.com/kmoneil/jira-cli/internal/transport"
 )
@@ -296,5 +297,94 @@ func TestCommentPathsEscapeTheirArguments(t *testing.T) {
 	}
 	if strings.Contains(out.String(), "Authorization") {
 		t.Errorf("the preview mentions a credential:\n%s", out.String())
+	}
+}
+
+// TestBodyFormatBuildsTheDocumentItNames covers the three ways a caller can
+// send a body, and the one deployment that takes only one of them.
+func TestBodyFormatBuildsTheDocumentItNames(t *testing.T) {
+	const markdown = "a **bold** word"
+
+	cloud, _ := writeClient(site.Cloud)
+	cloud.BodyFormat = issue.FormatMarkdown
+	req, err := cloud.CommentAddRequest("ENG-101", markdown, "")
+	if err != nil {
+		t.Fatalf("markdown: %v", err)
+	}
+	if !strings.Contains(string(req.Body), `"strong"`) {
+		t.Errorf("markdown was not converted: %s", req.Body)
+	}
+	if strings.Contains(string(req.Body), "**bold**") {
+		t.Errorf("the asterisks survived the conversion: %s", req.Body)
+	}
+
+	// The default still contains rather than converts, which is the whole
+	// distinction --body-format exists to make explicit.
+	plain, _ := writeClient(site.Cloud)
+	req, err = plain.CommentAddRequest("ENG-101", markdown, "")
+	if err != nil {
+		t.Fatalf("text: %v", err)
+	}
+	if !strings.Contains(string(req.Body), "**bold**") {
+		t.Errorf("the default interpreted markup: %s", req.Body)
+	}
+
+	// A document goes through as itself.
+	raw, _ := writeClient(site.Cloud)
+	raw.BodyFormat = issue.FormatADF
+	req, err = raw.CommentAddRequest("ENG-101",
+		`{"type":"doc","version":1,"content":[{"type":"rule"}]}`, "")
+	if err != nil {
+		t.Fatalf("adf: %v", err)
+	}
+	if !strings.Contains(string(req.Body), `"rule"`) {
+		t.Errorf("the document was not sent: %s", req.Body)
+	}
+
+	// Data Center stores wiki markup and there is no converter to it, so both
+	// of the other formats are refused rather than approximated.
+	for _, format := range []string{issue.FormatMarkdown, issue.FormatADF} {
+		dc, _ := writeClient(site.DataCenter)
+		dc.BodyFormat = format
+		if _, err := dc.CommentAddRequest("ENG-101", markdown, ""); err == nil {
+			t.Errorf("--body-format %s was accepted against Data Center", format)
+		} else if e := errs.Coerce(err); e.Code != "BODY_FORMAT_UNSUPPORTED" {
+			t.Errorf("code = %q, want BODY_FORMAT_UNSUPPORTED", e.Code)
+		}
+	}
+}
+
+// TestAWriteEchoNeverFailsRenderingWhatItDid is a bug found by using it.
+//
+// `issue comment add --body-format adf` with a document holding a coloured
+// span created the comment and then exited 2 rendering the reply. A caller
+// told their comment failed adds it again, which is the duplicate this project
+// exists to avoid — so the echo reports the document rather than refusing it.
+func TestAWriteEchoNeverFailsRenderingWhatItDid(t *testing.T) {
+	cmd, ok := registry.Lookup("issue.comment.add")
+	if !ok {
+		t.Fatal("issue comment add is not registered")
+	}
+
+	conn, _ := replayConn(t, "comment-add-unrepresentable.cloud.json")
+	inv := &registry.Invocation{
+		Jira: &stubSession{
+			doer: &stubDoer{body: catalogueJSON}, conn: conn, kind: site.Cloud,
+		},
+		Args: []string{"ENG-101", "unused"}, Flags: registry.NewFlags(),
+		Stderr: io.Discard, Progress: registry.NoProgress,
+	}
+
+	doc, err := cmd.Run(t.Context(), inv)
+	if err != nil {
+		t.Fatalf("a successful write was reported as a failure: %v", err)
+	}
+	body, ok := doc.Record.ChildNamed("body")
+	if !ok {
+		t.Fatal("the created comment carries no body")
+	}
+	if format, _ := body.AttrValue("format"); format != issue.BodyADF {
+		t.Errorf("format = %q, want %q — the document, since markdown could not hold it",
+			format, issue.BodyADF)
 	}
 }

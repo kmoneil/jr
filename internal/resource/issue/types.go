@@ -58,6 +58,16 @@ const (
 	ModeMarkdown BodyMode = iota
 	// ModeRaw emits the document exactly as Jira sent it.
 	ModeRaw
+	// ModeEcho converts, and reports the document itself rather than failing.
+	//
+	// Only a write's echo uses it, and only because the write already
+	// happened. `issue comment add --body-format adf` with a document holding
+	// a coloured span created the comment and then exited 2 rendering it, and
+	// a caller told their comment failed adds it again. Reporting the exact
+	// document is not an approximation — the format attribute says which one
+	// came back — and it is the only answer that does not invent a second
+	// comment.
+	ModeEcho
 )
 
 // Issue is one issue, in the shape this tool reports rather than the shape
@@ -338,10 +348,16 @@ func decodeDescription(raw json.RawMessage, mode BodyMode) (text, format string,
 
 	doc, err := adf.Parse(raw)
 	if err != nil {
+		if mode == ModeEcho {
+			return trimmed, BodyADF, nil
+		}
 		return "", "", err
 	}
 	markdown, err := adf.ToMarkdown(doc)
 	if err != nil {
+		if mode == ModeEcho {
+			return trimmed, BodyADF, nil
+		}
 		return "", "", err
 	}
 	// A document that held nothing but empty paragraphs converts to no text,

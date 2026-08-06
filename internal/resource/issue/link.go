@@ -418,5 +418,9 @@ func readClientFor(
 	if err != nil {
 		return nil, err
 	}
-	return &Client{Transport: conn, Site: info, Body: bodyMode(inv)}, nil
+	return &Client{
+		Transport: conn, Site: info,
+		Body:       bodyMode(inv),
+		BodyFormat: inv.Flags.String("body-format"),
+	}, nil
 }

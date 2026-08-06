@@ -33,21 +33,76 @@ func init() {
 	registry.Register(commentDeleteCommand())
 }
 
+// Body formats a caller can send a description or a comment in.
+const (
+	// FormatText contains the text without interpreting it: `**bold**` reaches
+	// Jira as six characters. It is the default because containing text is
+	// exact and interpreting it is a judgement.
+	FormatText = "text"
+	// FormatMarkdown parses the text as markdown and builds the document it
+	// describes, refusing anything the subset cannot hold.
+	FormatMarkdown = "markdown"
+	// FormatADF takes an Atlassian Document Format document as JSON and sends
+	// it untouched.
+	FormatADF = "adf"
+)
+
+// bodyFormatFlag is declared by every write that takes a body.
+func bodyFormatFlag() registry.Flag {
+	return registry.Flag{
+		Name: "body-format", Type: registry.TypeEnum,
+		Enum:    []string{FormatText, FormatMarkdown, FormatADF},
+		Default: FormatText,
+		Usage: "how to read the body: text sends it uninterpreted, markdown " +
+			"converts it, adf takes a document as JSON; the last two are Cloud only",
+	}
+}
+
 // bodyValue encodes comment or description text the way this deployment takes
 // it.
 //
-// Data Center takes a string of wiki markup. Cloud takes an ADF document, so
-// the text is *contained* in one — which is exact — rather than interpreted,
-// which would not be. Nothing here reads `**bold**` as anything but six
-// characters, and that is also what Data Center does with the same input: the
-// text reaches the server as typed, and the server decides what it means.
+// Data Center takes a string of wiki markup and gets the text as typed, which
+// is why it has only one format: there is no markdown-to-wiki converter here,
+// and it will not accept a document at all. Refusing is the honest answer —
+// sending markdown as wiki would put asterisks in the issue.
 //
-// Turning markdown into real ADF marks is a different job with its own failure
-// modes. It belongs in internal/adf's write-side subset, where an
-// unrepresentable construct can be refused by name.
-func bodyValue(kind site.Kind, text string) (any, error) {
+// Cloud will not accept a string where a document belongs, so every format
+// produces one. `text` contains the text, which is exact. `markdown` converts
+// it, or fails naming the construct that stopped it. `adf` is the caller's own
+// document, passed through.
+func bodyValue(kind site.Kind, text, format string) (any, error) {
+	if format == "" {
+		format = FormatText
+	}
 	if kind != site.Cloud {
+		if format != FormatText {
+			return nil, errs.Usage("BODY_FORMAT_UNSUPPORTED",
+				"this site stores wiki markup, which --body-format %s cannot produce",
+				format).
+				WithDetail("the site is Data Center or Server, not Cloud").
+				WithRemedy("send the body with --body-format text and write it " +
+					"in the markup the site uses")
+		}
 		return text, nil
+	}
+
+	switch format {
+	case FormatMarkdown:
+		doc, err := adf.FromMarkdown(text)
+		if err != nil {
+			return nil, err
+		}
+		return doc, nil
+	case FormatADF:
+		doc, err := adf.Parse([]byte(text))
+		if err != nil {
+			return nil, err
+		}
+		// Re-encoded from the parsed tree rather than forwarded as the bytes
+		// that arrived: a document that parsed is one this tool understands,
+		// and forwarding the original would let a field it refuses on the way
+		// out reach Jira on the way in.
+		return doc, nil
 	}
 	doc, err := adf.FromText(text)
 	if err != nil {
@@ -63,16 +118,23 @@ func commentAddCommand() *registry.Command {
 		Description: strings.TrimSpace(`
 Adds one comment.
 
-The text is sent as plain text. No markup is interpreted: **bold** reaches Jira
-as six characters and Jira decides what to do with them, which is also what
-happens on Data Center. On Cloud the text is wrapped in the document structure
-the API requires — a blank line starts a paragraph and a single newline is a
-line break — because containing text is exact where interpreting it is not.
+The text is sent as plain text by default. No markup is interpreted: **bold**
+reaches Jira as six characters and Jira decides what to do with them, which is
+also what happens on Data Center. On Cloud the text is wrapped in the document
+structure the API requires — a blank line starts a paragraph and a single
+newline is a line break — because containing text is exact where interpreting
+it is not.
+
+--body-format markdown parses it instead. A construct the subset cannot hold is
+refused by name rather than approximated, and a single newline joins its lines,
+which is what markdown means by one. --body-format adf takes a document as
+JSON. Both are Cloud only, because Data Center stores wiki markup.
 
 --dry-run prints the exact request, body included, and sends nothing.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue comment add ENG-101 'Reproduced on 9.12.7'",
 			buildinfo.App + " issue comment add ENG-101 \"$(cat notes.txt)\"",
+			buildinfo.App + " issue comment add ENG-101 \"$(cat notes.md)\" --body-format markdown",
 		}, "\n"),
 		Args: []registry.Arg{
 			{Name: "key", Usage: "issue key, e.g. ENG-101", Required: true},
@@ -83,6 +145,7 @@ line break — because containing text is exact where interpreting it is not.
 				Name: "visibility", Type: registry.TypeString,
 				Usage: "restrict to a role, e.g. 'role:Administrators'",
 			},
+			bodyFormatFlag(),
 			dryRunFlag(),
 		},
 		Mutating:     true,
@@ -118,7 +181,7 @@ func validateCommentBody(_ context.Context, inv *registry.Invocation) error {
 
 // commentBody builds the request body shared by add and edit.
 func (c *Client) commentBody(text, visibility string) ([]byte, error) {
-	value, err := bodyValue(c.Site.Kind, text)
+	value, err := bodyValue(c.Site.Kind, text, c.BodyFormat)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +251,7 @@ func runCommentAdd(ctx context.Context, inv *registry.Invocation) (*render.Doc, 
 			WithDetail("the comment may exist; list them before retrying").
 			Wrap(err)
 	}
-	comment, err := raw.convert(client.Body)
+	comment, err := raw.convert(echoMode(client.Body))
 	if err != nil {
 		return nil, err
 	}
@@ -206,8 +269,8 @@ Replaces a comment's body. The comment is named by its id, which
 ` + "`" + buildinfo.App + ` issue comment list` + "`" + ` reports — not by its position, which changes as
 comments are added.
 
-The text is handled exactly as on add: sent as plain text, with no markup
-interpreted.`),
+The text and --body-format are handled exactly as on add: sent uninterpreted by
+default, parsed as markdown or taken as a document when asked for.`),
 		Example: buildinfo.App + " issue comment edit ENG-101 10042 'Corrected: it was 9.12.7'",
 		Args: []registry.Arg{
 			{Name: "key", Usage: "issue key, e.g. ENG-101", Required: true},
@@ -219,6 +282,7 @@ interpreted.`),
 				Name: "visibility", Type: registry.TypeString,
 				Usage: "restrict to a role, e.g. 'role:Administrators'",
 			},
+			bodyFormatFlag(),
 			dryRunFlag(),
 		},
 		Mutating:     true,
