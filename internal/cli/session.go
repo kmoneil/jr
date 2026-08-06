@@ -226,6 +226,18 @@ func (a *app) explainMissingSite(err error) error {
 
 // userAgent identifies this build to the server, including the profile, so a
 // site administrator can tell an agent build from a human one.
+// userAgent identifies this build to the server, e.g. `jr/1.2.0 (reader)`.
+//
+// The profile stays in it, which was an open question. It names the compile-out
+// guarantee, and an administrator reading their access log to work out which
+// client touched an issue learns from `(reader)` that this one could not have —
+// the mutating verbs are not in that binary. That is exonerating information
+// they can get nowhere else, and a capability class rather than a secret.
+//
+// The release is always a semantic version; scripts/version.sh guarantees it.
+// It used to be whatever `git describe --always` produced, which on an untagged
+// tree is a bare commit hash — `jr/786d271`, which tells an administrator
+// nothing, does not sort, and does not announce that it is not a version.
 func userAgent() string {
 	return buildinfo.App + "/" + buildinfo.Release + " (" + buildinfo.Profile() + ")"
 }

@@ -109,7 +109,7 @@ because it is not there.
 
 ```
 $ jr version --format tsv | grep display
-display	jr 0.1.0-dev (reader; tags=mcp)
+display	jr 1.2.0 (reader; tags=mcp)
 ```
 
 **A command declares the tags it needs.** `internal/cli/contract_test.go`

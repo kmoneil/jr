@@ -672,13 +672,13 @@ func TestUserAgentIsSent(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, _ := newTestClient(t, srv, transport.Options{UserAgent: "jr/0.1.0-dev (reader)"})
+	c, _ := newTestClient(t, srv, transport.Options{UserAgent: "jr/1.2.0 (reader)"})
 	if _, err := c.Do(t.Context(), transport.Request{
 		Method: http.MethodGet, Path: "/x",
 	}); err != nil {
 		t.Fatalf("do: %v", err)
 	}
-	if got != "jr/0.1.0-dev (reader)" {
+	if got != "jr/1.2.0 (reader)" {
 		t.Errorf("User-Agent = %q", got)
 	}
 }

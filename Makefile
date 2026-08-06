@@ -3,7 +3,10 @@ MODULE  := github.com/kmoneil/jira-cli
 PKG     := ./cmd/jr
 BIN     := bin
 
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 0.1.0-dev)
+# Always semver, in every case — tagged, untagged, dirty, and no git at all.
+# `git describe --always` degraded to a bare commit hash, which is what a Jira
+# administrator saw in their access logs. See scripts/version.sh.
+VERSION ?= $(shell sh scripts/version.sh)
 COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 

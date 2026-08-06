@@ -25,6 +25,16 @@ not a result document and carries no envelope.
 | Collections (`list`, `search`, `schema`)         | `tsv`   | Rectangular data is rectangular, and TSV is the cheapest encoding of it |
 | Records and documents (`get`, `view`, `version`) | `xml`   | Mixed content, no escaping tax, self-describing                         |
 
+`jr version`'s `release` attribute is always a semantic version, in every case —
+a tagged build, an untagged tree, a dirty one, and a source tree with no git at
+all. `scripts/version.sh` produces it and `internal/lint/version_test.go` holds
+it to that shape, because the same string goes out as the `User-Agent` and lands
+in a Jira administrator's access log. It used to be whatever `git describe
+--always` returned, which on an untagged tree is a bare commit hash: it names no
+release, sorts against nothing, and does not announce that it is not a version.
+The User-Agent also carries the build profile — `jr/1.2.0 (reader)` tells an
+administrator the client that touched an issue could not have written to it.
+
 All four formats — `tsv`, `xml`, `json`, `yaml` — are available on every
 command. The defaults are a convenience; `--format` is the contract.
 `JIRA_FORMAT` sets the default globally; `--format` overrides it. An

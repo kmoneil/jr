@@ -15,8 +15,14 @@ import (
 
 // Release, Commit, and Built are stamped by the linker. They are variables so
 // tests can pin them and compare golden output.
+//
+// Release is always a semantic version — scripts/version.sh guarantees that in
+// every case, including an untagged tree and a source tree with no git at all.
+// The default here is what an unstamped build reports, and it says 0.0.0
+// rather than a plausible number: a binary built outside the Makefile should
+// not claim a release somebody might act on. `go build ./cmd/jr` produces one.
 var (
-	Release = "0.1.0-dev"
+	Release = "0.0.0-unknown"
 	Commit  = "unknown"
 	Built   = "unknown"
 )
@@ -124,7 +130,7 @@ func CanWrite() bool { return HasTag("write") }
 func CanPrompt() bool { return HasTag("prompt") }
 
 // Display is the one-line version banner, e.g.
-// "jr 0.1.0-dev (reader; tags=mcp)".
+// "jr 1.2.0 (reader; tags=mcp)".
 func Display() string {
 	return fmt.Sprintf("%s %s (%s; tags=%s)", App, Release, Profile(), TagList())
 }
