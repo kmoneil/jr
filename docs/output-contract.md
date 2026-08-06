@@ -258,6 +258,16 @@ often blocked from the current status than misspelled.
 An unparseable `--format` still produces a readable error: the diagnostic falls
 back to XML rather than failing twice.
 
+### Refusals the server sends
+
+Most of the above are decided before a request goes out. One is not, and it is
+worth naming because the server's own answer sends the caller to the wrong
+place.
+
+| Code               | Exit | Meaning                                                                                                                                                                                                    |
+| ------------------ | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SPRINTS_REFUSED`  | 2    | Jira refused a sprint listing for that board. Only a scrum board has sprints, and a 400 whose remedy reads "check the request" sends somebody looking at their flags. `detail` keeps the server's own message, so the likely cause is offered without being asserted. |
+
 ### Idempotency
 
 A mutating command that carries an idempotency key records `(site, key)` before
@@ -317,7 +327,10 @@ renders the request as the command built it, before the transport attaches one.
 | `UNKNOWN_LINK_TYPE`       | 2    | No relationship by that phrase. `detail` lists every phrase the site offers, because link wording is customizable. |
 | `INVALID_DURATION`        | 2    | Not a Jira duration. The format is a count of `w`, `d`, `h`, or `m`, largest first. Nothing is converted between them: a working week is a site setting. |
 | `SELF_LINK`               | 2    | Both ends of a link are the same issue. |
+| `SELF_EPIC`               | 2    | An epic was named as one of the issues to move into it. |
 | `NOTHING_TO_EDIT`         | 2    | `issue edit` was given no field to change. |
+| `TOO_MANY_ISSUES`         | 2    | More issues than the agile API moves at once. It is refused rather than split across requests: two requests can half-succeed, and the outcome would be neither moved nor not moved. |
+| `SPRINT_NOT_ACTIVE`       | 7    | Only a running sprint can be closed. The sprint is read first, so the wrong state costs one read and no mutation. |
 
 ### Body text on write
 

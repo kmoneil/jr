@@ -43,6 +43,15 @@ issue to a sprint — lives in `workflow` or in the calling layer. This is what
 keeps each resource independently compilable, which is what makes compile-out
 work and what lets a new resource be added without touching an existing one.
 
+`workflow` holds `sprint add`, `epic add`, and `epic remove`, all behind the
+`write` tag. Each moves issues into or out of a container, so each touches the
+issue resource and the container's, and neither could live in either one. What
+they need from `resource/issue` is `ParseKey`: a local copy would be another
+reimplementation of the one function this project has an invariant about, and
+the first one nobody would think to keep in step. `internal/lint` allows a
+`write`-gated file in `workflow` for exactly this reason and nowhere else — a
+mutation that does not span two resources belongs with the thing it mutates.
+
 That rule is why **Jira metadata lives in `site`, not in the resource that
 lists it.** `issue list --field "Story Points"` has to resolve a name to
 `customfield_10042`, and it cannot ask the field resource to do it; `issue move`

@@ -13,14 +13,14 @@ converts a class of runtime bugs into link errors.
 
 | Tag         | Intends to gate                                         | Gates today                    |
 | ----------- | ------------------------------------------------------- | ------------------------------ |
-| `write`     | All mutating commands                                   | the seven `issue` write verbs  |
+| `write`     | All mutating commands                                   | the 17 mutating verbs          |
 | `mcp`       | `jr mcp serve`                                          | `jr mcp serve`                 |
 | `prompt`    | Interactive prompts, the setup wizard, completion       | `jr completion`                |
+| `admin`     | Project, board, and sprint administration               | `jr sprint close`              |
 | `tui`       | `jr ui`, interactive tables                             | **nothing** — no `jr ui` yet   |
 | `render`    | ADF→terminal markdown rendering                         | **nothing** — `adf` is a stub  |
 | `browser`   | `jr open`, the OAuth browser flow                       | **nothing** — no OAuth yet     |
 | `clipboard` | Copying keys and URLs                                   | **nothing** — nothing copies   |
-| `admin`     | Project, board, and sprint administration               | **nothing** — no such commands |
 
 The right-hand column is not documentation that can drift.
 `internal/lint/tags_test.go` asserts it: a tag gating nothing must be listed in
@@ -28,6 +28,22 @@ The right-hand column is not documentation that can drift.
 test until it is taken off that list. A file that only records the tag is set,
 or a package that is nothing but a doc comment, does not count as gating — that
 would report exactly the reassurance the audit exists to withhold.
+
+### Tags that combine
+
+`jr sprint close` is behind `write && admin`, and it is the only thing so far
+that needs two. Write, because it changes Jira; admin, because of what it
+changes — closing a sprint ends an iteration for a whole board and returns
+every unfinished issue to the backlog. The agent profile has `write` and not
+`admin`, so it can edit an issue and cannot end an iteration.
+
+That combination broke the audit before it worked. `filesPerTag` turned each tag
+on by itself and compared against a build with none, so a file needing two tags
+was added by neither and both looked emptier than they were. It now compares a
+full build against a full build minus one tag, which attributes such a file to
+every tag its constraint names. There is a second assertion alongside it:
+anything `admin` gates must also be gated by `write`, because administering a
+board is a mutation and a build without `write` must not contain one.
 
 The list lives in `internal/buildinfo.KnownTags`, with one `tag_<name>.go` file
 per tag. A tag enabled without an entry there fails
@@ -54,17 +70,17 @@ make build-all     # all four
 terminal, display-server, or `os/exec` dependency creeping in — it is **not** a
 measure of what a profile excludes, and it should not be read as one.
 
-Binary size is a poor proxy for compile-out. `full` and `agent` are currently
-the same number of bytes despite differing by a command, because the excluded
+Binary size is a poor proxy for compile-out. `full` and `agent` are near enough
+the same number of bytes despite differing by two commands, because the excluded
 code is smaller than the linker's section alignment absorbs. The guarantee that
 matters is the command surface, and that does differ:
 
-| Profile  | Commands | Not present                              |
-| -------- | -------- | ---------------------------------------- |
-| `full`   | 26       | —                                        |
-| `agent`  | 25       | `completion`                             |
-| `reader` | 18       | `completion`, the seven write verbs      |
-| `ci`     | 17       | the above, plus `mcp serve`              |
+| Profile  | Commands | Not present                                   |
+| -------- | -------- | --------------------------------------------- |
+| `full`   | 54       | —                                             |
+| `agent`  | 52       | `completion`, `sprint close`                  |
+| `reader` | 35       | the above, plus the 17 mutating verbs         |
+| `ci`     | 34       | the above, plus `mcp serve`                   |
 
 `make test-profiles` runs the whole suite under every shipped tag set, and the
 contract tests inside it assert the surface directly: no mutating command
