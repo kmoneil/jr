@@ -1,0 +1,20 @@
+{
+  "deployment": "datacenter",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/myself"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"name\": \"ada\", \"key\": \"ada\", \"displayName\": \"Ada Lovelace\", \"emailAddress\": \"ada@example.invalid\", \"active\": true}"
+      }
+    }
+  ]
+}

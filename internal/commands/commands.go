@@ -19,4 +19,5 @@ import (
 	_ "github.com/kmoneil/jira-cli/internal/resource/issue"
 	_ "github.com/kmoneil/jira-cli/internal/resource/meta"
 	_ "github.com/kmoneil/jira-cli/internal/resource/project"
+	_ "github.com/kmoneil/jira-cli/internal/resource/user"
 )

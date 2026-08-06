@@ -1,0 +1,21 @@
+{
+  "deployment": "cloud",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/user/search",
+        "query": "maxResults=50&query=ada"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "[{\"accountId\": \"712020:8f3a\", \"displayName\": \"Ada Lovelace\", \"active\": true, \"accountType\": \"atlassian\"}, {\"accountId\": \"712020:1111\", \"displayName\": \"Aaron Bot\", \"active\": true, \"accountType\": \"app\"}]"
+      }
+    }
+  ]
+}

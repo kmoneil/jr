@@ -44,6 +44,18 @@ var allowedHosts = map[string]bool{
 	"example.com": true, "atlassian.com": true,
 }
 
+// commandNames are dotted strings that are this tool's own command names and
+// happen to end in something that is also a real top-level domain.
+//
+// They are kept apart from allowedHosts deliberately. That list is real names a
+// test may contain; this one is names that are not hosts at all, and conflating
+// the two would let a genuine host in under cover of looking like a command.
+// "me" is a real TLD, so `user.me` trips the check for a reason that has
+// nothing to do with what the guard exists to catch.
+var commandNames = map[string]bool{
+	"user.me": true,
+}
+
 // fileSuffixes make a dotted string a filename rather than a host.
 var fileSuffixes = []string{
 	".go", ".json", ".toml", ".txt", ".tsv", ".xml", ".yaml", ".yml",
@@ -150,6 +162,9 @@ func suspiciousHost(s string) (string, bool) {
 
 	for _, m := range hostPattern.FindAllStringSubmatch(s, -1) {
 		host := strings.ToLower(m[1])
+		if commandNames[host] {
+			return "", false
+		}
 		if allowedHosts[host] {
 			continue
 		}

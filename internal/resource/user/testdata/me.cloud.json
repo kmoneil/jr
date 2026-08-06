@@ -1,0 +1,20 @@
+{
+  "deployment": "cloud",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/myself"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"accountId\": \"712020:8f3a\", \"displayName\": \"Ada Lovelace\", \"active\": true, \"accountType\": \"atlassian\"}"
+      }
+    }
+  ]
+}

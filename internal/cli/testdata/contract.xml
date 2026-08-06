@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <result kind="contract" v="1">
-  <kinds count="21" complete="true">
+  <kinds count="23" complete="true">
     <kind name="auth.status" v="1" emitters="auth.login,auth.logout,auth.status"/>
     <kind name="auth.token" v="1" emitters="auth.token"/>
     <kind name="context.get" v="1" emitters="context.create,context.delete,context.show,context.use"/>
@@ -21,6 +21,8 @@
     <kind name="project.versions" v="1" emitters="project.versions"/>
     <kind name="schema.command" v="1" emitters="schema"/>
     <kind name="schema.commands" v="1" emitters="schema"/>
+    <kind name="user.get" v="1" emitters="user.get,user.me"/>
+    <kind name="user.list" v="1" emitters="user.list"/>
     <kind name="version" v="1" emitters="version"/>
   </kinds>
 </result>

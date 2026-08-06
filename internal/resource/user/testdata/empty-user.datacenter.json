@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/user",
+        "query": "username=nobody"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{}"
+      }
+    }
+  ]
+}
