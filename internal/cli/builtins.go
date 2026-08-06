@@ -96,6 +96,11 @@ it lists only what this build contains.`),
 			Usage: "dotted command name, e.g. issue.list",
 		}},
 		Paginated: true,
+		// The command surface is local, finite, and known before this runs, so
+		// there is nothing for the default bound to protect against. It stayed
+		// at fifty until the binary passed fifty commands, at which point
+		// `jr schema` began describing most of itself and exiting 3.
+		DefaultsToAll: true,
 		Outputs: []registry.Output{
 			{Kind: registry.KindCommands, Version: registry.VersionCommands},
 			{

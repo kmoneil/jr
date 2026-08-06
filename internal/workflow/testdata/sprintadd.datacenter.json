@@ -1,0 +1,15 @@
+{
+  "deployment": "datacenter",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/agile/1.0/sprint/128/issue",
+        "body": "{\"issues\":[\"ENG-1\",\"ENG-2\"]}"
+      },
+      "response": {
+        "status": 204
+      }
+    }
+  ]
+}

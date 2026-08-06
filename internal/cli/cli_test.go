@@ -107,6 +107,41 @@ func TestSchemaDefaultsToTSV(t *testing.T) {
 	assertGolden(t, "schema.tsv", got.stdout)
 }
 
+// TestSchemaIsCompleteWithNoFlags is a regression with a date on it.
+//
+// `jr schema` inherited the fifty-result default that exists so an unbounded
+// remote query does not page forever. The command surface is neither remote nor
+// unbounded — the binary holds the whole list before the command runs — and the
+// default was invisible right up until the build passed fifty commands, at
+// which point the tool's own self-description started arriving truncated with
+// exit 3. Honest, and useless: an agent introspecting the binary would have
+// seen most of it.
+//
+// The count is deliberately not asserted. What matters is that whatever the
+// build contains, asking it what it contains returns all of it.
+func TestSchemaIsCompleteWithNoFlags(t *testing.T) {
+	got := run(t, nil, "schema")
+	if got.exit != exitcode.OK {
+		t.Fatalf("exit = %v, want 0: the self-description was truncated\n%s",
+			got.exit, got.stderr)
+	}
+	if got.stderr != "" {
+		t.Errorf("stderr is not empty, so something was withheld:\n%s", got.stderr)
+	}
+
+	rows := strings.Count(strings.TrimRight(got.stdout, "\n"), "\n")
+	bounded := run(t, nil, "schema", "--limit", "all")
+	if want := strings.Count(strings.TrimRight(bounded.stdout, "\n"), "\n"); rows != want {
+		t.Errorf("schema returned %d rows and `schema --limit all` returned %d",
+			rows, want)
+	}
+	// --limit still bounds it when asked, so the flag keeps meaning what it
+	// says rather than becoming decoration.
+	if one := run(t, nil, "schema", "--limit", "1"); one.exit != exitcode.Partial {
+		t.Errorf("--limit 1 exit = %v, want PARTIAL", one.exit)
+	}
+}
+
 // TestTruncationExitsPartial is the contract's load-bearing behavior: a
 // truncated result is data on stdout, a structured warning on stderr, and
 // exit 3 — never a quiet success.

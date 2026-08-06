@@ -71,10 +71,17 @@ func TestTheTagsThatGateCodeGateTheRightCode(t *testing.T) {
 
 	// Every mutating verb is behind write, so a reader binary cannot contain
 	// one. The count is not asserted — verbs get added — but the location is.
+	//
+	// internal/workflow is the second home, and only for a mutation that spans
+	// two resources: resources never import each other, so `sprint add` cannot
+	// live in either the sprint resource or the issue one. Anywhere else means
+	// a mutation has drifted away from the thing it mutates.
 	for _, file := range gated["write"] {
-		if !strings.HasPrefix(file, "internal/resource/") {
-			t.Errorf("write gates %s, which is not a resource; a mutation "+
-				"belongs in the resource it mutates", file)
+		if !strings.HasPrefix(file, "internal/resource/") &&
+			!strings.HasPrefix(file, "internal/workflow/") {
+			t.Errorf("write gates %s, which is neither a resource nor workflow; "+
+				"a mutation belongs in the resource it mutates, or in workflow "+
+				"when it spans two", file)
 		}
 	}
 	if len(gated["write"]) == 0 {

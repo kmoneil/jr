@@ -1,0 +1,15 @@
+{
+  "deployment": "cloud",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/agile/1.0/epic/ENG-42/issue",
+        "body": "{\"issues\":[\"ENG-101\"]}"
+      },
+      "response": {
+        "status": 204
+      }
+    }
+  ]
+}

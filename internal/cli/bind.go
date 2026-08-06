@@ -46,7 +46,11 @@ func bindFlags(cc *cobra.Command, rc *registry.Command) func(*cobra.Command) reg
 	if rc.Paginated {
 		// --limit is a user intent, decoupled from the API page size. There is
 		// deliberately no offset flag: the upstream API is cursor-based.
-		fs.String("limit", fmt.Sprint(registry.DefaultLimit),
+		def := fmt.Sprint(registry.DefaultLimit)
+		if rc.DefaultsToAll {
+			def = "all"
+		}
+		fs.String("limit", def,
 			`maximum results, or "all" to exhaust the result set`)
 	}
 

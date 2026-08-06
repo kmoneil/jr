@@ -1,0 +1,15 @@
+{
+  "deployment": "datacenter",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/agile/1.0/epic/none/issue",
+        "body": "{\"issues\":[\"ENG-101\",\"ENG-102\"]}"
+      },
+      "response": {
+        "status": 204
+      }
+    }
+  ]
+}

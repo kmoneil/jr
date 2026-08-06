@@ -23,4 +23,8 @@ import (
 	_ "github.com/kmoneil/jira-cli/internal/resource/project"
 	_ "github.com/kmoneil/jira-cli/internal/resource/sprint"
 	_ "github.com/kmoneil/jira-cli/internal/resource/user"
+
+	// The verbs that move issues between containers span two resources, so
+	// they live in workflow rather than in either one.
+	_ "github.com/kmoneil/jira-cli/internal/workflow"
 )

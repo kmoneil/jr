@@ -93,6 +93,18 @@ type Command struct {
 	// Paginated marks a command that returns a collection the caller can
 	// bound with --limit.
 	Paginated bool
+	// DefaultsToAll makes --limit default to "all" instead of DefaultLimit.
+	//
+	// It is for a command whose result set is local, finite, and entirely
+	// known before it runs — the command surface of this binary, not a query
+	// against a server. DefaultLimit exists so an unbounded remote query does
+	// not page forever, and that reasoning does not apply to a list the binary
+	// already holds. A self-description that truncated at fifty would report
+	// most of itself and exit 3, which is honest and useless.
+	//
+	// --limit still bounds it when asked, so the flag keeps meaning what it
+	// says.
+	DefaultsToAll bool
 	// CollectionName is the container element a streaming command emits, e.g.
 	// "issues", and Columns is its default TSV projection. They live on the
 	// declaration rather than being returned with the rows, because the stream
