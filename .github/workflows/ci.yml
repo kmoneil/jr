@@ -30,6 +30,23 @@ jobs:
         with:
           version: latest
 
+  vuln:
+    name: vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          # go.mod pins a patch version, so a runner on an older 1.26 fetches
+          # the toolchain it asks for. That is the point: the scan reports the
+          # standard library it is actually built against, and GO-2026-5856 was
+          # a finding in crypto/tls rather than in anything this module wrote.
+          go-version: ${{ env.GO_VERSION }}
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          make vuln
+
   test:
     name: test (tags=${{ matrix.tags && matrix.tags || 'none' }})
     runs-on: ubuntu-latest

@@ -219,6 +219,37 @@ golden:
 lint:
 	golangci-lint run
 
+# Vulnerability scan, over the module and the toolchain it is built with.
+#
+# It fails closed, because govulncheck's own exit status already carries the
+# distinction worth acting on: 3 when a vulnerability is *reachable* — some
+# symbol this code calls, traced from a real call site — and 0 when the only
+# findings sit in modules nothing here calls into. Softening that into a
+# warning would make a green `make ci` mean "found something, carried on",
+# which is the one thing this project's checks are not allowed to mean.
+#
+# The scan runs under TAGS_FULL for the reason the fuzz sweep does. With no
+# tags it analyses the smallest build there is, and a vulnerability reachable
+# only from code behind `write` or `mcp` would be invisible while the scan
+# reported itself clean. There are no negated build constraints in this tree,
+# so the full tag set is a superset of every shipped profile and one pass
+# covers all four.
+#
+# Test files are deliberately not scanned: nothing in them ships, and a finding
+# there would fail a build over code no user can reach.
+#
+# This is the one target that needs a network — the database is vuln.go.dev.
+# An offline run fails rather than passing quietly, on the same principle as
+# everything else here: a check that did not run is not a check that passed.
+## vuln: scan for known vulnerabilities, in this module and the toolchain
+.PHONY: vuln
+vuln:
+	@command -v govulncheck >/dev/null || { \
+		echo "govulncheck is not installed:"; \
+		echo "  go install golang.org/x/vuln/cmd/govulncheck@latest"; \
+		exit 1; }
+	govulncheck -tags "$(TAGS_FULL)" ./...
+
 ## fmt: format the tree
 .PHONY: fmt
 fmt:
@@ -234,7 +265,7 @@ vet:
 
 ## ci: everything CI enforces, runnable locally
 .PHONY: ci
-ci: fmt-check vet lint test-profiles test-race build-all size
+ci: fmt-check vet lint vuln test-profiles test-race build-all size
 
 ## fmt-check: fail if the tree is not formatted
 .PHONY: fmt-check

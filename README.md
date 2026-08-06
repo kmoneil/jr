@@ -408,6 +408,7 @@ make test-profiles  # the suite under every shipped tag set
 make fuzz           # every fuzz target, FUZZTIME each (default 30s)
 make golden         # rewrite the output-contract golden files
 make cost           # what each format costs, in tokens (needs uv, and network)
+make vuln           # govulncheck over every profile's code (needs network)
 make lint fmt vet
 make ci             # everything CI enforces
 ```
