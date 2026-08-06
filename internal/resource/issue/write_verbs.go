@@ -265,6 +265,9 @@ Not copied: status, resolution, assignee, reporter, comments, attachments,
 links, worklogs, watchers, and every custom field. A copy that silently brought
 half an issue's history along would be worse than one that says what it is.
 
+A Cloud description is also not copied. It arrives as a document, and
+re-encoding it as plain text would flatten every mark and link in it.
+
 --summary replaces the copied summary. --idempotency-key makes a retry safe, the
 same as on issue create.
 
@@ -335,9 +338,10 @@ func runClone(ctx context.Context, inv *registry.Invocation) (*render.Doc, error
 		Labels:   source.Labels,
 		Parent:   source.Parent,
 	}
-	// The description only crosses over where it is text. On Cloud it arrives
-	// as ADF, and this tool does not yet build one to send back — copying it
-	// raw would be rejected, and flattening it would lose the markup.
+	// A wiki description crosses over as it is. An ADF one does not: it arrives
+	// as a document, and re-encoding it as plain text would flatten every mark
+	// and link in it into characters. Dropping it is the honest half-copy;
+	// silently flattening would be the dishonest one.
 	if source.BodyFormat == BodyWiki {
 		opt.Description = source.Description
 	}

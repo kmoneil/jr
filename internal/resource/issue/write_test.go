@@ -102,35 +102,75 @@ func TestCreateOmitsWhatWasNotAsked(t *testing.T) {
 	}
 }
 
-// TestDescriptionIsRefusedOnCloud is the deliberate hole. Cloud's v3 API takes
-// an ADF object; sending text raw is rejected and wrapping it would silently
-// discard markup, so the command refuses rather than approximating.
-func TestDescriptionIsRefusedOnCloud(t *testing.T) {
-	client, _ := writeClient(site.Cloud)
-	_, err := client.CreateRequest(issue.CreateOptions{
-		Project: "ENG", Type: "Bug", Summary: "s", Description: "some text",
-	})
-	if err == nil {
-		t.Fatal("a description was accepted against Cloud")
-	}
-	e := errs.Coerce(err)
-	if e.Code != "UNSUPPORTED_ON_DEPLOYMENT" {
-		t.Errorf("code = %q, want UNSUPPORTED_ON_DEPLOYMENT", e.Code)
-	}
-	if e.Exit != exitcode.Usage {
-		t.Errorf("exit = %v, want %v", e.Exit, exitcode.Usage)
-	}
+// TestDescriptionIsContainedNotConverted covers the shape each deployment
+// takes. Cloud will not accept a string where a document belongs, so the text
+// is wrapped in one — which is exact. What is *not* done is interpreting it:
+// **bold** reaches Jira as six characters, which is also what Data Center does
+// with the same input.
+func TestDescriptionIsContainedNotConverted(t *testing.T) {
+	const text = "line one\nline two\n\nsecond paragraph with **bold**"
 
-	// And it works on Data Center, where the field really is text.
+	// Data Center takes it as a string, unchanged.
 	dc, _ := writeClient(site.DataCenter)
 	req, err := dc.CreateRequest(issue.CreateOptions{
-		Project: "ENG", Type: "Bug", Summary: "s", Description: "some text",
+		Project: "ENG", Type: "Bug", Summary: "s", Description: text,
 	})
 	if err != nil {
 		t.Fatalf("data center: %v", err)
 	}
-	if got := bodyFields(t, req.Body)["description"]; got != "some text" {
+	if got := bodyFields(t, req.Body)["description"]; got != text {
 		t.Errorf("description = %v, want it carried through unchanged", got)
+	}
+
+	// Cloud takes a document containing the same characters.
+	cloud, _ := writeClient(site.Cloud)
+	req, err = cloud.CreateRequest(issue.CreateOptions{
+		Project: "ENG", Type: "Bug", Summary: "s", Description: text,
+	})
+	if err != nil {
+		t.Fatalf("cloud: %v", err)
+	}
+	doc, ok := bodyFields(t, req.Body)["description"].(map[string]any)
+	if !ok {
+		t.Fatalf("cloud description is not a document: %s", req.Body)
+	}
+	if doc["type"] != "doc" {
+		t.Errorf("type = %v, want doc", doc["type"])
+	}
+
+	// A blank line started a second paragraph; the single newline did not.
+	content, _ := doc["content"].([]any)
+	if len(content) != 2 {
+		t.Fatalf("got %d paragraphs, want 2: %s", len(content), req.Body)
+	}
+
+	// And the characters survive exactly — nothing read the asterisks as a
+	// mark, which is the difference between containing and converting.
+	flat := string(req.Body)
+	for _, want := range []string{"line one", "line two", "**bold**", "hardBreak"} {
+		if !strings.Contains(flat, want) {
+			t.Errorf("the document does not carry %q: %s", want, flat)
+		}
+	}
+	if strings.Contains(flat, `"strong"`) {
+		t.Errorf("markdown was interpreted as a mark: %s", flat)
+	}
+}
+
+// TestInvalidUTF8IsRefusedNotReplaced covers the encoding rule. Substituting
+// U+FFFD would put a character in Jira the caller never wrote, with no way for
+// them to know it happened.
+func TestInvalidUTF8IsRefusedNotReplaced(t *testing.T) {
+	cloud, _ := writeClient(site.Cloud)
+	_, err := cloud.CreateRequest(issue.CreateOptions{
+		Project: "ENG", Type: "Bug", Summary: "s",
+		Description: "valid then \xff\xfe invalid",
+	})
+	if err == nil {
+		t.Fatal("invalid UTF-8 was accepted")
+	}
+	if code := errs.Coerce(err).Code; code != "INVALID_ENCODING" {
+		t.Errorf("code = %q, want INVALID_ENCODING", code)
 	}
 }
 

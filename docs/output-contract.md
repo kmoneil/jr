@@ -311,9 +311,28 @@ renders the request as the command built it, before the transport attaches one.
 | `READ_ONLY`               | 10   | A context, `--readonly`, or `JIRA_READONLY` forbids changing Jira. It is a one-way latch; nothing turns it off. |
 | `CONFIRMATION_REQUIRED`   | 10   | A destructive command was run without `--yes`. Not raised for `--dry-run`: a preview is not the thing being confirmed, and you look at it in order to decide. |
 | `IDEMPOTENT_IN_FLIGHT`    | 7    | Another run holds this key and has not finished; it may already have done the work. |
-| `UNSUPPORTED_ON_DEPLOYMENT` | 2  | The flag is real but this deployment cannot honor it — `--description` against Cloud, which needs an ADF body this tool does not yet build. |
+| `INVALID_ENCODING`        | 2    | Text that is not valid UTF-8. It is refused, never repaired: substituting U+FFFD would put a character in Jira the caller never wrote. |
 | `CONFLICTING_LABEL_FLAGS` | 2    | `--label` replaces the whole set, so it cannot be combined with `--add-label` or `--remove-label`. |
 | `NOTHING_TO_EDIT`         | 2    | `issue edit` was given no field to change. |
+
+### Body text on write
+
+Text bound for a description or a comment is **contained, never converted**.
+
+Data Center takes a string of wiki markup and gets the text as typed. Cloud will
+not accept a string where a document belongs, so the text is wrapped in the
+minimal Atlassian Document Format document that holds it: a blank line starts a
+paragraph, a single newline is a line break. Nothing is interpreted — `**bold**`
+reaches Jira as six characters on both deployments, and the server decides what
+they mean.
+
+That is the difference between containing text, which is exact, and converting
+it, which is not. Turning markdown into real ADF marks is a separate job with
+its own failure modes, and when it lands an unrepresentable construct will be
+refused by name rather than approximated.
+
+Reading is unchanged: a body comes back with a `format` attribute of `wiki` or
+`adf` and its content untouched.
 
 A create result carries `replayed="true"` when it came from the ledger rather
 than from Jira. It is otherwise byte-identical to the original: a consumer

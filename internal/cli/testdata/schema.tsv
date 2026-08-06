@@ -10,6 +10,7 @@ context.show	Show one context, or the effective settings for this invocation	fal
 context.use	Select the context every command uses by default	false	false	context.get
 contract	Dump the machine-readable output contract for every kind	false	false	contract
 field.list	List every field this site has	false	false	field.list
+issue.comment.list	List an issue's comments	false	false	issue.comment.list
 issue.get	Fetch one issue in full	false	false	issue.get
 issue.list	List issues matching a query	false	false	issue.list
 meta.createmeta	List the fields a new issue of one type requires	false	false	meta.createmeta

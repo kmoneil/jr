@@ -77,10 +77,10 @@ identical issues are a legitimate thing to want.
 
 --dry-run prints the exact request, body included, and sends nothing.
 
---description is refused on Cloud. Cloud's v3 API takes an Atlassian Document
-Format object rather than text, and this tool does not yet convert one; sending
-the text raw would be rejected, and wrapping it would silently discard any
-markup in it.`),
+--description is sent as plain text. No markup is interpreted: **bold** reaches
+Jira as six characters. On Cloud the text is wrapped in the document structure
+the API requires, because containing text is exact where interpreting it is
+not.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue create --type Bug --summary 'Retry drops the last error'",
 			buildinfo.App + " issue create --type Task --summary Ship --idempotency-key deploy-42",
@@ -97,7 +97,7 @@ markup in it.`),
 			},
 			{
 				Name: "description", Type: registry.TypeString,
-				Usage: "the issue description; Data Center only, see the description above",
+				Usage: "the issue description, as plain text",
 			},
 			{
 				Name: "priority", Type: registry.TypeString,
@@ -179,19 +179,14 @@ func (c *Client) CreateRequest(opt CreateOptions) (transport.Request, error) {
 	}
 
 	if opt.Description != "" {
-		if c.Site.Kind == site.Cloud {
-			// Cloud's v3 API takes an ADF object. Sending the text raw is
-			// rejected, and wrapping it in a paragraph would silently discard
-			// any markup the caller wrote — which is the lossy conversion this
-			// tool refuses to make on their behalf.
-			return transport.Request{}, errs.Usage("UNSUPPORTED_ON_DEPLOYMENT",
-				"--description is not supported against Cloud yet").
-				WithDetail("Cloud takes an Atlassian Document Format body, " +
-					"and this tool does not convert text into one").
-				WithRemedy("set the description in the browser, or " +
-					"use a Data Center site")
+		// Contained, not converted: Cloud takes an ADF document where Data
+		// Center takes a string, and the text goes into one as plain text with
+		// no markup interpreted. See bodyValue.
+		value, err := bodyValue(c.Site.Kind, opt.Description)
+		if err != nil {
+			return transport.Request{}, err
 		}
-		fields["description"] = opt.Description
+		fields["description"] = value
 	}
 	if opt.Priority != "" {
 		fields["priority"] = map[string]any{"name": opt.Priority}
@@ -450,7 +445,7 @@ the flag leaves it as it was, which is a different thing.
 
 --dry-run prints the exact request, body included, and sends nothing.
 
---description carries the same Cloud restriction as issue create.`),
+--description is plain text, exactly as on issue create.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue edit ENG-101 --summary 'A better summary'",
 			buildinfo.App + " issue edit ENG-101 --add-label retry --remove-label wontfix",
@@ -463,7 +458,7 @@ the flag leaves it as it was, which is a different thing.
 			{Name: "summary", Type: registry.TypeString, Usage: "replace the summary"},
 			{
 				Name: "description", Type: registry.TypeString,
-				Usage: "replace the description; Data Center only",
+				Usage: "replace the description, as plain text",
 			},
 			{Name: "priority", Type: registry.TypeString, Usage: "set the priority by name"},
 			{
@@ -570,15 +565,11 @@ func (c *Client) EditRequest(opt EditOptions) (transport.Request, error) {
 		fields["summary"] = opt.Summary
 	}
 	if opt.Description != "" {
-		if c.Site.Kind == site.Cloud {
-			return transport.Request{}, errs.Usage("UNSUPPORTED_ON_DEPLOYMENT",
-				"--description is not supported against Cloud yet").
-				WithDetail("Cloud takes an Atlassian Document Format body, " +
-					"and this tool does not convert text into one").
-				WithRemedy("set the description in the browser, or " +
-					"use a Data Center site")
+		value, err := bodyValue(c.Site.Kind, opt.Description)
+		if err != nil {
+			return transport.Request{}, err
 		}
-		fields["description"] = opt.Description
+		fields["description"] = value
 	}
 	if opt.Priority != "" {
 		fields["priority"] = map[string]any{"name": opt.Priority}

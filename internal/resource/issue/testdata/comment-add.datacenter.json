@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/2/issue/ENG-101/comment",
+        "body": "{\"body\":\"a new comment\"}"
+      },
+      "response": {
+        "status": 201,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"id\": \"10099\", \"author\": {\"name\": \"ada\", \"displayName\": \"Ada Lovelace\"}, \"body\": \"Reproduced on 9.12.7 with *emphasis*\", \"created\": \"2026-08-01T09:15:00.000+0000\", \"updated\": \"2026-08-01T09:15:00.000+0000\"}"
+      }
+    }
+  ]
+}
