@@ -1195,3 +1195,44 @@ func TestTheRemainingVerbsRunAsRegisteredCommands(t *testing.T) {
 		}
 	}
 }
+
+// TestDeleteNamesTheFlagThatWouldHaveWorked covers the hint. Jira refuses an
+// issue with subtasks in prose, and passing that through unchanged leaves the
+// caller to discover that a flag exists.
+func TestDeleteNamesTheFlagThatWouldHaveWorked(t *testing.T) {
+	cmd, _ := registry.Lookup("issue.delete")
+	conn, _ := replayConn(t, "delete-subtasks.datacenter.json")
+
+	flags := registry.NewFlags()
+	flags.SetBool("yes", true)
+	inv := &registry.Invocation{
+		Jira: &stubSession{
+			doer: &stubDoer{body: catalogueJSON}, conn: conn, kind: site.DataCenter,
+		},
+		Args: []string{"ENG-101"}, Flags: flags,
+		Stderr: io.Discard, Progress: registry.NoProgress,
+	}
+
+	_, err := cmd.Run(t.Context(), inv)
+	if err == nil {
+		t.Fatal("an issue with subtasks was deleted without asking")
+	}
+	if remedy := errs.Coerce(err).Remedy; !strings.Contains(remedy, "--subtasks") {
+		t.Errorf("the refusal does not name the flag that would work: %q", remedy)
+	}
+
+	// With the flag already passed, Jira's own message stands: adding a remedy
+	// pointing at a flag the caller used would be noise.
+	flags.SetBool("subtasks", true)
+	conn2, _ := replayConn(t, "delete-subtasks.datacenter.json")
+	inv.Jira = &stubSession{
+		doer: &stubDoer{body: catalogueJSON}, conn: conn2, kind: site.DataCenter,
+	}
+	_, err = cmd.Run(t.Context(), inv)
+	if err == nil {
+		t.Fatal("the second call succeeded unexpectedly")
+	}
+	if remedy := errs.Coerce(err).Remedy; strings.Contains(remedy, "--subtasks") {
+		t.Errorf("the remedy repeats a flag already given: %q", remedy)
+	}
+}

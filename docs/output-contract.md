@@ -313,6 +313,10 @@ renders the request as the command built it, before the transport attaches one.
 | `IDEMPOTENT_IN_FLIGHT`    | 7    | Another run holds this key and has not finished; it may already have done the work. |
 | `INVALID_ENCODING`        | 2    | Text that is not valid UTF-8. It is refused, never repaired: substituting U+FFFD would put a character in Jira the caller never wrote. |
 | `CONFLICTING_LABEL_FLAGS` | 2    | `--label` replaces the whole set, so it cannot be combined with `--add-label` or `--remove-label`. |
+| `AMBIGUOUS_LINK_DIRECTION`| 2    | A link type's name was given where a direction was needed. `"Blocks"` reads either way; `detail` offers both phrasings. |
+| `UNKNOWN_LINK_TYPE`       | 2    | No relationship by that phrase. `detail` lists every phrase the site offers, because link wording is customizable. |
+| `INVALID_DURATION`        | 2    | Not a Jira duration. The format is a count of `w`, `d`, `h`, or `m`, largest first. Nothing is converted between them: a working week is a site setting. |
+| `SELF_LINK`               | 2    | Both ends of a link are the same issue. |
 | `NOTHING_TO_EDIT`         | 2    | `issue edit` was given no field to change. |
 
 ### Body text on write

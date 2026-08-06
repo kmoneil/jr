@@ -1,0 +1,36 @@
+{
+  "deployment": "datacenter",
+  "interactions": [
+    {
+      "request": {
+        "method": "DELETE",
+        "path": "/rest/api/2/issue/ENG-101"
+      },
+      "response": {
+        "status": 400,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"errorMessages\": [\"The issue 'ENG-101' has subtasks and subtasks are not deleted.\"]}"
+      }
+    },
+    {
+      "request": {
+        "method": "DELETE",
+        "path": "/rest/api/2/issue/ENG-101",
+        "query": "deleteSubtasks=true"
+      },
+      "response": {
+        "status": 400,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"errorMessages\": [\"The issue 'ENG-101' has subtasks and subtasks are not deleted.\"]}"
+      }
+    }
+  ]
+}

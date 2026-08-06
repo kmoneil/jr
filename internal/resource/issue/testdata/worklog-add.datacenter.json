@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/2/issue/ENG-101/worklog",
+        "body": "{\"started\":\"2026-08-05T09:00:00.000+0000\",\"timeSpent\":\"3h\"}"
+      },
+      "response": {
+        "status": 201,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"id\": \"10099\", \"author\": {\"name\": \"ada\", \"displayName\": \"Ada Lovelace\"}, \"timeSpent\": \"3h\", \"timeSpentSeconds\": 10800, \"started\": \"2026-08-05T09:00:00.000+0000\", \"created\": \"2026-08-05T09:00:00.000+0000\"}"
+      }
+    }
+  ]
+}

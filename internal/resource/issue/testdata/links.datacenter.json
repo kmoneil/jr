@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/issue/ENG-101",
+        "query": "fields=issuelinks"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"fields\": {\"issuelinks\": [{\"id\": \"10001\", \"type\": {\"id\": \"10000\", \"name\": \"Blocks\", \"inward\": \"is blocked by\", \"outward\": \"blocks\"}, \"outwardIssue\": {\"key\": \"ENG-200\", \"fields\": {\"summary\": \"the thing this waits on\", \"status\": {\"name\": \"Open\"}, \"issuetype\": {\"name\": \"Bug\"}}}}, {\"id\": \"10002\", \"type\": {\"id\": \"10000\", \"name\": \"Blocks\", \"inward\": \"is blocked by\", \"outward\": \"blocks\"}, \"inwardIssue\": {\"key\": \"ENG-300\", \"fields\": {\"summary\": \"the thing waiting on this\", \"status\": {\"name\": \"Open\"}, \"issuetype\": {\"name\": \"Bug\"}}}}]}}"
+      }
+    }
+  ]
+}

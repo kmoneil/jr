@@ -1,0 +1,36 @@
+{
+  "deployment": "cloud",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issueLinkType"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"issueLinkTypes\": [{\"id\": \"10000\", \"name\": \"Blocks\", \"inward\": \"is blocked by\", \"outward\": \"blocks\"}, {\"id\": \"10001\", \"name\": \"Relates\", \"inward\": \"relates to\", \"outward\": \"relates to\"}]}"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/3/issueLink",
+        "body": "{\"inwardIssue\":{\"key\":\"ENG-2\"},\"outwardIssue\":{\"key\":\"ENG-1\"},\"type\":{\"name\":\"Blocks\"}}"
+      },
+      "response": {
+        "status": 201,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": ""
+      }
+    }
+  ]
+}
