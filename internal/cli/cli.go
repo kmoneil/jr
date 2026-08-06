@@ -137,7 +137,7 @@ func (a *app) fail(err error) exitcode.Code {
 	if errors.Is(err, context.Canceled) {
 		err = errs.Runtime("CANCELED", "canceled").Wrap(err)
 	}
-	e := errs.Coerce(err)
+	e := a.explainSite(errs.Coerce(err))
 	format := a.errorFormat()
 	if werr := render.WriteError(a.stderr, e, format); werr != nil {
 		// The error renderer itself failed. Fall back to a plain line rather
@@ -145,6 +145,53 @@ func (a *app) fail(err error) exitcode.Code {
 		_, _ = io.WriteString(a.stderr, e.Error()+"\n")
 	}
 	return e.Exit
+}
+
+// siteErrors are the failures where "which site was that" is the next question
+// and the answer is not in the message.
+//
+// A NO_SUCH_ENDPOINT for a site you believe you configured is unresolvable
+// without running `jr context show` to find out what the tool actually used —
+// which cost several round trips during setup, and is exactly the kind of
+// second command an error should make unnecessary.
+var siteErrors = map[string]bool{
+	"NO_SUCH_ENDPOINT":      true,
+	"NETWORK":               true,
+	"TIMEOUT":               true,
+	"MALFORMED_SERVER_INFO": true,
+	"UNKNOWN_DEPLOYMENT":    true,
+	"OFF_SITE_URL":          true,
+}
+
+// explainSite adds where the site came from to a failure about reaching it.
+//
+// Three things can supply a site — --site, JIRA_SITE, a context — and which one
+// won is visible nowhere else. Resolving here rather than at the point of
+// failure means every command gets it, including the requests that never pass
+// through the connection code.
+func (a *app) explainSite(e *errs.Error) *errs.Error {
+	if e == nil || !siteErrors[e.Code] {
+		return e
+	}
+	cfg, err := a.config()
+	if err != nil {
+		// The config is why we are here, or it is broken too. Either way this
+		// is a decoration, not the failure, and it does not get to replace one.
+		return e
+	}
+	resolved, err := a.resolve(cfg)
+	if err != nil {
+		return e
+	}
+	origin := resolved.SiteOrigin()
+	if origin == "" || strings.Contains(e.Detail, origin) {
+		return e
+	}
+
+	if e.Detail == "" {
+		return e.WithDetail("%s", origin)
+	}
+	return e.WithDetail("%s; %s", e.Detail, origin)
 }
 
 // errorFormat resolves the format for a diagnostic. A bad --format value must

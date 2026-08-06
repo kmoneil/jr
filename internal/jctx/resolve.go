@@ -1,6 +1,7 @@
 package jctx
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
@@ -49,6 +50,49 @@ type Resolved struct {
 
 	// CredentialRef is the key the credential store is asked for.
 	CredentialRef string
+
+	// SiteSource says where Site came from, so an error about it can be acted
+	// on without a second command.
+	//
+	// "the site is not reachable" is unresolvable on its own when three things
+	// could have supplied it. Precedence is flag, then environment, then
+	// context, and which one won is not visible anywhere else.
+	SiteSource Source
+}
+
+// Source names where a resolved value came from.
+type Source string
+
+// The places a setting can come from, in precedence order.
+const (
+	FromFlag    Source = "flag"
+	FromEnv     Source = "environment"
+	FromContext Source = "context"
+	FromNowhere Source = ""
+)
+
+// SiteOrigin renders where the site came from, for an error message.
+//
+// It returns the empty string when nothing supplied one, because "no site is
+// configured" already says everything there is to say.
+func (r *Resolved) SiteOrigin() string {
+	if r == nil {
+		return ""
+	}
+	switch r.SiteSource {
+	case FromFlag:
+		return "the site came from --site"
+	case FromEnv:
+		return "the site came from " + EnvSite
+	case FromContext:
+		if r.Name != "" {
+			return fmt.Sprintf("the site came from context %q", r.Name)
+		}
+		return "the site came from the selected context"
+	case FromNowhere:
+		return ""
+	}
+	return ""
 }
 
 // Resolve computes the effective settings.
@@ -70,10 +114,11 @@ func Resolve(cfg *Config, over Overrides, getenv Getenv) (*Resolved, error) {
 	}
 
 	r := &Resolved{
-		Name:    name,
-		Site:    firstNonEmpty(over.Site, getenv(EnvSite), ctx.Site),
-		Project: firstNonEmpty(over.Project, getenv(EnvProject), ctx.Project),
-		Board:   firstNonEmpty(over.Board, getenv(EnvBoard), ctx.Board),
+		Name:       name,
+		Site:       firstNonEmpty(over.Site, getenv(EnvSite), ctx.Site),
+		SiteSource: sourceOf(over.Site, getenv(EnvSite), ctx.Site),
+		Project:    firstNonEmpty(over.Project, getenv(EnvProject), ctx.Project),
+		Board:      firstNonEmpty(over.Board, getenv(EnvBoard), ctx.Board),
 		// Read-only latches on from any source and never off.
 		ReadOnly:      over.ReadOnly || truthy(getenv(EnvReadOnly)) || ctx.ReadOnly,
 		CredentialRef: ctx.Credential,
@@ -182,6 +227,21 @@ func (r *Resolved) CheckWritable(command string) error {
 	return e.
 		WithDetail("read-only was requested by --readonly or %s", EnvReadOnly).
 		WithRemedy("drop --readonly, or unset %s", EnvReadOnly)
+}
+
+// sourceOf reports which of the three precedence slots supplied a value. It
+// takes the same arguments as firstNonEmpty, in the same order, so the two
+// cannot disagree about which one won.
+func sourceOf(flag, env, ctx string) Source {
+	switch {
+	case strings.TrimSpace(flag) != "":
+		return FromFlag
+	case strings.TrimSpace(env) != "":
+		return FromEnv
+	case strings.TrimSpace(ctx) != "":
+		return FromContext
+	}
+	return FromNowhere
 }
 
 func firstNonEmpty(values ...string) string {

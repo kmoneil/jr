@@ -296,6 +296,22 @@ or its parentheses did not balance. The three are not the same claim, and a
 consumer that treats them as one is trusting a lexer with a question only the
 server can answer.
 
+### Errors about reaching the site
+
+`NO_SUCH_ENDPOINT`, `NETWORK`, `TIMEOUT`, `MALFORMED_SERVER_INFO`,
+`UNKNOWN_DEPLOYMENT`, and `OFF_SITE_URL` carry where the site came from in
+their `detail`: `the site came from context "work"`, `from --site`, or
+`from JIRA_SITE`.
+
+Three things can supply a site and which one won is visible nowhere else, so
+"the site is not reachable" used to require a second command — `jr context
+show` — before it could be acted on. It is an addition to the detail and never
+a replacement: the endpoint that failed is still the first thing there.
+
+Nothing else carries it. An error that explains everything explains nothing, and
+"which site was that" is the next question for a connection failure and not for
+a mistyped flag.
+
 ### Refusals the server sends
 
 Most of the above are decided before a request goes out. One is not, and it is
