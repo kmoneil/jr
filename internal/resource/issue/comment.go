@@ -23,6 +23,53 @@ const (
 
 func init() {
 	registry.Register(commentListCommand())
+
+	render.RegisterSchema(KindCommentList, CommentSchema())
+}
+
+// CommentSchema is the shape of one comment.
+func CommentSchema() *render.Schema {
+	return &render.Schema{
+		Element: "comment",
+		Attrs: []render.Field{
+			{Name: "id", Type: render.TypeString},
+			// Set only when the comment is restricted to a role or group,
+			// which is exactly when a reader needs to know.
+			{Name: "visibility", Type: render.TypeString, Optional: true},
+		},
+		Children: []render.Child{
+			{Schema: authorSchema()},
+			{Schema: render.Leaf("created", render.TypeTimestamp)},
+			{Schema: render.Leaf("updated", render.TypeTimestamp)},
+			{Schema: bodySchema("body"), Optional: true},
+		},
+	}
+}
+
+// authorSchema is the shape shared by a comment's author and a worklog's.
+func authorSchema() *render.Schema {
+	return &render.Schema{
+		Element: "author",
+		Attrs: []render.Field{
+			// Absent where the deployment does not disclose one; the display
+			// name is always there.
+			{Name: "id", Type: render.TypeString, Optional: true},
+			{Name: "display", Type: render.TypeString},
+		},
+	}
+}
+
+// bodySchema is the shape of a block of Jira markup, named rather than guessed
+// at and carried as mixed content so newlines and fenced code survive.
+func bodySchema(element string) *render.Schema {
+	return &render.Schema{
+		Element: element,
+		Attrs: []render.Field{{
+			Name: "format", Type: render.TypeString,
+			Enum: []string{BodyWiki, BodyADF},
+		}},
+		Text: &render.Field{Type: render.TypeString},
+	}
 }
 
 // Comment is one comment, in the shape this tool reports.

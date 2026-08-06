@@ -10,11 +10,80 @@ import (
 	"github.com/kmoneil/jira-cli/internal/jql"
 	"github.com/kmoneil/jira-cli/internal/registry"
 	"github.com/kmoneil/jira-cli/internal/render"
+	"github.com/kmoneil/jira-cli/internal/site"
 )
 
 func init() {
 	registry.Register(listCommand())
 	registry.Register(getCommand())
+
+	render.RegisterSchema(KindList, Schema())
+	render.RegisterSchema(KindGet, Schema())
+}
+
+// Schema is the shape of an issue, as `jr contract` reports it and as
+// render.Doc.Validate holds every emitted issue to.
+func Schema() *render.Schema {
+	return &render.Schema{
+		Element: "issue",
+		Attrs: []render.Field{
+			{Name: "key", Type: render.TypeString},
+			{Name: "id", Type: render.TypeString},
+			{Name: "type", Type: render.TypeString, Optional: true},
+			{Name: "priority", Type: render.TypeString, Optional: true},
+			{Name: "project", Type: render.TypeString, Optional: true},
+			{Name: "resolution", Type: render.TypeString, Optional: true},
+			{Name: "parent", Type: render.TypeString, Optional: true},
+		},
+		Children: []render.Child{
+			{Schema: render.Leaf("summary", render.TypeString)},
+			{Schema: &render.Schema{
+				Element: "status",
+				Attrs: []render.Field{{
+					// A project can rename a status to anything; the category
+					// stays one of four values, which is what anything
+					// automated should branch on.
+					Name: "category", Type: render.TypeString,
+					Enum: []string{
+						site.CategoryToDo, site.CategoryInProgress,
+						site.CategoryDone, site.CategoryUnknown,
+					},
+				}},
+				Text: &render.Field{Type: render.TypeString},
+			}},
+			{Schema: &render.Schema{
+				// Always present, and empty when nobody is assigned: absent and
+				// unassigned are different facts and this kind reports both.
+				Element: "assignee",
+				Attrs: []render.Field{
+					{Name: "id", Type: render.TypeString},
+					{Name: "display", Type: render.TypeString},
+				},
+			}},
+			{Schema: render.Leaf("created", render.TypeTimestamp), Optional: true},
+			{Schema: render.Leaf("updated", render.TypeTimestamp), Optional: true},
+			{Schema: &render.Schema{
+				// Mixed content in CDATA, with the markup named rather than
+				// guessed at: wiki on Data Center, adf on Cloud.
+				Element: "description",
+				Attrs: []render.Field{{
+					Name: "format", Type: render.TypeString,
+					Enum: []string{BodyWiki, BodyADF},
+				}},
+				Text: &render.Field{Type: render.TypeString},
+			}, Optional: true},
+			{Schema: render.ListSchema("labels", "label",
+				render.Leaf("label", render.TypeString))},
+			{Schema: render.ListSchema("components", "component",
+				render.Leaf("component", render.TypeString)), Optional: true},
+			{Schema: render.ListSchema("fix-versions", "fix-version",
+				render.Leaf("fix-version", render.TypeString)), Optional: true},
+		},
+		Extra: &render.Extra{
+			Named: "the id of a field requested with --field, e.g. customfield_10042",
+			Type:  render.TypeString,
+		},
+	}
 }
 
 func listCommand() *registry.Command {

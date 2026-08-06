@@ -24,6 +24,32 @@ const (
 
 func init() {
 	registry.Register(worklogListCommand())
+
+	render.RegisterSchema(KindWorklogList, WorklogSchema())
+}
+
+// WorklogSchema is the shape of one recorded piece of work.
+func WorklogSchema() *render.Schema {
+	return &render.Schema{
+		Element: "worklog",
+		Attrs:   []render.Field{{Name: "id", Type: render.TypeString}},
+		Children: []render.Child{
+			{Schema: authorSchema()},
+			{Schema: &render.Schema{
+				// Reported twice and converted never: Jira's own wording as
+				// text for reading, seconds as an attribute for arithmetic.
+				// Deriving either from the other means re-implementing the
+				// site's working day, which is configurable.
+				Element: "time-spent",
+				Attrs:   []render.Field{{Name: "seconds", Type: render.TypeInt}},
+				Text:    &render.Field{Type: render.TypeString},
+			}},
+			// When the work happened, which is not when it was logged.
+			{Schema: render.Leaf("started", render.TypeTimestamp)},
+			{Schema: render.Leaf("created", render.TypeTimestamp)},
+			{Schema: bodySchema("comment"), Optional: true},
+		},
+	}
 }
 
 // Worklog is one recorded piece of work.

@@ -38,6 +38,31 @@ const (
 func init() {
 	registry.Register(listCommand())
 	registry.Register(getCommand())
+
+	// Both kinds are the same element: a listing is boards, and a get is one
+	// board. Declaring the shape once is the point — two copies would be two
+	// things to keep in step with Node.
+	render.RegisterSchema(KindList, Schema())
+	render.RegisterSchema(KindGet, Schema())
+}
+
+// Schema is the shape of a board, as `jr contract` reports it and as
+// render.Doc.Validate holds every emitted board to.
+func Schema() *render.Schema {
+	return &render.Schema{
+		Element: "board",
+		Attrs: []render.Field{
+			{Name: "id", Type: render.TypeInt},
+			{Name: "type", Type: render.TypeString, Optional: true, Enum: boardTypes},
+		},
+		Children: []render.Child{
+			{Schema: render.Leaf("name", render.TypeString)},
+			// Absent for a board located on a person rather than a project,
+			// which Data Center allows.
+			{Schema: render.Leaf("project", render.TypeString), Optional: true},
+			{Schema: render.Leaf("project-name", render.TypeString), Optional: true},
+		},
+	}
 }
 
 // Doer is the part of the transport this resource needs.

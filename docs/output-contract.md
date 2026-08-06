@@ -387,6 +387,41 @@ diffing two runs must not see a difference that means nothing.
 - `jr contract` (or `jr --contract`) dumps the machine-readable schema for every
   kind this build can emit, so a consumer can pin and verify.
 
+## Verifying against `jr contract`
+
+`jr contract` v2 carries each kind's element schema alongside its name, version,
+and emitters. v1 let a consumer pin a version; v2 lets it check a response
+against the shape, which is the half §3.5 promised and the first version could
+not deliver.
+
+Each kind reports one element: its attributes with types, optionality, and any
+closed set of values; its child elements with the same, plus whether each may be
+absent or repeated; and its text, when it carries any.
+
+The types are promises about the shape of the text, not JSON types — every
+format here is textual. `int` parses as a decimal integer. `bool` is exactly
+`true` or `false`, never `yes` or `1`. `timestamp` is RFC 3339 in UTC, which is
+why Jira's own formats are normalized before they are emitted. `date` is
+`YYYY-MM-DD` with no time, because Jira stores some dates without one and
+inventing midnight in a timezone would be a value nobody set.
+
+**An empty value satisfies every type.** "Present but empty" is a fact this tool
+emits deliberately — an unassigned issue, a context with no default project —
+and it is not the same as absent. A consumer checks for the element, then for
+the value.
+
+Some shapes are open, and say so. `issue list --field "Story Points"` adds a
+`<customfield_10042>` element, and no fixed list can name it; those kinds carry
+an `<extra>` element saying where the names come from. Every other kind is
+closed, and an element outside the schema is a contract violation rather than a
+curiosity.
+
+**The schema is checked on every document this tool writes.** That is the only
+reason to trust it. `render.Write` validates before it emits a byte, so a
+payload that does not match its published shape fails with `SCHEMA_VIOLATION`
+and exit 1, and stdout stays empty. A schema that were merely published
+alongside the code would describe the output as somebody once believed it to be.
+
 ## Golden files
 
 The contract is enforced by golden files, not by review discipline:

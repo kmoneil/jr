@@ -34,6 +34,32 @@ func init() {
 	registry.Register(listCommand())
 	registry.Register(getCommand())
 	registry.Register(meCommand())
+
+	render.RegisterSchema(KindList, Schema())
+	render.RegisterSchema(KindGet, Schema())
+}
+
+// Schema is the shape of a user, as `jr contract` reports it and as
+// render.Doc.Validate holds every emitted user to.
+func Schema() *render.Schema {
+	return &render.Schema{
+		Element: "user",
+		Attrs: []render.Field{
+			// An accountId on Cloud and a username on Data Center. The two are
+			// not interchangeable, which is why the type is a string rather
+			// than anything more specific.
+			{Name: "id", Type: render.TypeString},
+			{Name: "active", Type: render.TypeBool},
+			{Name: "kind", Type: render.TypeString, Optional: true},
+		},
+		Children: []render.Child{
+			{Schema: render.Leaf("display", render.TypeString)},
+			// Absent means not disclosed, which Cloud does by privacy setting.
+			// It is not the same as having none, and the element is omitted
+			// rather than emitted empty so a consumer can tell.
+			{Schema: render.Leaf("email", render.TypeString), Optional: true},
+		},
+	}
 }
 
 // Doer is the part of the transport this resource needs.

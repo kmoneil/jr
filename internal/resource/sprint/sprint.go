@@ -38,6 +38,34 @@ const (
 func init() {
 	registry.Register(listCommand())
 	registry.Register(getCommand())
+
+	render.RegisterSchema(KindList, Schema())
+	render.RegisterSchema(KindGet, Schema())
+}
+
+// Schema is the shape of a sprint, as `jr contract` reports it and as
+// render.Doc.Validate holds every emitted sprint to.
+func Schema() *render.Schema {
+	return &render.Schema{
+		Element: "sprint",
+		Attrs: []render.Field{
+			{Name: "id", Type: render.TypeInt},
+			{Name: "state", Type: render.TypeString, Enum: States},
+			{Name: "board", Type: render.TypeString, Optional: true},
+		},
+		Children: []render.Child{
+			{Schema: render.Leaf("name", render.TypeString)},
+			{Schema: render.Leaf("goal", render.TypeString), Optional: true},
+			// Absent means the event has not happened: a future sprint has no
+			// start, a running one has no completion. Declared as timestamps
+			// so a consumer knows they are RFC 3339 in UTC without finding out
+			// from a sample — and so the check fails here if a deployment's
+			// own format ever reaches the output unnormalized.
+			{Schema: render.Leaf("start", render.TypeTimestamp), Optional: true},
+			{Schema: render.Leaf("end", render.TypeTimestamp), Optional: true},
+			{Schema: render.Leaf("completed", render.TypeTimestamp), Optional: true},
+		},
+	}
 }
 
 // Doer is the part of the transport this resource needs.

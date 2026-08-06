@@ -64,6 +64,14 @@ A resource reaches all of it through one `registry.Session.Metadata` call, so
 the cache is shared: two commands resolving the same field name in the same day
 make one request between them.
 
+**A kind's shape is declared where its node is built.** Every output kind
+registers a `render.Schema` from the same file as the code that builds it,
+because the two have to agree and the shortest distance between them is one
+screen. `render.Write` checks every document against its kind's schema before
+emitting a byte, which is what makes `jr contract` a description of the output
+rather than a description of somebody's intent. `internal/cli/contract_test.go`
+fails on a kind with no schema and on a schema for no kind.
+
 **Query policy lives in `internal/jql` for the same reason.** The default
 `ORDER BY`, the key tiebreaker, and the keyset precondition are in
 `jql.AppendOrder` and `jql.SortsByKey` rather than in the resource that queries

@@ -64,6 +64,20 @@ func TestEveryTagEitherGatesCodeOrSaysWhyNot(t *testing.T) {
 	}
 }
 
+// writeGatedNonMutations names the files behind the write tag that do not
+// mutate anything, with the reason each is there.
+//
+// The rule the list bends is "a mutation lives with the thing it mutates". A
+// declaration *about* a mutating command is not a mutation, but it still has to
+// be gated: publishing the shape of a payload a reader build cannot produce
+// would be a contract that lies about the binary. Every entry needs a reason,
+// and an entry that stops being gated fails the test, so this cannot quietly
+// become the place mutations go to avoid the rule.
+var writeGatedNonMutations = map[string]string{
+	"internal/registry/schema_write.go": "the dry-run kind exists only where " +
+		"mutating commands do, so its schema is registered under the same tag",
+}
+
 // TestTheTagsThatGateCodeGateTheRightCode pins what `write` and `mcp` exclude,
 // because those two carry the guarantees the profiles are sold on.
 func TestTheTagsThatGateCodeGateTheRightCode(t *testing.T) {
@@ -77,11 +91,23 @@ func TestTheTagsThatGateCodeGateTheRightCode(t *testing.T) {
 	// live in either the sprint resource or the issue one. Anywhere else means
 	// a mutation has drifted away from the thing it mutates.
 	for _, file := range gated["write"] {
+		if reason, excused := writeGatedNonMutations[file]; excused {
+			if reason == "" {
+				t.Errorf("%s is excused with no reason", file)
+			}
+			continue
+		}
 		if !strings.HasPrefix(file, "internal/resource/") &&
 			!strings.HasPrefix(file, "internal/workflow/") {
 			t.Errorf("write gates %s, which is neither a resource nor workflow; "+
 				"a mutation belongs in the resource it mutates, or in workflow "+
 				"when it spans two", file)
+		}
+	}
+	for file := range writeGatedNonMutations {
+		if !slices.Contains(gated["write"], file) {
+			t.Errorf("%s is excused from the write-tag location rule and is not "+
+				"gated by write at all", file)
 		}
 	}
 	if len(gated["write"]) == 0 {

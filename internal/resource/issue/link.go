@@ -23,6 +23,35 @@ const (
 
 func init() {
 	registry.Register(linkListCommand())
+
+	render.RegisterSchema(KindLinkList, LinkSchema())
+}
+
+// LinkSchema is the shape of one link, read from this issue's side.
+func LinkSchema() *render.Schema {
+	return &render.Schema{
+		Element: "link",
+		Attrs: []render.Field{
+			{Name: "id", Type: render.TypeString},
+			// The link type's own name, e.g. "Blocks".
+			{Name: "type", Type: render.TypeString},
+		},
+		Children: []render.Child{
+			// The phrase that applies from this issue's side. "blocks" and "is
+			// blocked by" are the same link read from opposite ends, and a
+			// caller acting on the wrong one acts on the wrong issue.
+			{Schema: render.Leaf("relationship", render.TypeString)},
+			{Schema: &render.Schema{
+				Element: "issue",
+				Attrs: []render.Field{
+					{Name: "key", Type: render.TypeString},
+					{Name: "status", Type: render.TypeString, Optional: true},
+					{Name: "type", Type: render.TypeString, Optional: true},
+				},
+				Text: &render.Field{Type: render.TypeString},
+			}},
+		},
+	}
 }
 
 // Link is one relationship between two issues, from the point of view of the

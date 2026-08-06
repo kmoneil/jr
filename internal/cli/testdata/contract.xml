@@ -1,36 +1,1199 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<result kind="contract" v="1">
+<result kind="contract" v="2">
   <kinds count="31" complete="true">
-    <kind name="auth.status" v="1" emitters="auth.login,auth.logout,auth.status"/>
-    <kind name="auth.token" v="1" emitters="auth.token"/>
-    <kind name="board.get" v="1" emitters="board.get"/>
-    <kind name="board.list" v="1" emitters="board.list"/>
-    <kind name="context.get" v="1" emitters="context.create,context.delete,context.show,context.use"/>
-    <kind name="context.list" v="1" emitters="context.list"/>
-    <kind name="contract" v="1" emitters="contract"/>
-    <kind name="epic.get" v="1" emitters="epic.get"/>
-    <kind name="epic.list" v="1" emitters="epic.list"/>
-    <kind name="field.list" v="1" emitters="field.list"/>
-    <kind name="issue.comment.list" v="1" emitters="issue.comment.list"/>
-    <kind name="issue.get" v="1" emitters="issue.get"/>
-    <kind name="issue.link.list" v="1" emitters="issue.link.list"/>
-    <kind name="issue.list" v="1" emitters="issue.list"/>
-    <kind name="issue.worklog.list" v="1" emitters="issue.worklog.list"/>
-    <kind name="jql.explain" v="1" emitters="jql.explain"/>
-    <kind name="jql.validate" v="1" emitters="jql.validate"/>
-    <kind name="meta.createmeta" v="1" emitters="meta.createmeta"/>
-    <kind name="meta.transitions" v="1" emitters="meta.transitions"/>
-    <kind name="project.components" v="1" emitters="project.components"/>
-    <kind name="project.get" v="1" emitters="project.get"/>
-    <kind name="project.list" v="1" emitters="project.list"/>
-    <kind name="project.statuses" v="1" emitters="project.statuses"/>
-    <kind name="project.versions" v="1" emitters="project.versions"/>
-    <kind name="schema.command" v="1" emitters="schema"/>
-    <kind name="schema.commands" v="1" emitters="schema"/>
-    <kind name="sprint.get" v="1" emitters="sprint.get"/>
-    <kind name="sprint.list" v="1" emitters="sprint.list"/>
-    <kind name="user.get" v="1" emitters="user.get,user.me"/>
-    <kind name="user.list" v="1" emitters="user.list"/>
-    <kind name="version" v="1" emitters="version"/>
+    <kind name="auth.status" v="1" emitters="auth.login,auth.logout,auth.status">
+      <element name="auth">
+        <attributes count="9">
+          <attribute name="site" type="string" optional="false"/>
+          <attribute name="authenticated" type="bool" optional="false"/>
+          <attribute name="scheme" type="string" optional="true" enum="basic,bearer"/>
+          <attribute name="source" type="string" optional="true"/>
+          <attribute name="user" type="string" optional="true"/>
+          <attribute name="removed" type="bool" optional="true"/>
+          <attribute name="context" type="string" optional="true"/>
+          <attribute name="account" type="string" optional="true"/>
+          <attribute name="display" type="string" optional="true"/>
+        </attributes>
+        <elements count="1">
+          <element name="sources" list-of="source" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="source" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="auth.token" v="1" emitters="auth.token">
+      <element name="token">
+        <attributes count="3">
+          <attribute name="site" type="string" optional="false"/>
+          <attribute name="scheme" type="string" optional="false" enum="basic,bearer"/>
+          <attribute name="source" type="string" optional="false"/>
+        </attributes>
+        <elements count="1">
+          <element name="authorization" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="board.get" v="1" emitters="board.get">
+      <element name="board">
+        <attributes count="2">
+          <attribute name="id" type="int" optional="false"/>
+          <attribute name="type" type="string" optional="true" enum="scrum,kanban,simple"/>
+        </attributes>
+        <elements count="3">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="project" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="project-name" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="board.list" v="1" emitters="board.list">
+      <element name="board">
+        <attributes count="2">
+          <attribute name="id" type="int" optional="false"/>
+          <attribute name="type" type="string" optional="true" enum="scrum,kanban,simple"/>
+        </attributes>
+        <elements count="3">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="project" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="project-name" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="context.get" v="1" emitters="context.create,context.delete,context.show,context.use">
+      <element name="context">
+        <attributes count="9">
+          <attribute name="name" type="string" optional="false"/>
+          <attribute name="current" type="bool" optional="false"/>
+          <attribute name="site" type="string" optional="false"/>
+          <attribute name="project" type="string" optional="false"/>
+          <attribute name="board" type="string" optional="false"/>
+          <attribute name="readonly" type="bool" optional="false"/>
+          <attribute name="credential" type="string" optional="false"/>
+          <attribute name="effective" type="bool" optional="true"/>
+          <attribute name="deleted" type="bool" optional="true"/>
+        </attributes>
+        <elements count="2">
+          <element name="fields" list-of="field" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="field" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="config" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="context.list" v="1" emitters="context.list">
+      <element name="context">
+        <attributes count="7">
+          <attribute name="name" type="string" optional="false"/>
+          <attribute name="current" type="bool" optional="false"/>
+          <attribute name="site" type="string" optional="false"/>
+          <attribute name="project" type="string" optional="false"/>
+          <attribute name="board" type="string" optional="false"/>
+          <attribute name="readonly" type="bool" optional="false"/>
+          <attribute name="credential" type="string" optional="false"/>
+        </attributes>
+        <elements count="1">
+          <element name="fields" list-of="field" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="field" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="contract" v="2" emitters="contract">
+      <element name="kind">
+        <attributes count="3">
+          <attribute name="name" type="string" optional="false"/>
+          <attribute name="v" type="int" optional="false"/>
+          <attribute name="emitters" type="string" optional="false"/>
+        </attributes>
+        <elements count="1">
+          <element name="element" optional="true" repeated="false">
+            <attributes count="4">
+              <attribute name="name" type="string" optional="false"/>
+              <attribute name="list-of" type="string" optional="true"/>
+              <attribute name="optional" type="bool" optional="true"/>
+              <attribute name="repeated" type="bool" optional="true"/>
+            </attributes>
+            <elements count="4">
+              <element name="attributes" list-of="attribute" optional="false" repeated="false">
+                <attributes count="1">
+                  <attribute name="count" type="int" optional="false"/>
+                </attributes>
+                <elements count="1">
+                  <element name="attribute" optional="true" repeated="true">
+                    <attributes count="4">
+                      <attribute name="name" type="string" optional="true"/>
+                      <attribute name="type" type="string" optional="false"/>
+                      <attribute name="optional" type="bool" optional="false"/>
+                      <attribute name="enum" type="string" optional="true"/>
+                    </attributes>
+                    <elements count="0"/>
+                  </element>
+                </elements>
+              </element>
+              <element name="text" optional="true" repeated="false">
+                <attributes count="4">
+                  <attribute name="name" type="string" optional="true"/>
+                  <attribute name="type" type="string" optional="false"/>
+                  <attribute name="optional" type="bool" optional="false"/>
+                  <attribute name="enum" type="string" optional="true"/>
+                </attributes>
+                <elements count="0"/>
+              </element>
+              <element name="elements" list-of="element" optional="false" repeated="false">
+                <attributes count="1">
+                  <attribute name="count" type="int" optional="false"/>
+                </attributes>
+                <elements count="0"/>
+                <extra type="string">element, recursively — this schema does not repeat itself</extra>
+              </element>
+              <element name="extra" optional="true" repeated="false">
+                <attributes count="1">
+                  <attribute name="type" type="string" optional="false"/>
+                </attributes>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="epic.get" v="1" emitters="epic.get">
+      <element name="epic">
+        <attributes count="3">
+          <attribute name="key" type="string" optional="false"/>
+          <attribute name="id" type="int" optional="false"/>
+          <attribute name="done" type="bool" optional="false"/>
+        </attributes>
+        <elements count="3">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="summary" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="color" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="epic.list" v="1" emitters="epic.list">
+      <element name="epic">
+        <attributes count="3">
+          <attribute name="key" type="string" optional="false"/>
+          <attribute name="id" type="int" optional="false"/>
+          <attribute name="done" type="bool" optional="false"/>
+        </attributes>
+        <elements count="3">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="summary" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="color" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="field.list" v="1" emitters="field.list">
+      <element name="field">
+        <attributes count="5">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="custom" type="bool" optional="false"/>
+          <attribute name="searchable" type="bool" optional="false"/>
+          <attribute name="orderable" type="bool" optional="false"/>
+          <attribute name="navigable" type="bool" optional="false"/>
+        </attributes>
+        <elements count="4">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="type" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="items" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="clause-names" list-of="clause-name" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="clause-name" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="issue.comment.list" v="1" emitters="issue.comment.list">
+      <element name="comment">
+        <attributes count="2">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="visibility" type="string" optional="true"/>
+        </attributes>
+        <elements count="4">
+          <element name="author" optional="false" repeated="false">
+            <attributes count="2">
+              <attribute name="id" type="string" optional="true"/>
+              <attribute name="display" type="string" optional="false"/>
+            </attributes>
+            <elements count="0"/>
+          </element>
+          <element name="created" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="updated" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="body" optional="true" repeated="false">
+            <attributes count="1">
+              <attribute name="format" type="string" optional="false" enum="wiki,adf"/>
+            </attributes>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="issue.get" v="1" emitters="issue.get">
+      <element name="issue">
+        <attributes count="7">
+          <attribute name="key" type="string" optional="false"/>
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="type" type="string" optional="true"/>
+          <attribute name="priority" type="string" optional="true"/>
+          <attribute name="project" type="string" optional="true"/>
+          <attribute name="resolution" type="string" optional="true"/>
+          <attribute name="parent" type="string" optional="true"/>
+        </attributes>
+        <elements count="9">
+          <element name="summary" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="status" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="category" type="string" optional="false" enum="to-do,in-progress,done,unknown"/>
+            </attributes>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="assignee" optional="false" repeated="false">
+            <attributes count="2">
+              <attribute name="id" type="string" optional="false"/>
+              <attribute name="display" type="string" optional="false"/>
+            </attributes>
+            <elements count="0"/>
+          </element>
+          <element name="created" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="updated" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="description" optional="true" repeated="false">
+            <attributes count="1">
+              <attribute name="format" type="string" optional="false" enum="wiki,adf"/>
+            </attributes>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="labels" list-of="label" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="label" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="components" list-of="component" optional="true" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="component" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="fix-versions" list-of="fix-version" optional="true" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="fix-version" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+        <extra type="string">the id of a field requested with --field, e.g. customfield_10042</extra>
+      </element>
+    </kind>
+    <kind name="issue.link.list" v="1" emitters="issue.link.list">
+      <element name="link">
+        <attributes count="2">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="type" type="string" optional="false"/>
+        </attributes>
+        <elements count="2">
+          <element name="relationship" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="issue" optional="false" repeated="false">
+            <attributes count="3">
+              <attribute name="key" type="string" optional="false"/>
+              <attribute name="status" type="string" optional="true"/>
+              <attribute name="type" type="string" optional="true"/>
+            </attributes>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="issue.list" v="1" emitters="issue.list">
+      <element name="issue">
+        <attributes count="7">
+          <attribute name="key" type="string" optional="false"/>
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="type" type="string" optional="true"/>
+          <attribute name="priority" type="string" optional="true"/>
+          <attribute name="project" type="string" optional="true"/>
+          <attribute name="resolution" type="string" optional="true"/>
+          <attribute name="parent" type="string" optional="true"/>
+        </attributes>
+        <elements count="9">
+          <element name="summary" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="status" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="category" type="string" optional="false" enum="to-do,in-progress,done,unknown"/>
+            </attributes>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="assignee" optional="false" repeated="false">
+            <attributes count="2">
+              <attribute name="id" type="string" optional="false"/>
+              <attribute name="display" type="string" optional="false"/>
+            </attributes>
+            <elements count="0"/>
+          </element>
+          <element name="created" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="updated" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="description" optional="true" repeated="false">
+            <attributes count="1">
+              <attribute name="format" type="string" optional="false" enum="wiki,adf"/>
+            </attributes>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="labels" list-of="label" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="label" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="components" list-of="component" optional="true" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="component" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="fix-versions" list-of="fix-version" optional="true" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="fix-version" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+        <extra type="string">the id of a field requested with --field, e.g. customfield_10042</extra>
+      </element>
+    </kind>
+    <kind name="issue.worklog.list" v="1" emitters="issue.worklog.list">
+      <element name="worklog">
+        <attributes count="1">
+          <attribute name="id" type="string" optional="false"/>
+        </attributes>
+        <elements count="5">
+          <element name="author" optional="false" repeated="false">
+            <attributes count="2">
+              <attribute name="id" type="string" optional="true"/>
+              <attribute name="display" type="string" optional="false"/>
+            </attributes>
+            <elements count="0"/>
+          </element>
+          <element name="time-spent" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="seconds" type="int" optional="false"/>
+            </attributes>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="started" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="created" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="comment" optional="true" repeated="false">
+            <attributes count="1">
+              <attribute name="format" type="string" optional="false" enum="wiki,adf"/>
+            </attributes>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="jql.explain" v="1" emitters="jql.explain">
+      <element name="explanation">
+        <attributes count="1">
+          <attribute name="parenthesized" type="bool" optional="false"/>
+        </attributes>
+        <elements count="4">
+          <element name="fragment" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="query" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="project" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="fields" list-of="field" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="field" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="jql.validate" v="1" emitters="jql.validate">
+      <element name="query">
+        <attributes count="2">
+          <attribute name="valid" type="bool" optional="false"/>
+          <attribute name="method" type="string" optional="false" enum="parse,search,local"/>
+        </attributes>
+        <elements count="3">
+          <element name="jql" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="error" optional="true" repeated="true">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="warning" optional="true" repeated="true">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="meta.createmeta" v="1" emitters="meta.createmeta">
+      <element name="field">
+        <attributes count="3">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="required" type="bool" optional="false"/>
+          <attribute name="has-default" type="bool" optional="false"/>
+        </attributes>
+        <elements count="4">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="type" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="items" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="allowed-values" list-of="allowed-value" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="allowed-value" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="meta.transitions" v="1" emitters="meta.transitions">
+      <element name="transition">
+        <attributes count="2">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="has-screen" type="bool" optional="false"/>
+        </attributes>
+        <elements count="3">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="to" optional="false" repeated="false">
+            <attributes count="2">
+              <attribute name="id" type="string" optional="false"/>
+              <attribute name="category" type="string" optional="false" enum="to-do,in-progress,done,unknown"/>
+            </attributes>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="fields" list-of="field" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="field" optional="true" repeated="true">
+                <attributes count="3">
+                  <attribute name="id" type="string" optional="false"/>
+                  <attribute name="required" type="bool" optional="false"/>
+                  <attribute name="has-default" type="bool" optional="false"/>
+                </attributes>
+                <elements count="4">
+                  <element name="name" optional="false" repeated="false">
+                    <attributes count="0"/>
+                    <text name="text" type="string" optional="false"/>
+                    <elements count="0"/>
+                  </element>
+                  <element name="type" optional="true" repeated="false">
+                    <attributes count="0"/>
+                    <text name="text" type="string" optional="false"/>
+                    <elements count="0"/>
+                  </element>
+                  <element name="items" optional="true" repeated="false">
+                    <attributes count="0"/>
+                    <text name="text" type="string" optional="false"/>
+                    <elements count="0"/>
+                  </element>
+                  <element name="allowed-values" list-of="allowed-value" optional="false" repeated="false">
+                    <attributes count="1">
+                      <attribute name="count" type="int" optional="false"/>
+                    </attributes>
+                    <elements count="1">
+                      <element name="allowed-value" optional="true" repeated="true">
+                        <attributes count="0"/>
+                        <text name="text" type="string" optional="false"/>
+                        <elements count="0"/>
+                      </element>
+                    </elements>
+                  </element>
+                </elements>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="project.components" v="1" emitters="project.components">
+      <element name="component">
+        <attributes count="1">
+          <attribute name="id" type="string" optional="false"/>
+        </attributes>
+        <elements count="4">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="lead" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="assignee-type" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="description" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="project.get" v="1" emitters="project.get">
+      <element name="project">
+        <attributes count="4">
+          <attribute name="key" type="string" optional="false"/>
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="style" type="string" optional="true"/>
+          <attribute name="private" type="bool" optional="false"/>
+        </attributes>
+        <elements count="3">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="type" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="lead" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="project.list" v="1" emitters="project.list">
+      <element name="project">
+        <attributes count="4">
+          <attribute name="key" type="string" optional="false"/>
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="style" type="string" optional="true"/>
+          <attribute name="private" type="bool" optional="false"/>
+        </attributes>
+        <elements count="3">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="type" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="lead" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="project.statuses" v="1" emitters="project.statuses">
+      <element name="issue-type">
+        <attributes count="1">
+          <attribute name="type" type="string" optional="false"/>
+        </attributes>
+        <elements count="1">
+          <element name="statuses" list-of="status" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="status" optional="true" repeated="true">
+                <attributes count="2">
+                  <attribute name="id" type="string" optional="false"/>
+                  <attribute name="category" type="string" optional="false" enum="to-do,in-progress,done,unknown"/>
+                </attributes>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="project.versions" v="1" emitters="project.versions">
+      <element name="version">
+        <attributes count="3">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="released" type="bool" optional="false"/>
+          <attribute name="archived" type="bool" optional="false"/>
+        </attributes>
+        <elements count="4">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="release-date" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="date" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="start-date" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="date" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="description" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="schema.command" v="1" emitters="schema">
+      <element name="command">
+        <attributes count="7">
+          <attribute name="name" type="string" optional="false"/>
+          <attribute name="use" type="string" optional="false"/>
+          <attribute name="mutating" type="bool" optional="false"/>
+          <attribute name="destructive" type="bool" optional="false"/>
+          <attribute name="paginated" type="bool" optional="false"/>
+          <attribute name="kind" type="string" optional="false"/>
+          <attribute name="v" type="int" optional="false"/>
+        </attributes>
+        <elements count="8">
+          <element name="summary" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="description" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="outputs" list-of="output" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="output" optional="true" repeated="true">
+                <attributes count="3">
+                  <attribute name="kind" type="string" optional="false"/>
+                  <attribute name="v" type="int" optional="false"/>
+                  <attribute name="when" type="string" optional="true"/>
+                </attributes>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="args" list-of="arg" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="arg" optional="true" repeated="true">
+                <attributes count="3">
+                  <attribute name="name" type="string" optional="false"/>
+                  <attribute name="required" type="bool" optional="false"/>
+                  <attribute name="variadic" type="bool" optional="false"/>
+                </attributes>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="flags" list-of="flag" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="flag" optional="true" repeated="true">
+                <attributes count="6">
+                  <attribute name="name" type="string" optional="false"/>
+                  <attribute name="type" type="string" optional="false"/>
+                  <attribute name="required" type="bool" optional="false"/>
+                  <attribute name="repeatable" type="bool" optional="false"/>
+                  <attribute name="short" type="string" optional="true"/>
+                  <attribute name="default" type="string" optional="true"/>
+                </attributes>
+                <elements count="2">
+                  <element name="usage" optional="false" repeated="false">
+                    <attributes count="0"/>
+                    <text name="text" type="string" optional="false"/>
+                    <elements count="0"/>
+                  </element>
+                  <element name="values" list-of="value" optional="true" repeated="false">
+                    <attributes count="1">
+                      <attribute name="count" type="int" optional="false"/>
+                    </attributes>
+                    <elements count="1">
+                      <element name="value" optional="true" repeated="true">
+                        <attributes count="0"/>
+                        <text name="text" type="string" optional="false"/>
+                        <elements count="0"/>
+                      </element>
+                    </elements>
+                  </element>
+                </elements>
+              </element>
+            </elements>
+          </element>
+          <element name="exit-codes" list-of="exit-code" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="exit-code" optional="true" repeated="true">
+                <attributes count="2">
+                  <attribute name="code" type="int" optional="false"/>
+                  <attribute name="name" type="string" optional="false"/>
+                </attributes>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="requires-tags" list-of="tag" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="tag" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="example" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="schema.commands" v="1" emitters="schema">
+      <element name="command">
+        <attributes count="6">
+          <attribute name="name" type="string" optional="false"/>
+          <attribute name="use" type="string" optional="false"/>
+          <attribute name="mutating" type="bool" optional="false"/>
+          <attribute name="destructive" type="bool" optional="false"/>
+          <attribute name="kind" type="string" optional="false"/>
+          <attribute name="v" type="int" optional="false"/>
+        </attributes>
+        <elements count="1">
+          <element name="summary" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="sprint.get" v="1" emitters="sprint.get">
+      <element name="sprint">
+        <attributes count="3">
+          <attribute name="id" type="int" optional="false"/>
+          <attribute name="state" type="string" optional="false" enum="future,active,closed"/>
+          <attribute name="board" type="string" optional="true"/>
+        </attributes>
+        <elements count="5">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="goal" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="start" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="end" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="completed" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="sprint.list" v="1" emitters="sprint.list">
+      <element name="sprint">
+        <attributes count="3">
+          <attribute name="id" type="int" optional="false"/>
+          <attribute name="state" type="string" optional="false" enum="future,active,closed"/>
+          <attribute name="board" type="string" optional="true"/>
+        </attributes>
+        <elements count="5">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="goal" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="start" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="end" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="completed" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="user.get" v="1" emitters="user.get,user.me">
+      <element name="user">
+        <attributes count="3">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="active" type="bool" optional="false"/>
+          <attribute name="kind" type="string" optional="true"/>
+        </attributes>
+        <elements count="2">
+          <element name="display" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="email" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="user.list" v="1" emitters="user.list">
+      <element name="user">
+        <attributes count="3">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="active" type="bool" optional="false"/>
+          <attribute name="kind" type="string" optional="true"/>
+        </attributes>
+        <elements count="2">
+          <element name="display" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="email" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="version" v="1" emitters="version">
+      <element name="version">
+        <attributes count="5">
+          <attribute name="app" type="string" optional="false"/>
+          <attribute name="release" type="string" optional="false"/>
+          <attribute name="profile" type="string" optional="false"/>
+          <attribute name="writable" type="bool" optional="false"/>
+          <attribute name="interactive" type="bool" optional="false"/>
+        </attributes>
+        <elements count="6">
+          <element name="display" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="commit" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="built" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="go" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="platform" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="tags" list-of="tag" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="tag" optional="true" repeated="true">
+                <attributes count="1">
+                  <attribute name="name" type="string" optional="false"/>
+                </attributes>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>
+    </kind>
   </kinds>
 </result>

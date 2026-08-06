@@ -18,8 +18,164 @@ const (
 
 	VersionCommands = 1
 	VersionCommand  = 1
-	VersionContract = 1
+	// VersionContract is 2 because each kind now carries its element schema.
+	// A consumer that pinned v1 read a name, a version, and a list of
+	// emitters; v2 adds the shape, which is the half §3.5 promised and the
+	// first version could not deliver.
+	VersionContract = 2
 )
+
+func init() {
+	render.RegisterSchema(KindCommands, CommandSummarySchema())
+	render.RegisterSchema(KindCommand, CommandSchema())
+	render.RegisterSchema(KindContract, ContractSchema())
+}
+
+// CommandSummarySchema is the shape of one row of `jr schema`.
+func CommandSummarySchema() *render.Schema {
+	return &render.Schema{
+		Element: "command",
+		Attrs: []render.Field{
+			{Name: "name", Type: render.TypeString},
+			{Name: "use", Type: render.TypeString},
+			{Name: "mutating", Type: render.TypeBool},
+			{Name: "destructive", Type: render.TypeBool},
+			{Name: "kind", Type: render.TypeString},
+			{Name: "v", Type: render.TypeInt},
+		},
+		Children: []render.Child{
+			{Schema: render.Leaf("summary", render.TypeString)},
+		},
+	}
+}
+
+// CommandSchema is the shape of `jr schema <command>`: everything the registry
+// knows about one command.
+func CommandSchema() *render.Schema {
+	return &render.Schema{
+		Element: "command",
+		Attrs: []render.Field{
+			{Name: "name", Type: render.TypeString},
+			{Name: "use", Type: render.TypeString},
+			{Name: "mutating", Type: render.TypeBool},
+			{Name: "destructive", Type: render.TypeBool},
+			{Name: "paginated", Type: render.TypeBool},
+			{Name: "kind", Type: render.TypeString},
+			{Name: "v", Type: render.TypeInt},
+		},
+		Children: []render.Child{
+			{Schema: render.Leaf("summary", render.TypeString)},
+			{Schema: render.Leaf("description", render.TypeString), Optional: true},
+			{Schema: render.ListSchema("outputs", "output", &render.Schema{
+				Element: "output",
+				Attrs: []render.Field{
+					{Name: "kind", Type: render.TypeString},
+					{Name: "v", Type: render.TypeInt},
+					// What selects this shape, for a command with more than one.
+					{Name: "when", Type: render.TypeString, Optional: true},
+				},
+			})},
+			{Schema: render.ListSchema("args", "arg", &render.Schema{
+				Element: "arg",
+				Attrs: []render.Field{
+					{Name: "name", Type: render.TypeString},
+					{Name: "required", Type: render.TypeBool},
+					{Name: "variadic", Type: render.TypeBool},
+				},
+				Text: &render.Field{Type: render.TypeString},
+			})},
+			{Schema: render.ListSchema("flags", "flag", flagSchema())},
+			{Schema: render.ListSchema("exit-codes", "exit-code", &render.Schema{
+				Element: "exit-code",
+				Attrs: []render.Field{
+					{Name: "code", Type: render.TypeInt},
+					{Name: "name", Type: render.TypeString},
+				},
+				Text: &render.Field{Type: render.TypeString},
+			})},
+			{Schema: render.ListSchema("requires-tags", "tag",
+				render.Leaf("tag", render.TypeString))},
+			{Schema: render.Leaf("example", render.TypeString), Optional: true},
+		},
+	}
+}
+
+func flagSchema() *render.Schema {
+	return &render.Schema{
+		Element: "flag",
+		Attrs: []render.Field{
+			{Name: "name", Type: render.TypeString},
+			{Name: "type", Type: render.TypeString},
+			{Name: "required", Type: render.TypeBool},
+			{Name: "repeatable", Type: render.TypeBool},
+			{Name: "short", Type: render.TypeString, Optional: true},
+			{Name: "default", Type: render.TypeString, Optional: true},
+		},
+		Children: []render.Child{
+			{Schema: render.Leaf("usage", render.TypeString)},
+			{Schema: render.ListSchema("values", "value",
+				render.Leaf("value", render.TypeString)), Optional: true},
+		},
+	}
+}
+
+// ContractSchema is the shape of one kind in `jr contract` — including, since
+// v2, the shape of the kind itself.
+func ContractSchema() *render.Schema {
+	return &render.Schema{
+		Element: "kind",
+		Attrs: []render.Field{
+			{Name: "name", Type: render.TypeString},
+			{Name: "v", Type: render.TypeInt},
+			{Name: "emitters", Type: render.TypeString},
+		},
+		Children: []render.Child{
+			{Schema: elementSchema(), Optional: true},
+		},
+	}
+}
+
+// elementSchema is the shape of render.Schema's own rendering. It is recursive
+// in the data and cannot be in the declaration, so nesting stops here: a
+// consumer reads the top level from the contract and the rest by walking it.
+func elementSchema() *render.Schema {
+	return &render.Schema{
+		Element: "element",
+		Attrs: []render.Field{
+			{Name: "name", Type: render.TypeString},
+			{Name: "list-of", Type: render.TypeString, Optional: true},
+			{Name: "optional", Type: render.TypeBool, Optional: true},
+			{Name: "repeated", Type: render.TypeBool, Optional: true},
+		},
+		Children: []render.Child{
+			{Schema: render.ListSchema("attributes", "attribute", fieldShape("attribute"))},
+			{Schema: fieldShape("text"), Optional: true},
+			{Schema: &render.Schema{Element: "elements", ListOf: "element", Attrs: []render.Field{
+				{Name: "count", Type: render.TypeInt},
+			}, Extra: &render.Extra{
+				Named: "element, recursively — this schema does not repeat itself",
+				Type:  render.TypeString,
+			}}},
+			{Schema: &render.Schema{
+				Element: "extra",
+				Attrs:   []render.Field{{Name: "type", Type: render.TypeString}},
+				Text:    &render.Field{Type: render.TypeString},
+			}, Optional: true},
+		},
+	}
+}
+
+func fieldShape(element string) *render.Schema {
+	return &render.Schema{
+		Element: element,
+		Attrs: []render.Field{
+			{Name: "name", Type: render.TypeString, Optional: true},
+			{Name: "type", Type: render.TypeString},
+			{Name: "optional", Type: render.TypeBool},
+			{Name: "enum", Type: render.TypeString, Optional: true},
+		},
+	}
+}
 
 // CommandsDoc renders the command list. It is the self-description an agent
 // reads instead of documentation, and it lists only what this build contains.
@@ -148,6 +304,12 @@ func ContractDoc(r *Registry) *render.Doc {
 			Attr("name", k.Name).
 			Attr("v", strconv.Itoa(k.Version)).
 			Attr("emitters", strings.Join(k.Emitters, ","))
+		// The shape, which is what makes this verifiable rather than only
+		// pinnable. A kind with none is a bug the contract test catches; the
+		// element is omitted rather than faked so the gap is visible here too.
+		if s, ok := render.SchemaFor(k.Name); ok {
+			n.Child(s.Node())
+		}
 		items = append(items, n)
 	}
 	return render.List(KindContract, VersionContract, &render.Collection{

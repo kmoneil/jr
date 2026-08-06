@@ -37,6 +37,29 @@ const (
 func init() {
 	registry.Register(listCommand())
 	registry.Register(getCommand())
+
+	render.RegisterSchema(KindList, Schema())
+	render.RegisterSchema(KindGet, Schema())
+}
+
+// Schema is the shape of an epic, as `jr contract` reports it and as
+// render.Doc.Validate holds every emitted epic to.
+func Schema() *render.Schema {
+	return &render.Schema{
+		Element: "epic",
+		Attrs: []render.Field{
+			{Name: "key", Type: render.TypeString},
+			{Name: "id", Type: render.TypeInt},
+			{Name: "done", Type: render.TypeBool},
+		},
+		Children: []render.Child{
+			// name and summary are two fields and they differ. The board shows
+			// the name; a JQL search shows the summary.
+			{Schema: render.Leaf("name", render.TypeString)},
+			{Schema: render.Leaf("summary", render.TypeString), Optional: true},
+			{Schema: render.Leaf("color", render.TypeString), Optional: true},
+		},
+	}
 }
 
 // Doer is the part of the transport this resource needs.

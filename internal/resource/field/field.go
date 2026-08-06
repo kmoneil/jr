@@ -33,6 +33,32 @@ const (
 
 func init() {
 	registry.Register(listCommand())
+
+	render.RegisterSchema(KindList, Schema())
+}
+
+// Schema is the shape of one field in the catalogue.
+func Schema() *render.Schema {
+	return &render.Schema{
+		Element: "field",
+		Attrs: []render.Field{
+			// The identity — the thing a caller passes back to --field.
+			{Name: "id", Type: render.TypeString},
+			{Name: "custom", Type: render.TypeBool},
+			{Name: "searchable", Type: render.TypeBool},
+			{Name: "orderable", Type: render.TypeBool},
+			{Name: "navigable", Type: render.TypeBool},
+		},
+		Children: []render.Child{
+			{Schema: render.Leaf("name", render.TypeString)},
+			{Schema: render.Leaf("type", render.TypeString), Optional: true},
+			{Schema: render.Leaf("items", render.TypeString), Optional: true},
+			// What a query may call this field. A custom field has at least
+			// one, and often more than one.
+			{Schema: render.ListSchema("clause-names", "clause-name",
+				render.Leaf("clause-name", render.TypeString))},
+		},
+	}
 }
 
 func listCommand() *registry.Command {

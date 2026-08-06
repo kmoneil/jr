@@ -42,6 +42,96 @@ func init() {
 	registry.Register(componentsCommand())
 	registry.Register(versionsCommand())
 	registry.Register(statusesCommand())
+
+	render.RegisterSchema(KindList, Schema())
+	render.RegisterSchema(KindGet, Schema())
+	render.RegisterSchema(KindComponents, ComponentSchema())
+	render.RegisterSchema(KindVersions, VersionSchema())
+	render.RegisterSchema(KindStatuses, StatusesSchema())
+}
+
+// Schema is the shape of a project.
+func Schema() *render.Schema {
+	return &render.Schema{
+		Element: "project",
+		Attrs: []render.Field{
+			{Name: "key", Type: render.TypeString},
+			{Name: "id", Type: render.TypeString},
+			// Empty on Data Center, which has no such distinction. It is
+			// reported rather than normalized away, because what a project
+			// permits differs between them.
+			{Name: "style", Type: render.TypeString, Optional: true},
+			{Name: "private", Type: render.TypeBool},
+		},
+		Children: []render.Child{
+			{Schema: render.Leaf("name", render.TypeString)},
+			{Schema: render.Leaf("type", render.TypeString), Optional: true},
+			{Schema: render.Leaf("lead", render.TypeString), Optional: true},
+		},
+	}
+}
+
+// ComponentSchema is the shape of one component of a project.
+func ComponentSchema() *render.Schema {
+	return &render.Schema{
+		Element: "component",
+		Attrs:   []render.Field{{Name: "id", Type: render.TypeString}},
+		Children: []render.Child{
+			{Schema: render.Leaf("name", render.TypeString)},
+			{Schema: render.Leaf("lead", render.TypeString), Optional: true},
+			// How Jira picks an assignee for issues in this component. It is
+			// reported because it is the reason an issue can acquire an
+			// assignee nobody chose.
+			{Schema: render.Leaf("assignee-type", render.TypeString), Optional: true},
+			{Schema: render.Leaf("description", render.TypeString), Optional: true},
+		},
+	}
+}
+
+// VersionSchema is the shape of one release version.
+func VersionSchema() *render.Schema {
+	return &render.Schema{
+		Element: "version",
+		Attrs: []render.Field{
+			{Name: "id", Type: render.TypeString},
+			// Released and archived are separate because they are: a version
+			// can be either, both, or neither.
+			{Name: "released", Type: render.TypeBool},
+			{Name: "archived", Type: render.TypeBool},
+		},
+		Children: []render.Child{
+			{Schema: render.Leaf("name", render.TypeString)},
+			// A date, not a timestamp: Jira stores it without a time, and
+			// inventing midnight in some timezone would be a value nobody set.
+			{Schema: render.Leaf("release-date", render.TypeDate), Optional: true},
+			{Schema: render.Leaf("start-date", render.TypeDate), Optional: true},
+			{Schema: render.Leaf("description", render.TypeString), Optional: true},
+		},
+	}
+}
+
+// StatusesSchema is the shape of one issue type and the statuses it can be in.
+func StatusesSchema() *render.Schema {
+	return &render.Schema{
+		Element: "issue-type",
+		Attrs:   []render.Field{{Name: "type", Type: render.TypeString}},
+		Children: []render.Child{
+			{Schema: render.ListSchema("statuses", "status", &render.Schema{
+				Element: "status",
+				Attrs: []render.Field{
+					{Name: "id", Type: render.TypeString},
+					// The category matters more than the name for anything
+					// automated: a project can rename a status to anything,
+					// and the category stays one of four values.
+					{Name: "category", Type: render.TypeString, Enum: []string{
+						site.CategoryToDo, site.CategoryInProgress,
+						site.CategoryDone, site.CategoryUnknown,
+					}},
+				},
+				Text: &render.Field{Type: render.TypeString},
+			})},
+		},
+	}
 }
 
 // Doer is the part of the transport this resource needs.

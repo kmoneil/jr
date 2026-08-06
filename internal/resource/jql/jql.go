@@ -40,6 +40,47 @@ const (
 func init() {
 	registry.Register(validateCommand())
 	registry.Register(explainCommand())
+
+	render.RegisterSchema(KindValidate, ValidateSchema())
+	render.RegisterSchema(KindExplain, ExplainSchema())
+}
+
+// ValidateSchema is the shape of a verdict.
+func ValidateSchema() *render.Schema {
+	return &render.Schema{
+		Element: "query",
+		Attrs: []render.Field{
+			{Name: "valid", Type: render.TypeBool},
+			{
+				Name: "method", Type: render.TypeString,
+				Enum: []string{MethodParse, MethodSearch, MethodLocal},
+			},
+		},
+		Children: []render.Child{
+			{Schema: render.Leaf("jql", render.TypeString)},
+			// Jira reports more than one problem with a query, so these repeat.
+			// A consumer that read only the first would fix one error at a time.
+			{Schema: render.Leaf("error", render.TypeString), Optional: true, Repeated: true},
+			{Schema: render.Leaf("warning", render.TypeString), Optional: true, Repeated: true},
+		},
+	}
+}
+
+// ExplainSchema is the shape of an explanation.
+func ExplainSchema() *render.Schema {
+	return &render.Schema{
+		Element: "explanation",
+		Attrs: []render.Field{
+			{Name: "parenthesized", Type: render.TypeBool},
+		},
+		Children: []render.Child{
+			{Schema: render.Leaf("fragment", render.TypeString)},
+			{Schema: render.Leaf("query", render.TypeString)},
+			{Schema: render.Leaf("project", render.TypeString), Optional: true},
+			{Schema: render.ListSchema("fields", "field",
+				render.Leaf("field", render.TypeString))},
+		},
+	}
 }
 
 // Doer is the part of the transport this resource needs.

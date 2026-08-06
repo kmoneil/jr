@@ -9,6 +9,7 @@ import (
 	"github.com/kmoneil/jira-cli/internal/cli"
 	"github.com/kmoneil/jira-cli/internal/exitcode"
 	"github.com/kmoneil/jira-cli/internal/registry"
+	"github.com/kmoneil/jira-cli/internal/render"
 
 	// The contract rules must hold for every command the binary ships, not
 	// only the built-ins, so the resources are linked in here too.
@@ -380,5 +381,37 @@ func forEachCommand(t *testing.T, check func(*testing.T, *registry.Command)) {
 	}
 	for _, c := range cmds {
 		t.Run(c.Name(), func(t *testing.T) { check(t, c) })
+	}
+}
+
+// TestEveryKindDeclaresItsShape closes the gap §3.5 left open: `jr contract`
+// used to report a kind's name, version, and emitters, which is enough to pin a
+// version and not enough to verify a response against it.
+//
+// A kind with no schema is not merely undocumented. render.Doc.Validate skips
+// the conformance check when it finds none, so an unregistered kind is a
+// payload nothing holds to any shape at all.
+func TestEveryKindDeclaresItsShape(t *testing.T) {
+	for _, k := range cli.Registry().Kinds() {
+		if _, ok := render.SchemaFor(k.Name); !ok {
+			t.Errorf("kind %q has no schema; a consumer can pin it and cannot "+
+				"verify it, and nothing checks what this build emits for it",
+				k.Name)
+		}
+	}
+}
+
+// TestEverySchemaBelongsToAKind is the other direction. A schema for a kind no
+// command emits is a shape published for a payload that does not exist.
+func TestEverySchemaBelongsToAKind(t *testing.T) {
+	emitted := map[string]bool{}
+	for _, k := range cli.Registry().Kinds() {
+		emitted[k.Name] = true
+	}
+	for _, kind := range render.RegisteredKinds() {
+		if !emitted[kind] {
+			t.Errorf("a schema is registered for kind %q, which no command in "+
+				"this build emits", kind)
+		}
 	}
 }

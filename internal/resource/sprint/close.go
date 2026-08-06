@@ -30,6 +30,25 @@ const (
 
 func init() {
 	registry.Register(closeCommand())
+
+	render.RegisterSchema(KindClose, CloseSchema())
+}
+
+// CloseSchema is the shape of a sprint that was ended. The name comes from the
+// read that precedes the write, so the acknowledgement says which sprint ended
+// rather than echoing back the id the caller already had.
+func CloseSchema() *render.Schema {
+	return &render.Schema{
+		Element: "sprint",
+		Attrs: []render.Field{
+			{Name: "id", Type: render.TypeInt},
+			{Name: "state", Type: render.TypeString, Enum: []string{StateClosed}},
+			{Name: "action", Type: render.TypeString, Enum: []string{"closed"}},
+		},
+		Children: []render.Child{
+			{Schema: render.Leaf("name", render.TypeString)},
+		},
+	}
 }
 
 func closeCommand() *registry.Command {

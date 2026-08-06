@@ -35,6 +35,59 @@ const (
 func init() {
 	registry.Register(transitionsCommand())
 	registry.Register(createMetaCommand())
+
+	render.RegisterSchema(KindTransitions, TransitionSchema())
+	render.RegisterSchema(KindCreateMeta, MetaFieldSchema())
+}
+
+// TransitionSchema is the shape of one transition an issue can make right now.
+func TransitionSchema() *render.Schema {
+	return &render.Schema{
+		Element: "transition",
+		Attrs: []render.Field{
+			// The id is what gets sent back, which is why it is the identity.
+			{Name: "id", Type: render.TypeString},
+			{Name: "has-screen", Type: render.TypeBool},
+		},
+		Children: []render.Child{
+			{Schema: render.Leaf("name", render.TypeString)},
+			{Schema: &render.Schema{
+				// The category is on the destination rather than alongside it,
+				// because it describes that status.
+				Element: "to",
+				Attrs: []render.Field{
+					{Name: "id", Type: render.TypeString},
+					{Name: "category", Type: render.TypeString, Enum: []string{
+						site.CategoryToDo, site.CategoryInProgress,
+						site.CategoryDone, site.CategoryUnknown,
+					}},
+				},
+				Text: &render.Field{Type: render.TypeString},
+			}},
+			{Schema: render.ListSchema("fields", "field", MetaFieldSchema())},
+		},
+	}
+}
+
+// MetaFieldSchema is the shape of one field on a create or transition screen.
+func MetaFieldSchema() *render.Schema {
+	return &render.Schema{
+		Element: "field",
+		Attrs: []render.Field{
+			{Name: "id", Type: render.TypeString},
+			{Name: "required", Type: render.TypeBool},
+			// Whether the screen supplies a value when none is given, which is
+			// what makes a required field safe to omit.
+			{Name: "has-default", Type: render.TypeBool},
+		},
+		Children: []render.Child{
+			{Schema: render.Leaf("name", render.TypeString)},
+			{Schema: render.Leaf("type", render.TypeString), Optional: true},
+			{Schema: render.Leaf("items", render.TypeString), Optional: true},
+			{Schema: render.ListSchema("allowed-values", "allowed-value",
+				render.Leaf("allowed-value", render.TypeString))},
+		},
+	}
 }
 
 func transitionsCommand() *registry.Command {

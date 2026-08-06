@@ -94,7 +94,10 @@ func (d *Doc) Validate() error {
 	case d.Collection == nil && d.Record == nil:
 		return errs.Runtime("INVALID_DOC", "result kind %q has no payload", d.Kind)
 	case d.Record != nil:
-		return d.Record.validate(d.Kind)
+		if err := d.Record.validate(d.Kind); err != nil {
+			return err
+		}
+		return conformTo(d.Kind, d.Record)
 	}
 
 	c := d.Collection
@@ -133,8 +136,25 @@ func (d *Doc) Validate() error {
 		if err := it.validate(d.Kind + "/" + c.Name); err != nil {
 			return err
 		}
+		if err := conformTo(d.Kind, it); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// conformTo holds a payload node to its kind's declared schema.
+//
+// A kind with no registered schema passes. That is not a hole left open on
+// purpose — internal/cli/contract_test.go fails if any kind lacks one — it is
+// so that a test building an ad-hoc document does not have to invent a schema
+// to render it.
+func conformTo(kind string, n *Node) error {
+	s, ok := SchemaFor(kind)
+	if !ok {
+		return nil
+	}
+	return s.Conform(n, kind)
 }
 
 // ItemName returns the element name shared by every item in a collection.

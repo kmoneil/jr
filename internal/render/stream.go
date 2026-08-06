@@ -111,6 +111,12 @@ func (s *Stream) Write(items ...*Node) error {
 		if err := item.validate(s.spec.Kind + "/" + s.spec.Name); err != nil {
 			return err
 		}
+		// A streamed row is checked here rather than at Close, because by then
+		// it is already on stdout. This is the only place a collection's shape
+		// can still be refused before a consumer has read it.
+		if err := conformTo(s.spec.Kind, item); err != nil {
+			return err
+		}
 		if s.count > 0 || len(s.items) > 0 {
 			if name := s.itemName(); name != "" && item.Name != name {
 				return errs.Runtime("INVALID_DOC",

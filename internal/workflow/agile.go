@@ -42,6 +42,34 @@ func init() {
 	registry.Register(sprintAddCommand())
 	registry.Register(epicAddCommand())
 	registry.Register(epicRemoveCommand())
+
+	render.RegisterSchema(KindSprintAdd, MovedSchema("sprint", "added"))
+	render.RegisterSchema(KindEpicAdd, MovedSchema("epic", "added"))
+	render.RegisterSchema(KindEpicRemove, MovedSchema("epic", "removed"))
+}
+
+// MovedSchema is the shape all three verbs share: the container, what happened,
+// and every issue it happened to.
+//
+// Jira answers all three with 204 and no body, so this reports what was asked
+// for. The issues are listed rather than counted because a caller has to be
+// able to check that the set it named is the set that moved.
+func MovedSchema(container, action string) *render.Schema {
+	return &render.Schema{
+		Element: container,
+		Attrs: []render.Field{
+			// For epic remove this is the literal "none": leaving an epic is
+			// spelled as joining the absence of one, and there is no DELETE.
+			{Name: "id", Type: render.TypeString},
+			{Name: "action", Type: render.TypeString, Enum: []string{action}},
+		},
+		Children: []render.Child{
+			{Schema: render.ListSchema("issues", "issue", &render.Schema{
+				Element: "issue",
+				Attrs:   []render.Field{{Name: "key", Type: render.TypeString}},
+			})},
+		},
+	}
 }
 
 // MaxIssuesPerRequest is the agile API's cap on one move.
