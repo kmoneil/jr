@@ -33,11 +33,14 @@ const transitionsJSON = `{"transitions":[
 // createMetaJSON is the marker runStream turns into a doer that serves each to
 // the request that asked for it.
 const (
-	createMetaTypesJSON = `{"maxResults":100,"startAt":0,"total":1,"isLast":true,
-		"values":[{"id":"10001","name":"Bug","subtask":false}]}`
+	// Keyed as Cloud keys them. Data Center sends "values" and the parser
+	// takes either; using the Cloud spelling here means this test exercises the
+	// envelope that was silently unparseable until a recording showed it.
+	createMetaTypesJSON = `{"maxResults":100,"startAt":0,"total":1,
+		"issueTypes":[{"id":"10001","name":"Bug","subtask":false}]}`
 
-	createMetaFieldsJSON = `{"maxResults":100,"startAt":0,"total":2,"isLast":true,
-		"values":[
+	createMetaFieldsJSON = `{"maxResults":100,"startAt":0,"total":2,
+		"fields":[
 			{"fieldId":"summary","name":"Summary","required":true,
 			 "schema":{"type":"string"}},
 			{"fieldId":"priority","name":"Priority","required":false,

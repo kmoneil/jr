@@ -13,13 +13,35 @@ import (
 	"github.com/kmoneil/jira-cli/internal/transport"
 )
 
-// The two deployments answer createmeta from different endpoints in different
-// shapes. Both fixtures describe the same screen, which is what lets the test
-// assert the shapes converge.
+// The two deployments answer createmeta from the same route in different
+// envelopes. Both fixtures describe the same screen, which is what lets the
+// test assert the results converge — but they must not describe it in the same
+// JSON, because the difference between the two envelopes is the whole point.
+//
+// An earlier version served one body to both. It passed, and `meta createmeta`
+// was broken on Cloud the entire time: the parser read "values", Cloud returns
+// "issueTypes", so a project with seven issue types reported having none by any
+// requested name.
 const (
 	issueTypesJSON = `{"maxResults":100,"startAt":0,"total":2,"isLast":true,
 		"values":[{"id":"10001","name":"Bug","subtask":false},
 		          {"id":"10002","name":"Story","subtask":false}]}`
+
+	// Cloud names the arrays "issueTypes" and "fields" and sends no isLast;
+	// the loop ends on the total instead. Both are as recorded.
+	issueTypesCloudJSON = `{"maxResults":100,"startAt":0,"total":2,
+		"issueTypes":[{"id":"10001","name":"Bug","subtask":false},
+		              {"id":"10002","name":"Story","subtask":false}]}`
+
+	createMetaFieldsCloudJSON = `{"maxResults":100,"startAt":0,"total":3,
+		"fields":[
+			{"fieldId":"summary","name":"Summary","required":true,
+			 "schema":{"type":"string"},"hasDefaultValue":false},
+			{"fieldId":"priority","name":"Priority","required":false,
+			 "schema":{"type":"priority"},"hasDefaultValue":true,
+			 "allowedValues":[{"id":"1","name":"High"},{"id":"2","name":"Low"}]},
+			{"fieldId":"labels","name":"Labels","required":false,
+			 "schema":{"type":"array","items":"string"},"hasDefaultValue":false}]}`
 
 	createMetaFieldsJSON = `{"maxResults":100,"startAt":0,"total":3,"isLast":true,
 		"values":[
@@ -42,8 +64,8 @@ const (
 // What is left to assert is that the base path is the only difference.
 func TestCreateMetaConvergesAcrossDeployments(t *testing.T) {
 	cloud := &routingDoer{routes: map[string]string{
-		"/rest/api/3/issue/createmeta/ENG/issuetypes":       issueTypesJSON,
-		"/rest/api/3/issue/createmeta/ENG/issuetypes/10001": createMetaFieldsJSON,
+		"/rest/api/3/issue/createmeta/ENG/issuetypes":       issueTypesCloudJSON,
+		"/rest/api/3/issue/createmeta/ENG/issuetypes/10001": createMetaFieldsCloudJSON,
 	}}
 	dc := &routingDoer{routes: map[string]string{
 		"/rest/api/2/issue/createmeta/ENG/issuetypes":       issueTypesJSON,

@@ -190,16 +190,19 @@ func FetchIssueTypes(
 			return nil, err
 		}
 
+		// The two deployments name this array differently. Cloud returns
+		// "issueTypes" and no isLast; Data Center returns the paged-collection
+		// envelope with "values". The route and the parameters are identical,
+		// which is what made this easy to miss: the request was right, the
+		// response parsed to nothing, and the command reported that a project
+		// with seven issue types had none by the requested name.
 		var page struct {
-			MaxResults int  `json:"maxResults"`
-			StartAt    int  `json:"startAt"`
-			Total      int  `json:"total"`
-			IsLast     bool `json:"isLast"`
-			Values     []struct {
-				ID      string `json:"id"`
-				Name    string `json:"name"`
-				Subtask bool   `json:"subtask"`
-			} `json:"values"`
+			MaxResults int          `json:"maxResults"`
+			StartAt    int          `json:"startAt"`
+			Total      int          `json:"total"`
+			IsLast     bool         `json:"isLast"`
+			Values     []rawTypeRef `json:"values"`
+			IssueTypes []rawTypeRef `json:"issueTypes"`
 		}
 		if err := json.Unmarshal(resp.Body, &page); err != nil {
 			return nil, errs.Remote("MALFORMED_CREATEMETA",
@@ -208,20 +211,31 @@ func FetchIssueTypes(
 				Wrap(err)
 		}
 
-		for _, v := range page.Values {
-			out = append(out, IssueType{ID: v.ID, Name: v.Name, Subtask: v.Subtask})
+		values := page.Values
+		if len(values) == 0 {
+			values = page.IssueTypes
+		}
+		for _, v := range values {
+			out = append(out, IssueType(v))
 		}
 
 		// A page that added nothing ends the loop whatever the server claims,
 		// so a server that reports isLast=false forever cannot spin here.
-		if len(page.Values) == 0 || page.IsLast || len(out) >= page.Total {
+		if len(values) == 0 || page.IsLast || len(out) >= page.Total {
 			break
 		}
-		startAt += len(page.Values)
+		startAt += len(values)
 	}
 
 	sort.Slice(out, func(i, j int) bool { return lessID(out[i].ID, out[j].ID) })
 	return out, nil
+}
+
+// rawTypeRef is one issue type as either deployment describes it.
+type rawTypeRef struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Subtask bool   `json:"subtask"`
 }
 
 // ResolveIssueType turns a type name or id into the type itself, refusing an
@@ -320,10 +334,13 @@ func FetchCreateMeta(
 			return nil, err
 		}
 
+		// "fields" on Cloud, "values" on Data Center — the same split as the
+		// issue-type list above.
 		var page struct {
 			Total  int            `json:"total"`
 			IsLast bool           `json:"isLast"`
 			Values []rawMetaField `json:"values"`
+			Fields []rawMetaField `json:"fields"`
 		}
 		if err := json.Unmarshal(resp.Body, &page); err != nil {
 			return nil, errs.Remote("MALFORMED_CREATEMETA",
@@ -332,13 +349,17 @@ func FetchCreateMeta(
 				Wrap(err)
 		}
 
-		for _, v := range page.Values {
+		values := page.Values
+		if len(values) == 0 {
+			values = page.Fields
+		}
+		for _, v := range values {
 			fields = append(fields, v.convert(""))
 		}
-		if len(page.Values) == 0 || page.IsLast || len(fields) >= page.Total {
+		if len(values) == 0 || page.IsLast || len(fields) >= page.Total {
 			break
 		}
-		startAt += len(page.Values)
+		startAt += len(values)
 	}
 
 	sortMetaFields(fields)
