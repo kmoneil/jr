@@ -1,0 +1,20 @@
+{
+  "deployment": "cloud",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/project/ENG"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"id\": \"10069\", \"key\": \"ENG\", \"name\": \"Engineering\", \"projectTypeKey\": \"software\", \"isPrivate\": false, \"lead\": {\"displayName\": \"Ada Lovelace\"}}"
+      }
+    }
+  ]
+}

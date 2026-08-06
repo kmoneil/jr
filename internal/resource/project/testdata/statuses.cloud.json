@@ -1,0 +1,20 @@
+{
+  "deployment": "cloud",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/project/ENG/statuses"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "[{\"name\": \"Bug\", \"statuses\": [{\"id\": \"1\", \"name\": \"Open\", \"statusCategory\": {\"key\": \"new\", \"name\": \"To Do\"}}, {\"id\": \"6\", \"name\": \"Closed\", \"statusCategory\": {\"key\": \"done\", \"name\": \"Done\"}}]}, {\"name\": \"Task\", \"statuses\": [{\"id\": \"1\", \"name\": \"Open\", \"statusCategory\": {\"key\": \"new\", \"name\": \"To Do\"}}]}]"
+      }
+    }
+  ]
+}

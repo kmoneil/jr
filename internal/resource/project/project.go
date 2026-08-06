@@ -1,0 +1,376 @@
+// Package project is the project resource.
+//
+// It knows nothing about any other resource, and nothing outside cmd, tui,
+// mcp, workflow, and internal/commands may import it — which is what keeps it
+// independently compilable and what makes compile-out work.
+package project
+
+import (
+	"context"
+	"encoding/json"
+	"net/url"
+	"sort"
+	"strconv"
+	"strings"
+
+	"github.com/kmoneil/jira-cli/internal/buildinfo"
+	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jira-cli/internal/registry"
+	"github.com/kmoneil/jira-cli/internal/render"
+	"github.com/kmoneil/jira-cli/internal/site"
+	"github.com/kmoneil/jira-cli/internal/transport"
+)
+
+// Kinds and schema versions this resource emits.
+const (
+	KindList       = "project.list"
+	VersionList    = 1
+	KindGet        = "project.get"
+	VersionGet     = 1
+	KindComponents = "project.components"
+	VersionComp    = 1
+	KindVersions   = "project.versions"
+	VersionVers    = 1
+	KindStatuses   = "project.statuses"
+	VersionStat    = 1
+)
+
+func init() {
+	registry.Register(listCommand())
+	registry.Register(getCommand())
+	registry.Register(componentsCommand())
+	registry.Register(versionsCommand())
+	registry.Register(statusesCommand())
+}
+
+// Doer is the part of the transport this resource needs.
+type Doer interface {
+	Do(ctx context.Context, r transport.Request) (*transport.Response, error)
+}
+
+// Client queries projects.
+type Client struct {
+	Transport Doer
+	Site      site.Info
+}
+
+// Project is one project, in the shape this tool reports.
+type Project struct {
+	ID   string
+	Key  string
+	Name string
+	// Type is the project's template family, e.g. software or service_desk.
+	Type string
+	// Style is "classic" or "next-gen" on Cloud, and empty on Data Center,
+	// which has no such distinction. It is reported rather than normalized
+	// away, because what a project permits differs between them.
+	Style   string
+	Lead    string
+	Simple  bool
+	Private bool
+}
+
+type rawProject struct {
+	ID          string `json:"id"`
+	Key         string `json:"key"`
+	Name        string `json:"name"`
+	ProjectType string `json:"projectTypeKey"`
+	Style       string `json:"style"`
+	Simplified  bool   `json:"simplified"`
+	IsPrivate   bool   `json:"isPrivate"`
+	Lead        *struct {
+		DisplayName string `json:"displayName"`
+		Name        string `json:"name"`
+	} `json:"lead"`
+}
+
+func (r rawProject) convert() Project {
+	out := Project{
+		ID: r.ID, Key: r.Key, Name: r.Name, Type: r.ProjectType,
+		Style: r.Style, Simple: r.Simplified, Private: r.IsPrivate,
+	}
+	if r.Lead != nil {
+		out.Lead = r.Lead.DisplayName
+		if out.Lead == "" {
+			out.Lead = r.Lead.Name
+		}
+	}
+	return out
+}
+
+// Node renders one project.
+func (p Project) Node() *render.Node {
+	return render.El("project").
+		Attr("key", p.Key).
+		Attr("id", p.ID).
+		AttrIf("style", p.Style).
+		Attr("private", strconv.FormatBool(p.Private)).
+		Leaf("name", p.Name).
+		LeafIf("type", p.Type).
+		LeafIf("lead", p.Lead)
+}
+
+// ListColumns is the default TSV column set for `project list`.
+func ListColumns() []render.Column {
+	return []render.Column{
+		{Header: "key", Path: "@key"},
+		{Header: "name", Path: "name"},
+		{Header: "type", Path: "type"},
+		{Header: "lead", Path: "lead"},
+	}
+}
+
+func listCommand() *registry.Command {
+	return &registry.Command{
+		Path:    []string{"project", "list"},
+		Summary: "List the projects this credential can see",
+		Description: strings.TrimSpace(`
+Returns every project visible to the credential, ordered by key.
+
+The two deployments answer this differently — Cloud pages a search endpoint,
+Data Center returns the lot from one request — and the split is behind the
+client, so the result is the same shape either way.
+
+Ordered by key rather than by whatever the server felt like, so two runs of a
+script agree.`),
+		Example: strings.Join([]string{
+			buildinfo.App + " project list",
+			buildinfo.App + " project list --format json --limit all",
+		}, "\n"),
+		Paginated:      true,
+		NeedsJira:      true,
+		CollectionName: "projects",
+		Columns:        ListColumns(),
+		Outputs:        []registry.Output{{Kind: KindList, Version: VersionList}},
+		ExitCodes: []exitcode.Code{
+			exitcode.Partial, exitcode.Auth, exitcode.NotFound,
+			exitcode.Permission, exitcode.RateLimit, exitcode.Remote,
+		},
+		Stream: runList,
+	}
+}
+
+// List reads every visible project.
+//
+// Cloud replaced the plain listing with a paged search and left the old one
+// returning nothing useful; Data Center never had the search. The deployments
+// are genuinely different endpoints, not one with different parameters, which
+// is why the split is here rather than in a query builder.
+func (c *Client) List(ctx context.Context) ([]Project, error) {
+	if c.Site.Kind == site.Cloud {
+		return c.listCloud(ctx)
+	}
+	return c.listDataCenter(ctx)
+}
+
+func (c *Client) listCloud(ctx context.Context) ([]Project, error) {
+	path := c.Site.APIBase() + "/project/search"
+
+	var out []Project
+	startAt := 0
+	for {
+		resp, err := c.Transport.Do(ctx, transport.Request{
+			Method: transport.MethodGet,
+			Path:   path,
+			Query: url.Values{
+				"startAt":    {strconv.Itoa(startAt)},
+				"maxResults": {"50"},
+				"orderBy":    {"key"},
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+		if err := transport.Err(resp); err != nil {
+			return nil, err
+		}
+
+		var page struct {
+			IsLast bool         `json:"isLast"`
+			Total  int          `json:"total"`
+			Values []rawProject `json:"values"`
+		}
+		if err := json.Unmarshal(resp.Body, &page); err != nil {
+			return nil, errs.Remote("MALFORMED_PROJECTS",
+				"%s did not return usable projects", path).
+				WithRequestID(resp.RequestID).Wrap(err)
+		}
+
+		for _, raw := range page.Values {
+			out = append(out, raw.convert())
+		}
+		// A page that added nothing ends the loop whatever the server claims,
+		// so a server that never sets isLast cannot spin here.
+		if len(page.Values) == 0 || page.IsLast || len(out) >= page.Total {
+			break
+		}
+		startAt += len(page.Values)
+	}
+	return sorted(out), nil
+}
+
+func (c *Client) listDataCenter(ctx context.Context) ([]Project, error) {
+	path := c.Site.APIBase() + "/project"
+
+	resp, err := c.Transport.Do(ctx, transport.Request{
+		Method: transport.MethodGet, Path: path,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := transport.Err(resp); err != nil {
+		return nil, err
+	}
+
+	var raw []rawProject
+	if err := json.Unmarshal(resp.Body, &raw); err != nil {
+		return nil, errs.Remote("MALFORMED_PROJECTS",
+			"%s did not return usable projects", path).
+			WithRequestID(resp.RequestID).Wrap(err)
+	}
+
+	out := make([]Project, 0, len(raw))
+	for _, r := range raw {
+		out = append(out, r.convert())
+	}
+	return sorted(out), nil
+}
+
+// sorted orders by key, so two runs against one site produce the same rows in
+// the same order. Neither endpoint promises one.
+func sorted(projects []Project) []Project {
+	sort.Slice(projects, func(i, j int) bool { return projects[i].Key < projects[j].Key })
+	return projects
+}
+
+func runList(
+	ctx context.Context, inv *registry.Invocation, out *render.Stream,
+) (registry.StreamResult, error) {
+	client, err := clientFor(ctx, inv, "project list")
+	if err != nil {
+		return registry.StreamResult{}, err
+	}
+
+	projects, err := client.List(ctx)
+	if err != nil {
+		return registry.StreamResult{}, err
+	}
+
+	complete := true
+	if !inv.Limit.All && len(projects) > inv.Limit.N {
+		projects = projects[:inv.Limit.N]
+		complete = false
+	}
+	for _, p := range projects {
+		if err := out.Write(p.Node()); err != nil {
+			return registry.StreamResult{}, err
+		}
+	}
+	inv.Progress.Update(out.Count(), out.Count())
+	return registry.StreamResult{Complete: complete}, nil
+}
+
+func getCommand() *registry.Command {
+	return &registry.Command{
+		Path:    []string{"project", "get"},
+		Summary: "Fetch one project",
+		Description: strings.TrimSpace(`
+Returns a single project by key or id.
+
+The key defaults to the context's project, so a configured caller can ask
+without repeating themselves.`),
+		Example: strings.Join([]string{
+			buildinfo.App + " project get ENG",
+			buildinfo.App + " project get --format json",
+		}, "\n"),
+		Args: []registry.Arg{{
+			Name: "key", Usage: "project key; defaults to the context's project",
+		}},
+		NeedsJira: true,
+		Outputs:   []registry.Output{{Kind: KindGet, Version: VersionGet}},
+		ExitCodes: []exitcode.Code{
+			exitcode.Auth, exitcode.NotFound, exitcode.Permission,
+			exitcode.RateLimit, exitcode.Remote,
+		},
+		Run: runGet,
+	}
+}
+
+// Get reads one project.
+func (c *Client) Get(ctx context.Context, key string) (Project, error) {
+	resp, err := c.Transport.Do(ctx, transport.Request{
+		Method: transport.MethodGet,
+		Path:   c.Site.APIBase() + "/project/" + url.PathEscape(key),
+	})
+	if err != nil {
+		return Project{}, err
+	}
+	if err := transport.Err(resp); err != nil {
+		return Project{}, err
+	}
+
+	var raw rawProject
+	if err := json.Unmarshal(resp.Body, &raw); err != nil || raw.Key == "" {
+		return Project{}, errs.Remote("MALFORMED_PROJECT",
+			"the response for %s is not a usable project", key).
+			WithRequestID(resp.RequestID).Wrap(err)
+	}
+	return raw.convert(), nil
+}
+
+func runGet(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) {
+	client, err := clientFor(ctx, inv, "project get")
+	if err != nil {
+		return nil, err
+	}
+	key, err := projectArg(inv)
+	if err != nil {
+		return nil, err
+	}
+
+	got, err := client.Get(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	return render.Record(KindGet, VersionGet, got.Node()), nil
+}
+
+// projectArg resolves the project to act on: the argument, or the context's.
+//
+// It is a default rather than a requirement everywhere else in this tool, and
+// these commands are the few that genuinely cannot proceed without one.
+func projectArg(inv *registry.Invocation) (string, error) {
+	if len(inv.Args) > 0 && inv.Args[0] != "" {
+		return inv.Args[0], nil
+	}
+	if inv.Jira == nil {
+		return "", errs.Usage("NO_PROJECT", "a project key is required")
+	}
+	return inv.Jira.RequireProject()
+}
+
+// clientFor is the opening every command here shares.
+func clientFor(
+	ctx context.Context, inv *registry.Invocation, command string,
+) (*Client, error) {
+	if inv.Jira == nil {
+		return nil, errs.Runtime("NO_SESSION", "%s has no connection to Jira", command)
+	}
+	conn, info, err := inv.Jira.Connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &Client{Transport: conn, Site: info}, nil
+}
+
+// ListDoc renders projects as a document.
+func ListDoc(projects []Project, complete bool) *render.Doc {
+	items := make([]*render.Node, 0, len(projects))
+	for _, p := range projects {
+		items = append(items, p.Node())
+	}
+	return render.List(KindList, VersionList, &render.Collection{
+		Name: "projects", Items: items, Complete: complete, Columns: ListColumns(),
+	})
+}

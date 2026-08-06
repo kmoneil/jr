@@ -17,5 +17,10 @@ issue.list	List issues matching a query	false	false	issue.list
 issue.worklog.list	List the work logged against an issue	false	false	issue.worklog.list
 meta.createmeta	List the fields a new issue of one type requires	false	false	meta.createmeta
 meta.transitions	List the transitions available on an issue right now	false	false	meta.transitions
+project.components	List a project's components	false	false	project.components
+project.get	Fetch one project	false	false	project.get
+project.list	List the projects this credential can see	false	false	project.list
+project.statuses	List the statuses each issue type can be in	false	false	project.statuses
+project.versions	List a project's versions	false	false	project.versions
 schema	Describe every command this build contains	false	false	schema.commands
 version	Print the build identity and its compiled-in capabilities	false	false	version
