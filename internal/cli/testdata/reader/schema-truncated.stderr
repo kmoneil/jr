@@ -1,0 +1,7 @@
+field	value
+@v	1
+code	RESULT_TRUNCATED
+message	result set was truncated before it was exhausted
+kind	schema.commands
+count	1
+remedy	raise --limit, or use --limit all

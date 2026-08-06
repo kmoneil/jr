@@ -1,0 +1,33 @@
+      <element name="context">
+        <attributes count="10">
+          <attribute name="name" type="string" optional="false"/>
+          <attribute name="current" type="bool" optional="false"/>
+          <attribute name="site" type="string" optional="false"/>
+          <attribute name="project" type="string" optional="false"/>
+          <attribute name="board" type="string" optional="false"/>
+          <attribute name="readonly" type="bool" optional="false"/>
+          <attribute name="credential" type="string" optional="false"/>
+          <attribute name="effective" type="bool" optional="true"/>
+          <attribute name="deleted" type="bool" optional="true"/>
+          <attribute name="api-version" type="int" optional="true"/>
+        </attributes>
+        <elements count="2">
+          <element name="fields" list-of="field" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="field" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="config" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

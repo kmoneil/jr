@@ -1,0 +1,8 @@
+      <element name="worklog">
+        <attributes count="3">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="action" type="string" optional="false" enum="deleted"/>
+          <attribute name="issue" type="string" optional="false"/>
+        </attributes>
+        <elements count="0"/>
+      </element>

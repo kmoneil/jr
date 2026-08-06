@@ -1,0 +1,23 @@
+      <element name="board">
+        <attributes count="2">
+          <attribute name="id" type="int" optional="false"/>
+          <attribute name="type" type="string" optional="true" enum="scrum,kanban,simple"/>
+        </attributes>
+        <elements count="3">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="project" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="project-name" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

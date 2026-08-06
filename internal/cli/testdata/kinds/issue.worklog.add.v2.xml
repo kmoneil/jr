@@ -1,0 +1,39 @@
+      <element name="worklog">
+        <attributes count="2">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="issue" type="string" optional="false"/>
+        </attributes>
+        <elements count="5">
+          <element name="author" optional="false" repeated="false">
+            <attributes count="2">
+              <attribute name="id" type="string" optional="true"/>
+              <attribute name="display" type="string" optional="false"/>
+            </attributes>
+            <elements count="0"/>
+          </element>
+          <element name="time-spent" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="seconds" type="int" optional="false"/>
+            </attributes>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="started" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="created" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="comment" optional="true" repeated="false">
+            <attributes count="1">
+              <attribute name="format" type="string" optional="false" enum="wiki,adf,markdown"/>
+            </attributes>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

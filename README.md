@@ -412,8 +412,11 @@ make ci             # everything CI enforces
 ```
 
 The golden files under `internal/render/testdata/` and `internal/cli/testdata/`
-**are** the output contract. A diff in one is a change every consumer sees:
-bump the schema version of the affected kind in the same commit.
+**are** the output contract. Every kind's shape is pinned once per version in
+`internal/cli/testdata/kinds/`, and each shipped profile has its own recorded
+set beside it. A diff in one is a change every consumer sees: bump the schema
+version of the affected kind in the same commit, which `make golden` will insist
+on rather than quietly rewrite.
 
 ## Open questions
 

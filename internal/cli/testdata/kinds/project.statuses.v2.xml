@@ -1,0 +1,23 @@
+      <element name="issue-type">
+        <attributes count="2">
+          <attribute name="type" type="string" optional="false"/>
+          <attribute name="status-names" type="string" optional="false"/>
+        </attributes>
+        <elements count="1">
+          <element name="statuses" list-of="status" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="status" optional="true" repeated="true">
+                <attributes count="2">
+                  <attribute name="id" type="string" optional="false"/>
+                  <attribute name="category" type="string" optional="false" enum="to-do,in-progress,done,unknown"/>
+                </attributes>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>

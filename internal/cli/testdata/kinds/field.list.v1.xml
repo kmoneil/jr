@@ -1,0 +1,38 @@
+      <element name="field">
+        <attributes count="5">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="custom" type="bool" optional="false"/>
+          <attribute name="searchable" type="bool" optional="false"/>
+          <attribute name="orderable" type="bool" optional="false"/>
+          <attribute name="navigable" type="bool" optional="false"/>
+        </attributes>
+        <elements count="4">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="type" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="items" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="clause-names" list-of="clause-name" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="clause-name" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>

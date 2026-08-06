@@ -1,0 +1,14 @@
+      <element name="token">
+        <attributes count="3">
+          <attribute name="site" type="string" optional="false"/>
+          <attribute name="scheme" type="string" optional="false" enum="basic,bearer"/>
+          <attribute name="source" type="string" optional="false"/>
+        </attributes>
+        <elements count="1">
+          <element name="authorization" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

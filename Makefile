@@ -26,7 +26,15 @@ READER_MAX_BYTES := 12582912
 
 # Packages that own golden files. `make golden` rewrites them; every other
 # package would reject the -update flag.
-GOLDEN_PKGS := ./internal/render/ ./internal/cli/ ./internal/adf/
+#
+# GOLDEN_PKGS write the same bytes whatever the build tags are, so they are
+# recorded once. GOLDEN_PKGS_PROFILE hold output that legitimately differs
+# between profiles — the command list, the tag list, the kinds a build emits —
+# and are recorded under every shipped tag set. Recording only one is how half
+# the output contract went unenforced: everything behind the write tag had no
+# golden at all, and the test that would have compared it skipped instead.
+GOLDEN_PKGS         := ./internal/render/ ./internal/adf/
+GOLDEN_PKGS_PROFILE := ./internal/cli/
 
 .DEFAULT_GOAL := help
 
@@ -164,6 +172,10 @@ fuzz-jql-date:
 .PHONY: golden
 golden:
 	go test $(GOLDEN_PKGS) -update
+	@set -e; for tags in "$(TAGS_CI)" "$(TAGS_READER)" "$(TAGS_AGENT)" "$(TAGS_FULL)"; do \
+		echo "== tags=$${tags:-none}"; \
+		go test -tags "$$tags" $(GOLDEN_PKGS_PROFILE) -update; \
+	done
 	@echo
 	@echo "Golden files rewritten. Any diff is a change to the public output"
 	@echo "contract: bump the schema version of the affected kind in the same commit."

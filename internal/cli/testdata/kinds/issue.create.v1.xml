@@ -1,0 +1,8 @@
+      <element name="issue">
+        <attributes count="3">
+          <attribute name="key" type="string" optional="false"/>
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="replayed" type="bool" optional="true"/>
+        </attributes>
+        <elements count="0"/>
+      </element>

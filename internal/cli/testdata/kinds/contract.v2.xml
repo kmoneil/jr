@@ -1,0 +1,58 @@
+      <element name="kind">
+        <attributes count="3">
+          <attribute name="name" type="string" optional="false"/>
+          <attribute name="v" type="int" optional="false"/>
+          <attribute name="emitters" type="string" optional="false"/>
+        </attributes>
+        <elements count="1">
+          <element name="element" optional="true" repeated="false">
+            <attributes count="4">
+              <attribute name="name" type="string" optional="false"/>
+              <attribute name="list-of" type="string" optional="true"/>
+              <attribute name="optional" type="bool" optional="true"/>
+              <attribute name="repeated" type="bool" optional="true"/>
+            </attributes>
+            <elements count="4">
+              <element name="attributes" list-of="attribute" optional="false" repeated="false">
+                <attributes count="1">
+                  <attribute name="count" type="int" optional="false"/>
+                </attributes>
+                <elements count="1">
+                  <element name="attribute" optional="true" repeated="true">
+                    <attributes count="4">
+                      <attribute name="name" type="string" optional="true"/>
+                      <attribute name="type" type="string" optional="false"/>
+                      <attribute name="optional" type="bool" optional="false"/>
+                      <attribute name="enum" type="string" optional="true"/>
+                    </attributes>
+                    <elements count="0"/>
+                  </element>
+                </elements>
+              </element>
+              <element name="text" optional="true" repeated="false">
+                <attributes count="4">
+                  <attribute name="name" type="string" optional="true"/>
+                  <attribute name="type" type="string" optional="false"/>
+                  <attribute name="optional" type="bool" optional="false"/>
+                  <attribute name="enum" type="string" optional="true"/>
+                </attributes>
+                <elements count="0"/>
+              </element>
+              <element name="elements" list-of="element" optional="false" repeated="false">
+                <attributes count="1">
+                  <attribute name="count" type="int" optional="false"/>
+                </attributes>
+                <elements count="0"/>
+                <extra type="string">element, recursively — this schema does not repeat itself</extra>
+              </element>
+              <element name="extra" optional="true" repeated="false">
+                <attributes count="1">
+                  <attribute name="type" type="string" optional="false"/>
+                </attributes>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>

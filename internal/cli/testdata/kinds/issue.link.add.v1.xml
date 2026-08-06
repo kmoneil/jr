@@ -1,0 +1,23 @@
+      <element name="link">
+        <attributes count="2">
+          <attribute name="type" type="string" optional="false"/>
+          <attribute name="action" type="string" optional="false" enum="linked"/>
+        </attributes>
+        <elements count="3">
+          <element name="from" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="relationship" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="to" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

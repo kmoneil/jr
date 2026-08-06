@@ -1,0 +1,50 @@
+      <element name="version">
+        <attributes count="5">
+          <attribute name="app" type="string" optional="false"/>
+          <attribute name="release" type="string" optional="false"/>
+          <attribute name="profile" type="string" optional="false"/>
+          <attribute name="writable" type="bool" optional="false"/>
+          <attribute name="interactive" type="bool" optional="false"/>
+        </attributes>
+        <elements count="6">
+          <element name="display" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="commit" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="built" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="go" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="platform" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="tags" list-of="tag" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="tag" optional="true" repeated="true">
+                <attributes count="1">
+                  <attribute name="name" type="string" optional="false"/>
+                </attributes>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>

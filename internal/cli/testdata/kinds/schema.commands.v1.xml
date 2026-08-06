@@ -1,0 +1,17 @@
+      <element name="command">
+        <attributes count="6">
+          <attribute name="name" type="string" optional="false"/>
+          <attribute name="use" type="string" optional="false"/>
+          <attribute name="mutating" type="bool" optional="false"/>
+          <attribute name="destructive" type="bool" optional="false"/>
+          <attribute name="kind" type="string" optional="false"/>
+          <attribute name="v" type="int" optional="false"/>
+        </attributes>
+        <elements count="1">
+          <element name="summary" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

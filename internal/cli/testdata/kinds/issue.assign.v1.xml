@@ -1,0 +1,13 @@
+      <element name="issue">
+        <attributes count="2">
+          <attribute name="key" type="string" optional="false"/>
+          <attribute name="action" type="string" optional="false" enum="assigned"/>
+        </attributes>
+        <elements count="1">
+          <element name="assignee" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

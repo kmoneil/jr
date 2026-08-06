@@ -1,0 +1,17 @@
+      <element name="issue">
+        <attributes count="3">
+          <attribute name="key" type="string" optional="false"/>
+          <attribute name="action" type="string" optional="false" enum="moved"/>
+          <attribute name="transition" type="string" optional="false"/>
+        </attributes>
+        <elements count="1">
+          <element name="to" optional="false" repeated="false">
+            <attributes count="2">
+              <attribute name="id" type="string" optional="false"/>
+              <attribute name="category" type="string" optional="false"/>
+            </attributes>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

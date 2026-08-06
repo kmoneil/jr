@@ -1,0 +1,36 @@
+      <element name="field">
+        <attributes count="3">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="required" type="bool" optional="false"/>
+          <attribute name="has-default" type="bool" optional="false"/>
+        </attributes>
+        <elements count="4">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="type" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="items" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="allowed-values" list-of="allowed-value" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="allowed-value" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>

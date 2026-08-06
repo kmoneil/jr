@@ -1,0 +1,29 @@
+      <element name="version">
+        <attributes count="3">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="released" type="bool" optional="false"/>
+          <attribute name="archived" type="bool" optional="false"/>
+        </attributes>
+        <elements count="4">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="release-date" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="date" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="start-date" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="date" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="description" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

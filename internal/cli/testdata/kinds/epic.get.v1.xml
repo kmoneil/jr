@@ -1,0 +1,24 @@
+      <element name="epic">
+        <attributes count="3">
+          <attribute name="key" type="string" optional="false"/>
+          <attribute name="id" type="int" optional="false"/>
+          <attribute name="done" type="bool" optional="false"/>
+        </attributes>
+        <elements count="3">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="summary" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="color" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

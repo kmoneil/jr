@@ -1,0 +1,59 @@
+name	summary	mutating	destructive	kind
+auth.login	Store a credential for a site	false	false	auth.status
+auth.logout	Remove a stored credential	false	true	auth.status
+auth.status	Report which credential a site would use, and where it comes from	false	false	auth.status
+auth.token	Print the credential for a site, for use in another tool	false	false	auth.token
+board.get	Fetch one board	false	false	board.get
+board.list	List the boards this credential can see	false	false	board.list
+context.create	Create or replace a named site and project pairing	false	false	context.get
+context.delete	Delete a context	false	true	context.get
+context.edit	Change one setting of a context, leaving the rest alone	false	false	context.get
+context.list	List every configured context	false	false	context.list
+context.show	Show one context, or the effective settings for this invocation	false	false	context.get
+context.use	Select the context every command uses by default	false	false	context.get
+contract	Dump the machine-readable output contract for every kind	false	false	contract
+epic.add	Move issues into an epic	true	false	epic.add
+epic.get	Fetch one epic	false	false	epic.get
+epic.list	List a board's epics	false	false	epic.list
+epic.remove	Take issues out of their epic	true	false	epic.remove
+field.list	List every field this site has	false	false	field.list
+issue.assign	Set or clear an issue's assignee	true	false	issue.assign
+issue.attachment.download	Download an attachment	false	false	issue.attachment.download
+issue.attachment.list	List the files attached to an issue	false	false	issue.attachment.list
+issue.attachment.upload	Attach a file to an issue	true	false	issue.attachment.upload
+issue.clone	Create a copy of an issue	true	false	issue.clone
+issue.comment.add	Add a comment to an issue	true	false	issue.comment.add
+issue.comment.delete	Delete a comment	true	true	issue.comment.delete
+issue.comment.edit	Replace the text of a comment	true	false	issue.comment.edit
+issue.comment.list	List an issue's comments	false	false	issue.comment.list
+issue.create	Create an issue	true	false	issue.create
+issue.delete	Delete an issue	true	true	issue.delete
+issue.edit	Change fields on an issue	true	false	issue.edit
+issue.get	Fetch one issue in full	false	false	issue.get
+issue.link.add	Link two issues	true	false	issue.link.add
+issue.link.list	List the issues linked to one issue	false	false	issue.link.list
+issue.link.remove	Remove a link between two issues	true	true	issue.link.remove
+issue.list	List issues matching a query	false	false	issue.list
+issue.move	Transition an issue to another status	true	false	issue.move
+issue.watch	Start or stop watching an issue	true	false	issue.watch
+issue.worklog.add	Log work against an issue	true	false	issue.worklog.add
+issue.worklog.delete	Delete a worklog entry	true	true	issue.worklog.delete
+issue.worklog.list	List the work logged against an issue	false	false	issue.worklog.list
+jql.explain	Show the query this tool would send	false	false	jql.explain
+jql.validate	Ask Jira whether a query parses, without running it	false	false	jql.validate
+mcp.serve	Serve this build's commands as MCP tools over stdio	false	false	mcp.serve
+meta.createmeta	List the fields a new issue of one type requires	false	false	meta.createmeta
+meta.transitions	List the transitions available on an issue right now	false	false	meta.transitions
+project.components	List a project's components	false	false	project.components
+project.get	Fetch one project	false	false	project.get
+project.list	List the projects this credential can see	false	false	project.list
+project.statuses	List the statuses each issue type can be in	false	false	project.statuses
+project.versions	List a project's versions	false	false	project.versions
+schema	Describe every command this build contains	false	false	schema.commands
+sprint.add	Move issues into a sprint	true	false	sprint.add
+sprint.get	Fetch one sprint	false	false	sprint.get
+sprint.list	List a board's sprints	false	false	sprint.list
+user.get	Fetch one user by id	false	false	user.get
+user.list	Search for users	false	false	user.list
+user.me	Show who this credential authenticates as	false	false	user.get
+version	Print the build identity and its compiled-in capabilities	false	false	version

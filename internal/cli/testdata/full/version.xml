@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<result kind="version" v="1">
+  <version app="jr" release="0.0.0-test" profile="full" writable="true" interactive="true">
+    <display>jr 0.0.0-test (full; tags=tui,prompt,render,browser,clipboard,mcp,write,admin)</display>
+    <commit>0000000</commit>
+    <built>2026-01-01T00:00:00Z</built>
+    <go>go0.0.0</go>
+    <platform>test/test</platform>
+    <tags count="8">
+      <tag name="tui">Interactive terminal UI (jr ui)</tag>
+      <tag name="prompt">Interactive prompts and the setup wizard</tag>
+      <tag name="render">ADF to terminal markdown rendering</tag>
+      <tag name="browser">Opening URLs and the OAuth browser flow</tag>
+      <tag name="clipboard">Copying keys and URLs to the system clipboard</tag>
+      <tag name="mcp">MCP server (jr mcp serve)</tag>
+      <tag name="write">All mutating commands</tag>
+      <tag name="admin">Project, board, and sprint administration</tag>
+    </tags>
+  </version>
+</result>

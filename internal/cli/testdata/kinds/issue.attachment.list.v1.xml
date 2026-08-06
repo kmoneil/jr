@@ -1,0 +1,24 @@
+      <element name="attachment">
+        <attributes count="3">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="size" type="int" optional="false"/>
+          <attribute name="mime-type" type="string" optional="true"/>
+        </attributes>
+        <elements count="3">
+          <element name="filename" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="author" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="created" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

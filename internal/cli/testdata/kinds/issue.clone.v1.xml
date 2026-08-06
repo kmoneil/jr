@@ -1,0 +1,9 @@
+      <element name="issue">
+        <attributes count="4">
+          <attribute name="key" type="string" optional="false"/>
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="replayed" type="bool" optional="true"/>
+          <attribute name="cloned-from" type="string" optional="false"/>
+        </attributes>
+        <elements count="0"/>
+      </element>

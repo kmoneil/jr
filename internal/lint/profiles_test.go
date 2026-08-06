@@ -104,26 +104,11 @@ func TestTheDocumentedTagSetsAreTheOnesTheMakefileBuilds(t *testing.T) {
 func commandCount(t *testing.T, dir string, p profile) int {
 	t.Helper()
 
-	out := filepath.Join(dir, "jr-"+p.name)
-	build := exec.Command("go", "build", "-tags", p.tags, "-o", out, "./cmd/jr")
-	// The module root, which is two up from internal/lint.
-	build.Dir = "../.."
-	if err := build.Run(); err != nil {
-		t.Fatalf("build %s (tags=%q): %v\n%s", p.name, p.tags, err, stderrOf(err))
-	}
-
 	// --limit all rather than the default, so this measures the surface and not
 	// whatever bound `schema` happens to carry.
-	schema := exec.Command(out, "schema", "--format", "tsv", "--limit", "all")
-	// A stray config or a context in the environment must not reach a command
-	// that only reads its own registry.
-	schema.Env = append(os.Environ(), "JIRA_FORMAT=", "JIRA_READONLY=")
-	stdout, err := schema.Output()
-	if err != nil {
-		t.Fatalf("%s schema: %v\n%s", p.name, err, stderrOf(err))
-	}
+	stdout := askBinary(t, buildProfile(t, dir, p), p, "schema", "--format", "tsv", "--limit", "all")
 
-	lines := strings.Split(strings.TrimRight(string(stdout), "\n"), "\n")
+	lines := strings.Split(strings.TrimRight(stdout, "\n"), "\n")
 	if len(lines) < 2 {
 		t.Fatalf("%s schema returned no rows:\n%s", p.name, stdout)
 	}

@@ -1,0 +1,23 @@
+      <element name="query">
+        <attributes count="2">
+          <attribute name="valid" type="bool" optional="false"/>
+          <attribute name="method" type="string" optional="false" enum="parse,search,local"/>
+        </attributes>
+        <elements count="3">
+          <element name="jql" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="error" optional="true" repeated="true">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="warning" optional="true" repeated="true">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

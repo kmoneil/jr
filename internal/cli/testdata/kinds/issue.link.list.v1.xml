@@ -1,0 +1,22 @@
+      <element name="link">
+        <attributes count="2">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="type" type="string" optional="false"/>
+        </attributes>
+        <elements count="2">
+          <element name="relationship" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="issue" optional="false" repeated="false">
+            <attributes count="3">
+              <attribute name="key" type="string" optional="false"/>
+              <attribute name="status" type="string" optional="true"/>
+              <attribute name="type" type="string" optional="true"/>
+            </attributes>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

@@ -582,12 +582,32 @@ alongside the code would describe the output as somebody once believed it to be.
 
 The contract is enforced by golden files, not by review discipline:
 
-- `internal/render/testdata/` — every writer, every payload shape.
-- `internal/cli/testdata/` — end-to-end output for each built-in command.
+- `internal/render/testdata/` — every writer, every payload shape. The envelope,
+  the escaping rules, and the truncation signal, which do not vary between
+  builds.
+- `internal/cli/testdata/kinds/` — one file per kind and schema version, holding
+  that kind's element shape as `jr contract` prints it. `issue.get.v2.xml` is
+  the shape of `issue.get` at v2.
+- `internal/cli/testdata/<profile>/` — end-to-end output for each built-in
+  command, recorded once per shipped profile: `full`, `agent`, `reader`, `ci`.
 
-`make golden` rewrites them. **A diff in a golden file is a change every
-consumer sees.** Bump the schema version of the affected kind in the same
-commit.
+`make golden` rewrites all of them, running the per-profile set under every
+shipped tag set. **A diff in a golden file is a change every consumer sees.**
+Bump the schema version of the affected kind in the same commit.
+
+The split is not cosmetic. A kind's *shape* is the same in every build that has
+the kind, so it is pinned once and every profile compares against the same file.
+What differs between builds is which kinds exist and which commands emit them,
+and that is what the per-profile sets carry — `contract.tsv` is the inventory,
+`schema.tsv` the command surface, `version.xml` the tag list.
+
+**The version rule is mechanical, not remembered.** `make golden` refuses to
+overwrite `<kind>.v<N>.xml` with different content: a changed shape at an
+unchanged version cannot be regenerated, and the failure says to bump the
+version instead. Doing so writes `<kind>.v<N+1>.xml` and leaves the old file as
+the record of what that version was. `internal/lint` builds every shipped
+profile and asserts each kind it emits has a golden, so a kind behind the
+`write` tag cannot go unpinned just because the default suite is the `ci` build.
 
 ## Keeping this current
 
@@ -603,3 +623,4 @@ Update this document in the same change that alters any of:
 - What the ADF converter carries, drops, or refuses, in either direction —
   including the `jira-` link schemes, which are as much a part of the contract
   as an element name.
+- Where the golden files live, or which builds they are recorded against.

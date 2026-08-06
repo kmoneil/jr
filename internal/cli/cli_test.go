@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -205,7 +206,16 @@ func TestContractListsEveryKind(t *testing.T) {
 			t.Errorf("--contract omits kind %q:\n%s", kind, got.stdout)
 		}
 	}
-	assertGolden(t, "contract.xml", got.stdout)
+
+	// The inventory — which kinds this build emits, at what version, and from
+	// which commands — is a property of the profile, so it is goldened per
+	// profile. Each kind's shape is not: it is the same wherever the kind
+	// exists, and lives once per version in testdata/kinds.
+	inventory := run(t, nil, "--contract", "--format", "tsv")
+	if inventory.exit != exitcode.OK {
+		t.Fatalf("exit = %v, stderr = %s", inventory.exit, inventory.stderr)
+	}
+	assertGolden(t, "contract.tsv", inventory.stdout)
 }
 
 // TestErrorsGoToStderrAndLeaveStdoutClean is the stdout discipline: a failing
@@ -415,38 +425,49 @@ func TestRunsAreIndependent(t *testing.T) {
 	}
 }
 
-// goldenProfile is the build the CLI golden files are recorded against.
+// goldenProfiles are the shipped builds this package records a golden set for.
 //
-// Output legitimately differs between profiles — `jr schema` lists fewer
-// commands in a reader build, and `jr version` says so — so one set of goldens
-// cannot cover all of them. The goldens pin the contract for the reference
-// build; every other assertion in this file runs under every profile, which is
-// what `make test-profiles` exercises.
-const goldenProfile = "ci"
+// Output legitimately differs between them: `jr schema` lists fewer commands in
+// a reader build, `jr version` names the tags it was built with, and
+// `jr contract` lists only the kinds that build can emit. One set therefore
+// cannot cover all four, so each gets its own directory under testdata and
+// compares against that one. `make golden` records all four and
+// `make test-profiles` checks all four.
+//
+// The per-kind *shapes* are not in here: a kind's schema is the same in every
+// build that has the kind, so it is pinned once per version in testdata/kinds.
+// See kinds_test.go.
+var goldenProfiles = []string{"full", "agent", "reader", "ci"}
 
-// TestGoldensCoverTheReferenceBuild fails if the reference profile stops
-// existing, so the skip below can never become a permanent silent pass.
-func TestGoldensCoverTheReferenceBuild(t *testing.T) {
-	found := false
-	for _, p := range []string{"full", "agent", "reader", "ci"} {
-		if p == goldenProfile {
-			found = true
-		}
+// goldenSet names the directory holding this build's golden files.
+//
+// A tag set that is not a shipped profile has no recorded set, and recording
+// one would be pinning the output of a build nobody ships. That is the only
+// skip left: all four shipped profiles have a set, and `make test-profiles`
+// runs every one of them. internal/lint asserts the four directories exist and
+// agree on which files they hold, so a profile whose set was never recorded
+// fails in every build rather than skipping quietly in its own.
+func goldenSet(t *testing.T) string {
+	t.Helper()
+
+	profile := buildinfo.Profile()
+	if !slices.Contains(goldenProfiles, profile) {
+		t.Skipf("tags=%s is not a shipped profile, so no golden set is recorded "+
+			"for it; run `make test-profiles`", buildinfo.TagList())
 	}
-	if !found {
-		t.Fatalf("goldenProfile %q is not a shipped profile", goldenProfile)
-	}
+	return profile
 }
 
 func assertGolden(t *testing.T, name, got string) {
 	t.Helper()
+	assertGoldenAt(t, filepath.Join("testdata", goldenSet(t), name), got)
+}
 
-	if buildinfo.Profile() != goldenProfile {
-		t.Skipf("golden files are recorded against the %s build; this is %s (tags=%s)",
-			goldenProfile, buildinfo.Profile(), buildinfo.TagList())
-	}
+// assertGoldenAt compares got against an exact path, or rewrites it under
+// -update.
+func assertGoldenAt(t *testing.T, path, got string) {
+	t.Helper()
 
-	path := filepath.Join("testdata", name)
 	if *update {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			t.Fatalf("create testdata dir: %v", err)
@@ -459,7 +480,7 @@ func assertGolden(t *testing.T, name, got string) {
 
 	want, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("read golden %s: %v\nrun: go test ./... -update", path, err)
+		t.Fatalf("read golden %s: %v\nrun: make golden", path, err)
 	}
 	if got != string(want) {
 		t.Errorf("output does not match %s\n--- want ---\n%s\n--- got ---\n%s", path, want, got)

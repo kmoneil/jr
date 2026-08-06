@@ -1,0 +1,41 @@
+name	summary	mutating	destructive	kind
+auth.login	Store a credential for a site	false	false	auth.status
+auth.logout	Remove a stored credential	false	true	auth.status
+auth.status	Report which credential a site would use, and where it comes from	false	false	auth.status
+auth.token	Print the credential for a site, for use in another tool	false	false	auth.token
+board.get	Fetch one board	false	false	board.get
+board.list	List the boards this credential can see	false	false	board.list
+context.create	Create or replace a named site and project pairing	false	false	context.get
+context.delete	Delete a context	false	true	context.get
+context.edit	Change one setting of a context, leaving the rest alone	false	false	context.get
+context.list	List every configured context	false	false	context.list
+context.show	Show one context, or the effective settings for this invocation	false	false	context.get
+context.use	Select the context every command uses by default	false	false	context.get
+contract	Dump the machine-readable output contract for every kind	false	false	contract
+epic.get	Fetch one epic	false	false	epic.get
+epic.list	List a board's epics	false	false	epic.list
+field.list	List every field this site has	false	false	field.list
+issue.attachment.download	Download an attachment	false	false	issue.attachment.download
+issue.attachment.list	List the files attached to an issue	false	false	issue.attachment.list
+issue.comment.list	List an issue's comments	false	false	issue.comment.list
+issue.get	Fetch one issue in full	false	false	issue.get
+issue.link.list	List the issues linked to one issue	false	false	issue.link.list
+issue.list	List issues matching a query	false	false	issue.list
+issue.worklog.list	List the work logged against an issue	false	false	issue.worklog.list
+jql.explain	Show the query this tool would send	false	false	jql.explain
+jql.validate	Ask Jira whether a query parses, without running it	false	false	jql.validate
+mcp.serve	Serve this build's commands as MCP tools over stdio	false	false	mcp.serve
+meta.createmeta	List the fields a new issue of one type requires	false	false	meta.createmeta
+meta.transitions	List the transitions available on an issue right now	false	false	meta.transitions
+project.components	List a project's components	false	false	project.components
+project.get	Fetch one project	false	false	project.get
+project.list	List the projects this credential can see	false	false	project.list
+project.statuses	List the statuses each issue type can be in	false	false	project.statuses
+project.versions	List a project's versions	false	false	project.versions
+schema	Describe every command this build contains	false	false	schema.commands
+sprint.get	Fetch one sprint	false	false	sprint.get
+sprint.list	List a board's sprints	false	false	sprint.list
+user.get	Fetch one user by id	false	false	user.get
+user.list	Search for users	false	false	user.list
+user.me	Show who this credential authenticates as	false	false	user.get
+version	Print the build identity and its compiled-in capabilities	false	false	version

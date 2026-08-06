@@ -1,0 +1,7 @@
+      <element name="issue">
+        <attributes count="2">
+          <attribute name="key" type="string" optional="false"/>
+          <attribute name="action" type="string" optional="false" enum="edited"/>
+        </attributes>
+        <elements count="0"/>
+      </element>

@@ -1,0 +1,21 @@
+      <element name="sprint">
+        <attributes count="2">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="action" type="string" optional="false" enum="added"/>
+        </attributes>
+        <elements count="1">
+          <element name="issues" list-of="issue" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="issue" optional="true" repeated="true">
+                <attributes count="1">
+                  <attribute name="key" type="string" optional="false"/>
+                </attributes>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>

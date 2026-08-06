@@ -1,0 +1,64 @@
+      <element name="transition">
+        <attributes count="2">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="has-screen" type="bool" optional="false"/>
+        </attributes>
+        <elements count="3">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="to" optional="false" repeated="false">
+            <attributes count="2">
+              <attribute name="id" type="string" optional="false"/>
+              <attribute name="category" type="string" optional="false" enum="to-do,in-progress,done,unknown"/>
+            </attributes>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="fields" list-of="field" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="field" optional="true" repeated="true">
+                <attributes count="3">
+                  <attribute name="id" type="string" optional="false"/>
+                  <attribute name="required" type="bool" optional="false"/>
+                  <attribute name="has-default" type="bool" optional="false"/>
+                </attributes>
+                <elements count="4">
+                  <element name="name" optional="false" repeated="false">
+                    <attributes count="0"/>
+                    <text name="text" type="string" optional="false"/>
+                    <elements count="0"/>
+                  </element>
+                  <element name="type" optional="true" repeated="false">
+                    <attributes count="0"/>
+                    <text name="text" type="string" optional="false"/>
+                    <elements count="0"/>
+                  </element>
+                  <element name="items" optional="true" repeated="false">
+                    <attributes count="0"/>
+                    <text name="text" type="string" optional="false"/>
+                    <elements count="0"/>
+                  </element>
+                  <element name="allowed-values" list-of="allowed-value" optional="false" repeated="false">
+                    <attributes count="1">
+                      <attribute name="count" type="int" optional="false"/>
+                    </attributes>
+                    <elements count="1">
+                      <element name="allowed-value" optional="true" repeated="true">
+                        <attributes count="0"/>
+                        <text name="text" type="string" optional="false"/>
+                        <elements count="0"/>
+                      </element>
+                    </elements>
+                  </element>
+                </elements>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>
