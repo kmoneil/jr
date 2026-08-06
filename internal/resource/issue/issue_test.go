@@ -1360,6 +1360,9 @@ type stubSession struct {
 	kind site.Kind
 	// ledger backs the mutating verbs; nil means no idempotency protection.
 	ledger *idem.Ledger
+	// project overrides the default scope, and unscoped removes it entirely.
+	project  string
+	unscoped bool
 	// metaClient answers metadata lookups. It is separate from doer so a test
 	// can point transitions at a recorded conversation while the field
 	// catalogue stays a stub.
@@ -1389,9 +1392,26 @@ func (s *stubSession) Metadata(context.Context) (*site.Metadata, error) {
 	return s.meta, nil
 }
 
-func (s *stubSession) Project() string                 { return "ENG" }
-func (s *stubSession) RequireProject() (string, error) { return "ENG", nil }
-func (s *stubSession) Board() string                   { return "" }
+// Project defaults to ENG, which is what forty other tests assume. unscoped is
+// how a test says "no project at all" — a state the default cannot express and
+// the one the unconstrained-query guard exists for.
+func (s *stubSession) Project() string {
+	switch {
+	case s.unscoped:
+		return ""
+	case s.project != "":
+		return s.project
+	}
+	return "ENG"
+}
+
+func (s *stubSession) RequireProject() (string, error) {
+	if p := s.Project(); p != "" {
+		return p, nil
+	}
+	return "", errs.Usage("NO_PROJECT", "this command needs a project and none is set")
+}
+func (s *stubSession) Board() string { return "" }
 
 // RequireBoard is what an agile command calls. None of these fixtures set a
 // board, so it fails the way the real session does rather than returning one.
@@ -1923,4 +1943,145 @@ func (f *failingDoer) Do(
 		Body:   []byte(f.ok),
 		Header: map[string][]string{"Content-Type": {"application/json"}},
 	}, nil
+}
+
+// TestAnUnconstrainedSweepIsRefused is §6.4 at its narrowest.
+//
+// The default bound is what makes an unfiltered query harmless: one request,
+// fifty rows. --limit all is different — it pages until the instance is
+// exhausted, and a personal access token inherits every project its owner was
+// ever added to, so the result is every issue they can see. That is rarely what
+// was meant and is not something to find out afterwards.
+func TestAnUnconstrainedSweepIsRefused(t *testing.T) {
+	cmd, ok := registry.Lookup("issue.list")
+	if !ok {
+		t.Fatal("issue list is not registered")
+	}
+
+	unfiltered := func(limit registry.Limit, set func(registry.Flags)) *registry.Invocation {
+		flags := registry.NewFlags()
+		if set != nil {
+			set(flags)
+		}
+		return &registry.Invocation{
+			Jira:  &stubSession{unscoped: true},
+			Flags: flags, Limit: limit, Progress: registry.NoProgress,
+		}
+	}
+
+	// The one refusal.
+	err := cmd.Validate(t.Context(), unfiltered(registry.Limit{All: true}, nil))
+	if err == nil {
+		t.Fatal("an unconstrained --limit all was accepted")
+	}
+	e := errs.Coerce(err)
+	if e.Code != "UNCONSTRAINED_QUERY" {
+		t.Fatalf("code = %q, want UNCONSTRAINED_QUERY", e.Code)
+	}
+	// The refusal offers what would have been enough, so the caller does not
+	// have to go and read --help to find out.
+	for _, flag := range []string{"--project", "--jql", "--status"} {
+		if !strings.Contains(e.Detail, flag) {
+			t.Errorf("the detail does not offer %s: %q", flag, e.Detail)
+		}
+	}
+
+	// The bounded default is not the hazard and is not refused.
+	if err := cmd.Validate(t.Context(),
+		unfiltered(registry.Limit{N: 50}, nil)); err != nil {
+		t.Errorf("a bounded unfiltered list was refused: %v", err)
+	}
+
+	// --all-projects is how to mean it.
+	if err := cmd.Validate(t.Context(), unfiltered(registry.Limit{All: true},
+		func(f registry.Flags) { f.SetBool("all-projects", true) })); err != nil {
+		t.Errorf("--all-projects did not allow the sweep: %v", err)
+	}
+}
+
+// TestAnyFilterSatisfiesTheGuard covers what counts as constraining, one flag
+// at a time, because a guard that fires on a query somebody did narrow is worse
+// than no guard.
+func TestAnyFilterSatisfiesTheGuard(t *testing.T) {
+	cmd, _ := registry.Lookup("issue.list")
+
+	for _, tc := range []struct {
+		flag  string
+		apply func(registry.Flags)
+	}{
+		{"--jql", func(f registry.Flags) { f.SetString("jql", "labels = retry") }},
+		{"--status", func(f registry.Flags) { f.SetString("status", "Open") }},
+		{"--label", func(f registry.Flags) { f.SetString("label", "retry") }},
+		{"--not-label", func(f registry.Flags) { f.SetString("not-label", "wontfix") }},
+		{"--type", func(f registry.Flags) { f.SetString("type", "Bug") }},
+		{"--assignee", func(f registry.Flags) { f.SetString("assignee", "currentUser") }},
+		{"--reporter", func(f registry.Flags) { f.SetString("reporter", "ada") }},
+		{"--created-after", func(f registry.Flags) { f.SetString("created-after", "-7d") }},
+		{"--created-before", func(f registry.Flags) { f.SetString("created-before", "-1d") }},
+		{"--updated-after", func(f registry.Flags) { f.SetString("updated-after", "-7d") }},
+	} {
+		t.Run(tc.flag, func(t *testing.T) {
+			flags := registry.NewFlags()
+			tc.apply(flags)
+			err := cmd.Validate(t.Context(), &registry.Invocation{
+				Jira:  &stubSession{unscoped: true},
+				Flags: flags, Limit: registry.Limit{All: true},
+				Progress: registry.NoProgress,
+			})
+			if err != nil {
+				t.Errorf("%s did not satisfy the guard: %v", tc.flag, err)
+			}
+		})
+	}
+
+	// A context project counts, which is the common case: a configured caller
+	// exhausting their own project is not sweeping anything.
+	err := cmd.Validate(t.Context(), &registry.Invocation{
+		Jira:  &stubSession{project: "ENG"},
+		Flags: registry.NewFlags(), Limit: registry.Limit{All: true},
+		Progress: registry.NoProgress,
+	})
+	if err != nil {
+		t.Errorf("a context project did not satisfy the guard: %v", err)
+	}
+}
+
+// TestSortingIsNotAFilter is the loophole worth closing explicitly. Ordering an
+// unbounded query does not make it smaller, and counting it would let --sort
+// updated talk the guard out of firing.
+func TestSortingIsNotAFilter(t *testing.T) {
+	cmd, _ := registry.Lookup("issue.list")
+	flags := registry.NewFlags()
+	flags.SetString("sort", "updated")
+	flags.SetString("order", "desc")
+
+	err := cmd.Validate(t.Context(), &registry.Invocation{
+		Jira:  &stubSession{unscoped: true},
+		Flags: flags, Limit: registry.Limit{All: true},
+		Progress: registry.NoProgress,
+	})
+	if err == nil {
+		t.Fatal("--sort was accepted as a constraint")
+	}
+	if code := errs.Coerce(err).Code; code != "UNCONSTRAINED_QUERY" {
+		t.Errorf("code = %q", code)
+	}
+}
+
+// TestAllProjectsLiftsTheContextProject covers the other half of the flag. A
+// context that sets a project would otherwise make a site-wide sweep
+// impossible, since an empty --project falls back to it rather than clearing it.
+func TestAllProjectsLiftsTheContextProject(t *testing.T) {
+	flags := registry.NewFlags()
+	flags.SetBool("all-projects", true)
+	inv := &registry.Invocation{Jira: &stubSession{project: "ENG"}, Flags: flags}
+
+	if got := issue.ListQueryFor(inv); got.Project != "" {
+		t.Errorf("project = %q, want the context's scope lifted", got.Project)
+	}
+	if got := issue.ListQueryFor(&registry.Invocation{
+		Jira: &stubSession{project: "ENG"}, Flags: registry.NewFlags(),
+	}); got.Project != "ENG" {
+		t.Errorf("project = %q, want the context's", got.Project)
+	}
 }

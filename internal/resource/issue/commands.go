@@ -167,6 +167,11 @@ filters, so an OR inside it cannot escape the project scope.`),
 					"added to the default set, repeat for several",
 			},
 			{
+				Name: "all-projects", Type: registry.TypeBool,
+				Usage: "search every project the credential can see, ignoring " +
+					"the context's; required to exhaust an unfiltered query",
+			},
+			{
 				Name: "page-size", Type: registry.TypeInt,
 				Usage: "results per HTTP request, 1 to 100; transport tuning only",
 			},
@@ -180,7 +185,7 @@ filters, so an OR inside it cannot escape the project scope.`),
 		CollectionName: "issues",
 		Columns:        ListColumns(),
 		ColumnsFor:     listColumnsFor,
-		Validate:       validateFields,
+		Validate:       validateList,
 		Outputs:        []registry.Output{{Kind: KindList, Version: VersionList}},
 		ExitCodes: []exitcode.Code{
 			exitcode.Partial, exitcode.Auth, exitcode.NotFound,
@@ -203,23 +208,7 @@ func runList(
 			errs.Runtime("NO_SESSION", "issue list has no connection to Jira")
 	}
 
-	query := QueryOptions{
-		// Project comes from the resolved context rather than a local flag:
-		// --project is global, and it is a default, never a requirement.
-		Project:       inv.Jira.Project(),
-		JQL:           inv.Flags.String("jql"),
-		Statuses:      inv.Flags.StringSlice("status"),
-		Labels:        inv.Flags.StringSlice("label"),
-		NotLabels:     inv.Flags.StringSlice("not-label"),
-		Types:         inv.Flags.StringSlice("type"),
-		Assignee:      inv.Flags.String("assignee"),
-		Reporter:      inv.Flags.String("reporter"),
-		CreatedAfter:  inv.Flags.String("created-after"),
-		CreatedBefore: inv.Flags.String("created-before"),
-		UpdatedAfter:  inv.Flags.String("updated-after"),
-		Sort:          inv.Flags.String("sort"),
-		Order:         inv.Flags.String("order"),
-	}
+	query := listQuery(inv)
 
 	conn, info, err := inv.Jira.Connect(ctx)
 	if err != nil {
@@ -277,6 +266,54 @@ const resolvedFieldsKey = "issue.fields"
 // computed from those ids before the body runs — a streaming command's header
 // goes out first — and because a name that resolves to nothing has to be
 // refused before any bytes reach stdout.
+// validateList refuses the one invocation that is a sweep rather than a query,
+// then resolves the field names.
+//
+// Both have to happen here rather than in the body: this is a streaming
+// command, so its header — and its columns — go out before the body runs, and a
+// rejection from inside it would arrive after bytes were already on stdout.
+func validateList(ctx context.Context, inv *registry.Invocation) error {
+	if err := refuseUnconstrainedSweep(inv); err != nil {
+		return err
+	}
+	return validateFields(ctx, inv)
+}
+
+// refuseUnconstrainedSweep stops `issue list --limit all` with nothing set.
+//
+// The default bound is what makes the unfiltered query harmless: it costs one
+// request and fifty rows, and refusing it would be a judgement about what
+// somebody meant. --limit all is different. It pages until the instance is
+// exhausted, and on a production Data Center a personal access token inherits
+// every project its owner was ever added to — so the result is every issue in
+// every project they can see, which is rarely what was meant and is not
+// something to find out afterwards.
+//
+// --all-projects is how to mean it. The refusal is not that the request cannot
+// be honored; it is that a request this wide should be stated rather than
+// arrived at.
+func refuseUnconstrainedSweep(inv *registry.Invocation) error {
+	if !inv.Limit.All || inv.Flags.Bool("all-projects") {
+		return nil
+	}
+	if listQuery(inv).Constrained() {
+		return nil
+	}
+	return errs.Usage("UNCONSTRAINED_QUERY",
+		"issue list --limit all with no filter would return every issue in "+
+			"every project this credential can see").
+		WithDetail("any of these constrains it: %s", strings.Join(constrainingFlags, ", ")).
+		WithRemedy("set --project, add a filter, or pass --all-projects to mean it")
+}
+
+// constrainingFlags is what the refusal offers instead, so the caller does not
+// have to go and read --help to find out what would have been enough.
+var constrainingFlags = []string{
+	"--project", "--jql", "--status", "--label", "--not-label", "--type",
+	"--assignee", "--reporter", "--created-after", "--created-before",
+	"--updated-after",
+}
+
 func validateFields(ctx context.Context, inv *registry.Invocation) error {
 	requested := inv.Flags.StringSlice("field")
 	if len(requested) == 0 {
@@ -344,6 +381,60 @@ func ListDoc(result *ListResult) *render.Doc {
 		NextPageToken: result.NextPageToken,
 		Columns:       ListColumns(),
 	})
+}
+
+// ListQueryFor exposes listQuery for a test that needs to see what the flags
+// resolved to without sending anything.
+func ListQueryFor(inv *registry.Invocation) QueryOptions { return listQuery(inv) }
+
+// listQuery reads the filters off one invocation.
+//
+// It is one function because two callers need the same answer: the guard that
+// decides whether the query constrains anything, and the body that sends it. A
+// second copy would let them disagree about what "unfiltered" means, which is
+// the one thing the guard exists to be right about.
+func listQuery(inv *registry.Invocation) QueryOptions {
+	opt := QueryOptions{
+		JQL:           inv.Flags.String("jql"),
+		Statuses:      inv.Flags.StringSlice("status"),
+		Labels:        inv.Flags.StringSlice("label"),
+		NotLabels:     inv.Flags.StringSlice("not-label"),
+		Types:         inv.Flags.StringSlice("type"),
+		Assignee:      inv.Flags.String("assignee"),
+		Reporter:      inv.Flags.String("reporter"),
+		CreatedAfter:  inv.Flags.String("created-after"),
+		CreatedBefore: inv.Flags.String("created-before"),
+		UpdatedAfter:  inv.Flags.String("updated-after"),
+		Sort:          inv.Flags.String("sort"),
+		Order:         inv.Flags.String("order"),
+	}
+	// Project comes from the resolved context rather than a local flag:
+	// --project is global, and it is a default, never a requirement.
+	// --all-projects lifts it, which is the only way past a context that sets
+	// one — an empty --project falls back to the context rather than clearing
+	// it.
+	if inv.Jira != nil && !inv.Flags.Bool("all-projects") {
+		opt.Project = inv.Jira.Project()
+	}
+	return opt
+}
+
+// Constrained reports whether these options narrow the result set at all.
+//
+// The sort does not count. Ordering an unbounded query does not make it
+// smaller, and treating it as a filter is how a guard against sweeping the
+// instance gets talked out of firing by --sort updated.
+func (o QueryOptions) Constrained() bool {
+	for _, v := range []string{
+		o.Project, o.JQL, o.Assignee, o.Reporter,
+		o.CreatedAfter, o.CreatedBefore, o.UpdatedAfter,
+	} {
+		if strings.TrimSpace(v) != "" {
+			return true
+		}
+	}
+	return len(o.Statuses) > 0 || len(o.Labels) > 0 ||
+		len(o.NotLabels) > 0 || len(o.Types) > 0
 }
 
 // QueryOptions are the filter flags, before they become JQL.

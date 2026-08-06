@@ -83,15 +83,19 @@ func TestTheContextProjectScopesTheListing(t *testing.T) {
 	}
 }
 
-// TestProjectAllLiftsTheScope covers the only way out of a context's project.
+// TestAllProjectsLiftsTheScope covers the only way out of a context's project.
 // An empty --project falls back to the context rather than clearing it, so
 // without this a configured caller could not ask for every board on the site.
-func TestProjectAllLiftsTheScope(t *testing.T) {
+//
+// It used to be spelled `--project all`, a magic value inside a normal flag —
+// which meant a project genuinely keyed ALL could not be listed, and which
+// `issue list` would have had to spell a second way.
+func TestAllProjectsLiftsTheScope(t *testing.T) {
 	// The unscoped fixture is the one that answers, which is the assertion:
-	// "all" has to reach the client as no filter at all.
-	_, _, replayer := runList(t, site.DataCenter, "all", registry.Limit{All: true})
+	// the flag has to reach the client as no filter at all.
+	_, _, replayer := runList(t, site.DataCenter, allProjects, registry.Limit{All: true})
 	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
-		t.Errorf("--project all still scoped the query: %v", unplayed)
+		t.Errorf("--all-projects still scoped the query: %v", unplayed)
 	}
 }
 
@@ -298,9 +302,13 @@ func TestCommandsWithoutASessionFailLoudly(t *testing.T) {
 	}
 }
 
+// allProjects is the sentinel a test passes for "the caller lifted the scope",
+// which the command spells as a flag rather than as a project.
+const allProjects = "\x00all-projects"
+
 // runList runs `board list` against a cassette chosen by the scope: no project
-// and "all" both use the unscoped recording, and a project key uses the scoped
-// one.
+// and --all-projects both use the unscoped recording, and a project key uses
+// the scoped one.
 func runList(
 	t *testing.T, kind site.Kind, project string, limit registry.Limit,
 ) (string, registry.StreamResult, *transport.Replayer) {
@@ -311,14 +319,20 @@ func runList(
 		t.Fatal("board list is not registered")
 	}
 
+	flags := registry.NewFlags()
+	if project == allProjects {
+		flags.SetBool("all-projects", true)
+		project = "ENG" // a context project the flag must override.
+	}
+
 	fixture := "boards." + string(kind) + ".json"
-	if project != "" && !strings.EqualFold(project, "all") {
+	if project != "" && !flags.Bool("all-projects") {
 		fixture = "scoped." + string(kind) + ".json"
 	}
 	conn, replayer := replayConn(t, fixture)
 	inv := &registry.Invocation{
 		Jira:  &stubSession{conn: conn, kind: kind, project: project},
-		Flags: registry.NewFlags(), Limit: limit,
+		Flags: flags, Limit: limit,
 		Stderr: io.Discard, Progress: registry.NoProgress,
 	}
 

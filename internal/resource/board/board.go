@@ -154,8 +154,9 @@ func listCommand() *registry.Command {
 Returns the boards visible to the credential, ordered by id.
 
 Scoped to the resolved project when the context sets one, exactly as issue list
-is. --project all lifts the scope and returns every board on the site, which is
-a different and much larger question.
+is. --all-projects lifts the scope and returns every board on the site, which is
+a different and much larger question — and the only way past a context that sets
+a project, since an empty --project falls back to it rather than clearing it.
 
 The type matters more than it looks. A sprint listing exists only for a scrum
 board, so ` + "`" + buildinfo.App + ` sprint list` + "`" + ` against a kanban board is refused by the
@@ -166,7 +167,7 @@ which the agile API does not document — so two runs of a script agree.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " board list",
 			buildinfo.App + " board list --type scrum",
-			buildinfo.App + " board list --project all --limit all",
+			buildinfo.App + " board list --all-projects --limit all",
 		}, "\n"),
 		Flags: []registry.Flag{
 			{
@@ -176,6 +177,10 @@ which the agile API does not document — so two runs of a script agree.`),
 			{
 				Name: "name", Type: registry.TypeString,
 				Usage: "only boards whose name contains this text",
+			},
+			{
+				Name: "all-projects", Type: registry.TypeBool,
+				Usage: "every board on the site, ignoring the context's project",
 			},
 		},
 		Paginated:      true,
@@ -340,18 +345,19 @@ func runList(
 
 // listProject resolves the scope of a board listing.
 //
-// The word "all" is how a caller says "ignore the context", which is otherwise
+// --all-projects is how a caller says "ignore the context", which is otherwise
 // impossible: an empty --project falls back to the context rather than clearing
 // it, and a context with a project set would silently hide every other board.
+//
+// It used to be spelled `--project all`, which had two problems. A magic value
+// inside a normal flag means a project genuinely keyed ALL cannot be listed,
+// and `issue list` needed the same escape hatch — two spellings for one job is
+// what the flag rules exist to prevent.
 func listProject(inv *registry.Invocation) string {
-	if inv.Jira == nil {
+	if inv.Jira == nil || inv.Flags.Bool("all-projects") {
 		return ""
 	}
-	project := inv.Jira.Project()
-	if strings.EqualFold(project, "all") {
-		return ""
-	}
-	return project
+	return inv.Jira.Project()
 }
 
 func getCommand() *registry.Command {
