@@ -1,21 +1,93 @@
 {
   "deployment": "cloud",
-  "source": "constructed",
+  "source": "recorded",
   "interactions": [
     {
       "request": {
         "method": "GET",
         "path": "/rest/api/3/user",
-        "query": "accountId=712020%3A8f3a"
+        "query": "accountId=000000%3A00000000-0000-0000-0000-000000000000"
       },
       "response": {
         "status": 200,
         "header": {
+          "Atl-Request-Id": [
+            "00000000-0000-0000-0000-000000000000"
+          ],
+          "Atl-Traceid": [
+            "6e8b934fb26743eca625db7f4de42535"
+          ],
+          "Cache-Control": [
+            "no-cache, no-store, no-transform"
+          ],
           "Content-Type": [
-            "application/json"
+            "application/json;charset=UTF-8"
+          ],
+          "Date": [
+            "Thu, 06 Aug 2026 17:47:15 GMT"
+          ],
+          "Nel": [
+            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=399;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=150;w=1"
+          ],
+          "Report-To": [
+            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
+          ],
+          "Server": [
+            "AtlassianEdge"
+          ],
+          "Server-Timing": [
+            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=98,cdn-upstream-fbl;dur=195,atl-edge;dur=64,atl-edge-internal;dur=22,atl-edge-upstream;dur=41,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW57-P8\",cdn-rid;desc=\"HLN5lXDXWvvA_3WE6UR0xYjyunAkm0A9Ov7IFPgTPmBeG2Ca_I3Sjw==\",cdn-downstream-fbl;dur=199"
+          ],
+          "Set-Cookie": [
+            "REDACTED"
+          ],
+          "Strict-Transport-Security": [
+            "max-age=63072000; includeSubDomains; preload"
+          ],
+          "Timing-Allow-Origin": [
+            "*"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "Via": [
+            "1.1 8bbe3ae007e74a478c72cdc6d6978178.cloudfront.net (CloudFront)"
+          ],
+          "X-Aaccountid": [
+            "000000%3A00000000-0000-0000-0000-000000000000"
+          ],
+          "X-Amz-Cf-Id": [
+            "HLN5lXDXWvvA_3WE6UR0xYjyunAkm0A9Ov7IFPgTPmBeG2Ca_I3Sjw=="
+          ],
+          "X-Amz-Cf-Pop": [
+            "DFW57-P8"
+          ],
+          "X-Arequestid": [
+            "16440cfe7ce591185627553e30b418ef"
+          ],
+          "X-Cache": [
+            "Miss from cloudfront"
+          ],
+          "X-Content-Type-Options": [
+            "nosniff"
+          ],
+          "X-Ratelimit-Limit": [
+            "400"
+          ],
+          "X-Ratelimit-Remaining": [
+            "399"
+          ],
+          "X-Xss-Protection": [
+            "1; mode=block"
           ]
         },
-        "body": "{\"accountId\": \"712020:8f3a\", \"displayName\": \"Ada Lovelace\", \"active\": true, \"accountType\": \"atlassian\"}"
+        "body": "{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000:00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"accountType\":\"atlassian\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"locale\":\"en_US\",\"groups\":{\"size\":6,\"items\":[]},\"applicationRoles\":{\"size\":1,\"items\":[]},\"expand\":\"groups,applicationRoles\"}"
       }
     }
   ]

@@ -19,6 +19,11 @@ import (
 
 var deployments = []site.Kind{site.Cloud, site.DataCenter}
 
+// recordedAccountID is the Cloud id the recorded fixtures carry, after
+// scrubbing. The value is a placeholder; its shape — prefix, colon, UUID — is
+// the real thing, which is what the id handling is about.
+const recordedAccountID = "000000:00000000-0000-0000-0000-000000000000"
+
 // TestTheIdIsTheDeploymentsOwn is the point of this resource. Every command
 // that takes a user wants an accountId on Cloud and a username on Data Center,
 // they are not interchangeable, and this is where the right one comes from.
@@ -27,7 +32,7 @@ func TestTheIdIsTheDeploymentsOwn(t *testing.T) {
 		kind site.Kind
 		id   string
 	}{
-		{site.Cloud, "712020:8f3a"},
+		{site.Cloud, "000000:00000000-0000-0000-0000-000000000000"},
 		{site.DataCenter, "ada"},
 	} {
 		t.Run(string(tc.kind), func(t *testing.T) {
@@ -45,9 +50,8 @@ func TestTheIdIsTheDeploymentsOwn(t *testing.T) {
 				t.Fatalf("the search used the wrong parameter: %v", unplayed)
 			}
 
-			// Ordered by display name, so two runs agree.
-			if len(users) != 2 || users[0].Display != "Aaron Bot" {
-				t.Fatalf("users = %+v, want them ordered by display name", users)
+			if len(users) == 0 {
+				t.Fatalf("no users came back")
 			}
 			var ada user.User
 			for _, u := range users {
@@ -62,11 +66,32 @@ func TestTheIdIsTheDeploymentsOwn(t *testing.T) {
 	}
 }
 
+// TestUsersAreOrderedByDisplayName needs two of them, which the recorded
+// instance does not have — it is a one-person sandbox. So it runs against the
+// constructed fixture, which says so in its source field.
+func TestUsersAreOrderedByDisplayName(t *testing.T) {
+	conn, _ := replayConn(t, "search-private.cloud.json")
+	client := &user.Client{Transport: conn, Site: site.Info{Kind: site.Cloud}}
+
+	users, err := client.Search(t.Context(), "ada", 50)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(users) != 2 || users[0].Display != "Aaron Bot" {
+		t.Fatalf("users = %+v, want them ordered by display name", users)
+	}
+}
+
 // TestAnAbsentEmailIsNotAnAbsentAddress covers the Cloud privacy setting. An
 // empty column means "not disclosed", and inferring "has none" from it would be
 // wrong about most of an instance.
+//
+// It uses the constructed fixture deliberately. The recorded instance is one a
+// single person owns, so it discloses its own owner's address — a recording
+// cannot show the case this is about, and pretending otherwise would leave the
+// privacy path untested.
 func TestAnAbsentEmailIsNotAnAbsentAddress(t *testing.T) {
-	conn, _ := replayConn(t, "search.cloud.json")
+	conn, _ := replayConn(t, "search-private.cloud.json")
 	client := &user.Client{Transport: conn, Site: site.Info{Kind: site.Cloud}}
 
 	users, err := client.Search(t.Context(), "ada", 50)
@@ -126,7 +151,7 @@ func TestGetUsesTheRightParameter(t *testing.T) {
 		kind site.Kind
 		id   string
 	}{
-		{site.Cloud, "712020:8f3a"},
+		{site.Cloud, recordedAccountID},
 		{site.DataCenter, "ada"},
 	} {
 		conn, replayer := replayConn(t, "user."+string(tc.kind)+".json")
@@ -332,8 +357,15 @@ func TestSearchAndGetRunAsCommands(t *testing.T) {
 			if lines[0] != "id\tdisplay\temail\tactive" {
 				t.Errorf("header = %q", lines[0])
 			}
-			if len(lines) != 3 {
-				t.Errorf("got %d rows, want 2:\n%s", len(lines)-1, buf.String())
+			// One on Cloud because the recorded sandbox has one user, two on
+			// Data Center because that fixture is constructed.
+			wantRows := 2
+			if kind == site.Cloud {
+				wantRows = 1
+			}
+			if len(lines) != wantRows+1 {
+				t.Errorf("got %d rows, want %d:\n%s",
+					len(lines)-1, wantRows, buf.String())
 			}
 		})
 
@@ -342,7 +374,7 @@ func TestSearchAndGetRunAsCommands(t *testing.T) {
 			conn, _ := replayConn(t, "user."+string(kind)+".json")
 			id := "ada"
 			if kind == site.Cloud {
-				id = "712020:8f3a"
+				id = recordedAccountID
 			}
 			inv := &registry.Invocation{
 				Jira: &stubSession{conn: conn, kind: kind},
@@ -374,5 +406,28 @@ func TestUserCommandsWithoutASessionFailLoudly(t *testing.T) {
 		Flags: registry.NewFlags(),
 	}); err == nil {
 		t.Error("user me ran without a session")
+	}
+}
+
+// TestTheCloudFixturesAreRecordings guards what the other tests here rest on.
+//
+// TestGetUsesTheRightParameter and TestTheIdIsTheDeploymentsOwn are only worth
+// anything because the conversation they replay is one a real Jira had: the
+// replayer matches on path and query, so a mismatch means this code builds a
+// request the server never answered. Replace the fixture with a hand-written
+// one and those tests still pass while proving nothing, which is exactly the
+// state this resource was in before.
+func TestTheCloudFixturesAreRecordings(t *testing.T) {
+	for _, name := range []string{
+		"search.cloud.json", "me.cloud.json", "user.cloud.json",
+	} {
+		cassette, err := transport.LoadCassette(filepath.Join("testdata", name))
+		if err != nil {
+			t.Fatalf("load %s: %v", name, err)
+		}
+		if !cassette.Evidence() {
+			t.Errorf("%s is no longer a recording, so the tests that replay it "+
+				"assert nothing about the API", name)
+		}
 	}
 }
