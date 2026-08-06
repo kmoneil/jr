@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <result kind="contract" v="2">
-  <kinds count="31" complete="true">
+  <kinds count="33" complete="true">
     <kind name="auth.status" v="1" emitters="auth.login,auth.logout,auth.status">
       <element name="auth">
         <attributes count="9">
@@ -305,6 +305,53 @@
                 <elements count="0"/>
               </element>
             </elements>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="issue.attachment.download" v="1" emitters="issue.attachment.download">
+      <element name="attachment">
+        <attributes count="3">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="issue" type="string" optional="false"/>
+          <attribute name="bytes" type="int" optional="false"/>
+        </attributes>
+        <elements count="2">
+          <element name="filename" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="path" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
+    </kind>
+    <kind name="issue.attachment.list" v="1" emitters="issue.attachment.list">
+      <element name="attachment">
+        <attributes count="3">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="size" type="int" optional="false"/>
+          <attribute name="mime-type" type="string" optional="true"/>
+        </attributes>
+        <elements count="3">
+          <element name="filename" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="author" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="created" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
           </element>
         </elements>
       </element>

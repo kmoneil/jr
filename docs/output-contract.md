@@ -258,6 +258,22 @@ often blocked from the current status than misspelled.
 An unparseable `--format` still produces a readable error: the diagnostic falls
 back to XML rather than failing twice.
 
+### A command that writes bytes instead of a document
+
+`jr issue attachment download --output -` writes the file to stdout and emits no
+result document. It is the only command that does this and the exception is
+narrow on purpose: a file and a result on the same channel means one corrupts
+the other, and the caller who asked for the file gets it.
+
+Writing to a path is the ordinary case and emits `issue.attachment.download`
+saying what was written, where, and how many bytes — counted while writing, so
+if it disagrees with the size the listing reported, this is the one that
+happened.
+
+A caller with no stdout to spare — `mcp serve`, where bytes would land on the
+JSON-RPC stream as a frame the peer cannot parse — gets `NO_STDOUT` and exit 2
+rather than a corrupted session.
+
 ### Verdicts
 
 A command whose whole product is a judgement reports it and exits 0, even when
@@ -352,6 +368,8 @@ renders the request as the command built it, before the transport attaches one.
 | `SELF_EPIC`               | 2    | An epic was named as one of the issues to move into it. |
 | `NOTHING_TO_EDIT`         | 2    | `issue edit` was given no field to change. |
 | `TOO_MANY_ISSUES`         | 2    | More issues than the agile API moves at once. It is refused rather than split across requests: two requests can half-succeed, and the outcome would be neither moved nor not moved. |
+| `DESTINATION_EXISTS`      | 7    | A download would replace a file that is already there. It refuses rather than overwriting, because a download that silently replaced a file is indistinguishable from one that worked, and the file it replaced is not recoverable. `--force` allows it. |
+| `OFF_SITE_URL`            | 1    | The server pointed at a host other than the configured site, and this tool will not follow it. Data Center reports an attachment's content as an absolute URL; following it on trust is how a credential reaches a host nobody chose. The refusal never echoes the URL — one can carry userinfo or a signed parameter. |
 | `BODY_NOT_REPLAYABLE`     | 1    | A retry needed the request body again and could not get it — a body read from a pipe cannot be sent twice. The request fails rather than going out short, because a second attempt carrying nothing would be accepted as a successful upload of an empty file. |
 | `SPRINT_NOT_ACTIVE`       | 7    | Only a running sprint can be closed. The sprint is read first, so the wrong state costs one read and no mutation. |
 

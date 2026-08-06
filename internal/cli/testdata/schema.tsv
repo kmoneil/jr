@@ -14,6 +14,8 @@ contract	Dump the machine-readable output contract for every kind	false	false	co
 epic.get	Fetch one epic	false	false	epic.get
 epic.list	List a board's epics	false	false	epic.list
 field.list	List every field this site has	false	false	field.list
+issue.attachment.download	Download an attachment	false	false	issue.attachment.download
+issue.attachment.list	List the files attached to an issue	false	false	issue.attachment.list
 issue.comment.list	List an issue's comments	false	false	issue.comment.list
 issue.get	Fetch one issue in full	false	false	issue.get
 issue.link.list	List the issues linked to one issue	false	false	issue.link.list

@@ -1,0 +1,23 @@
+{
+  "deployment": "cloud",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/attachment/content/10042"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/pdf"
+          ],
+          "Content-Disposition": [
+            "attachment; filename=\"report.pdf\""
+          ]
+        },
+        "body": "%PDF-1.4 pretend contents"
+      }
+    }
+  ]
+}

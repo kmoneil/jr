@@ -124,6 +124,15 @@ type Command struct {
 	// wire that the peer cannot parse, and the session dies rather than the
 	// message being ignored.
 	OwnsStdout bool
+	// OwnsStdoutWhen makes that conditional, for a command that either writes
+	// a result document or writes raw bytes depending on where it was told to
+	// put them.
+	//
+	// `issue attachment download --output -` is the only case: a file on
+	// stdout and a result document on stdout are the same channel, and one of
+	// them has to lose. The document does, because the caller asked for the
+	// file. Writing to a path emits the document as normal.
+	OwnsStdoutWhen func(inv *Invocation) bool
 	// NeedsJira marks a command that talks to the configured site. The CLI
 	// layer builds a Session for it; a command without this never resolves a
 	// credential and never probes the deployment.
@@ -271,9 +280,20 @@ type Invocation struct {
 	// Format is the resolved output format, for commands that need to know
 	// (almost none should).
 	Format render.Format
-	// Stderr is where a command may emit structured diagnostics. Nothing a
-	// command writes ever reaches stdout.
+	// Stderr is where a command may emit structured diagnostics.
 	Stderr io.Writer
+	// Stdout is the raw byte channel, and exists for exactly one shape of
+	// command: one whose output is a file rather than a document.
+	//
+	// It is nil wherever stdout is not free to be written — inside
+	// `mcp serve`, bytes here would land on the JSON-RPC stream as a frame the
+	// peer cannot parse, which is a bug this project has already shipped once.
+	// A command that needs it and finds it nil refuses rather than writing
+	// somewhere else.
+	//
+	// Everything else writes a *render.Doc and lets the CLI encode it. If a
+	// second command ever reaches for this, that is the moment to ask why.
+	Stdout io.Writer
 	// Progress reports the scale of a long operation. It is never nil.
 	Progress Progress
 
@@ -318,6 +338,18 @@ func (c *Command) Kind() string {
 // Emits reports whether this command produces a result document at all. A
 // command that owns stdout does not.
 func (c *Command) EmitsDocument() bool { return !c.OwnsStdout }
+
+// EmitsDocumentFor answers the same question for one invocation, which is the
+// form the CLI needs: a command may own stdout only for some of its arguments.
+func (c *Command) EmitsDocumentFor(inv *Invocation) bool {
+	if c.OwnsStdout {
+		return false
+	}
+	if c.OwnsStdoutWhen != nil && c.OwnsStdoutWhen(inv) {
+		return false
+	}
+	return true
+}
 
 // KindVersion returns the schema version of the command's default output kind.
 func (c *Command) KindVersion() int {

@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/issue/ENG-101",
+        "query": "fields=attachment"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"key\":\"ENG-101\",\"fields\":{\"attachment\":[{\"id\":\"10042\",\"filename\":\"report.pdf\",\"mimeType\":\"application/pdf\",\"size\":1048576,\"created\":\"2026-08-01T09:00:00.000+0000\",\"content\":\"https://recorded.invalid/secure/attachment/10042/report.pdf\",\"author\":{\"displayName\":\"Ada Lovelace\"}},{\"id\":\"10043\",\"filename\":\"run.log\",\"mimeType\":\"text/plain\",\"size\":2048,\"created\":\"2026-08-02T11:30:00.000+0000\",\"content\":\"https://recorded.invalid/secure/attachment/10043/run.log\",\"author\":{\"displayName\":\"Ada Lovelace\"}}]}}"
+      }
+    }
+  ]
+}

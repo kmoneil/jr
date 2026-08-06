@@ -13,7 +13,7 @@ converts a class of runtime bugs into link errors.
 
 | Tag         | Intends to gate                                         | Gates today                    |
 | ----------- | ------------------------------------------------------- | ------------------------------ |
-| `write`     | All mutating commands                                   | the 17 mutating verbs          |
+| `write`     | All mutating commands                                   | the 18 mutating verbs          |
 | `mcp`       | `jr mcp serve`                                          | `jr mcp serve`                 |
 | `prompt`    | Interactive prompts, the setup wizard, completion       | `jr completion`                |
 | `admin`     | Project, board, and sprint administration               | `jr sprint close`              |
@@ -84,10 +84,10 @@ document that nothing checks eventually becomes.
 
 | Profile  | Commands | Not present                                   |
 | -------- | -------- | --------------------------------------------- |
-| `full`   | 56       | —                                             |
-| `agent`  | 54       | `completion`, `sprint close`                  |
-| `reader` | 37       | the above, plus the 17 mutating verbs         |
-| `ci`     | 36       | the above, plus `mcp serve`                   |
+| `full`   | 59       | —                                             |
+| `agent`  | 57       | `completion`, `sprint close`                  |
+| `reader` | 39       | the above, plus the 18 mutating verbs         |
+| `ci`     | 38       | the above, plus `mcp serve`                   |
 
 `make test-profiles` runs the whole suite under every shipped tag set, and the
 contract tests inside it assert the surface directly: no mutating command

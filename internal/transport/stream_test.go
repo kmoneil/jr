@@ -345,3 +345,95 @@ func TestAStreamedRequestReplaysFromACassette(t *testing.T) {
 		t.Errorf("the request was never played: %v", unplayed)
 	}
 }
+
+// TestRelativeRefusesAnotherHost is the guard on a value the server chooses.
+//
+// Data Center reports an attachment's content as an absolute URL. Following it
+// as given would hand the credential to whatever host it names, and unlike a
+// bad --site that is not a mistake the caller made or could see.
+func TestRelativeRefusesAnotherHost(t *testing.T) {
+	client, err := transport.New(transport.Options{
+		BaseURL: "https://jira.acme.invalid/jira",
+	})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name, raw, want string
+	}{
+		{
+			name: "absolute on the configured site, under its context path",
+			raw:  "https://jira.acme.invalid/jira/secure/attachment/10042/report.pdf",
+			want: "/secure/attachment/10042/report.pdf",
+		},
+		{
+			// The port is implied by the scheme on one side and written on the
+			// other. They are one host, not two.
+			name: "the same host with the default port spelled out",
+			raw:  "https://jira.acme.invalid:443/jira/secure/attachment/1/a.txt",
+			want: "/secure/attachment/1/a.txt",
+		},
+		{
+			name: "a relative value is already what we want",
+			raw:  "/rest/api/2/attachment/content/1",
+			want: "/rest/api/2/attachment/content/1",
+		},
+		{
+			name: "a query survives",
+			raw:  "https://jira.acme.invalid/jira/secure/attachment/1/a.txt?v=2",
+			want: "/secure/attachment/1/a.txt?v=2",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := client.Relative(tc.raw)
+			if err != nil {
+				t.Fatalf("Relative(%q): %v", tc.raw, err)
+			}
+			if got != tc.want {
+				t.Errorf("Relative(%q) = %q, want %q", tc.raw, got, tc.want)
+			}
+		})
+	}
+
+	for _, tc := range []struct{ name, raw, code string }{
+		{"another host entirely", "https://evil.invalid/steal", "OFF_SITE_URL"},
+		{"a subdomain is not the same host", "https://x.jira.acme.invalid/jira/a", "OFF_SITE_URL"},
+		{"a different scheme", "http://jira.acme.invalid/jira/a", "OFF_SITE_URL"},
+		{"a different port", "https://jira.acme.invalid:8443/jira/a", "OFF_SITE_URL"},
+		{"outside the context path", "https://jira.acme.invalid/other/a", "OFF_SITE_URL"},
+		{"nothing at all", "  ", "NO_URL"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := client.Relative(tc.raw)
+			if err == nil {
+				t.Fatalf("Relative(%q) was accepted", tc.raw)
+			}
+			if code := errs.Coerce(err).Code; code != tc.code {
+				t.Errorf("code = %q, want %q", code, tc.code)
+			}
+		})
+	}
+}
+
+// TestRelativeDoesNotEchoTheURL keeps a server-supplied URL out of the error
+// text. A URL is not obviously a secret, which is exactly why one carrying
+// userinfo or a signed query parameter gets printed by accident.
+func TestRelativeDoesNotEchoTheURL(t *testing.T) {
+	client, err := transport.New(transport.Options{BaseURL: "https://jira.acme.invalid"})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	const secret = "s3cr3t-signature"
+	_, err = client.Relative("https://cdn.invalid/a?signature=" + secret)
+	if err == nil {
+		t.Fatal("an off-site URL was accepted")
+	}
+	e := errs.Coerce(err)
+	for _, text := range []string{e.Message, e.Detail, e.Remedy} {
+		if strings.Contains(text, secret) {
+			t.Errorf("the refusal echoed the query: %q", text)
+		}
+	}
+}

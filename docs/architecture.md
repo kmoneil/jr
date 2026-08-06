@@ -234,6 +234,12 @@ idea how large the file is. A stream is bounded to first byte and then handed
 over; the caller's own context governs the transfer, which is what makes Ctrl-C
 work on a long download.
 
+**A server-supplied URL is checked before it is followed.**
+`transport.Client.Relative` converts an absolute URL the server chose into a
+site-relative path and refuses one naming another scheme, host, port, or context
+path. Data Center reports an attachment's content that way, and unlike a
+mistyped `--site` this is not a mistake the caller made or could see.
+
 **An upload body is a factory, not a reader.** `Request.BodySource` is re-opened
 on every attempt, for the same reason `Body` is bytes: a retry has to send the
 same content again, and a reader is spent by the first one. A source that cannot

@@ -633,3 +633,82 @@ func newRequestID() string {
 	}
 	return hex.EncodeToString(b[:])
 }
+
+// Relative converts a URL the server supplied into a path this client will
+// send, and refuses one pointing anywhere else.
+//
+// Data Center reports an attachment's content as an absolute URL. Following it
+// as given would hand the credential to whatever host it names, which is the
+// exact failure "a request path is relative, never absolute" exists to prevent
+// — and the value comes from the server, so it is not a caller's mistake to
+// make. Scheme, host, and port must all match the configured site.
+//
+// A relative value is returned unchanged, so a caller can pass whatever the API
+// gave it without first working out which shape it got.
+func (c *Client) Relative(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", errs.Runtime("NO_URL", "the server supplied no URL to follow")
+	}
+
+	ref, err := url.Parse(trimmed)
+	if err != nil {
+		// The raw value is not echoed: a URL is not obviously a secret, which
+		// is exactly why one carrying userinfo or a signed query parameter
+		// gets printed by accident.
+		return "", errs.Remote("MALFORMED_URL",
+			"the server supplied a URL this tool cannot parse").Wrap(err)
+	}
+	if !ref.IsAbs() {
+		return ref.RequestURI(), nil
+	}
+
+	if !strings.EqualFold(ref.Scheme, c.base.Scheme) || !sameHost(ref, c.base) {
+		return "", errs.Remote("OFF_SITE_URL",
+			"the server pointed at another host, and this tool will not follow it").
+			WithDetail("configured %s, supplied %s", c.base.Host, ref.Host).
+			WithRemedy("report this: a credential is not sent anywhere but the " +
+				"configured site")
+	}
+
+	// The site may be served under a context path — a Data Center instance
+	// often is — and the base already carries it. Returning the whole path
+	// would repeat it; returning the remainder keeps resolve's JoinPath honest.
+	path := ref.EscapedPath()
+	if base := c.base.EscapedPath(); base != "" && base != "/" {
+		if !strings.HasPrefix(path, base) {
+			return "", errs.Remote("OFF_SITE_URL",
+				"the server pointed outside the configured context path").
+				WithDetail("configured %s, supplied %s", base, path).
+				WithRemedy("report this: a credential is not sent anywhere but " +
+					"the configured site")
+		}
+		path = strings.TrimPrefix(path, base)
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	if ref.RawQuery != "" {
+		path += "?" + ref.RawQuery
+	}
+	return path, nil
+}
+
+// sameHost compares two URLs by host and port, defaulting the port from the
+// scheme so https://x and https://x:443 are one host rather than two.
+func sameHost(a, b *url.URL) bool {
+	return strings.EqualFold(withPort(a), withPort(b))
+}
+
+func withPort(u *url.URL) string {
+	if u.Port() != "" {
+		return u.Hostname() + ":" + u.Port()
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "https":
+		return u.Hostname() + ":443"
+	case "http":
+		return u.Hostname() + ":80"
+	}
+	return u.Hostname()
+}

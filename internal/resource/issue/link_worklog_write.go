@@ -468,23 +468,3 @@ func runWorklogDelete(ctx context.Context, inv *registry.Invocation) (*render.Do
 		Attr("issue", inv.Args[0]).
 		Attr("action", "deleted")), nil
 }
-
-// validNumericID rejects an id this tool cannot address.
-//
-// Jira's ids are numeric strings. Checking locally means a typo costs no round
-// trip, and it keeps a caller's argument from reaching a URL path as anything
-// but digits.
-func validNumericID(what, id string) error {
-	code := "INVALID_" + strings.ToUpper(what) + "_ID"
-	if id == "" {
-		return errs.Usage(code, "a %s id is required", what)
-	}
-	for _, r := range id {
-		if r < '0' || r > '9' {
-			return errs.Usage(code, "%q is not a %s id", id, what).
-				WithDetail("an id is digits, e.g. 10042").
-				WithRemedy("take it from `%s issue %s list`", buildinfo.App, what)
-		}
-	}
-	return nil
-}

@@ -219,6 +219,7 @@ func (a *app) newLeaf(rc *registry.Command) *cobra.Command {
 			Flags:    binder(cmd),
 			Limit:    registry.Limit{N: registry.DefaultLimit},
 			Stderr:   a.stderr,
+			Stdout:   a.stdout,
 			Progress: registry.NoProgress,
 		}
 		// Built lazily inside: a command that never connects never resolves a
@@ -271,7 +272,7 @@ func (a *app) newLeaf(rc *registry.Command) *cobra.Command {
 		// A command that owns stdout has already written everything that
 		// belongs there. Rendering a result on top would put a frame on the
 		// wire its peer cannot parse.
-		if !rc.EmitsDocument() {
+		if !rc.EmitsDocumentFor(inv) {
 			return nil
 		}
 		if !rc.Emits(doc.Kind, doc.Version) {
