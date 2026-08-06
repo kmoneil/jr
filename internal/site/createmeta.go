@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kmoneil/jira-cli/internal/buildinfo"
 	"github.com/kmoneil/jira-cli/internal/errs"
 	"github.com/kmoneil/jira-cli/internal/transport"
 )
@@ -148,9 +149,11 @@ func sortMetaFields(fields []MetaField) {
 
 // FetchIssueTypes lists the types a project offers.
 //
-// It exists because Cloud's createmeta is addressed by issue type *id* while a
-// caller types a name. Data Center takes the name directly, so this is only
-// reached on Cloud.
+// It exists because createmeta is addressed by issue type *id* while a caller
+// types a name, on both deployments. It is also what makes the two failures
+// distinguishable: this request 404s for a project that is not there, and a
+// name missing from what it returns is an unknown type reported with the list
+// of real ones.
 func FetchIssueTypes(
 	ctx context.Context, client Doer, info Info, project string,
 ) ([]IssueType, error) {
@@ -169,6 +172,19 @@ func FetchIssueTypes(
 		})
 		if err != nil {
 			return nil, err
+		}
+		if resp.Status == 400 || resp.Status == 404 {
+			// The project is the only thing this route is addressed by, so
+			// either status means that project — a 10.3 instance answers an
+			// unknown one with 400 and a 404 is equally plausible elsewhere.
+			// Saying which cause it is keeps it apart from "no such type":
+			// they have different fixes, and a bare "Jira rejected the request"
+			// leaves a caller guessing which of three things to check.
+			return nil, errs.NotFound("UNKNOWN_PROJECT",
+				"project %q does not exist, or this credential cannot create in it",
+				project).
+				WithRequestID(resp.RequestID).
+				WithRemedy("check the key with `%s project list`", buildinfo.App)
 		}
 		if err := transport.Err(resp); err != nil {
 			return nil, err
@@ -258,20 +274,20 @@ func ResolveIssueType(types []IssueType, input string) (IssueType, error) {
 
 // FetchCreateMeta reads what a project and issue type require at creation.
 //
-// The two deployments diverge here more than anywhere else. Data Center serves
-// the whole thing from one request with an expand; Cloud removed that endpoint
-// and replaced it with a pair — one to map a type name to an id, one to page
-// the fields. The split is behind this function, so a caller sees one shape.
+// It is two requests on both deployments: one to map a type name to an id, one
+// to page that type's fields. There is no deployment split, which there used to
+// be — Data Center once served the whole thing from a single `createmeta` call
+// filtered by projectKeys and issuetypeNames, and this took that route.
+//
+// Atlassian deprecated it in 8.4 and removed it in 9.0, so on any supported
+// Data Center it answers "Issue Does Not Exist" — Jira reading `createmeta` as
+// an issue key. A live 10.3 instance is where that was found; the fixture that
+// was supposed to cover it encoded the old shape and passed happily.
+//
+// Nothing branches on the deployment now, and nothing branches on the version
+// either: 8.x is out of support, so the route that replaced it is the only one
+// worth having.
 func FetchCreateMeta(
-	ctx context.Context, client Doer, info Info, project, issueType string,
-) (*CreateMeta, error) {
-	if info.Kind == Cloud {
-		return fetchCreateMetaCloud(ctx, client, info, project, issueType)
-	}
-	return fetchCreateMetaDataCenter(ctx, client, info, project, issueType)
-}
-
-func fetchCreateMetaCloud(
 	ctx context.Context, client Doer, info Info, project, issueType string,
 ) (*CreateMeta, error) {
 	types, err := FetchIssueTypes(ctx, client, info, project)
@@ -329,140 +345,6 @@ func fetchCreateMetaCloud(
 	return &CreateMeta{
 		Project: project, IssueType: resolved.Name, Fields: fields,
 	}, nil
-}
-
-func fetchCreateMetaDataCenter(
-	ctx context.Context, client Doer, info Info, project, issueType string,
-) (*CreateMeta, error) {
-	path := info.APIBase() + "/issue/createmeta"
-
-	resp, err := client.Do(ctx, transport.Request{
-		Method: transport.MethodGet,
-		Path:   path,
-		Query: map[string][]string{
-			"projectKeys":    {project},
-			"issuetypeNames": {issueType},
-			"expand":         {"projects.issuetypes.fields"},
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-	if err := transport.Err(resp); err != nil {
-		return nil, err
-	}
-
-	var raw struct {
-		Projects []struct {
-			Key        string `json:"key"`
-			IssueTypes []struct {
-				ID     string                     `json:"id"`
-				Name   string                     `json:"name"`
-				Fields map[string]json.RawMessage `json:"fields"`
-			} `json:"issuetypes"`
-		} `json:"projects"`
-	}
-	if err := json.Unmarshal(resp.Body, &raw); err != nil {
-		return nil, errs.Remote("MALFORMED_CREATEMETA",
-			"%s did not return usable field metadata", path).
-			WithRequestID(resp.RequestID).
-			Wrap(err)
-	}
-
-	// A filter that matched nothing comes back as an empty projects array with
-	// a 200, so an unknown project and an unknown type both look like success.
-	// Asking again without the type filter separates them, and gives the same
-	// refusal Cloud gives — where the type name is resolved before the fields
-	// are asked for, so a typo comes back with the alternatives.
-	if len(raw.Projects) == 0 || len(raw.Projects[0].IssueTypes) == 0 {
-		return nil, dataCenterNoMatch(ctx, client, info, project, issueType, resp.RequestID)
-	}
-
-	found := raw.Projects[0].IssueTypes[0]
-	fields, err := decodeMetaFields(found.Fields, path, resp.RequestID)
-	if err != nil {
-		return nil, err
-	}
-	return &CreateMeta{
-		Project: raw.Projects[0].Key, IssueType: found.Name, Fields: fields,
-	}, nil
-}
-
-// dataCenterNoMatch explains an empty createmeta result.
-//
-// It asks once more without the issue type filter. A project that offers types
-// means the type name was wrong, and the alternatives are worth printing; a
-// project that offers none means the project is wrong or unreadable. Reporting
-// both as one condition would leave a caller guessing which of three things to
-// check — the exact opaqueness §5.2 exists to remove.
-//
-// A failure of the second request is not propagated. The first request already
-// established that the answer is "nothing matched", and a diagnostic lookup
-// that fails must not replace that with an unrelated error.
-func dataCenterNoMatch(
-	ctx context.Context, client Doer, info Info, project, issueType, requestID string,
-) error {
-	types, err := dataCenterIssueTypes(ctx, client, info, project)
-	if err != nil || len(types) == 0 {
-		return errs.NotFound("UNKNOWN_PROJECT",
-			"project %s has no issue types this credential can create", project).
-			WithRequestID(requestID).
-			WithDetail("the project does not exist, or creating in it is not permitted").
-			WithRemedy("check the key with `jr context show`")
-	}
-
-	names := make([]string, 0, len(types))
-	for _, t := range types {
-		names = append(names, t.Name+" ("+t.ID+")")
-	}
-	return errs.NotFound("UNKNOWN_ISSUE_TYPE",
-		"project %s has no issue type called %q", project, issueType).
-		WithRequestID(requestID).
-		WithDetail("available: %s", strings.Join(names, ", ")).
-		WithRemedy("pass one of the above, by name or by id")
-}
-
-// dataCenterIssueTypes lists what a project offers, from the same endpoint
-// without the type filter.
-func dataCenterIssueTypes(
-	ctx context.Context, client Doer, info Info, project string,
-) ([]IssueType, error) {
-	resp, err := client.Do(ctx, transport.Request{
-		Method: transport.MethodGet,
-		Path:   info.APIBase() + "/issue/createmeta",
-		Query: map[string][]string{
-			"projectKeys": {project},
-			"expand":      {"projects.issuetypes"},
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-	if err := transport.Err(resp); err != nil {
-		return nil, err
-	}
-
-	var raw struct {
-		Projects []struct {
-			IssueTypes []struct {
-				ID   string `json:"id"`
-				Name string `json:"name"`
-			} `json:"issuetypes"`
-		} `json:"projects"`
-	}
-	if err := json.Unmarshal(resp.Body, &raw); err != nil {
-		return nil, err
-	}
-	if len(raw.Projects) == 0 {
-		return nil, nil
-	}
-
-	out := make([]IssueType, 0, len(raw.Projects[0].IssueTypes))
-	for _, t := range raw.Projects[0].IssueTypes {
-		out = append(out, IssueType{ID: t.ID, Name: t.Name})
-	}
-	sort.Slice(out, func(i, j int) bool { return lessID(out[i].ID, out[j].ID) })
-	return out, nil
 }
 
 // createMetaEntry is what goes on disk.

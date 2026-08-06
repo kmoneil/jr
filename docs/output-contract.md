@@ -241,9 +241,9 @@ their typo.
 | `INVALID_FIELD`        | 2      | The field resolved, but its id cannot be an element name or collides with one the command already emits.                                                            |
 | `UNKNOWN_TRANSITION`   | 2      | The issue offers no such move _right now_. `detail` lists every transition it does offer, with its id and destination.                                              |
 | `AMBIGUOUS_TRANSITION` | 2      | Two transitions share that name and lead to different statuses. `detail` lists both.                                                                                |
-| `UNKNOWN_ISSUE_TYPE`   | 2 or 5 | The project offers no such type. `detail` lists the ones it does. Exit 5 when the answer came from a createmeta lookup, 2 when a type name was resolved before one. |
+| `UNKNOWN_ISSUE_TYPE`   | 2      | The project offers no such type. `detail` lists the ones it does. It used to be 2 or 5 depending on which lookup answered; the type name is now always resolved before the fields are fetched, so there is one path and one code. |
 | `AMBIGUOUS_ISSUE_TYPE` | 2      | Several types share that name; pass the id.                                                                                                                         |
-| `UNKNOWN_PROJECT`      | 5      | The project does not exist, or this credential may not create in it.                                                                                                |
+| `UNKNOWN_PROJECT`      | 5      | The project does not exist, or this credential may not create in it. Reported for either status the createmeta route answers an unaddressable project with — a 10.3 Data Center says 400, and 404 is equally plausible elsewhere. |
 
 Field resolution costs one request against a cold cache and none against a warm
 one; a command that names nothing to resolve makes no extra request at all.

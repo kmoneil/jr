@@ -17,11 +17,11 @@ import (
 // shapes. Both fixtures describe the same screen, which is what lets the test
 // assert the shapes converge.
 const (
-	cloudIssueTypesJSON = `{"maxResults":100,"startAt":0,"total":2,"isLast":true,
+	issueTypesJSON = `{"maxResults":100,"startAt":0,"total":2,"isLast":true,
 		"values":[{"id":"10001","name":"Bug","subtask":false},
 		          {"id":"10002","name":"Story","subtask":false}]}`
 
-	cloudCreateMetaJSON = `{"maxResults":100,"startAt":0,"total":3,"isLast":true,
+	createMetaFieldsJSON = `{"maxResults":100,"startAt":0,"total":3,"isLast":true,
 		"values":[
 			{"fieldId":"summary","name":"Summary","required":true,
 			 "schema":{"type":"string"},"hasDefaultValue":false},
@@ -30,28 +30,24 @@ const (
 			 "allowedValues":[{"id":"1","name":"High"},{"id":"2","name":"Low"}]},
 			{"fieldId":"labels","name":"Labels","required":false,
 			 "schema":{"type":"array","items":"string"},"hasDefaultValue":false}]}`
-
-	dcCreateMetaJSON = `{"projects":[{"key":"ENG","issuetypes":[{"id":"10001","name":"Bug",
-		"fields":{
-			"summary":{"required":true,"name":"Summary","schema":{"type":"string"},
-			           "hasDefaultValue":false},
-			"priority":{"required":false,"name":"Priority","schema":{"type":"priority"},
-			            "hasDefaultValue":true,
-			            "allowedValues":[{"id":"1","name":"High"},{"id":"2","name":"Low"}]},
-			"labels":{"required":false,"name":"Labels",
-			          "schema":{"type":"array","items":"string"},"hasDefaultValue":false}}}]}]}`
 )
 
-// TestCreateMetaConvergesAcrossDeployments is why both fixtures exist. Cloud
-// pages the fields and wants an issue type id; Data Center serves the lot from
-// one request keyed by name. A caller must not be able to tell.
+// TestCreateMetaConvergesAcrossDeployments keeps both deployments on the same
+// two requests.
+//
+// They used to diverge here more than anywhere else: Data Center served the lot
+// from one `createmeta` call filtered by projectKeys and issuetypeNames. That
+// endpoint was removed in Jira 9.0, so the only route left is the pair — one to
+// map a type name to an id, one to page the fields — and it is the same on both.
+// What is left to assert is that the base path is the only difference.
 func TestCreateMetaConvergesAcrossDeployments(t *testing.T) {
 	cloud := &routingDoer{routes: map[string]string{
-		"/rest/api/3/issue/createmeta/ENG/issuetypes":       cloudIssueTypesJSON,
-		"/rest/api/3/issue/createmeta/ENG/issuetypes/10001": cloudCreateMetaJSON,
+		"/rest/api/3/issue/createmeta/ENG/issuetypes":       issueTypesJSON,
+		"/rest/api/3/issue/createmeta/ENG/issuetypes/10001": createMetaFieldsJSON,
 	}}
 	dc := &routingDoer{routes: map[string]string{
-		"/rest/api/2/issue/createmeta": dcCreateMetaJSON,
+		"/rest/api/2/issue/createmeta/ENG/issuetypes":       issueTypesJSON,
+		"/rest/api/2/issue/createmeta/ENG/issuetypes/10001": createMetaFieldsJSON,
 	}}
 
 	got := map[site.Kind]*site.CreateMeta{}
@@ -92,14 +88,20 @@ func TestCreateMetaConvergesAcrossDeployments(t *testing.T) {
 	if cloud.calls != 2 {
 		t.Errorf("cloud made %d requests, want 2", cloud.calls)
 	}
-	if dc.calls != 1 {
-		t.Errorf("data center made %d requests, want 1", dc.calls)
+	// Two requests on both, now that both take the same route: one to map the
+	// type name to an id, one to page that type's fields.
+	if dc.calls != 2 {
+		t.Errorf("data center made %d requests, want 2", dc.calls)
 	}
 }
 
 func TestCreateMetaCarriesAllowedValues(t *testing.T) {
 	doer := &routingDoer{routes: map[string]string{
-		"/rest/api/2/issue/createmeta": dcCreateMetaJSON,
+		"/rest/api/2/issue/createmeta/ENG/issuetypes":       issueTypesJSON,
+		"/rest/api/2/issue/createmeta/ENG/issuetypes/10001": createMetaFieldsJSON,
+		"/rest/api/2/issue/createmeta/OPS/issuetypes":       issueTypesJSON,
+		"/rest/api/2/issue/createmeta/OPS/issuetypes/10001": createMetaFieldsJSON,
+		"/rest/api/2/issue/createmeta/ENG/issuetypes/10002": createMetaFieldsJSON,
 	}}
 	meta, err := site.FetchCreateMeta(t.Context(), doer,
 		site.Info{Kind: site.DataCenter}, "ENG", "Bug")
@@ -124,68 +126,72 @@ func TestCreateMetaCarriesAllowedValues(t *testing.T) {
 	t.Error("priority is missing from the result")
 }
 
-// TestDataCenterEmptyResultIsNotFound covers the shape that would otherwise
-// read as success: a filter matching nothing comes back as an empty array with
-// a 200, not a 404.
-//
-// The two causes are separated, because "the type is wrong" and "the project is
-// wrong" have different fixes and reporting them as one leaves a caller
+// TestTheTwoCausesStaySeparate keeps "no such project" and "no such type"
+// apart. They have different fixes, and reporting them as one leaves a caller
 // guessing which of three things to check.
-func TestDataCenterEmptyResultIsNotFound(t *testing.T) {
+//
+// This used to need a second probe: Data Center answered an unmatched filter
+// with an empty array and a 200, so the only way to tell was to ask again
+// without the type. The modern route makes it structural — the project is in
+// the path, so a missing one is a 404, and a missing type is a name absent from
+// what that request returned.
+func TestTheTwoCausesStaySeparate(t *testing.T) {
 	t.Run("unknown type lists what the project offers", func(t *testing.T) {
-		doer := &sequencingDoer{bodies: []string{
-			`{"projects":[]}`,
-			`{"projects":[{"key":"ENG","issuetypes":[
-				{"id":"10001","name":"Bug"},{"id":"10002","name":"Story"}]}]}`,
+		doer := &routingDoer{routes: map[string]string{
+			"/rest/api/2/issue/createmeta/ENG/issuetypes": issueTypesJSON,
 		}}
 		_, err := site.FetchCreateMeta(t.Context(), doer,
 			site.Info{Kind: site.DataCenter}, "ENG", "Buug")
 		if err == nil {
-			t.Fatal("an empty createmeta result was reported as success")
+			t.Fatal("an unknown issue type was accepted")
 		}
 		e := errs.Coerce(err)
 		if e.Code != "UNKNOWN_ISSUE_TYPE" {
-			t.Errorf("code = %q, want UNKNOWN_ISSUE_TYPE", e.Code)
+			t.Fatalf("code = %q, want UNKNOWN_ISSUE_TYPE", e.Code)
 		}
-		if e.Exit != exitcode.NotFound {
-			t.Errorf("exit = %v, want %v", e.Exit, exitcode.NotFound)
-		}
-		// The same help Cloud gives, from a deployment whose endpoint does not
-		// resolve the name for us.
-		if !strings.Contains(e.Detail, "Bug (10001)") ||
-			!strings.Contains(e.Detail, "Story (10002)") {
-			t.Errorf("the detail does not list the available types: %q", e.Detail)
+		// The types the project does offer, so a typo is one command to fix
+		// rather than two.
+		for _, want := range []string{"Bug", "Story"} {
+			if !strings.Contains(e.Detail, want) {
+				t.Errorf("the detail does not offer %q: %q", want, e.Detail)
+			}
 		}
 	})
 
 	t.Run("unknown project says so", func(t *testing.T) {
-		doer := &sequencingDoer{bodies: []string{
-			`{"projects":[]}`,
-			`{"projects":[]}`,
-		}}
+		doer := &statusDoer{status: 404, body: `{"errorMessages":["not found"]}`}
 		_, err := site.FetchCreateMeta(t.Context(), doer,
 			site.Info{Kind: site.DataCenter}, "NOPE", "Bug")
 		if err == nil {
-			t.Fatal("an unknown project was reported as success")
+			t.Fatal("a missing project was accepted")
 		}
-		if code := errs.Coerce(err).Code; code != "UNKNOWN_PROJECT" {
-			t.Errorf("code = %q, want UNKNOWN_PROJECT", code)
+		e := errs.Coerce(err)
+		if e.Code != "UNKNOWN_PROJECT" {
+			t.Errorf("code = %q, want UNKNOWN_PROJECT", e.Code)
+		}
+		if e.Exit != exitcode.NotFound {
+			t.Errorf("exit = %v, want %v", e.Exit, exitcode.NotFound)
+		}
+		if !strings.Contains(e.Message, "NOPE") {
+			t.Errorf("the refusal does not name the project: %q", e.Message)
 		}
 	})
+}
 
-	t.Run("a failed diagnostic lookup does not replace the answer", func(t *testing.T) {
-		doer := &sequencingDoer{bodies: []string{`{"projects":[]}`}, failAfter: 1}
-		_, err := site.FetchCreateMeta(t.Context(), doer,
-			site.Info{Kind: site.DataCenter}, "ENG", "Bug")
-		if err == nil {
-			t.Fatal("an empty createmeta result was reported as success")
-		}
-		// The first request established that nothing matched. A second request
-		// failing must not turn that into an unrelated error.
-		if code := errs.Coerce(err).Code; code != "UNKNOWN_PROJECT" {
-			t.Errorf("code = %q, want UNKNOWN_PROJECT", code)
-		}
-	})
+// statusDoer answers everything with one status and body.
+type statusDoer struct {
+	status int
+	body   string
+	calls  int
+}
+
+func (s *statusDoer) Do(context.Context, transport.Request) (*transport.Response, error) {
+	s.calls++
+	return &transport.Response{
+		Status: s.status,
+		Body:   []byte(s.body),
+		Header: map[string][]string{"Content-Type": {"application/json"}},
+	}, nil
 }
 
 // sequencingDoer answers each call with the next body, which is how a
@@ -226,7 +232,7 @@ func (s *sequencingDoer) Do(
 // that was never looked up.
 func TestUnknownIssueTypeListsWhatTheProjectOffers(t *testing.T) {
 	doer := &routingDoer{routes: map[string]string{
-		"/rest/api/3/issue/createmeta/ENG/issuetypes": cloudIssueTypesJSON,
+		"/rest/api/3/issue/createmeta/ENG/issuetypes": issueTypesJSON,
 	}}
 	_, err := site.FetchCreateMeta(t.Context(), doer, site.Info{Kind: site.Cloud}, "ENG", "Buug")
 	if err == nil {
@@ -271,7 +277,11 @@ func TestResolveIssueTypeRefusesAmbiguity(t *testing.T) {
 func TestCreateMetaIsCached(t *testing.T) {
 	dir := t.TempDir()
 	doer := &routingDoer{routes: map[string]string{
-		"/rest/api/2/issue/createmeta": dcCreateMetaJSON,
+		"/rest/api/2/issue/createmeta/ENG/issuetypes":       issueTypesJSON,
+		"/rest/api/2/issue/createmeta/ENG/issuetypes/10001": createMetaFieldsJSON,
+		"/rest/api/2/issue/createmeta/OPS/issuetypes":       issueTypesJSON,
+		"/rest/api/2/issue/createmeta/OPS/issuetypes/10001": createMetaFieldsJSON,
+		"/rest/api/2/issue/createmeta/ENG/issuetypes/10002": createMetaFieldsJSON,
 	}}
 
 	first := dcMetadataAt(doer, dir, testNow)
@@ -285,8 +295,8 @@ func TestCreateMetaIsCached(t *testing.T) {
 		t.Fatalf("second: %v", err)
 	}
 
-	if doer.calls != 1 {
-		t.Errorf("createmeta was fetched %d times, want 1", doer.calls)
+	if doer.calls != 2 {
+		t.Errorf("createmeta cost %d requests, want the 2 one lookup takes", doer.calls)
 	}
 	// A warm cache returns what a cold one did. The server echoes the resolved
 	// pairing, and returning the requested one on a hit would make the output
@@ -304,7 +314,11 @@ func TestCreateMetaIsCached(t *testing.T) {
 func TestCreateMetaCacheIsPerPairing(t *testing.T) {
 	dir := t.TempDir()
 	doer := &routingDoer{routes: map[string]string{
-		"/rest/api/2/issue/createmeta": dcCreateMetaJSON,
+		"/rest/api/2/issue/createmeta/ENG/issuetypes":       issueTypesJSON,
+		"/rest/api/2/issue/createmeta/ENG/issuetypes/10001": createMetaFieldsJSON,
+		"/rest/api/2/issue/createmeta/OPS/issuetypes":       issueTypesJSON,
+		"/rest/api/2/issue/createmeta/OPS/issuetypes/10001": createMetaFieldsJSON,
+		"/rest/api/2/issue/createmeta/ENG/issuetypes/10002": createMetaFieldsJSON,
 	}}
 	meta := dcMetadataAt(doer, dir, testNow)
 
@@ -317,8 +331,8 @@ func TestCreateMetaCacheIsPerPairing(t *testing.T) {
 	if _, err := meta.CreateMeta(t.Context(), "OPS", "Bug"); err != nil {
 		t.Fatalf("other project: %v", err)
 	}
-	if doer.calls != 3 {
-		t.Errorf("three pairings cost %d requests, want 3", doer.calls)
+	if doer.calls != 6 {
+		t.Errorf("three pairings cost %d requests, want 6 — two each", doer.calls)
 	}
 }
 
@@ -366,21 +380,23 @@ func (r *routingDoer) Do(
 // rendered as an empty string, because an empty cell in a list of choices reads
 // as a choice.
 func TestAllowedValuesCoverEveryShape(t *testing.T) {
-	body := `{"projects":[{"key":"ENG","issuetypes":[{"id":"1","name":"Bug","fields":{
-		"named":{"required":false,"name":"Named","schema":{"type":"option"},
-		         "allowedValues":[{"id":"1","name":"By Name"}]},
-		"valued":{"required":false,"name":"Valued","schema":{"type":"option"},
-		          "allowedValues":[{"id":"2","value":"By Value"}]},
-		"idonly":{"required":false,"name":"Id Only","schema":{"type":"option"},
-		          "allowedValues":[{"id":"3"}]},
-		"bare":{"required":false,"name":"Bare","schema":{"type":"option"},
-		        "allowedValues":["a bare string"]},
-		"empty":{"required":false,"name":"Empty","schema":{"type":"option"},
-		         "allowedValues":[{}]}
-	}}]}]}`
+	body := `{"maxResults":100,"startAt":0,"total":5,"isLast":true,"values":[
+		{"fieldId":"named","name":"Named","required":false,"schema":{"type":"option"},
+		 "allowedValues":[{"id":"1","name":"By Name"}]},
+		{"fieldId":"valued","name":"Valued","required":false,"schema":{"type":"option"},
+		 "allowedValues":[{"id":"2","value":"By Value"}]},
+		{"fieldId":"idonly","name":"Id Only","required":false,"schema":{"type":"option"},
+		 "allowedValues":[{"id":"3"}]},
+		{"fieldId":"bare","name":"Bare","required":false,"schema":{"type":"option"},
+		 "allowedValues":["a bare string"]},
+		{"fieldId":"empty","name":"Empty","required":false,"schema":{"type":"option"},
+		 "allowedValues":[{}]}]}`
 
 	meta, err := site.FetchCreateMeta(t.Context(),
-		&routingDoer{routes: map[string]string{"/rest/api/2/issue/createmeta": body}},
+		&routingDoer{routes: map[string]string{
+			"/rest/api/2/issue/createmeta/ENG/issuetypes":       issueTypesJSON,
+			"/rest/api/2/issue/createmeta/ENG/issuetypes/10001": body,
+		}},
 		site.Info{Kind: site.DataCenter}, "ENG", "Bug")
 	if err != nil {
 		t.Fatalf("fetch: %v", err)
@@ -411,7 +427,7 @@ func TestAllowedValuesCoverEveryShape(t *testing.T) {
 // was never told about.
 func TestCloudPagesEveryField(t *testing.T) {
 	doer := &sequencingDoer{bodies: []string{
-		cloudIssueTypesJSON,
+		issueTypesJSON,
 		`{"total":4,"isLast":false,"values":[
 			{"fieldId":"a","name":"A","required":true,"schema":{"type":"string"}},
 			{"fieldId":"b","name":"B","required":false,"schema":{"type":"string"}}]}`,
@@ -500,11 +516,14 @@ func TestResolveIssueTypeRefusesEmpty(t *testing.T) {
 // cannot read. Skipping it would produce a create screen missing a required
 // field, which fails later and somewhere else.
 func TestMalformedFieldMetaIsRefused(t *testing.T) {
-	body := `{"projects":[{"key":"ENG","issuetypes":[{"id":"1","name":"Bug",
-		"fields":{"summary":"not an object"}}]}]}`
-	_, err := site.FetchCreateMeta(t.Context(),
-		&routingDoer{routes: map[string]string{"/rest/api/2/issue/createmeta": body}},
-		site.Info{Kind: site.DataCenter}, "ENG", "Bug")
+	// The map-of-field-id shape now reaches this only through transitions:
+	// createmeta's modern route returns a list. The decoder is shared, so the
+	// coverage follows it rather than being deleted with the old route.
+	body := `{"transitions":[{"id":"11","name":"Start","to":{"id":"3","name":"In Progress",
+		"statusCategory":{"key":"indeterminate"}},
+		"fields":{"summary":"not an object"}}]}`
+	_, err := site.FetchTransitions(t.Context(),
+		&stubDoer{body: body}, site.Info{Kind: site.DataCenter}, "ENG-101")
 	if err == nil {
 		t.Fatal("a field described as a string was accepted")
 	}
@@ -519,7 +538,7 @@ func TestCreateMetaRefusesAnUnusableBody(t *testing.T) {
 		kind  site.Kind
 		route string
 	}{
-		{site.DataCenter, "/rest/api/2/issue/createmeta"},
+		{site.DataCenter, "/rest/api/2/issue/createmeta/ENG/issuetypes"},
 		{site.Cloud, "/rest/api/3/issue/createmeta/ENG/issuetypes"},
 	} {
 		doer := &routingDoer{routes: map[string]string{tc.route: `<html>not jira</html>`}}
@@ -538,7 +557,11 @@ func TestCreateMetaRefusesAnUnusableBody(t *testing.T) {
 func TestRefreshBustsTheCreateMetaCache(t *testing.T) {
 	dir := t.TempDir()
 	doer := &routingDoer{routes: map[string]string{
-		"/rest/api/2/issue/createmeta": dcCreateMetaJSON,
+		"/rest/api/2/issue/createmeta/ENG/issuetypes":       issueTypesJSON,
+		"/rest/api/2/issue/createmeta/ENG/issuetypes/10001": createMetaFieldsJSON,
+		"/rest/api/2/issue/createmeta/OPS/issuetypes":       issueTypesJSON,
+		"/rest/api/2/issue/createmeta/OPS/issuetypes/10001": createMetaFieldsJSON,
+		"/rest/api/2/issue/createmeta/ENG/issuetypes/10002": createMetaFieldsJSON,
 	}}
 
 	if _, err := dcMetadataAt(doer, dir, testNow).CreateMeta(t.Context(), "ENG", "Bug"); err != nil {
@@ -549,8 +572,9 @@ func TestRefreshBustsTheCreateMetaCache(t *testing.T) {
 	if _, err := forced.CreateMeta(t.Context(), "ENG", "Bug"); err != nil {
 		t.Fatalf("second: %v", err)
 	}
-	if doer.calls != 2 {
-		t.Errorf("--refresh reused the cache: %d calls, want 2", doer.calls)
+	// Two requests per lookup, so two lookups are four.
+	if doer.calls != 4 {
+		t.Errorf("--refresh reused the cache: %d calls, want 4", doer.calls)
 	}
 
 	// Past the TTL measured from the entry --refresh wrote, not from the first
@@ -560,7 +584,7 @@ func TestRefreshBustsTheCreateMetaCache(t *testing.T) {
 	if _, err := stale.CreateMeta(t.Context(), "ENG", "Bug"); err != nil {
 		t.Fatalf("third: %v", err)
 	}
-	if doer.calls != 3 {
-		t.Errorf("an expired entry was reused: %d calls, want 3", doer.calls)
+	if doer.calls != 6 {
+		t.Errorf("an expired entry was reused: %d calls, want 6", doer.calls)
 	}
 }
