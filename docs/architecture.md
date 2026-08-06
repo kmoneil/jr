@@ -186,7 +186,7 @@ name to `customfield_10042` should not cost a round trip on every invocation.
 | Output contract | Golden files per kind, per format                              | Any diff requires a version bump in the same commit |
 | CLI surface     | Snapshot tests of `--help`, `schema`, exit codes               | Any diff is reviewed                                |
 | Architecture    | Import-graph assertions                                        | Every PR                                            |
-| Build profiles  | Matrix build of all profiles plus a size assertion             | Every PR                                            |
+| Build profiles  | Matrix build of all profiles, a size assertion, and a command count per profile | Every PR                           |
 | Fuzzing         | `make fuzz`, every target, built with the full tag set         | Every PR, 60s per target                            |
 
 **A parser guarantees its own output is safe.** An issue key, an epic

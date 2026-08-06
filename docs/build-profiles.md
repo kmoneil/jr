@@ -73,7 +73,14 @@ measure of what a profile excludes, and it should not be read as one.
 Binary size is a poor proxy for compile-out. `full` and `agent` are near enough
 the same number of bytes despite differing by two commands, because the excluded
 code is smaller than the linker's section alignment absorbs. The guarantee that
-matters is the command surface, and that does differ:
+matters is the command surface, and that does differ.
+
+The counts below are asserted, not maintained. `internal/lint/profiles_test.go`
+builds each profile, runs `jr schema` against it, and fails if this table
+disagrees; it reads the tag sets from the Makefile so it has no second copy of
+them to go stale. It exists because these numbers were four releases out of date
+— 26, 25, 18, 17 against a real 54, 52, 35, 34 — which is what a number in a
+document that nothing checks eventually becomes.
 
 | Profile  | Commands | Not present                                   |
 | -------- | -------- | --------------------------------------------- |
