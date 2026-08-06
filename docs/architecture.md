@@ -216,6 +216,31 @@ Recorded HTTP contract tests are mandatory, not optional. Pure-function unit
 tests would not have caught any of the incumbent bugs this project exists to
 avoid — all of them live at the seam between the CLI and a real Jira.
 
+## Bodies that do not fit in memory
+
+`transport` buffers a response by default, capped at 64MB — right for JSON,
+wrong for an attachment. `Request.Stream` hands the body back unread instead,
+and `Response.Close` releases it.
+
+Three things follow from that, and each is a rule rather than a detail:
+
+**A failed streamed request is buffered anyway.** An error body is small and is
+the only thing that says what went wrong. Handing back an unread stream would
+leave a caller draining it to find out why its request failed.
+
+**The per-attempt timeout bounds getting a response, not reading one.** The
+caller reads a streamed body after `Do` returns, and a 30-second deadline has no
+idea how large the file is. A stream is bounded to first byte and then handed
+over; the caller's own context governs the transfer, which is what makes Ctrl-C
+work on a long download.
+
+**An upload body is a factory, not a reader.** `Request.BodySource` is re-opened
+on every attempt, for the same reason `Body` is bytes: a retry has to send the
+same content again, and a reader is spent by the first one. A source that cannot
+be re-opened fails with `BODY_NOT_REPLAYABLE` rather than sending a short body —
+the failure mode without it is the worst kind, where the retry succeeds having
+uploaded nothing.
+
 ## Keeping this current
 
 Update this document in the same change that alters any of:

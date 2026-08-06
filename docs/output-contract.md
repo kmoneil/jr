@@ -352,6 +352,7 @@ renders the request as the command built it, before the transport attaches one.
 | `SELF_EPIC`               | 2    | An epic was named as one of the issues to move into it. |
 | `NOTHING_TO_EDIT`         | 2    | `issue edit` was given no field to change. |
 | `TOO_MANY_ISSUES`         | 2    | More issues than the agile API moves at once. It is refused rather than split across requests: two requests can half-succeed, and the outcome would be neither moved nor not moved. |
+| `BODY_NOT_REPLAYABLE`     | 1    | A retry needed the request body again and could not get it — a body read from a pipe cannot be sent twice. The request fails rather than going out short, because a second attempt carrying nothing would be accepted as a successful upload of an empty file. |
 | `SPRINT_NOT_ACTIVE`       | 7    | Only a running sprint can be closed. The sprint is read first, so the wrong state costs one read and no mutation. |
 
 ### Body text on write

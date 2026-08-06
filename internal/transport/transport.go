@@ -21,6 +21,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kmoneil/jira-cli/internal/errs"
@@ -137,6 +139,25 @@ type Request struct {
 	Header http.Header
 	Body   []byte
 
+	// BodySource supplies a request body too large to hold in memory — an
+	// attachment upload, and nothing else so far. It takes precedence over
+	// Body.
+	//
+	// It is a factory rather than a reader for the same reason Body is bytes:
+	// a retry has to send the same content again, and a reader is spent by the
+	// first attempt. A source that cannot be re-opened — stdin, a pipe —
+	// returns an error on its second call, and the transport reports that
+	// rather than sending a short body and calling it a success.
+	BodySource func() (io.ReadCloser, error)
+
+	// Stream asks for the response body as a reader instead of bytes.
+	//
+	// The caller owns it and must Close it. A response that is not a success is
+	// buffered anyway, whatever this says: an error body is small, it is the
+	// only thing that names what went wrong, and a caller cannot be expected to
+	// drain a stream to find out why its request failed.
+	Stream bool
+
 	// Replayable marks a non-idempotent request safe to retry, which is true
 	// when the caller holds an idempotency key. Without it, a POST is not
 	// replayed after an upstream error, because the server may have processed
@@ -144,11 +165,20 @@ type Request struct {
 	Replayable bool
 }
 
-// Response is a completed exchange with the body already read.
+// Response is a completed exchange with the body already read, unless the
+// request asked for a stream.
 type Response struct {
 	Status int
 	Header http.Header
 	Body   []byte
+	// Stream is the unread response body, set only when Request.Stream was
+	// asked for and the status was a success. The caller owns it and must
+	// Close it; Response.Close does that safely whether it is set or not.
+	//
+	// Body is empty when Stream is set. The two are never both populated,
+	// because a body cannot be both read and unread and pretending otherwise
+	// is how a caller ends up copying an empty file.
+	Stream io.ReadCloser
 	// Method and URL identify what was asked for. They are here so an error
 	// can say which endpoint failed: a 404 that does not name the path it
 	// tried is nearly useless, and "which URL" is the only question worth
@@ -158,6 +188,19 @@ type Response struct {
 	RequestID string
 	// Attempts is how many HTTP calls this response cost, including retries.
 	Attempts int
+}
+
+// Close releases a streamed body, and does nothing for a buffered one.
+//
+// It is safe on a nil Response and safe to call twice, so a caller can
+// `defer resp.Close()` immediately after Do without first working out whether
+// this particular request streamed.
+func (r *Response) Close() {
+	if r == nil || r.Stream == nil {
+		return
+	}
+	_ = r.Stream.Close()
+	r.Stream = nil
 }
 
 // Endpoint renders the request this response answered, for an error message.
@@ -260,6 +303,10 @@ func (c *Client) Do(ctx context.Context, r Request) (*Response, error) {
 				}
 				return resp, nil
 			}
+			// Only a success streams, and a success is never retried — but the
+			// two facts live in different functions, and a leaked connection
+			// is not the way to find out they diverged.
+			resp.Close()
 			wait := backoff(attempt, resp.Header, c.clock.Now(), c.jitter())
 			c.tracer.Trace(Event{
 				Kind: EventRetry, Method: r.Method, URL: RedactURL(target),
@@ -292,11 +339,61 @@ func (c *Client) Do(ctx context.Context, r Request) (*Response, error) {
 func (c *Client) attempt(ctx context.Context, r Request, target *url.URL,
 	requestID string, attempt int,
 ) (*Response, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
-	defer cancel()
+	// The per-attempt timeout bounds getting a response, not reading one.
+	//
+	// For a buffered request those are the same thing, and a deadline over the
+	// whole exchange is right. For a streamed one they are not: the caller
+	// reads the body after this function returns, and a 30-second deadline has
+	// no idea how large the file is or how fast the link is. So a stream is
+	// bounded to first byte and then handed over — the caller's own context
+	// still governs, which is what makes Ctrl-C work on a long download.
+	var (
+		cancel   context.CancelFunc
+		deadline *time.Timer
+		expired  atomic.Bool
+	)
+	if r.Stream {
+		ctx, cancel = context.WithCancel(ctx)
+		deadline = time.AfterFunc(c.timeout, func() {
+			// Recorded as well as acted on, because a cancelled context cannot
+			// say afterwards whether it ran out of time or was interrupted,
+			// and those need different messages.
+			expired.Store(true)
+			cancel()
+		})
+	} else {
+		ctx, cancel = context.WithTimeout(ctx, c.timeout)
+	}
+	// handedOver is set when the response body becomes the caller's, at which
+	// point cancelling here would kill the transfer mid-copy.
+	handedOver := false
+	defer func() {
+		if deadline != nil {
+			deadline.Stop()
+		}
+		if !handedOver {
+			cancel()
+		}
+	}()
 
 	var body io.Reader
-	if len(r.Body) > 0 {
+	switch {
+	case r.BodySource != nil:
+		// Re-opened on every attempt, so a retry sends the same content rather
+		// than the remains of the last one. A source that cannot do that says
+		// so here, and the request fails instead of going out short.
+		source, err := r.BodySource()
+		if err != nil {
+			return nil, errs.Runtime("BODY_NOT_REPLAYABLE",
+				"the request body cannot be sent again for attempt %d", attempt).
+				WithDetail("%s", err.Error()).
+				WithRemedy("a body read from a pipe cannot be retried; write it " +
+					"to a file first, or retry the command yourself").
+				Wrap(err)
+		}
+		defer func() { _ = source.Close() }()
+		body = source
+	case len(r.Body) > 0:
 		body = bytes.NewReader(r.Body)
 	}
 	req, err := http.NewRequestWithContext(ctx, r.Method, target.String(), body)
@@ -310,9 +407,19 @@ func (c *Client) attempt(ctx context.Context, r Request, target *url.URL,
 		}
 	}
 	if req.Header.Get("Accept") == "" {
-		req.Header.Set("Accept", "application/json")
+		// A download is not asking for JSON. Sending Accept: application/json
+		// for an attachment invites the server to answer with a JSON error
+		// instead of the file, which is a 406 that reads like a missing
+		// attachment.
+		if r.Stream {
+			req.Header.Set("Accept", "*/*")
+		} else {
+			req.Header.Set("Accept", "application/json")
+		}
 	}
-	if len(r.Body) > 0 && req.Header.Get("Content-Type") == "" {
+	// Only for a byte body: a BodySource carries content of some other type,
+	// and the caller is the one that knows which.
+	if len(r.Body) > 0 && r.BodySource == nil && req.Header.Get("Content-Type") == "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if c.userAgent != "" {
@@ -344,14 +451,30 @@ func (c *Client) attempt(ctx context.Context, r Request, target *url.URL,
 			Kind: EventFailure, Method: r.Method, URL: RedactURL(target),
 			Attempt: attempt, RequestID: requestID, Reason: redactErrorText(err),
 		})
+		if expired.Load() {
+			// The streamed path cancels rather than deadlines, so the context
+			// alone would report this as an interruption.
+			return nil, timedOut(err)
+		}
 		return nil, networkError(ctx, err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	// A streamed success hands the body to the caller unread, which is the
+	// whole point: a 50MB attachment is copied to a file rather than held in
+	// memory. Anything else is buffered, including a streamed request that
+	// failed — the error body is small and is the only thing that says why.
+	streaming := r.Stream && resp.StatusCode >= 200 && resp.StatusCode < 300
 
-	payload, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
-	if err != nil {
-		return nil, errs.Remote("TRUNCATED_RESPONSE", "the response body could not be read").
-			WithRequestID(requestID).Wrap(err)
+	var payload []byte
+	if streaming {
+		// Not deferred: ownership passes to the caller with the Response.
+		payload = nil
+	} else {
+		defer func() { _ = resp.Body.Close() }()
+		payload, err = io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+		if err != nil {
+			return nil, errs.Remote("TRUNCATED_RESPONSE", "the response body could not be read").
+				WithRequestID(requestID).Wrap(err)
+		}
 	}
 	elapsed := c.clock.Now().Sub(start)
 
@@ -362,10 +485,17 @@ func (c *Client) attempt(ctx context.Context, r Request, target *url.URL,
 		id = echoed
 	}
 
+	// A streamed body has not been read, so its size is whatever the server
+	// declared or unknown. Reporting len(payload) would trace every download
+	// as zero bytes.
+	size := len(payload)
+	if streaming {
+		size = int(resp.ContentLength)
+	}
 	c.tracer.Trace(responseEvent(target, r.Method, resp.StatusCode, resp.Header,
-		attempt, len(payload), elapsed, id))
+		attempt, size, elapsed, id))
 
-	return &Response{
+	out := &Response{
 		Status:    resp.StatusCode,
 		Header:    resp.Header,
 		Body:      payload,
@@ -373,7 +503,31 @@ func (c *Client) attempt(ctx context.Context, r Request, target *url.URL,
 		URL:       RedactURL(target),
 		RequestID: id,
 		Attempts:  attempt,
-	}, nil
+	}
+	if streaming {
+		// The connection outlives this function, so its cancellation does too.
+		// Closing the stream is what releases it, which is why Response.Close
+		// exists and why a caller that forgets it leaks a connection rather
+		// than merely a file handle.
+		deadline.Stop()
+		handedOver = true
+		out.Stream = &cancelOnClose{ReadCloser: resp.Body, cancel: cancel}
+	}
+	return out, nil
+}
+
+// cancelOnClose ties a request's cancellation to the lifetime of its body, so
+// the transfer is not killed when the function that started it returns.
+type cancelOnClose struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+	once   sync.Once
+}
+
+func (c *cancelOnClose) Close() error {
+	err := c.ReadCloser.Close()
+	c.once.Do(c.cancel)
+	return err
 }
 
 // resolve builds the absolute URL for a request.
@@ -426,10 +580,19 @@ func networkError(ctx context.Context, err error) error {
 
 func canceled(err error) error {
 	if errors.Is(err, context.DeadlineExceeded) {
-		return errs.Remote("TIMEOUT", "the request timed out").
-			WithRemedy("raise the timeout, or narrow the request").Wrap(err)
+		return timedOut(err)
 	}
 	return errs.Runtime("CANCELED", "canceled").Wrap(err)
+}
+
+// timedOut is the same error a deadline produces, for the streamed path, which
+// cancels on a timer rather than carrying a deadline. Without it, running out
+// of time on a download would report itself as an interruption — and the two
+// call for different things: one is a timeout to raise, the other is a Ctrl-C
+// nobody needs to be told about.
+func timedOut(err error) error {
+	return errs.Remote("TIMEOUT", "the request timed out").
+		WithRemedy("raise the timeout, or narrow the request").Wrap(err)
 }
 
 // defaultJitter returns a value in [0,1) for backoff spreading. It does not
