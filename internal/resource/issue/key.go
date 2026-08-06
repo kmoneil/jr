@@ -8,7 +8,7 @@ import (
 // Key is a parsed issue key.
 //
 // It is parsed rather than compared as a string because issue keys do not sort
-// lexically: "IDO-1000" is less than "IDO-999" as text and greater as an issue.
+// lexically: "ENG-1000" is less than "ENG-999" as text and greater as an issue.
 // Anything that ordered keys as strings would page through a project in an
 // order that looks right for the first nine issues and is wrong after that.
 type Key struct {

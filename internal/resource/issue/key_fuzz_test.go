@@ -30,7 +30,7 @@ func safeSegment(s string) bool {
 // regression is visible in the test source.
 func FuzzParseKeyProducesASafePathSegment(f *testing.F) {
 	for _, seed := range []string{
-		"ENG-1", "eng-12", "IDO-1000", "A1_B-7",
+		"ENG-1", "eng-12", "ENG-1000", "A1_B-7",
 		// The bug, in the shapes it took.
 		"../../admin-1", "a/b-1", "ENG/x-9", "%2e%2e-1",
 		"a b-1", "a\n-1", "ENG-+1", "ENG--1", ".-1", "..-1",
@@ -80,7 +80,7 @@ func FuzzParseKeyProducesASafePathSegment(f *testing.F) {
 // up as a paged result that silently skips rows.
 func FuzzKeyCompareIsATotalOrder(f *testing.F) {
 	f.Add("ENG-1", "ENG-2", "ENG-10")
-	f.Add("IDO-999", "IDO-1000", "IDO-1")
+	f.Add("ENG-999", "ENG-1000", "ENG-1")
 	f.Add("AAA-9999", "ZZZ-1", "MMM-500")
 
 	f.Fuzz(func(t *testing.T, a, b, c string) {

@@ -82,7 +82,7 @@ func TestRealHostsAreFlagged(t *testing.T) {
 	for _, unsafe := range []string{
 		"acme.atlassian.net",
 		"https://jira.corp.com/jira",
-		"jira.gfs.com",
+		"jira.internal.example.com",
 		"evil.example.org",
 	} {
 		if _, bad := suspiciousHost(unsafe); !bad {

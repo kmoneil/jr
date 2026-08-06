@@ -284,8 +284,8 @@ func (c *Client) advanceKeyset(page *searchResponse, issues []Issue, want int) (
 // client assumed, and really does start below the cursor.
 //
 // It exists because the whole scheme rests on JQL comparing issue keys by
-// project and number. If a server compared them as text instead, "IDO-1000"
-// would sort below "IDO-999" and pages would silently skip issues. This turns
+// project and number. If a server compared them as text instead, "ENG-1000"
+// would sort below "ENG-999" and pages would silently skip issues. This turns
 // that into an error naming the two keys.
 func verifyDescendingBelow(issues []Issue, afterKey string) error {
 	bound, hasBound := ParseKey(afterKey)

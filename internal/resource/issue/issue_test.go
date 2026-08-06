@@ -1740,8 +1740,8 @@ func replayConn(t *testing.T, fixture string) (*transport.Client, *transport.Rep
 	return conn, replayer
 }
 
-// TestKeyCompareIsTotalAndNumeric is the invariant that IDO-999 is below
-// IDO-1000 as an issue and above it as a string. Every branch matters: the
+// TestKeyCompareIsTotalAndNumeric is the invariant that ENG-999 is below
+// ENG-1000 as an issue and above it as a string. Every branch matters: the
 // project comparison is what keeps the order total across projects, and getting
 // it wrong produces a silently short result rather than an error.
 func TestKeyCompareIsTotalAndNumeric(t *testing.T) {
@@ -1758,9 +1758,9 @@ func TestKeyCompareIsTotalAndNumeric(t *testing.T) {
 		a, b string
 		want int
 	}{
-		{"IDO-999", "IDO-1000", -1},
-		{"IDO-1000", "IDO-999", 1},
-		{"IDO-1", "IDO-1", 0},
+		{"ENG-999", "ENG-1000", -1},
+		{"ENG-1000", "ENG-999", 1},
+		{"ENG-1", "ENG-1", 0},
 		{"ABC-1", "XYZ-1", -1},
 		{"XYZ-1", "ABC-1", 1},
 		// The project wins over the number, so a high number in an early
@@ -1778,10 +1778,10 @@ func TestKeyCompareIsTotalAndNumeric(t *testing.T) {
 	}
 
 	// And the text ordering it exists to avoid really does disagree.
-	if "IDO-1000" >= "IDO-999" {
+	if "ENG-1000" >= "ENG-999" {
 		t.Fatal("this test's premise is wrong")
 	}
-	if key("IDO-1000").Before(key("IDO-999")) {
+	if key("ENG-1000").Before(key("ENG-999")) {
 		t.Error("keys are being compared as text")
 	}
 }

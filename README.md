@@ -102,9 +102,9 @@ is not shipped at all.
 ### Reading one issue
 
 ```console
-$ jr issue get IDO-5224
+$ jr issue get ENG-101
 <result kind="issue.get" v="1">
-  <issue key="IDO-5224" type="Story" priority="High" project="IDO" parent="IDO-1">
+  <issue key="ENG-101" type="Story" priority="High" project="ENG" parent="ENG-1">
     <summary>...</summary>
     <status category="in-progress">In Progress</status>
     <description format="wiki"><![CDATA[ ... ]]></description>
@@ -128,13 +128,13 @@ Rows reach stdout as each page arrives, so output starts immediately instead of
 after the last of a hundred requests:
 
 ```console
-$ jr issue list --limit all --project IDO | head -20   # stops after one page
-$ jr issue list --limit all --project IDO > all.tsv    # 5,270 rows, first in ~300ms
+$ jr issue list --limit all --project ENG | head -20   # stops after one page
+$ jr issue list --limit all --project ENG > all.tsv    # first row before the last request
 ```
 
-Measured against a deliberately slow server: first row at 528ms, whole run at
-2,784ms. An interrupt leaves you with what arrived; `head` closes the pipe and
-the run stops early.
+Measured against a deliberately slow test server, the first row arrives in a
+fraction of the whole run rather than after it. An interrupt leaves you with
+what arrived; `head` closes the pipe and the run stops early.
 
 TSV streams. XML, JSON, and YAML buffer, because their envelopes carry `count`
 and `complete` and neither is known until the end — so the formats you would
@@ -195,15 +195,15 @@ arbitrarily.
 
 **There is no offset flag, and the token is opaque on purpose.** Cloud pages by
 cursor. Data Center pages by **keyset** — the token names the last row seen and
-the next page resumes with `AND issuekey < "IDO-5225"`, not `startAt=50`. That
+the next page resumes with `AND issuekey < "ENG-102"`, not `startAt=50`. That
 matters: an offset cursor shifts when anyone creates an issue mid-run, so a
 long `--limit all` silently skips or repeats rows while reporting itself
 complete. A keyset cursor names a position in the data and cannot shift.
 
 Keyset needs the key ordering, so a `--sort` on another field falls back to
 offsets. The result says which was used. And because the whole scheme rests on
-JQL comparing keys by number rather than as text — `IDO-999` sorts *below*
-`IDO-1000`, which a string comparison gets backwards — each page is verified to
+JQL comparing keys by number rather than as text — `ENG-999` sorts *below*
+`ENG-1000`, which a string comparison gets backwards — each page is verified to
 start below its cursor. A server that disagrees is an error, not a quietly
 short result.
 

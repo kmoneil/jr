@@ -169,7 +169,7 @@ default to false and silently hide every finished epic from a caller who never
 passed it.
 
 Ordered by id, which is the order the epics were created. Keys are deliberately
-not sorted as text — IDO-999 is below IDO-1000 as an issue and above it as a
+not sorted as text — ENG-999 is below ENG-1000 as an issue and above it as a
 string — and id order needs no such parsing.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " epic list --board 42",
@@ -273,7 +273,7 @@ func (c *Client) List(ctx context.Context, boardID, done string) ([]Epic, error)
 // same rows in the same order.
 //
 // By id rather than by key on purpose. An epic key is an issue key, and issue
-// keys do not sort as text — IDO-999 is below IDO-1000 as an issue and above it
+// keys do not sort as text — ENG-999 is below ENG-1000 as an issue and above it
 // as a string. Ordering by key would need the parsing that lives in the issue
 // resource, which this one may not import; ordering by id needs none of it and
 // is creation order, which is at least a thing a reader can predict.
