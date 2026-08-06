@@ -1,0 +1,21 @@
+{
+  "deployment": "cloud",
+  "interactions": [
+    {
+      "request": {
+        "method": "PUT",
+        "path": "/rest/api/3/issue/ENG-101",
+        "body": "{\"fields\":{\"summary\":\"a better summary\"}}"
+      },
+      "response": {
+        "status": 204,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": ""
+      }
+    }
+  ]
+}

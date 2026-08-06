@@ -3,10 +3,12 @@ package registry
 import (
 	"context"
 	"io"
+	"maps"
 	"slices"
 	"strings"
 
 	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jira-cli/internal/idem"
 	"github.com/kmoneil/jira-cli/internal/render"
 	"github.com/kmoneil/jira-cli/internal/site"
 	"github.com/kmoneil/jira-cli/internal/transport"
@@ -230,6 +232,12 @@ type Session interface {
 	// CheckWritable refuses a mutation in read-only mode, before any network
 	// call, so a blocked command costs nothing and cannot half-happen.
 	CheckWritable(command string) error
+	// Idempotency returns the ledger of what a mutating request already did.
+	//
+	// It may be nil, which means no protection — a build or an environment with
+	// no state directory. A caller finds out by the flag having no effect
+	// rather than by a silent duplicate.
+	Idempotency() *idem.Ledger
 }
 
 // Invocation is everything a command needs from the caller.
@@ -380,4 +388,56 @@ func (c *Command) Available(has func(string) bool) bool {
 		}
 	}
 	return true
+}
+
+// Kinds every mutating command shares.
+const (
+	// KindDryRun is what --dry-run emits: the request that would have been
+	// sent, not a paraphrase of it.
+	KindDryRun = "dry-run"
+	// VersionDryRun is its schema version.
+	VersionDryRun = 1
+)
+
+// DryRunOutput is the declaration every mutating command adds, so the shape
+// --dry-run produces is described in one place rather than copied per verb.
+func DryRunOutput() Output {
+	return Output{Kind: KindDryRun, Version: VersionDryRun, When: "--dry-run is given"}
+}
+
+// DryRunDoc renders the request a command would have sent.
+//
+// It is the request itself — method, path, query, and body — because §4.1 says
+// --dry-run prints the exact request. A paraphrase is a second implementation
+// of the thing being previewed, and the two drift; this cannot, because it
+// takes the same transport.Request the command was about to hand to the client.
+//
+// The Authorization header is not here and cannot be: this renders the request
+// as the command built it, before the transport attaches a credential.
+func DryRunDoc(command string, r transport.Request) *render.Doc {
+	n := render.El("request").
+		Attr("command", command).
+		Attr("method", r.Method).
+		Attr("path", r.Path)
+
+	if len(r.Query) > 0 {
+		params := make([]*render.Node, 0, len(r.Query))
+		for _, key := range slices.Sorted(maps.Keys(r.Query)) {
+			for _, value := range r.Query[key] {
+				params = append(params, render.El("param").
+					Attr("name", key).SetText(value))
+			}
+		}
+		n.Child(render.ListEl("query", "param", params...))
+	}
+
+	if len(r.Body) > 0 {
+		// CDATA, because a JSON body is full of quotes and braces and an
+		// escaped one is not something a person can read back or paste into
+		// curl — which is most of what a dry run is for.
+		n.Child(render.El("body").
+			Attr("content-type", "application/json").
+			SetCDATA(string(r.Body)))
+	}
+	return render.Record(KindDryRun, VersionDryRun, n)
 }

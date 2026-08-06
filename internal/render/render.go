@@ -91,3 +91,13 @@ func encode(w io.Writer, f Format, body func(*writer)) error {
 func isKnownFormat(f Format) bool {
 	return slices.Contains(formats, f)
 }
+
+// WriteWarning emits a structured warning, in the requested format.
+//
+// It goes to stderr, always, and a caller passing stdout would break the rule
+// that stdout carries the result and nothing else. It is a warning rather than
+// an error because the command continues: a possible duplicate is worth saying
+// and is not worth refusing over.
+func WriteWarning(w io.Writer, code, message string, f Format) error {
+	return writeDiagnostic(w, warningNode(code, message), f)
+}

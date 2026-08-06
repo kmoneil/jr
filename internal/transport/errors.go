@@ -2,6 +2,8 @@ package transport
 
 import (
 	"encoding/json"
+	"errors"
+	"net"
 	"net/http"
 	"regexp"
 	"strings"
@@ -205,4 +207,32 @@ func joinDetail(parts ...string) string {
 		}
 	}
 	return strings.Join(out, "; ")
+}
+
+// NeverSent reports whether a failure happened before the request could reach
+// the server.
+//
+// It exists for the idempotency ledger. After an ambiguous failure a claim must
+// be held, because a 503 can arrive after Jira has already done the work — but a
+// connection that was never established, or a name that never resolved, proves
+// the request was not processed. Holding a key for ten minutes because a site
+// URL had a typo is a cost with nothing bought by it.
+//
+// It answers false whenever it is unsure. The safe direction here is to assume
+// the request may have landed.
+func NeverSent(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// A DNS failure means no connection was ever attempted.
+	if dns, ok := errors.AsType[*net.DNSError](err); ok && dns != nil {
+		return true
+	}
+	// A dial failure means the connection was never established, so no bytes
+	// left this process. Any other op — read, write — means they may have.
+	if op, ok := errors.AsType[*net.OpError](err); ok && op != nil {
+		return op.Op == "dial"
+	}
+	return false
 }

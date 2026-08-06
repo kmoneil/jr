@@ -245,6 +245,13 @@ func (a *app) newLeaf(rc *registry.Command) *cobra.Command {
 		// A command's own validation runs before anything is written, which
 		// matters for a streaming command: its header goes out before its body
 		// runs, so a flag rejected later would arrive after output had started.
+		// Read-only and confirmation are enforced here, from the declaration,
+		// so a resource author cannot ship a verb that forgets them. Both come
+		// before Validate and before any network call.
+		if err := a.gate(rc, inv); err != nil {
+			return err
+		}
+
 		if rc.Validate != nil {
 			if err := rc.Validate(cmd.Context(), inv); err != nil {
 				return err

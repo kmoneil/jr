@@ -49,3 +49,14 @@ func truncationNode(d *Doc) *Node {
 	}
 	return n
 }
+
+// warningNode builds a general <warning> envelope.
+//
+// It is the same shape as the truncation warning, because a consumer that
+// learned to read one should not have to learn a second — the code is what
+// distinguishes them.
+func warningNode(code, message string) *Node {
+	return El("warning").Attr("v", strconv.Itoa(diagnosticVersion)).
+		Leaf("code", code).
+		Leaf("message", message)
+}

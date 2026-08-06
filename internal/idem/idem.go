@@ -290,6 +290,49 @@ func (l *Ledger) finish(site, key, result string, done bool) error {
 	return l.write(file)
 }
 
+// Note records a completed request that was never claimed.
+//
+// It backs the unkeyed warning: a create with no key gets no protection, but it
+// is still worth remembering so the *next* identical one can say "this happened
+// a moment ago". It is deliberately not a claim — nothing is reserved, nothing
+// is blocked, and a later Claim on the same derived key would still be refused
+// as a reused key rather than silently replayed.
+//
+// A failure is returned but callers are expected to ignore it: the request
+// already succeeded, and the only cost is a warning that will not appear.
+func (l *Ledger) Note(site, key, result string) error {
+	if l == nil || l.Path == "" {
+		return nil
+	}
+	if err := ValidateKey(key); err != nil {
+		return err
+	}
+
+	unlock, err := l.lock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
+
+	file, err := l.read()
+	if err != nil {
+		return err
+	}
+
+	now := l.now()
+	file.Entries[entryID(site, key)] = Entry{
+		Site: site, Key: key, Status: Done, Result: result,
+		At: now, Operation: noteOperation,
+	}
+	l.prune(file, now)
+	return l.write(file)
+}
+
+// noteOperation marks an entry that was recorded rather than claimed. It is a
+// distinct operation name so a later --idempotency-key using the same string
+// is refused as reused instead of replaying an advisory record.
+const noteOperation = "note"
+
 // Recent reports whether an identical request finished within the window.
 //
 // This is what backs the unkeyed warning: a caller who did not pass a key gets

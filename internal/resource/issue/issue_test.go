@@ -9,6 +9,7 @@ import (
 
 	"github.com/kmoneil/jira-cli/internal/errs"
 	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jira-cli/internal/idem"
 	"github.com/kmoneil/jira-cli/internal/registry"
 	"github.com/kmoneil/jira-cli/internal/render"
 	"github.com/kmoneil/jira-cli/internal/resource/issue"
@@ -1357,6 +1358,12 @@ type stubSession struct {
 	// conversation rather than only the catalogue.
 	conn *transport.Client
 	kind site.Kind
+	// ledger backs the mutating verbs; nil means no idempotency protection.
+	ledger *idem.Ledger
+	// metaClient answers metadata lookups. It is separate from doer so a test
+	// can point transitions at a recorded conversation while the field
+	// catalogue stays a stub.
+	metaClient site.Doer
 }
 
 func (s *stubSession) Connect(context.Context) (*transport.Client, site.Info, error) {
@@ -1369,7 +1376,15 @@ func (s *stubSession) Connect(context.Context) (*transport.Client, site.Info, er
 
 func (s *stubSession) Metadata(context.Context) (*site.Metadata, error) {
 	if s.meta == nil {
-		s.meta = &site.Metadata{Client: s.doer, Info: site.Info{Kind: site.Cloud}}
+		kind := s.kind
+		if kind == "" {
+			kind = site.Cloud
+		}
+		var client site.Doer = s.doer
+		if s.metaClient != nil {
+			client = s.metaClient
+		}
+		s.meta = &site.Metadata{Client: client, Info: site.Info{Kind: kind}}
 	}
 	return s.meta, nil
 }
@@ -1378,6 +1393,10 @@ func (s *stubSession) Project() string                 { return "ENG" }
 func (s *stubSession) RequireProject() (string, error) { return "ENG", nil }
 func (s *stubSession) Board() string                   { return "" }
 func (s *stubSession) CheckWritable(string) error      { return nil }
+
+// Idempotency implements registry.Session. A nil ledger means no protection,
+// which is what a command that does not mutate should never notice.
+func (s *stubSession) Idempotency() *idem.Ledger { return s.ledger }
 
 // stubDoer answers with a fixed body and counts how often it was asked, which
 // is what the "no extra request" assertions read.

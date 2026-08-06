@@ -283,6 +283,36 @@ structured **warning** on stderr and nothing else. It is not blocked: two
 deliberate identical creates are a legitimate thing to want, and a caller who
 did not ask for idempotency does not silently get it.
 
+### Mutations
+
+Every mutating command accepts `--dry-run`, requires the `write` build tag, and
+declares exit 10. A reader binary does not contain them at all — that is the
+linker's guarantee, not a runtime check.
+
+Read-only mode and the missing-confirmation refusal are enforced in the CLI
+layer from the command's declaration, not by each command, so a verb cannot ship
+having forgotten them. Both happen before any network call, so a blocked command
+costs nothing and cannot half-happen.
+
+`--dry-run` emits kind `dry-run` v1: the request itself, with its method, path,
+query, and body verbatim. It is built from the same `transport.Request` the
+command was about to send, so the preview and the real thing cannot drift, and
+the body can be pasted into `curl`. It never carries a credential — the document
+renders the request as the command built it, before the transport attaches one.
+
+| Code                      | Exit | Meaning                                    |
+| ------------------------- | ---- | ------------------------------------------- |
+| `READ_ONLY`               | 10   | A context, `--readonly`, or `JIRA_READONLY` forbids changing Jira. It is a one-way latch; nothing turns it off. |
+| `CONFIRMATION_REQUIRED`   | 10   | A destructive command was run without `--yes`. |
+| `IDEMPOTENT_IN_FLIGHT`    | 7    | Another run holds this key and has not finished; it may already have done the work. |
+| `UNSUPPORTED_ON_DEPLOYMENT` | 2  | The flag is real but this deployment cannot honor it — `--description` against Cloud, which needs an ADF body this tool does not yet build. |
+| `CONFLICTING_LABEL_FLAGS` | 2    | `--label` replaces the whole set, so it cannot be combined with `--add-label` or `--remove-label`. |
+| `NOTHING_TO_EDIT`         | 2    | `issue edit` was given no field to change. |
+
+A create result carries `replayed="true"` when it came from the ledger rather
+than from Jira. It is otherwise byte-identical to the original: a consumer
+diffing two runs must not see a difference that means nothing.
+
 ## Stability policy
 
 - Adding a new optional element or attribute: **minor**.

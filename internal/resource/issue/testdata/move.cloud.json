@@ -1,0 +1,37 @@
+{
+  "deployment": "cloud",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/ENG-101/transitions",
+        "query": "expand=transitions.fields"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"transitions\": [{\"id\": \"11\", \"name\": \"Start Progress\", \"hasScreen\": false, \"to\": {\"id\": \"3\", \"name\": \"In Progress\", \"statusCategory\": {\"key\": \"indeterminate\", \"name\": \"In Progress\"}}}, {\"id\": \"2\", \"name\": \"Close Issue\", \"hasScreen\": true, \"to\": {\"id\": \"6\", \"name\": \"Closed\", \"statusCategory\": {\"key\": \"done\", \"name\": \"Done\"}}}]}"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/3/issue/ENG-101/transitions",
+        "body": "{\"transition\":{\"id\":\"2\"}}"
+      },
+      "response": {
+        "status": 204,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": ""
+      }
+    }
+  ]
+}

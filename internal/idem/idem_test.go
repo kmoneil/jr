@@ -704,3 +704,38 @@ func TestEntriesAreOrdered(t *testing.T) {
 		t.Errorf("a nil ledger listed %v, %v", list, err)
 	}
 }
+
+// TestNoteRecordsWithoutClaiming covers what backs the unkeyed warning. It has
+// to record — otherwise the warning looks for an entry nothing ever writes —
+// without reserving anything, because an unkeyed request gets no protection.
+func TestNoteRecordsWithoutClaiming(t *testing.T) {
+	dir := t.TempDir()
+	l := ledgerAt(t, dir, testNow)
+	derived := idem.DeriveKey("issue.create", site, "a body")
+
+	if err := l.Note(site, derived, "ENG-1"); err != nil {
+		t.Fatalf("note: %v", err)
+	}
+
+	entry, found, err := l.Recent(site, derived, idem.RecentWindow)
+	if err != nil || !found {
+		t.Fatalf("a noted request was not recent: %v, %v", found, err)
+	}
+	if entry.Result != "ENG-1" {
+		t.Errorf("result = %q", entry.Result)
+	}
+
+	// Nothing was reserved, so a real key on the same string is refused as
+	// reused rather than replaying an advisory record as if it were a claim.
+	if _, err := l.Claim(site, derived, "issue.create"); err == nil {
+		t.Error("an advisory record was claimable as a real one")
+	} else if code := errs.Coerce(err).Code; code != "IDEMPOTENCY_KEY_REUSED" {
+		t.Errorf("code = %q, want IDEMPOTENCY_KEY_REUSED", code)
+	}
+
+	// A nil ledger accepts a note and does nothing, so a caller need not branch.
+	var none *idem.Ledger
+	if err := none.Note(site, derived, "ENG-1"); err != nil {
+		t.Errorf("note on a nil ledger: %v", err)
+	}
+}

@@ -19,7 +19,7 @@ converts a class of runtime bugs into link errors.
 | `browser`   | `jr open`, the OAuth browser flow                       | `pkg/browser`           |
 | `clipboard` | Copying keys and URLs                                   | `xclip`/`xsel` shellout |
 | `mcp`       | `jr mcp serve`                                          | MCP SDK                 |
-| `write`     | All mutating commands                                   | —                       |
+| `write`     | All mutating commands                                   | `issue create/edit/move` |
 | `admin`     | Project, board, and sprint administration               | —                       |
 
 The list lives in `internal/buildinfo.KnownTags`, with one `tag_<name>.go` file

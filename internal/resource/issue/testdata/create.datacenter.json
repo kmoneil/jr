@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/2/issue",
+        "body": "{\"fields\":{\"issuetype\":{\"name\":\"Bug\"},\"project\":{\"key\":\"ENG\"},\"summary\":\"a summary\"}}"
+      },
+      "response": {
+        "status": 201,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"id\": \"10001\", \"key\": \"ENG-201\"}"
+      }
+    }
+  ]
+}

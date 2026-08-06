@@ -9,6 +9,7 @@ import (
 
 	"github.com/kmoneil/jira-cli/internal/errs"
 	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jira-cli/internal/idem"
 	"github.com/kmoneil/jira-cli/internal/registry"
 	"github.com/kmoneil/jira-cli/internal/render"
 	"github.com/kmoneil/jira-cli/internal/resource/meta"
@@ -274,6 +275,10 @@ func (s *stubSession) Project() string                 { return "ENG" }
 func (s *stubSession) RequireProject() (string, error) { return "ENG", nil }
 func (s *stubSession) Board() string                   { return "" }
 func (s *stubSession) CheckWritable(string) error      { return nil }
+
+// Idempotency implements registry.Session. A nil ledger means no protection,
+// which is what a command that does not mutate should never notice.
+func (s *stubSession) Idempotency() *idem.Ledger { return nil }
 
 // stubDoer answers with a fixed body and counts how often it was asked.
 type stubDoer struct {

@@ -9,6 +9,7 @@ import (
 	"github.com/kmoneil/jira-cli/internal/auth"
 	"github.com/kmoneil/jira-cli/internal/buildinfo"
 	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jira-cli/internal/idem"
 	"github.com/kmoneil/jira-cli/internal/jctx"
 	"github.com/kmoneil/jira-cli/internal/registry"
 	"github.com/kmoneil/jira-cli/internal/site"
@@ -32,6 +33,9 @@ type session struct {
 
 	metaOnce sync.Once
 	meta     *site.Metadata
+
+	ledgerOnce sync.Once
+	ledger     *idem.Ledger
 }
 
 // newSession builds the session for this invocation.
@@ -115,6 +119,22 @@ func (s *session) Metadata(ctx context.Context) (*site.Metadata, error) {
 		}
 	})
 	return s.meta, nil
+}
+
+// Idempotency implements registry.Session.
+//
+// A ledger that cannot be located is nil rather than an error: the commands
+// that use it say so, and failing here would stop a mutation that has nothing
+// to do with idempotency.
+func (s *session) Idempotency() *idem.Ledger {
+	s.ledgerOnce.Do(func() {
+		paths, err := s.app.resolvePaths()
+		if err != nil {
+			return
+		}
+		s.ledger = &idem.Ledger{Path: paths.IdempotencyFile()}
+	})
+	return s.ledger
 }
 
 // probe resolves what the site is, from cache when it is still fresh.
