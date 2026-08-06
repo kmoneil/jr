@@ -28,7 +28,6 @@ var notYetGating = map[string]string{
 	"render":    "internal/adf is a stub, so there is no ADF renderer to exclude",
 	"browser":   "there is no OAuth browser flow yet",
 	"clipboard": "nothing copies to the clipboard yet",
-	"admin":     "project, board, and sprint commands do not exist yet",
 }
 
 // TestEveryTagEitherGatesCodeOrSaysWhyNot is the audit §8 asks for.
@@ -88,6 +87,21 @@ func TestTheTagsThatGateCodeGateTheRightCode(t *testing.T) {
 	if len(gated["prompt"]) == 0 {
 		t.Error("prompt gates nothing, so shell completion is in an agent build")
 	}
+
+	// admin is the only tag that gates code no single tag can reach: `sprint
+	// close` needs write as well. Asserting it here is what keeps the
+	// combination working — a file that quietly moved to one tag would still
+	// satisfy the audit above, and the agent profile would gain the ability to
+	// end an iteration without anything failing.
+	if len(gated["admin"]) == 0 {
+		t.Error("admin gates nothing, so an agent build can administer a board")
+	}
+	for _, file := range gated["admin"] {
+		if !slices.Contains(gated["write"], file) {
+			t.Errorf("admin gates %s and write does not; administering a board "+
+				"is a mutation, and a build without write must not contain it", file)
+		}
+	}
 }
 
 // stubs are files a tag compiles that carry no behaviour, so gating them
@@ -112,22 +126,29 @@ func isStub(file string) bool {
 	return false
 }
 
-// filesPerTag returns, for each known tag, the files that compile only when it
-// is set.
+// filesPerTag returns, for each known tag, the files whose compilation depends
+// on it.
 //
 // It asks the go tool rather than parsing source, because a constraint can be
 // written several ways and only the toolchain is authoritative about which
 // files a build includes.
+//
+// The comparison is "everything on" against "everything on but this one",
+// rather than "nothing on" against "this one alone". The two differ for a file
+// that needs more than one tag: `//go:build write && admin` is added by neither
+// tag on its own, so turning them on one at a time attributes it to nothing and
+// the audit reports both tags as gating less than they do. Removing one tag
+// from a full build attributes it to both, which is what the constraint says.
 func filesPerTag(t *testing.T) map[string][]string {
 	t.Helper()
 
-	base := goFiles(t, nil)
+	all := goFiles(t, buildinfo.KnownTags)
 	out := map[string][]string{}
 	for _, tag := range buildinfo.KnownTags {
-		with := goFiles(t, []string{tag})
+		without := goFiles(t, remove(buildinfo.KnownTags, tag))
 		var added []string
-		for file := range with {
-			if base[file] {
+		for file := range all {
+			if without[file] {
 				continue
 			}
 			if isStub(file) {
@@ -137,6 +158,17 @@ func filesPerTag(t *testing.T) map[string][]string {
 		}
 		sort.Strings(added)
 		out[tag] = added
+	}
+	return out
+}
+
+// remove returns tags without one of them, leaving the original untouched.
+func remove(tags []string, drop string) []string {
+	out := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		if tag != drop {
+			out = append(out, tag)
+		}
 	}
 	return out
 }

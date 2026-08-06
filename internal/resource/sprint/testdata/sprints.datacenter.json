@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/agile/1.0/board/99/sprint",
+        "query": "maxResults=50&startAt=0"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"maxResults\":50,\"startAt\":0,\"total\":3,\"isLast\":true,\"values\":[{\"id\":100,\"self\":\"https://jira.acme.invalid/rest/agile/1.0/sprint/100\",\"state\":\"active\",\"name\":\"ENG Sprint 4\",\"startDate\":\"2026-07-01T09:00:00.000+0000\",\"endDate\":\"2026-07-15T09:00:00.000+0000\",\"originBoardId\":99,\"goal\":\"Keyset pagination\"},{\"id\":12,\"self\":\"https://jira.acme.invalid/rest/agile/1.0/sprint/12\",\"state\":\"closed\",\"name\":\"ENG Sprint 3\",\"startDate\":\"2026-06-01T09:00:00.000+0000\",\"endDate\":\"2026-06-15T09:00:00.000+0000\",\"completeDate\":\"2026-06-15T17:32:11.000+0000\",\"originBoardId\":99,\"goal\":\"Ship the retry path\"},{\"id\":99,\"self\":\"https://jira.acme.invalid/rest/agile/1.0/sprint/99\",\"state\":\"future\",\"name\":\"ENG Sprint 5\",\"originBoardId\":99}]}"
+      }
+    }
+  ]
+}

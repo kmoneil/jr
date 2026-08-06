@@ -22,6 +22,7 @@ Available Commands:
   meta        Ask Jira what can be done to an issue
   project     Inspect projects
   schema      Describe every command this build contains
+  sprint      Work with sprints
   user        Look up users
   version     Print the build identity and its compiled-in capabilities
 

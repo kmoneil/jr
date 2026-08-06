@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/agile/1.0/board/99/sprint",
+        "query": "maxResults=50&startAt=0"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"maxResults\":50,\"startAt\":0,\"isLast\":true,\"values\":[{\"id\":1,\"state\":\"closed\",\"name\":\"Odd\",\"startDate\":\"last Tuesday\",\"originBoardId\":99}]}"
+      }
+    }
+  ]
+}
