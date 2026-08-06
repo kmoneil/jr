@@ -415,3 +415,35 @@ func TestEverySchemaBelongsToAKind(t *testing.T) {
 		}
 	}
 }
+
+// TestEveryColumnNamesAValue is the test the TSV writer already claimed
+// existed.
+//
+// writeTSV resolves each column against the item and takes an empty string when
+// the path leads nowhere, with a comment saying the contract tests assert the
+// path is resolvable. They did not. `project statuses` declared a column over a
+// list element, and because a container resolves to its own (empty) text, every
+// row on both deployments carried a blank cell — through a convergence test, a
+// golden file, and a per-deployment command test, none of which ever looked at
+// a cell.
+//
+// A column that cannot show what its header says is the same defect as a flag
+// that cannot do what it says, and this repository does not ship either.
+func TestEveryColumnNamesAValue(t *testing.T) {
+	for _, cmd := range registry.All() {
+		if len(cmd.Columns) == 0 {
+			continue
+		}
+		schema, ok := render.SchemaFor(cmd.Kind())
+		if !ok || schema == nil {
+			continue // Kinds without a registered schema are a separate check.
+		}
+		t.Run(strings.Join(cmd.Path, "."), func(t *testing.T) {
+			for _, col := range cmd.Columns {
+				if err := schema.ResolveColumn(col.Path); err != nil {
+					t.Errorf("column %q: %v", col.Header, err)
+				}
+			}
+		})
+	}
+}

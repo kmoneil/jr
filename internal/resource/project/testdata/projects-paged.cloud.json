@@ -1,0 +1,38 @@
+{
+  "deployment": "cloud",
+  "source": "constructed",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/project/search",
+        "query": "expand=lead&maxResults=50&orderBy=key&startAt=0"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"isLast\": false, \"total\": 3, \"values\": [{\"id\": \"10069\", \"key\": \"ENG\", \"name\": \"Engineering\", \"projectTypeKey\": \"software\", \"isPrivate\": false, \"lead\": {\"displayName\": \"Ada Lovelace\"}, \"style\": \"classic\"}, {\"id\": \"10079\", \"key\": \"OPS\", \"name\": \"Operations\", \"projectTypeKey\": \"software\", \"isPrivate\": false, \"lead\": {\"displayName\": \"Ada Lovelace\"}, \"style\": \"next-gen\"}]}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/project/search",
+        "query": "expand=lead&maxResults=50&orderBy=key&startAt=2"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"isLast\": true, \"total\": 3, \"values\": [{\"id\": \"10090\", \"key\": \"ZZZ\", \"name\": \"Archive\", \"projectTypeKey\": \"software\", \"isPrivate\": false, \"lead\": {\"displayName\": \"Ada Lovelace\"}}]}"
+      }
+    }
+  ]
+}

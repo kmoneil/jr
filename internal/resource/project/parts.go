@@ -312,7 +312,7 @@ is ` + "`" + buildinfo.App + ` meta transitions` + "`" + `, and it is a shorter 
 		CollectionName: "issue-types",
 		Columns: []render.Column{
 			{Header: "type", Path: "@type"},
-			{Header: "statuses", Path: "statuses"},
+			{Header: "statuses", Path: "@status-names"},
 		},
 		Outputs: []registry.Output{{Kind: KindStatuses, Version: VersionStat}},
 		ExitCodes: []exitcode.Code{
@@ -394,13 +394,19 @@ func runStatuses(
 	}
 	for _, t := range types {
 		statuses := make([]*render.Node, 0, len(t.Statuses))
+		names := make([]string, 0, len(t.Statuses))
 		for _, s := range t.Statuses {
 			statuses = append(statuses, render.El("status").
 				Attr("id", s.ID).
 				Attr("category", s.Category).
 				SetText(s.Name))
+			names = append(names, s.Name)
 		}
-		node := render.El("issue-type").Attr("type", t.Type)
+		// The names again, flattened, because a TSV cell cannot hold the list
+		// and a column over the container was blank on every row.
+		node := render.El("issue-type").
+			Attr("type", t.Type).
+			Attr("status-names", render.JoinList(names))
 		node.Child(render.ListEl("statuses", "status", statuses...))
 		if err := out.Write(node); err != nil {
 			return registry.StreamResult{}, err

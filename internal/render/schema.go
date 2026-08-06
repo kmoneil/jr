@@ -380,3 +380,79 @@ func fieldNode(element string, f Field) *Node {
 	}
 	return n
 }
+
+// ResolveColumn reports whether a column path names a value in this schema.
+//
+// A TSV cell is a scalar. A path that walks to a container — an element with
+// children and no text of its own — has nowhere to get one, so the cell comes
+// out empty on every row for every caller, forever. That is a column which
+// cannot do what its header says, and this repository has a rule against
+// shipping one.
+//
+// The TSV writer already claimed this was checked: "whether the path is even
+// resolvable against this kind is asserted by the contract tests, not guessed
+// at here." No such test existed. `project statuses` declared a `statuses`
+// column over a list element and emitted an empty cell for every issue type on
+// both deployments, and every test passed, because they asserted the header and
+// the row count and never a cell.
+func (s *Schema) ResolveColumn(path string) error {
+	if s == nil {
+		return errs.Runtime("UNKNOWN_KIND", "no schema to resolve %q against", path)
+	}
+	cur := s
+	segs := strings.Split(path, "/")
+
+	for i, seg := range segs {
+		last := i == len(segs)-1
+		name, attr, hasAttr := strings.Cut(seg, "@")
+
+		if name != "" {
+			next, ok := cur.childNamed(name)
+			if !ok {
+				if cur.Extra != nil {
+					return nil // A kind whose shape depends on the request.
+				}
+				return errs.Runtime("UNKNOWN_COLUMN",
+					"%q names element %q, which %q does not contain",
+					path, name, cur.Element)
+			}
+			cur = next
+		}
+		if !last {
+			continue
+		}
+		if hasAttr {
+			if cur.hasAttr(attr) || cur.Extra != nil {
+				return nil
+			}
+			return errs.Runtime("UNKNOWN_COLUMN",
+				"%q names attribute %q, which %q does not have",
+				path, attr, cur.Element)
+		}
+		if cur.Text == nil {
+			return errs.Runtime("UNKNOWN_COLUMN",
+				"%q names element %q, which carries no text of its own — "+
+					"a column over a container is an empty cell on every row",
+				path, cur.Element)
+		}
+	}
+	return nil
+}
+
+func (s *Schema) childNamed(name string) (*Schema, bool) {
+	for _, c := range s.Children {
+		if c.Schema != nil && c.Schema.Element == name {
+			return c.Schema, true
+		}
+	}
+	return nil, false
+}
+
+func (s *Schema) hasAttr(name string) bool {
+	for _, a := range s.Attrs {
+		if a.Name == name {
+			return true
+		}
+	}
+	return false
+}

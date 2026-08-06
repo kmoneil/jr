@@ -1,6 +1,6 @@
 {
   "deployment": "cloud",
-  "source": "constructed",
+  "source": "recorded",
   "interactions": [
     {
       "request": {
@@ -10,11 +10,83 @@
       "response": {
         "status": 200,
         "header": {
+          "Atl-Request-Id": [
+            "00000000-0000-0000-0000-000000000000"
+          ],
+          "Atl-Traceid": [
+            "9d432b0b26484cb89469d31ed0ab3b73"
+          ],
+          "Cache-Control": [
+            "no-cache, no-store, no-transform"
+          ],
           "Content-Type": [
-            "application/json"
+            "application/json;charset=UTF-8"
+          ],
+          "Date": [
+            "Thu, 06 Aug 2026 17:34:03 GMT"
+          ],
+          "Nel": [
+            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=349;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "Report-To": [
+            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
+          ],
+          "Server": [
+            "AtlassianEdge"
+          ],
+          "Server-Timing": [
+            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=103,cdn-upstream-fbl;dur=302,atl-edge;dur=164,atl-edge-internal;dur=17,atl-edge-upstream;dur=147,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW57-P6\",cdn-rid;desc=\"GG2W6BXGDxYg6lq9SpmpJ7_5H2s6LP5uvjLYCSR093AbDTQcY6O9eA==\",cdn-downstream-fbl;dur=309"
+          ],
+          "Set-Cookie": [
+            "REDACTED"
+          ],
+          "Strict-Transport-Security": [
+            "max-age=63072000; includeSubDomains; preload"
+          ],
+          "Timing-Allow-Origin": [
+            "*"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "Via": [
+            "1.1 a95434276714bb5db91ed4adefba458c.cloudfront.net (CloudFront)"
+          ],
+          "X-Aaccountid": [
+            "000000:00000000-0000-0000-0000-000000000000"
+          ],
+          "X-Amz-Cf-Id": [
+            "GG2W6BXGDxYg6lq9SpmpJ7_5H2s6LP5uvjLYCSR093AbDTQcY6O9eA=="
+          ],
+          "X-Amz-Cf-Pop": [
+            "DFW57-P6"
+          ],
+          "X-Arequestid": [
+            "be101eca9c1becac46796c98e4af9473"
+          ],
+          "X-Cache": [
+            "Miss from cloudfront"
+          ],
+          "X-Content-Type-Options": [
+            "nosniff"
+          ],
+          "X-Ratelimit-Limit": [
+            "350"
+          ],
+          "X-Ratelimit-Remaining": [
+            "349"
+          ],
+          "X-Xss-Protection": [
+            "1; mode=block"
           ]
         },
-        "body": "{\"id\": \"10069\", \"key\": \"ENG\", \"name\": \"Engineering\", \"projectTypeKey\": \"software\", \"isPrivate\": false, \"lead\": {\"displayName\": \"Ada Lovelace\"}}"
+        "body": "{\"expand\":\"description,lead,issueTypes,url,projectKeys,permissions,insight\",\"self\":\"https://recorded.invalid/rest/api/3/project/10001\",\"id\":\"10001\",\"key\":\"ENG\",\"description\":\"\",\"lead\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000:00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true},\"components\":[],\"issueTypes\":[{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10006\",\"id\":\"10006\",\"description\":\"Epics track collections of related bugs, stories, and tasks.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Epic\",\"subtask\":false,\"avatarId\":10307,\"hierarchyLevel\":1},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10007\",\"id\":\"10007\",\"description\":\"Subtasks track small pieces of work that are part of a larger task.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Subtask\",\"subtask\":true,\"avatarId\":10316,\"hierarchyLevel\":-1},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10008\",\"id\":\"10008\",\"description\":\"Tasks track small, distinct pieces of work.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Task\",\"subtask\":false,\"avatarId\":10318,\"hierarchyLevel\":0},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10009\",\"id\":\"10009\",\"description\":\"Stories track functionality or features expressed as user goals.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Story\",\"subtask\":false,\"avatarId\":10315,\"hierarchyLevel\":0},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10010\",\"id\":\"10010\",\"description\":\"A broad piece of functionality.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Feature\",\"subtask\":false,\"avatarId\":10314,\"hierarchyLevel\":0},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10011\",\"id\":\"10011\",\"description\":\"An ask for design assistance.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Request\",\"subtask\":false,\"avatarId\":10311,\"hierarchyLevel\":0},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10012\",\"id\":\"10012\",\"description\":\"Bugs track problems or errors.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Bug\",\"subtask\":false,\"avatarId\":10303,\"hierarchyLevel\":0}],\"assigneeType\":\"UNASSIGNED\",\"versions\":[],\"name\":\"Engineering\",\"roles\":{\"atlassian-addons-project-access\":\"https://recorded.invalid/rest/api/3/project/10001/role/10013\",\"Administrator\":\"https://recorded.invalid/rest/api/3/project/10001/role/10009\",\"jira-guest-member\":\"https://recorded.invalid/rest/api/3/project/10001/role/10012\",\"Viewer\":\"https://recorded.invalid/rest/api/3/project/10001/role/10011\",\"Member\":\"https://recorded.invalid/rest/api/3/project/10001/role/10010\"},\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"projectTypeKey\":\"software\",\"simplified\":true,\"style\":\"next-gen\",\"isPrivate\":false,\"properties\":{},\"entityId\":\"00000000-0000-0000-0000-000000000000\",\"uuid\":\"00000000-0000-0000-0000-000000000000\"}"
       }
     }
   ]

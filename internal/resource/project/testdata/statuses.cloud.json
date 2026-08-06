@@ -1,6 +1,6 @@
 {
   "deployment": "cloud",
-  "source": "constructed",
+  "source": "recorded",
   "interactions": [
     {
       "request": {
@@ -10,11 +10,83 @@
       "response": {
         "status": 200,
         "header": {
+          "Atl-Request-Id": [
+            "00000000-0000-0000-0000-000000000000"
+          ],
+          "Atl-Traceid": [
+            "0ce4c1ad3c62414382299283d1a1bfe0"
+          ],
+          "Cache-Control": [
+            "no-cache, no-store, no-transform"
+          ],
           "Content-Type": [
-            "application/json"
+            "application/json;charset=UTF-8"
+          ],
+          "Date": [
+            "Thu, 06 Aug 2026 17:34:03 GMT"
+          ],
+          "Nel": [
+            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=349;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "Report-To": [
+            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
+          ],
+          "Server": [
+            "AtlassianEdge"
+          ],
+          "Server-Timing": [
+            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=99,cdn-upstream-fbl;dur=232,atl-edge;dur=99,atl-edge-internal;dur=19,atl-edge-upstream;dur=81,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW59-P7\",cdn-rid;desc=\"2Exc-17l4MSSmWgG_Wh_pZGMw3zx-QpwYAWHqGm2TJBCV732ga3DFQ==\",cdn-downstream-fbl;dur=238"
+          ],
+          "Set-Cookie": [
+            "REDACTED"
+          ],
+          "Strict-Transport-Security": [
+            "max-age=63072000; includeSubDomains; preload"
+          ],
+          "Timing-Allow-Origin": [
+            "*"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "Via": [
+            "1.1 0b3b2bc925bbb60cbc1668ae1c438b24.cloudfront.net (CloudFront)"
+          ],
+          "X-Aaccountid": [
+            "000000:00000000-0000-0000-0000-000000000000"
+          ],
+          "X-Amz-Cf-Id": [
+            "2Exc-17l4MSSmWgG_Wh_pZGMw3zx-QpwYAWHqGm2TJBCV732ga3DFQ=="
+          ],
+          "X-Amz-Cf-Pop": [
+            "DFW59-P7"
+          ],
+          "X-Arequestid": [
+            "cd036b6015a94c40f7e75469c846cdcc"
+          ],
+          "X-Cache": [
+            "Miss from cloudfront"
+          ],
+          "X-Content-Type-Options": [
+            "nosniff"
+          ],
+          "X-Ratelimit-Limit": [
+            "350"
+          ],
+          "X-Ratelimit-Remaining": [
+            "349"
+          ],
+          "X-Xss-Protection": [
+            "1; mode=block"
           ]
         },
-        "body": "[{\"name\": \"Bug\", \"statuses\": [{\"id\": \"1\", \"name\": \"Open\", \"statusCategory\": {\"key\": \"new\", \"name\": \"To Do\"}}, {\"id\": \"6\", \"name\": \"Closed\", \"statusCategory\": {\"key\": \"done\", \"name\": \"Done\"}}]}, {\"name\": \"Task\", \"statuses\": [{\"id\": \"1\", \"name\": \"Open\", \"statusCategory\": {\"key\": \"new\", \"name\": \"To Do\"}}]}]"
+        "body": "[{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10006\",\"id\":\"10006\",\"name\":\"Epic\",\"subtask\":false,\"statuses\":[{\"self\":\"https://recorded.invalid/rest/api/3/status/10007\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"Done\",\"untranslatedName\":\"Done\",\"id\":\"10007\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/3\",\"id\":3,\"key\":\"done\",\"colorName\":\"green\",\"name\":\"Done\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10006\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"In Review\",\"untranslatedName\":\"In Review\",\"id\":\"10006\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10004\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"To Do\",\"untranslatedName\":\"To Do\",\"id\":\"10004\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"blue-gray\",\"name\":\"To Do\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10005\",\"description\":\"This work item is being actively worked on at the moment by the assignee.\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"In Progress\",\"untranslatedName\":\"In Progress\",\"id\":\"10005\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}}]},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10007\",\"id\":\"10007\",\"name\":\"Subtask\",\"subtask\":true,\"statuses\":[{\"self\":\"https://recorded.invalid/rest/api/3/status/10007\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"Done\",\"untranslatedName\":\"Done\",\"id\":\"10007\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/3\",\"id\":3,\"key\":\"done\",\"colorName\":\"green\",\"name\":\"Done\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10006\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"In Review\",\"untranslatedName\":\"In Review\",\"id\":\"10006\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10004\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"To Do\",\"untranslatedName\":\"To Do\",\"id\":\"10004\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"blue-gray\",\"name\":\"To Do\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10005\",\"description\":\"This work item is being actively worked on at the moment by the assignee.\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"In Progress\",\"untranslatedName\":\"In Progress\",\"id\":\"10005\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}}]},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10008\",\"id\":\"10008\",\"name\":\"Task\",\"subtask\":false,\"statuses\":[{\"self\":\"https://recorded.invalid/rest/api/3/status/10007\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"Done\",\"untranslatedName\":\"Done\",\"id\":\"10007\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/3\",\"id\":3,\"key\":\"done\",\"colorName\":\"green\",\"name\":\"Done\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10006\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"In Review\",\"untranslatedName\":\"In Review\",\"id\":\"10006\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10004\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"To Do\",\"untranslatedName\":\"To Do\",\"id\":\"10004\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"blue-gray\",\"name\":\"To Do\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10005\",\"description\":\"This work item is being actively worked on at the moment by the assignee.\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"In Progress\",\"untranslatedName\":\"In Progress\",\"id\":\"10005\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}}]},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10009\",\"id\":\"10009\",\"name\":\"Story\",\"subtask\":false,\"statuses\":[{\"self\":\"https://recorded.invalid/rest/api/3/status/10007\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"Done\",\"untranslatedName\":\"Done\",\"id\":\"10007\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/3\",\"id\":3,\"key\":\"done\",\"colorName\":\"green\",\"name\":\"Done\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10006\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"In Review\",\"untranslatedName\":\"In Review\",\"id\":\"10006\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10004\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"To Do\",\"untranslatedName\":\"To Do\",\"id\":\"10004\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"blue-gray\",\"name\":\"To Do\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10005\",\"description\":\"This work item is being actively worked on at the moment by the assignee.\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"In Progress\",\"untranslatedName\":\"In Progress\",\"id\":\"10005\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}}]},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10010\",\"id\":\"10010\",\"name\":\"Feature\",\"subtask\":false,\"statuses\":[{\"self\":\"https://recorded.invalid/rest/api/3/status/10007\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"Done\",\"untranslatedName\":\"Done\",\"id\":\"10007\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/3\",\"id\":3,\"key\":\"done\",\"colorName\":\"green\",\"name\":\"Done\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10006\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"In Review\",\"untranslatedName\":\"In Review\",\"id\":\"10006\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10004\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"To Do\",\"untranslatedName\":\"To Do\",\"id\":\"10004\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"blue-gray\",\"name\":\"To Do\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10005\",\"description\":\"This work item is being actively worked on at the moment by the assignee.\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"In Progress\",\"untranslatedName\":\"In Progress\",\"id\":\"10005\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}}]},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10011\",\"id\":\"10011\",\"name\":\"Request\",\"subtask\":false,\"statuses\":[{\"self\":\"https://recorded.invalid/rest/api/3/status/10007\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"Done\",\"untranslatedName\":\"Done\",\"id\":\"10007\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/3\",\"id\":3,\"key\":\"done\",\"colorName\":\"green\",\"name\":\"Done\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10006\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"In Review\",\"untranslatedName\":\"In Review\",\"id\":\"10006\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10004\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"To Do\",\"untranslatedName\":\"To Do\",\"id\":\"10004\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"blue-gray\",\"name\":\"To Do\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10005\",\"description\":\"This work item is being actively worked on at the moment by the assignee.\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"In Progress\",\"untranslatedName\":\"In Progress\",\"id\":\"10005\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}}]},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10012\",\"id\":\"10012\",\"name\":\"Bug\",\"subtask\":false,\"statuses\":[{\"self\":\"https://recorded.invalid/rest/api/3/status/10007\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"Done\",\"untranslatedName\":\"Done\",\"id\":\"10007\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/3\",\"id\":3,\"key\":\"done\",\"colorName\":\"green\",\"name\":\"Done\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10006\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"In Review\",\"untranslatedName\":\"In Review\",\"id\":\"10006\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10004\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"To Do\",\"untranslatedName\":\"To Do\",\"id\":\"10004\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"blue-gray\",\"name\":\"To Do\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}},{\"self\":\"https://recorded.invalid/rest/api/3/status/10005\",\"description\":\"This work item is being actively worked on at the moment by the assignee.\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"In Progress\",\"untranslatedName\":\"In Progress\",\"id\":\"10005\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"},\"scope\":{\"type\":\"PROJECT\",\"project\":{\"id\":\"10001\"}}}]}]"
       }
     }
   ]

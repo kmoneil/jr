@@ -33,7 +33,7 @@ const (
 	KindVersions   = "project.versions"
 	VersionVers    = 1
 	KindStatuses   = "project.statuses"
-	VersionStat    = 1
+	VersionStat    = 2
 )
 
 func init() {
@@ -114,7 +114,14 @@ func VersionSchema() *render.Schema {
 func StatusesSchema() *render.Schema {
 	return &render.Schema{
 		Element: "issue-type",
-		Attrs:   []render.Field{{Name: "type", Type: render.TypeString}},
+		Attrs: []render.Field{
+			{Name: "type", Type: render.TypeString},
+			// The status names flattened into one value, so TSV has something
+			// to put in a cell. Redundant with the <statuses> list below, and
+			// deliberately so: the list is the truth, this is the projection a
+			// format without lists can carry.
+			{Name: "status-names", Type: render.TypeString},
+		},
 		Children: []render.Child{
 			{Schema: render.ListSchema("statuses", "status", &render.Schema{
 				Element: "status",

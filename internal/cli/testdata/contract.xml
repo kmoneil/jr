@@ -879,10 +879,11 @@
         </elements>
       </element>
     </kind>
-    <kind name="project.statuses" v="1" emitters="project.statuses">
+    <kind name="project.statuses" v="2" emitters="project.statuses">
       <element name="issue-type">
-        <attributes count="1">
+        <attributes count="2">
           <attribute name="type" type="string" optional="false"/>
+          <attribute name="status-names" type="string" optional="false"/>
         </attributes>
         <elements count="1">
           <element name="statuses" list-of="status" optional="false" repeated="false">

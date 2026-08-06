@@ -101,3 +101,31 @@ func walkRows(n *Node, prefix string, rows *[][]string) {
 		walkRows(c, prefix+name+"/", rows)
 	}
 }
+
+// listEscaper escapes the two characters JoinList gives meaning to. The
+// backslash is doubled first, by virtue of being the first pair, exactly as in
+// tsvEscaper.
+var listEscaper = strings.NewReplacer(`\`, `\\`, `,`, `\,`)
+
+// JoinList renders a list of values as one scalar, for a format whose cell
+// cannot hold a list.
+//
+// XML and JSON carry a list as a list, and this is not for them. TSV has one
+// cell per column, so a column over a list either flattens or shows nothing —
+// and showing nothing is what `project statuses` did for every issue type on
+// every deployment until the column check caught it.
+//
+// A comma separates, and a comma inside a value is escaped rather than left
+// ambiguous. Nothing here is ever altered to make it representable: a status
+// named "Ready, Set" comes back as `Ready\, Set` and splits correctly, instead
+// of quietly becoming two statuses.
+//
+// A consumer reading TSV unescapes the cell first — TSV's own escaping doubles
+// these backslashes — and then splits on a comma not preceded by one.
+func JoinList(values []string) string {
+	escaped := make([]string, 0, len(values))
+	for _, v := range values {
+		escaped = append(escaped, listEscaper.Replace(v))
+	}
+	return strings.Join(escaped, ",")
+}

@@ -172,7 +172,28 @@ Every record is one line and every field is one column. Within a field:
 | carriage return | `\r`       |
 
 Split on `\t` and `\n` with no defensive code. A column path that does not
-resolve produces an empty cell.
+resolve produces an empty cell — but no shipped column has such a path, and
+`TestEveryColumnNamesAValue` refuses one that does. A column whose path walks to
+an element with no text of its own can only ever be blank, which is a column
+that cannot show what its header says.
+
+### Lists in a cell
+
+XML and JSON carry a list as a list. TSV has one cell per column, so a column
+over a list flattens: values are joined with `,`, and a `,` or `\` inside a
+value is escaped with a backslash.
+
+| Character | Emitted as |
+| --------- | ---------- |
+| `\`       | `\\`       |
+| `,`       | `\,`       |
+
+This is applied before the TSV escaping in the table above, so a consumer
+unescapes the cell first and then splits on a comma not preceded by a
+backslash. A status named `Ready, Set` arrives as one value rather than
+silently becoming two.
+
+Only `project statuses` uses this today, for its `statuses` column.
 
 A record rendered as TSV becomes two columns, `field` and `value`, one row per
 leaf. Field names use the same path syntax as column definitions: `/` for

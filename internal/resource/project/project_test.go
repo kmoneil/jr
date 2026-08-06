@@ -38,8 +38,8 @@ func TestListConvergesAcrossDeployments(t *testing.T) {
 	// Ordered by key on both, so the rows and their order agree.
 	for kind, out := range got {
 		lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
-		if len(lines) != 4 {
-			t.Fatalf("%s: got %d lines, want a header and three rows:\n%s",
+		if len(lines) != 3 {
+			t.Fatalf("%s: got %d lines, want a header and two rows:\n%s",
 				kind, len(lines), out)
 		}
 		if lines[0] != "key\tname\ttype\tlead" {
@@ -49,7 +49,7 @@ func TestListConvergesAcrossDeployments(t *testing.T) {
 		for _, line := range lines[1:] {
 			keys = append(keys, strings.SplitN(line, "\t", 2)[0])
 		}
-		if strings.Join(keys, ",") != "ENG,OPS,ZZZ" {
+		if strings.Join(keys, ",") != "ENG,OPS" {
 			t.Errorf("%s keys = %v, want them ordered by key", kind, keys)
 		}
 	}
@@ -127,15 +127,42 @@ func TestStatusesCarryTheirCategory(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", kind, err)
 		}
-		if len(types) != 2 || types[0].Type != "Bug" {
-			t.Fatalf("%s types = %+v, want Bug then Task", kind, types)
+		if len(types) == 0 {
+			t.Fatalf("%s: no issue types", kind)
 		}
-		want := map[string]string{"Open": site.CategoryToDo, "Closed": site.CategoryDone}
-		for _, s := range types[0].Statuses {
-			if s.Category != want[s.Name] {
-				t.Errorf("%s: %s category = %q, want %q",
-					kind, s.Name, s.Category, want[s.Name])
+
+		// Asserted by name where the name is one whose category is not a
+		// matter of opinion. The two fixtures hold different workflows — the
+		// Cloud one is recorded, so it has whatever that instance defines —
+		// and pinning either one's exact list would make this a test of the
+		// sandbox rather than of the mapping.
+		want := map[string]string{
+			"Open": site.CategoryToDo, "To Do": site.CategoryToDo,
+			"Closed": site.CategoryDone, "Done": site.CategoryDone,
+			"In Progress": site.CategoryInProgress,
+			"In Review":   site.CategoryInProgress,
+		}
+		checked := 0
+		for _, ty := range types {
+			if len(ty.Statuses) == 0 {
+				t.Errorf("%s: issue type %q has no statuses", kind, ty.Type)
 			}
+			for _, st := range ty.Statuses {
+				if st.Category == "" {
+					t.Errorf("%s: %s has no category", kind, st.Name)
+				}
+				if w, known := want[st.Name]; known {
+					checked++
+					if st.Category != w {
+						t.Errorf("%s: %s category = %q, want %q",
+							kind, st.Name, st.Category, w)
+					}
+				}
+			}
+		}
+		if checked == 0 {
+			t.Errorf("%s: no status had a name this test knows, so it asserted "+
+				"nothing about the mapping", kind)
 		}
 	}
 }
@@ -225,13 +252,20 @@ func runList(
 	t *testing.T, kind site.Kind, limit registry.Limit,
 ) (string, registry.StreamResult, *transport.Replayer) {
 	t.Helper()
+	return runListFixture(t, kind, limit, "projects."+string(kind)+".json")
+}
+
+func runListFixture(
+	t *testing.T, kind site.Kind, limit registry.Limit, fixture string,
+) (string, registry.StreamResult, *transport.Replayer) {
+	t.Helper()
 
 	cmd, ok := registry.Lookup("project.list")
 	if !ok {
 		t.Fatal("project list is not registered")
 	}
 
-	conn, replayer := replayConn(t, "projects."+string(kind)+".json")
+	conn, replayer := replayConn(t, fixture)
 	inv := &registry.Invocation{
 		Jira:  &stubSession{conn: conn, kind: kind},
 		Flags: registry.NewFlags(), Limit: limit,
@@ -305,19 +339,24 @@ func (s *stubSession) CheckWritable(string) error { return nil }
 func TestTheThreePerProjectListingsRunAsCommands(t *testing.T) {
 	for _, tc := range []struct {
 		command, fixture, header string
-		rows                     int
+		rows                     map[site.Kind]int
 	}{
 		{
 			command: "project.components", fixture: "components",
-			header: "id\tname\tlead\tassignee-type", rows: 2,
+			header: "id\tname\tlead\tassignee-type",
+			rows:   map[site.Kind]int{site.Cloud: 2, site.DataCenter: 2},
 		},
 		{
 			command: "project.versions", fixture: "versions",
-			header: "id\tname\treleased\tarchived\trelease-date", rows: 3,
+			header: "id\tname\treleased\tarchived\trelease-date",
+			rows:   map[site.Kind]int{site.Cloud: 3, site.DataCenter: 3},
 		},
 		{
 			command: "project.statuses", fixture: "statuses",
-			header: "type\tstatuses", rows: 2,
+			header: "type\tstatuses",
+			// Seven on Cloud because that is what the recorded instance
+			// defines; two on Data Center because that fixture is written.
+			rows: map[site.Kind]int{site.Cloud: 7, site.DataCenter: 2},
 		},
 	} {
 		for _, kind := range deployments {
@@ -360,9 +399,29 @@ func TestTheThreePerProjectListingsRunAsCommands(t *testing.T) {
 				if lines[0] != tc.header {
 					t.Errorf("header = %q, want %q", lines[0], tc.header)
 				}
-				if len(lines) != tc.rows+1 {
+				if len(lines) != tc.rows[kind]+1 {
 					t.Errorf("got %d rows, want %d:\n%s",
-						len(lines)-1, tc.rows, buf.String())
+						len(lines)-1, tc.rows[kind], buf.String())
+				}
+
+				// Every column has to show something somewhere. `project
+				// statuses` declared a column over a list element and emitted a
+				// blank cell on every row for both deployments, and this test
+				// passed the whole time because it checked the header and the
+				// row count and never looked at a cell.
+				for i, header := range strings.Split(tc.header, "\t") {
+					filled := false
+					for _, line := range lines[1:] {
+						cells := strings.Split(line, "\t")
+						if i < len(cells) && cells[i] != "" {
+							filled = true
+							break
+						}
+					}
+					if !filled {
+						t.Errorf("column %q is empty on every row:\n%s",
+							header, buf.String())
+					}
 				}
 			})
 		}
@@ -391,5 +450,101 @@ func TestAMalformedResponseIsRefused(t *testing.T) {
 	}
 	if code := errs.Coerce(err).Code; code != "MALFORMED_PROJECTS" {
 		t.Errorf("code = %q, want MALFORMED_PROJECTS", code)
+	}
+}
+
+// TestListPagesUntilExhausted keeps the paging path covered now that the
+// recorded listing no longer exercises it.
+//
+// The sandbox has two projects and `project list` has no page size, so a real
+// conversation there is one request and proves nothing about the second page.
+// This fixture is constructed and says so: three projects over two pages, which
+// is a thing no recording available here can produce.
+func TestListPagesUntilExhausted(t *testing.T) {
+	out, result, replayer := runListFixture(t, site.Cloud,
+		registry.Limit{All: true}, "projects-paged.cloud.json")
+
+	if !result.Complete {
+		t.Error("an exhausted list was reported incomplete")
+	}
+	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+		t.Errorf("the second page was never fetched: %v", unplayed)
+	}
+
+	var keys []string
+	for _, line := range strings.Split(strings.TrimRight(out, "\n"), "\n")[1:] {
+		keys = append(keys, strings.SplitN(line, "\t", 2)[0])
+	}
+	// Ordered across the page boundary, not merely within a page.
+	if strings.Join(keys, ",") != "ENG,OPS,ZZZ" {
+		t.Errorf("keys = %v, want them ordered by key across both pages", keys)
+	}
+}
+
+// TestRecordedConversationsReplay is the test a hand-written fixture cannot be.
+//
+// The replayer matches a request by method, path, and query, and fails when
+// nothing matches. So replaying a recording asserts that the request this code
+// builds is the request a real Jira answered — which is exactly what every
+// fixture here implied and none of them established. Three of them encoded a
+// call the API rejects, and all three passed their tests.
+//
+// It stays honest by refusing to run on a fixture that only claims to be a
+// recording: a file marked constructed proves nothing, and quietly passing over
+// it would let a recording be replaced by a hand-written stand-in unnoticed.
+func TestRecordedConversationsReplay(t *testing.T) {
+	for _, tc := range []struct {
+		fixture string
+		call    func(*project.Client) error
+	}{
+		{"project.cloud.json", func(c *project.Client) error {
+			_, err := c.Get(t.Context(), "ENG")
+			return err
+		}},
+		{"statuses.cloud.json", func(c *project.Client) error {
+			_, err := c.Statuses(t.Context(), "ENG")
+			return err
+		}},
+		{"versions-empty.cloud.json", func(c *project.Client) error {
+			_, err := c.Versions(t.Context(), "ENG")
+			return err
+		}},
+		{"components-empty.cloud.json", func(c *project.Client) error {
+			_, err := c.Components(t.Context(), "ENG")
+			return err
+		}},
+	} {
+		t.Run(tc.fixture, func(t *testing.T) {
+			cassette, err := transport.LoadCassette(filepath.Join("testdata", tc.fixture))
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			if !cassette.Evidence() {
+				t.Fatalf("%s is not a recording, so replaying it asserts nothing "+
+					"about the API", tc.fixture)
+			}
+
+			conn, replayer := replayConn(t, tc.fixture)
+			client := &project.Client{Transport: conn, Site: site.Info{Kind: site.Cloud}}
+			if err := tc.call(client); err != nil {
+				t.Fatalf("the request this code builds is not the one the server "+
+					"answered: %v", err)
+			}
+			if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+				t.Errorf("recorded but never requested: %v", unplayed)
+			}
+		})
+	}
+}
+
+// TestTheRecordedListingIsEvidence guards the listing fixture the same way. It
+// is separate because the listing runs as a command rather than a client call.
+func TestTheRecordedListingIsEvidence(t *testing.T) {
+	cassette, err := transport.LoadCassette(filepath.Join("testdata", "projects.cloud.json"))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !cassette.Evidence() {
+		t.Error("projects.cloud.json is no longer a recording")
 	}
 }
