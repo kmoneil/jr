@@ -115,6 +115,7 @@ func (s *session) connect(ctx context.Context) (*transport.Client, site.Info, er
 		// The deployment is a label on the cassette and is not known until the
 		// probe has answered, which is after the recorder was already running.
 		rec.Cassette().Deployment = recordedDeployment(info)
+		rec.Cassette().Source = transport.Recorded
 		s.app.cleanup = append(s.app.cleanup, save)
 	}
 	return client, info, nil

@@ -1,5 +1,6 @@
 {
   "deployment": "cloud",
+  "source": "constructed",
   "interactions": [
     {
       "request": {
@@ -9,8 +10,12 @@
       "response": {
         "status": 200,
         "header": {
-          "Content-Type": ["application/json;charset=UTF-8"],
-          "X-Request-Id": ["9f2c1e7a4b6d8c3e"]
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "X-Request-Id": [
+            "9f2c1e7a4b6d8c3e"
+          ]
         },
         "body": "{\"baseUrl\":\"https://acme.atlassian.net\",\"version\":\"1001.0.0-SNAPSHOT\",\"versionNumbers\":[1001,0,0],\"deploymentType\":\"Cloud\",\"buildNumber\":100262,\"serverTitle\":\"Jira\"}"
       }
@@ -23,7 +28,9 @@
       "response": {
         "status": 200,
         "header": {
-          "Content-Type": ["application/json;charset=UTF-8"]
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
         },
         "body": "{\"accountId\":\"712020:8f3a1b2c\",\"displayName\":\"Ada Lovelace\",\"active\":true}"
       }
@@ -36,7 +43,9 @@
       "response": {
         "status": 404,
         "header": {
-          "Content-Type": ["application/json;charset=UTF-8"]
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
         },
         "body": "{\"errorMessages\":[\"Issue does not exist or you do not have permission to see it.\"],\"errors\":{}}"
       }
@@ -50,7 +59,9 @@
       "response": {
         "status": 400,
         "header": {
-          "Content-Type": ["application/json;charset=UTF-8"]
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
         },
         "body": "{\"errorMessages\":[],\"errors\":{\"summary\":\"You must specify a summary of the issue.\"}}"
       }

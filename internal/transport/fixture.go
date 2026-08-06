@@ -53,9 +53,37 @@ type RecordedResponse struct {
 
 // Cassette is a recorded conversation with one deployment.
 type Cassette struct {
-	Deployment   Deployment    `json:"deployment"`
+	Deployment Deployment `json:"deployment"`
+	// Source says whether this conversation happened or was imagined. It is
+	// the difference between a fixture that proves a request was right and one
+	// that only proves it has not changed, and for a long time this repository
+	// had nothing but the second kind while reading like it had the first.
+	Source       Source        `json:"source,omitempty"`
 	Interactions []Interaction `json:"interactions"`
 }
+
+// Source distinguishes evidence from assumption.
+type Source string
+
+const (
+	// Recorded means a real server produced this, scrubbed on the way out. It
+	// is evidence: the path, the parameters, and the response fields are what
+	// that deployment actually does.
+	Recorded Source = "recorded"
+
+	// Constructed means somebody wrote it. Still useful — it exercises logic no
+	// sandbox will produce on demand, an empty page, a truncation, a malformed
+	// body — but it asserts nothing about the API, and a request shape it
+	// encodes is a belief rather than a finding.
+	Constructed Source = "constructed"
+)
+
+// Evidence reports whether a cassette records something that happened.
+//
+// Absent means constructed. Every fixture predates the recorder, so silence has
+// to mean the weaker claim: a file that says nothing about where it came from
+// is not evidence of anything.
+func (c *Cassette) Evidence() bool { return c != nil && c.Source == Recorded }
 
 // LoadCassette reads a fixture from disk.
 func LoadCassette(path string) (*Cassette, error) {

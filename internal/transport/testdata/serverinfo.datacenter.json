@@ -1,5 +1,6 @@
 {
   "deployment": "datacenter",
+  "source": "constructed",
   "interactions": [
     {
       "request": {
@@ -9,7 +10,9 @@
       "response": {
         "status": 200,
         "header": {
-          "Content-Type": ["application/json;charset=UTF-8"]
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
         },
         "body": "{\"baseUrl\":\"https://jira.acme.internal\",\"version\":\"9.12.7\",\"versionNumbers\":[9,12,7],\"deploymentType\":\"Server\",\"buildNumber\":912007,\"serverTitle\":\"Jira Data Center\"}"
       }
@@ -22,7 +25,9 @@
       "response": {
         "status": 200,
         "header": {
-          "Content-Type": ["application/json;charset=UTF-8"]
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
         },
         "body": "{\"key\":\"ada\",\"name\":\"ada\",\"displayName\":\"Ada Lovelace\",\"active\":true}"
       }
@@ -35,7 +40,9 @@
       "response": {
         "status": 404,
         "header": {
-          "Content-Type": ["application/json;charset=UTF-8"]
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
         },
         "body": "{\"errorMessages\":[\"Issue Does Not Exist\"],\"errors\":{}}"
       }
@@ -49,7 +56,9 @@
       "response": {
         "status": 400,
         "header": {
-          "Content-Type": ["application/json;charset=UTF-8"]
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
         },
         "body": "{\"errorMessages\":[],\"errors\":{\"summary\":\"You must specify a summary of the issue.\"}}"
       }
