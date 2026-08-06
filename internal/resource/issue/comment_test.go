@@ -22,7 +22,7 @@ func TestCommentListPagesAndNamesTheMarkup(t *testing.T) {
 		kind   site.Kind
 		format string
 	}{
-		{site.Cloud, "adf"},
+		{site.Cloud, "markdown"},
 		{site.DataCenter, "wiki"},
 	} {
 		t.Run(string(tc.kind), func(t *testing.T) {

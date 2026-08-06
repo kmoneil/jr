@@ -19,7 +19,7 @@ import (
 // Kinds the worklog commands emit.
 const (
 	KindWorklogList    = "issue.worklog.list"
-	VersionWorklogList = 1
+	VersionWorklogList = 2
 )
 
 func init() {
@@ -79,7 +79,7 @@ type rawWorklog struct {
 	Comment          json.RawMessage `json:"comment"`
 }
 
-func (r rawWorklog) convert() (Worklog, error) {
+func (r rawWorklog) convert(mode BodyMode) (Worklog, error) {
 	started, err := normalizeTime("started", r.Started)
 	if err != nil {
 		return Worklog{}, err
@@ -89,7 +89,10 @@ func (r rawWorklog) convert() (Worklog, error) {
 		return Worklog{}, err
 	}
 
-	comment, format := decodeDescription(r.Comment)
+	comment, format, err := decodeDescription(r.Comment, mode)
+	if err != nil {
+		return Worklog{}, err
+	}
 	return Worklog{
 		ID: r.ID, Author: r.Author.convert(),
 		TimeSpent: r.TimeSpent, Seconds: r.TimeSpentSeconds,
@@ -145,6 +148,10 @@ client that guessed at it would be wrong on exactly the sites that care.
 Started is when the work happened. Created is when somebody said so. They are
 often different, and summing the wrong one answers a different question.
 
+An entry's note follows the same rule every body does: wiki markup on Data
+Center is carried through, a Cloud document is converted to markdown or refused
+naming what stopped it, and --raw-body emits the document itself.
+
 Reading takes no write tag, so this is in every build.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue worklog list ENG-101",
@@ -156,7 +163,7 @@ Reading takes no write tag, so this is in every build.`),
 		Flags: []registry.Flag{{
 			Name: "page-size", Type: registry.TypeInt,
 			Usage: "results per HTTP request, 1 to 100; transport tuning only",
-		}},
+		}, rawBodyFlag()},
 		Paginated:      true,
 		NeedsJira:      true,
 		CollectionName: "worklogs",
@@ -165,7 +172,7 @@ Reading takes no write tag, so this is in every build.`),
 			{Kind: KindWorklogList, Version: VersionWorklogList},
 		},
 		ExitCodes: []exitcode.Code{
-			exitcode.Partial, exitcode.Auth, exitcode.NotFound,
+			exitcode.Partial, exitcode.Usage, exitcode.Auth, exitcode.NotFound,
 			exitcode.Permission, exitcode.RateLimit, exitcode.Remote,
 		},
 		Validate: func(_ context.Context, inv *registry.Invocation) error {
@@ -220,7 +227,7 @@ func (c *Client) ListWorklogs(
 
 	out := WorklogPage{Total: page.Total}
 	for _, raw := range page.Worklogs {
-		converted, err := raw.convert()
+		converted, err := raw.convert(c.Body)
 		if err != nil {
 			return WorklogPage{}, err
 		}

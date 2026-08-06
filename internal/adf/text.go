@@ -10,18 +10,6 @@ import (
 // Version is the ADF schema version this package emits.
 const Version = 1
 
-// Node is one node of an Atlassian Document Format tree.
-//
-// It is deliberately a small struct rather than a map, so a caller cannot
-// invent a field ADF does not have and have it silently accepted by the
-// encoder and then rejected by the server.
-type Node struct {
-	Type    string `json:"type"`
-	Version int    `json:"version,omitempty"`
-	Text    string `json:"text,omitempty"`
-	Content []Node `json:"content,omitempty"`
-}
-
 // FromText encodes plain text as an ADF document.
 //
 // This is not markdown conversion, and the distinction is the whole point.

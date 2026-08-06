@@ -1123,11 +1123,14 @@ func TestGetOnBothDeployments(t *testing.T) {
 	}
 }
 
-// TestDescriptionMarkupIsNamedNotConverted is the honest half of shipping
-// without an ADF converter. Data Center sends wiki markup and Cloud sends an ADF
-// object; both are carried through unchanged with the format named, so a caller
-// knows what it has rather than receiving a half-conversion called markdown.
-func TestDescriptionMarkupIsNamedNotConverted(t *testing.T) {
+// TestDescriptionMarkupIsNamedNotGuessed covers what the format attribute is
+// for. A description is three different things depending on the deployment and
+// the flags, and none of them can be told apart by looking at the text.
+//
+// Data Center's wiki markup is carried through: there is no converter for it
+// and inventing one would be the half-conversion this project refuses. Cloud's
+// document becomes markdown, or stays a document when the caller says so.
+func TestDescriptionMarkupIsNamedNotGuessed(t *testing.T) {
 	dc, err := getClient(t, site.DataCenter).Get(t.Context(), "ENG-101", issue.DetailFields())
 	if err != nil {
 		t.Fatalf("get: %v", err)
@@ -1143,11 +1146,26 @@ func TestDescriptionMarkupIsNamedNotConverted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	if cloud.BodyFormat != issue.BodyADF {
-		t.Errorf("Cloud description format = %q, want %q", cloud.BodyFormat, issue.BodyADF)
+	if cloud.BodyFormat != issue.BodyMarkdown {
+		t.Errorf("Cloud description format = %q, want %q", cloud.BodyFormat, issue.BodyMarkdown)
 	}
-	if !strings.Contains(cloud.Description, `"type":"doc"`) {
-		t.Errorf("ADF was not carried through as JSON:\n%s", cloud.Description)
+	if cloud.Description != "The retry loop drops the last error." {
+		t.Errorf("the document was not converted:\n%s", cloud.Description)
+	}
+
+	// --raw-body is the exact escape hatch, and it has to produce the document
+	// rather than a re-encoding of the markdown.
+	raw := getClient(t, site.Cloud)
+	raw.Body = issue.ModeRaw
+	got, err := raw.Get(t.Context(), "ENG-101", issue.DetailFields())
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.BodyFormat != issue.BodyADF {
+		t.Errorf("--raw-body description format = %q, want %q", got.BodyFormat, issue.BodyADF)
+	}
+	if !strings.Contains(got.Description, `"type":"doc"`) {
+		t.Errorf("ADF was not carried through as JSON:\n%s", got.Description)
 	}
 }
 

@@ -357,7 +357,7 @@
         </elements>
       </element>
     </kind>
-    <kind name="issue.comment.list" v="1" emitters="issue.comment.list">
+    <kind name="issue.comment.list" v="2" emitters="issue.comment.list">
       <element name="comment">
         <attributes count="2">
           <attribute name="id" type="string" optional="false"/>
@@ -383,7 +383,7 @@
           </element>
           <element name="body" optional="true" repeated="false">
             <attributes count="1">
-              <attribute name="format" type="string" optional="false" enum="wiki,adf"/>
+              <attribute name="format" type="string" optional="false" enum="wiki,adf,markdown"/>
             </attributes>
             <text name="text" type="string" optional="false"/>
             <elements count="0"/>
@@ -391,7 +391,7 @@
         </elements>
       </element>
     </kind>
-    <kind name="issue.get" v="1" emitters="issue.get">
+    <kind name="issue.get" v="2" emitters="issue.get">
       <element name="issue">
         <attributes count="7">
           <attribute name="key" type="string" optional="false"/>
@@ -434,7 +434,7 @@
           </element>
           <element name="description" optional="true" repeated="false">
             <attributes count="1">
-              <attribute name="format" type="string" optional="false" enum="wiki,adf"/>
+              <attribute name="format" type="string" optional="false" enum="wiki,adf,markdown"/>
             </attributes>
             <text name="text" type="string" optional="false"/>
             <elements count="0"/>
@@ -503,7 +503,7 @@
         </elements>
       </element>
     </kind>
-    <kind name="issue.list" v="1" emitters="issue.list">
+    <kind name="issue.list" v="2" emitters="issue.list">
       <element name="issue">
         <attributes count="7">
           <attribute name="key" type="string" optional="false"/>
@@ -546,7 +546,7 @@
           </element>
           <element name="description" optional="true" repeated="false">
             <attributes count="1">
-              <attribute name="format" type="string" optional="false" enum="wiki,adf"/>
+              <attribute name="format" type="string" optional="false" enum="wiki,adf,markdown"/>
             </attributes>
             <text name="text" type="string" optional="false"/>
             <elements count="0"/>
@@ -591,7 +591,7 @@
         <extra type="string">the id of a field requested with --field, e.g. customfield_10042</extra>
       </element>
     </kind>
-    <kind name="issue.worklog.list" v="1" emitters="issue.worklog.list">
+    <kind name="issue.worklog.list" v="2" emitters="issue.worklog.list">
       <element name="worklog">
         <attributes count="1">
           <attribute name="id" type="string" optional="false"/>
@@ -623,7 +623,7 @@
           </element>
           <element name="comment" optional="true" repeated="false">
             <attributes count="1">
-              <attribute name="format" type="string" optional="false" enum="wiki,adf"/>
+              <attribute name="format" type="string" optional="false" enum="wiki,adf,markdown"/>
             </attributes>
             <text name="text" type="string" optional="false"/>
             <elements count="0"/>

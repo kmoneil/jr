@@ -18,7 +18,7 @@ converts a class of runtime bugs into link errors.
 | `prompt`    | Interactive prompts, the setup wizard, completion       | `jr completion`                |
 | `admin`     | Project, board, and sprint administration               | `jr sprint close`              |
 | `tui`       | `jr ui`, interactive tables                             | **nothing** — no `jr ui` yet   |
-| `render`    | ADF→terminal markdown rendering                         | **nothing** — `adf` is a stub  |
+| `render`    | ANSI styling of converted markdown for a terminal       | **nothing** — nothing styles   |
 | `browser`   | `jr open`, the OAuth browser flow                       | **nothing** — no OAuth yet     |
 | `clipboard` | Copying keys and URLs                                   | **nothing** — nothing copies   |
 

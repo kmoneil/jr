@@ -143,6 +143,54 @@ client.Do(req)  // returns err == nil on 5xx
 A literal `]]>` inside the text is split across two CDATA sections
 (`]]]]><![CDATA[>`), which is the only way to carry that sequence.
 
+### ADF converted to markdown
+
+Cloud stores a body as an Atlassian Document Format document. It is reported as
+markdown, and **the conversion is lossless or it fails**: a document holding
+something markdown cannot represent exits 2 with `ADF_UNREPRESENTABLE`, naming
+the construct and where in the document it sits. Nothing is approximated, and
+nothing is dropped to make a document fit.
+
+`--raw-body` emits the document exactly as Jira sent it, with
+`format="adf"`. It is the escape hatch for a refusal and for anything that
+needs the original bytes.
+
+Five Jira constructs have no CommonMark or GFM spelling. Each is written as a
+link with a documented scheme, so the value survives the conversion and a
+consumer can recognise it:
+
+| ADF                | Markdown                                        |
+| ------------------ | ----------------------------------------------- |
+| `mention`          | `[@Ada Lovelace](jira-user:557058:abc)`         |
+| `media`            | `![alt](jira-media:<collection>/<id>)`          |
+| `status`           | `[Blocked](jira-status:red)`                    |
+| `date`             | `[2026-08-06](jira-date:1785974400000)`         |
+| `panel`            | `> [!WARNING]` — GitHub alert syntax, with ADF's own panel type |
+
+A `media` node that carries a URL rather than an id — an external or linked
+image — keeps that URL instead. An `inlineCard`, `blockCard`, or `embedCard`
+becomes the bare URL it points at. An `emoji` becomes the character it stands
+for, or its `:short-name:` where it has no character.
+
+Presentation is not content and is dropped deliberately: a panel keeps its type
+and loses its colour, an image keeps its id and alt text and loses its layout
+and width, a status keeps its text and colour and loses its local id. Markdown
+has no page, so there is nowhere for a position on one to go.
+
+Everything else is refused by name. That includes underlined, coloured,
+superscript, subscript, aligned, indented, and annotated text; collapsible
+sections; multi-column layouts; decision lists; macros and extensions; custom
+panels, whose colour is content; table cells that span rows or columns, hold
+more than a single paragraph, or sit in a table with no header row; and any
+node type or mark this build does not know. A node-level JSON field the schema
+does not define is refused too, rather than ignored — ignoring one converts a
+document while silently leaving part of it out.
+
+Link destinations use CommonMark's angle-bracket form
+(`[text](<https://example.invalid/a(b)>)`) where the URL holds a bracket, a
+space, or an angle bracket. Percent-encoding is not used, because a `%28`
+already in the URL and one this tool wrote are the same three characters.
+
 ## Types
 
 XML has no attribute types, so **every attribute is a string** in JSON and YAML,
@@ -429,8 +477,10 @@ it, which is not. Turning markdown into real ADF marks is a separate job with
 its own failure modes, and when it lands an unrepresentable construct will be
 refused by name rather than approximated.
 
-Reading is unchanged: a body comes back with a `format` attribute of `wiki` or
-`adf` and its content untouched.
+Reading is the other direction and is described under [ADF converted to
+markdown](#adf-converted-to-markdown): a Cloud body comes back as markdown, or
+as the document itself with `--raw-body`, and a Data Center body comes back as
+`wiki` untouched.
 
 A create result carries `replayed="true"` when it came from the ledger rather
 than from Jira. It is otherwise byte-identical to the original: a consumer

@@ -37,6 +37,11 @@ type Doer interface {
 type Client struct {
 	Transport Doer
 	Site      site.Info
+	// Body says how a Cloud description, comment, or worklog note is
+	// reported. The zero value converts it to markdown; --raw-body asks for
+	// the document instead. It lives here rather than on each options struct
+	// because every read that can carry a body answers the same question.
+	Body BodyMode
 }
 
 // ListOptions is one `issue list` request.
@@ -166,7 +171,7 @@ func (c *Client) ListStream(
 		}
 		out.Requests++
 
-		issues, err := decodeIssues(page.Issues, ExtraFieldNames(opt.Fields))
+		issues, err := decodeIssues(page.Issues, ExtraFieldNames(opt.Fields), c.Body)
 		if err != nil {
 			return nil, err
 		}
@@ -421,7 +426,7 @@ func (c *Client) Get(ctx context.Context, key string, fields []string) (Issue, e
 		return Issue{}, err
 	}
 
-	issues, err := decodeIssues([]json.RawMessage{resp.Body}, ExtraFieldNames(fields))
+	issues, err := decodeIssues([]json.RawMessage{resp.Body}, ExtraFieldNames(fields), c.Body)
 	if err != nil {
 		return Issue{}, err
 	}

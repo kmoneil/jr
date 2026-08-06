@@ -20,7 +20,7 @@ import (
 // Kinds the comment write verbs emit.
 const (
 	KindCommentAdd       = "issue.comment.add"
-	VersionCommentAdd    = 1
+	VersionCommentAdd    = 2
 	KindCommentEdit      = "issue.comment.edit"
 	VersionCommentEdit   = 1
 	KindCommentDelete    = "issue.comment.delete"
@@ -188,7 +188,7 @@ func runCommentAdd(ctx context.Context, inv *registry.Invocation) (*render.Doc, 
 			WithDetail("the comment may exist; list them before retrying").
 			Wrap(err)
 	}
-	comment, err := raw.convert()
+	comment, err := raw.convert(client.Body)
 	if err != nil {
 		return nil, err
 	}

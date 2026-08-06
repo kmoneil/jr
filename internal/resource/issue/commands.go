@@ -68,7 +68,7 @@ func Schema() *render.Schema {
 				Element: "description",
 				Attrs: []render.Field{{
 					Name: "format", Type: render.TypeString,
-					Enum: []string{BodyWiki, BodyADF},
+					Enum: []string{BodyWiki, BodyADF, BodyMarkdown},
 				}},
 				Text: &render.Field{Type: render.TypeString},
 			}, Optional: true},
@@ -549,9 +549,11 @@ func getCommand() *registry.Command {
 Returns a single issue with its description, resolution, components, and fix
 versions — the fields worth fetching one issue at a time.
 
-The description is carried through unchanged with its markup named. Data Center
-serves wiki markup and Cloud serves an Atlassian Document Format object; the
-format attribute says which, so nothing is silently converted or mangled.
+Data Center serves wiki markup, which is carried through unchanged. Cloud
+serves an Atlassian Document Format object, which is converted to markdown —
+losslessly, or not at all: a description holding something markdown cannot
+represent is an error naming it rather than an approximation. --raw-body emits
+the document itself. The format attribute says which you have.
 
 The issue shape here is the same one issue list emits for a row, so a caller
 parses both identically. It simply has more of it filled in.`),
@@ -559,6 +561,7 @@ parses both identically. It simply has more of it filled in.`),
 			buildinfo.App + " issue get ENG-101",
 			buildinfo.App + " issue get ENG-101 --format json",
 			buildinfo.App + " issue get ENG-101 --field customfield_10042",
+			buildinfo.App + " issue get ENG-101 --raw-body",
 		}, "\n"),
 		Args: []registry.Arg{{
 			Name: "key", Usage: "issue key, e.g. ENG-101", Required: true,
@@ -568,11 +571,11 @@ parses both identically. It simply has more of it filled in.`),
 			Usage: "extra field to include, by id or name, e.g. " +
 				"customfield_10042 or 'Story Points'; " +
 				"added to the default set, repeat for several",
-		}},
+		}, rawBodyFlag()},
 		NeedsJira: true,
 		Outputs:   []registry.Output{{Kind: KindGet, Version: VersionGet}},
 		ExitCodes: []exitcode.Code{
-			exitcode.Auth, exitcode.NotFound, exitcode.Permission,
+			exitcode.Usage, exitcode.Auth, exitcode.NotFound, exitcode.Permission,
 			exitcode.RateLimit, exitcode.Remote,
 		},
 		Validate: validateFields,
@@ -589,7 +592,7 @@ func runGet(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) 
 	if err != nil {
 		return nil, err
 	}
-	client := &Client{Transport: conn, Site: info}
+	client := &Client{Transport: conn, Site: info, Body: bodyMode(inv)}
 
 	fields := append(DetailFields(), ExtraFieldNames(resolvedFields(inv))...)
 	issue, err := client.Get(ctx, inv.Args[0], fields)

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kmoneil/jira-cli/internal/adf"
 	"github.com/kmoneil/jira-cli/internal/errs"
 	"github.com/kmoneil/jira-cli/internal/render"
 	"github.com/kmoneil/jira-cli/internal/site"
@@ -21,9 +22,9 @@ import (
 // commit that changes the corresponding golden file.
 const (
 	KindList    = "issue.list"
-	VersionList = 1
+	VersionList = 2
 	KindGet     = "issue.get"
-	VersionGet  = 1
+	VersionGet  = 2
 )
 
 // Body formats a description can arrive in.
@@ -34,10 +35,29 @@ const (
 const (
 	// BodyWiki is Data Center's wiki markup, carried through unchanged.
 	BodyWiki = "wiki"
-	// BodyADF is Cloud's Atlassian Document Format, carried through as JSON
-	// until a converter exists. Emitting it raw is honest; emitting a
-	// half-conversion would not be.
+	// BodyADF is Cloud's Atlassian Document Format, exactly as Jira sent it.
+	// Only --raw-body produces this.
 	BodyADF = "adf"
+	// BodyMarkdown is a Cloud document converted by internal/adf. The
+	// conversion is lossless or it fails, so a body reported as markdown holds
+	// everything the document did.
+	BodyMarkdown = "markdown"
+)
+
+// BodyMode says how a Cloud body is reported.
+//
+// The zero value converts, because that is the useful answer and the one a
+// caller who did not think about it should get. Asking for the document itself
+// is the deliberate act.
+type BodyMode int
+
+// Body modes.
+const (
+	// ModeMarkdown converts an ADF document to markdown, or fails naming the
+	// construct that stopped it.
+	ModeMarkdown BodyMode = iota
+	// ModeRaw emits the document exactly as Jira sent it.
+	ModeRaw
 )
 
 // Issue is one issue, in the shape this tool reports rather than the shape
@@ -61,7 +81,7 @@ type Issue struct {
 	// either way, so a caller parses a listed issue and a fetched one
 	// identically.
 	Description string
-	// BodyFormat names the markup Description is in: wiki or adf.
+	// BodyFormat names the markup Description is in: wiki, markdown, or adf.
 	BodyFormat  string
 	Resolution  string
 	Parent      string
@@ -229,7 +249,7 @@ func normalizeCategory(key, name string) string {
 	return CategoryUnknown
 }
 
-func (r rawIssue) convert() (Issue, error) {
+func (r rawIssue) convert(mode BodyMode) (Issue, error) {
 	created, err := normalizeTime("created", r.Fields.Created)
 	if err != nil {
 		return Issue{}, err
@@ -277,36 +297,64 @@ func (r rawIssue) convert() (Issue, error) {
 	for _, v := range r.Fields.FixVersions {
 		out.FixVersions = append(out.FixVersions, v.Name)
 	}
-	out.Description, out.BodyFormat = decodeDescription(r.Fields.Description)
+	out.Description, out.BodyFormat, err = decodeDescription(r.Fields.Description, mode)
+	if err != nil {
+		return Issue{}, err
+	}
 	return out, nil
 }
 
 // decodeDescription reads a description, which is a different type on each
 // deployment.
 //
-// Data Center sends a string of wiki markup. Cloud sends an ADF document, which
-// is an object. Both are carried through unchanged with the format named, so a
-// caller knows what it has. Converting ADF to markdown here would mean shipping
-// a half-converter and calling its output markdown.
-func decodeDescription(raw json.RawMessage) (text, format string) {
+// Data Center sends a string of wiki markup, which is carried through
+// unchanged: it is markup this tool does not read and has nothing to convert
+// it to. Cloud sends an Atlassian Document Format document, which becomes
+// markdown unless the caller asked for the document itself.
+//
+// The format attribute names what the caller got either way, so nothing has to
+// be guessed from the shape of the text.
+func decodeDescription(raw json.RawMessage, mode BodyMode) (text, format string, err error) {
 	trimmed := strings.TrimSpace(string(raw))
 	switch {
 	case trimmed == "" || trimmed == "null":
-		return "", ""
+		return "", "", nil
 	case trimmed[0] == '"':
 		var s string
 		if err := json.Unmarshal(raw, &s); err != nil {
-			return trimmed, BodyWiki
+			// Unreachable through a decoded issue, because encoding/json
+			// validates a RawMessage as part of its parent. It is here because
+			// "cannot happen" is a claim, and returning the undecoded bytes as
+			// if they were the markup would make a broken body look like a
+			// body with quotes in it.
+			return "", "", errs.Remote("MALFORMED_BODY",
+				"Jira returned a body this tool cannot read").
+				Wrap(err)
 		}
-		return s, BodyWiki
-	default:
-		return trimmed, BodyADF
+		return s, BodyWiki, nil
+	case mode == ModeRaw:
+		return trimmed, BodyADF, nil
 	}
+
+	doc, err := adf.Parse(raw)
+	if err != nil {
+		return "", "", err
+	}
+	markdown, err := adf.ToMarkdown(doc)
+	if err != nil {
+		return "", "", err
+	}
+	// A document that held nothing but empty paragraphs converts to no text,
+	// and no text is no description — the same answer an absent field gives.
+	if markdown == "" {
+		return "", "", nil
+	}
+	return markdown, BodyMarkdown, nil
 }
 
 // decodeIssues converts a page of raw issues. extras names the fields the
 // caller asked for beyond the default set.
-func decodeIssues(raw []json.RawMessage, extras []string) ([]Issue, error) {
+func decodeIssues(raw []json.RawMessage, extras []string, mode BodyMode) ([]Issue, error) {
 	out := make([]Issue, 0, len(raw))
 	for i, data := range raw {
 		var r rawIssue
@@ -316,7 +364,7 @@ func decodeIssues(raw []json.RawMessage, extras []string) ([]Issue, error) {
 				WithDetail("issue %d of the page", i+1).
 				Wrap(err)
 		}
-		issue, err := r.convert()
+		issue, err := r.convert(mode)
 		if err != nil {
 			return nil, err
 		}

@@ -23,7 +23,7 @@ const (
 	KindLinkRemove       = "issue.link.remove"
 	VersionLinkRemove    = 1
 	KindWorklogAdd       = "issue.worklog.add"
-	VersionWorklogAdd    = 1
+	VersionWorklogAdd    = 2
 	KindWorklogDelete    = "issue.worklog.delete"
 	VersionWorklogDelete = 1
 )
@@ -395,7 +395,7 @@ func runWorklogAdd(ctx context.Context, inv *registry.Invocation) (*render.Doc, 
 			WithDetail("the entry may exist; list them before retrying").
 			Wrap(err)
 	}
-	logged, err := raw.convert()
+	logged, err := raw.convert(client.Body)
 	if err != nil {
 		return nil, err
 	}

@@ -18,7 +18,7 @@ import (
 // Kinds the comment commands emit.
 const (
 	KindCommentList    = "issue.comment.list"
-	VersionCommentList = 1
+	VersionCommentList = 2
 )
 
 func init() {
@@ -66,19 +66,41 @@ func bodySchema(element string) *render.Schema {
 		Element: element,
 		Attrs: []render.Field{{
 			Name: "format", Type: render.TypeString,
-			Enum: []string{BodyWiki, BodyADF},
+			Enum: []string{BodyWiki, BodyADF, BodyMarkdown},
 		}},
 		Text: &render.Field{Type: render.TypeString},
 	}
+}
+
+// rawBodyFlag is declared by every read that can carry a Cloud body.
+//
+// It is one flag rather than one per command because the question is the same
+// everywhere: a description, a comment, and a worklog note are all documents,
+// and a caller who wants one unconverted wants all of them unconverted.
+func rawBodyFlag() registry.Flag {
+	return registry.Flag{
+		Name: "raw-body", Type: registry.TypeBool,
+		Usage: "emit a Cloud body as the Atlassian Document Format document " +
+			"Jira sent it as, rather than converting it to markdown",
+	}
+}
+
+// bodyMode reads --raw-body. A command that does not declare it gets the
+// converting mode, which is the flag's default anyway.
+func bodyMode(inv *registry.Invocation) BodyMode {
+	if inv.Flags.Bool("raw-body") {
+		return ModeRaw
+	}
+	return ModeMarkdown
 }
 
 // Comment is one comment, in the shape this tool reports.
 type Comment struct {
 	ID     string
 	Author User
-	// Body is carried through unchanged, and BodyFormat says what it is: wiki
-	// markup on Data Center, an ADF document as JSON on Cloud. Converting here
-	// would mean shipping a half-converter and calling its output markdown.
+	// Body is the comment's text and BodyFormat says what markup it is in:
+	// wiki on Data Center, markdown converted from Cloud's document, or the
+	// document itself when the caller asked for it with --raw-body.
 	Body       string
 	BodyFormat string
 	Created    string
@@ -103,7 +125,7 @@ type rawComment struct {
 	} `json:"visibility"`
 }
 
-func (r rawComment) convert() (Comment, error) {
+func (r rawComment) convert(mode BodyMode) (Comment, error) {
 	created, err := normalizeTime("created", r.Created)
 	if err != nil {
 		return Comment{}, err
@@ -113,7 +135,10 @@ func (r rawComment) convert() (Comment, error) {
 		return Comment{}, err
 	}
 
-	body, format := decodeDescription(r.Body)
+	body, format, err := decodeDescription(r.Body, mode)
+	if err != nil {
+		return Comment{}, err
+	}
 	out := Comment{
 		ID: r.ID, Author: r.Author.convert(),
 		Body: body, BodyFormat: format,
@@ -167,9 +192,11 @@ func commentListCommand() *registry.Command {
 		Description: strings.TrimSpace(`
 Returns the comments on an issue, oldest first.
 
-A body is carried through unchanged with its markup named: wiki on Data Center,
-an Atlassian Document Format document as JSON on Cloud. Nothing is converted,
-so nothing is mangled, and the format attribute says which you have.
+Data Center serves wiki markup, which is carried through unchanged. Cloud
+serves an Atlassian Document Format document, which is converted to markdown —
+losslessly, or not at all: a body holding something markdown cannot represent
+is an error naming it rather than an approximation. --raw-body emits the
+document itself. The format attribute says which you have.
 
 A restricted comment carries the role or group it is limited to. That is worth
 reading before quoting one: a comment that looks public in a list may not be.
@@ -178,6 +205,7 @@ Reading takes no write tag, so this is in every build.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue comment list ENG-101",
 			buildinfo.App + " issue comment list ENG-101 --format json --limit all",
+			buildinfo.App + " issue comment list ENG-101 --raw-body",
 		}, "\n"),
 		Args: []registry.Arg{{
 			Name: "key", Usage: "issue key, e.g. ENG-101", Required: true,
@@ -185,7 +213,7 @@ Reading takes no write tag, so this is in every build.`),
 		Flags: []registry.Flag{{
 			Name: "page-size", Type: registry.TypeInt,
 			Usage: "results per HTTP request, 1 to 100; transport tuning only",
-		}},
+		}, rawBodyFlag()},
 		Paginated:      true,
 		NeedsJira:      true,
 		CollectionName: "comments",
@@ -194,7 +222,7 @@ Reading takes no write tag, so this is in every build.`),
 			{Kind: KindCommentList, Version: VersionCommentList},
 		},
 		ExitCodes: []exitcode.Code{
-			exitcode.Partial, exitcode.Auth, exitcode.NotFound,
+			exitcode.Partial, exitcode.Usage, exitcode.Auth, exitcode.NotFound,
 			exitcode.Permission, exitcode.RateLimit, exitcode.Remote,
 		},
 		Validate: func(_ context.Context, inv *registry.Invocation) error {
@@ -277,7 +305,7 @@ func (c *Client) ListComments(
 
 	out := CommentPage{StartAt: page.StartAt, Total: page.Total}
 	for _, raw := range page.Comments {
-		converted, err := raw.convert()
+		converted, err := raw.convert(c.Body)
 		if err != nil {
 			return CommentPage{}, err
 		}
@@ -297,7 +325,7 @@ func runCommentList(
 	if err != nil {
 		return registry.StreamResult{}, err
 	}
-	client := &Client{Transport: conn, Site: info}
+	client := &Client{Transport: conn, Site: info, Body: bodyMode(inv)}
 
 	pageSize, err := resolvePageSize(inv.Flags.Int("page-size"))
 	if err != nil {
