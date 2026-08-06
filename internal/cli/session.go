@@ -86,14 +86,23 @@ func (s *session) connect(ctx context.Context) (*transport.Client, site.Info, er
 		return nil, site.Info{}, err
 	}
 
-	client, err := transport.New(transport.Options{
+	// The recorder wraps the transport rather than sitting inside it, so the
+	// probe is captured too — it is the first request any run makes and the
+	// one whose answer decides every path taken afterwards.
+	rec, save := s.app.recorder(siteURL)
+
+	opts := transport.Options{
 		BaseURL:     siteURL,
 		Auth:        authorizerFor(cred),
 		Retries:     s.app.retries,
 		MaxRequests: s.app.maxRequests,
 		UserAgent:   userAgent(),
 		Tracer:      s.app.tracer(),
-	})
+	}
+	if rec != nil {
+		opts.RoundTripper = rec
+	}
+	client, err := transport.New(opts)
 	if err != nil {
 		return nil, site.Info{}, err
 	}
@@ -101,6 +110,12 @@ func (s *session) connect(ctx context.Context) (*transport.Client, site.Info, er
 	info, err := s.probe(ctx, client, siteURL)
 	if err != nil {
 		return nil, site.Info{}, err
+	}
+	if rec != nil {
+		// The deployment is a label on the cassette and is not known until the
+		// probe has answered, which is after the recorder was already running.
+		rec.Cassette().Deployment = recordedDeployment(info)
+		s.app.cleanup = append(s.app.cleanup, save)
 	}
 	return client, info, nil
 }

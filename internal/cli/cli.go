@@ -59,6 +59,10 @@ type app struct {
 
 	// exit is the status the run resolved to.
 	exit exitcode.Code
+
+	// cleanup runs after the command, in order. It exists for the recorder,
+	// whose output is not complete until the last request has been made.
+	cleanup []func()
 }
 
 // Options configures a Main run. The zero value uses the default registry,
@@ -94,6 +98,9 @@ func Main(ctx context.Context, args []string, opt Options) exitcode.Code {
 	root := a.newRoot()
 	root.SetArgs(args)
 	err := root.ExecuteContext(ctx)
+	for _, done := range a.cleanup {
+		done()
+	}
 	if err != nil {
 		return a.fail(err)
 	}

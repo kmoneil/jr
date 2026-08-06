@@ -132,6 +132,32 @@ and pagination shape, so a fixture recorded against one proves nothing about
 the other — and a resource that ships only the Cloud recording has tested half
 of what it claims to.
 
+**Record them; do not write them.** Every cassette in this repository was
+written by hand, and three encoded an assumption rather than the API — an
+endpoint removed in Jira 9.0, a parameter of the wrong type, an expand nobody
+documents as necessary. All three passed their tests. A cassette proves a
+request is *unchanged*; only a recorded one proves it was ever *right*.
+
+`JIRA_RECORD=<path>` writes an invocation's whole conversation to a cassette.
+It is an environment variable rather than a flag because a flag would join the
+command surface, appear in `jr schema`, and need declaring on every command —
+for something no caller of this tool should reach for.
+
+A recording is scrubbed **as it is written**, never as a later step somebody has
+to remember, on the same reasoning as credential redaction: a file that only
+becomes safe if a second command is run is a file that gets committed before it
+is. The host becomes `recorded.invalid`, account ids, UUIDs, emails, and avatar
+URLs become fixed placeholders, and `JIRA_RECORD_SCRUB="from=to,..."` renames
+whatever else a particular instance carries — a display name, a project key.
+
+Afterwards the cassette is checked for residue and anything identifier-shaped is
+reported on stderr. **That check deliberately does not reuse the scrubber's own
+patterns.** The first version did, and missed a real account id for exactly that
+reason: the pattern was too narrow, so the scrubber left the value and the check
+meant to catch the miss was blind in the same place. A guard that shares a
+definition with the thing it guards cannot catch that definition being wrong, so
+the residue patterns are looser and expected to produce false positives.
+
 Three properties make a fixture-backed test trustworthy:
 
 - **An unmatched request is an error.** Falling through to the network would be

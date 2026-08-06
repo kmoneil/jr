@@ -92,6 +92,12 @@ type Options struct {
 	// HTTPClient overrides the underlying client, and is how a recorded
 	// fixture is replayed.
 	HTTPClient *http.Client
+	// RoundTripper wraps the transport without the caller building a client,
+	// which is how recording is switched on from internal/cli. It exists so
+	// that nothing outside this package has to import net/http — the rule that
+	// keeps header redaction impossible to bypass. Ignored when HTTPClient is
+	// set, because a caller that supplied a whole client has already decided.
+	RoundTripper http.RoundTripper
 	// Retries is the retry budget per request. Zero means DefaultRetries;
 	// a negative value disables retrying.
 	Retries int
@@ -247,6 +253,9 @@ func New(opt Options) (*Client, error) {
 	}
 	if c.timeout == 0 {
 		c.timeout = DefaultTimeout
+	}
+	if opt.HTTPClient == nil && opt.RoundTripper != nil {
+		c.http = &http.Client{Transport: opt.RoundTripper}
 	}
 	if c.tracer == nil {
 		c.tracer = discardTracer{}
