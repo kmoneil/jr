@@ -1,0 +1,20 @@
+{
+  "deployment": "datacenter",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/agile/1.0/board/5"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"id\":5,\"self\":\"https://jira.acme.invalid/rest/agile/1.0/board/5\",\"name\":\"Ada's board\",\"type\":\"simple\",\"location\":{\"userId\":10000,\"displayName\":\"Ada Lovelace\"}}"
+      }
+    }
+  ]
+}

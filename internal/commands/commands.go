@@ -15,6 +15,7 @@ package commands
 
 import (
 	// Each resource registers its commands from init.
+	_ "github.com/kmoneil/jira-cli/internal/resource/board"
 	_ "github.com/kmoneil/jira-cli/internal/resource/field"
 	_ "github.com/kmoneil/jira-cli/internal/resource/issue"
 	_ "github.com/kmoneil/jira-cli/internal/resource/meta"

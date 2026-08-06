@@ -229,6 +229,9 @@ type Session interface {
 	RequireProject() (string, error)
 	// Board is the resolved default board, which may be empty.
 	Board() string
+	// RequireBoard returns the board or a usage error naming the flag, for the
+	// agile commands that have nothing to list without one.
+	RequireBoard() (string, error)
 	// CheckWritable refuses a mutation in read-only mode, before any network
 	// call, so a blocked command costs nothing and cannot half-happen.
 	CheckWritable(command string) error

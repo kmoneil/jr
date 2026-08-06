@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/agile/1.0/board",
+        "query": "maxResults=50&startAt=0"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "text/html"
+          ]
+        },
+        "body": "<html><body>Sign in</body></html>"
+      }
+    }
+  ]
+}

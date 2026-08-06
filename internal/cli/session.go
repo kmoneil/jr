@@ -60,6 +60,9 @@ func (s *session) Board() string { return s.resolved.Board }
 // RequireProject implements registry.Session.
 func (s *session) RequireProject() (string, error) { return s.resolved.RequireProject() }
 
+// RequireBoard implements registry.Session.
+func (s *session) RequireBoard() (string, error) { return s.resolved.RequireBoard() }
+
 // CheckWritable implements registry.Session.
 func (s *session) CheckWritable(command string) error {
 	return s.resolved.CheckWritable(command)

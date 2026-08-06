@@ -83,6 +83,8 @@ and go to stderr.`),
 		"Jira site, overriding the context's")
 	root.PersistentFlags().StringVar(&a.project, "project", "",
 		"project key, overriding the context's")
+	root.PersistentFlags().StringVar(&a.board, "board", "",
+		"board id, overriding the context's")
 	root.PersistentFlags().BoolVar(&a.readOnly, "readonly", false,
 		"refuse any command that would change Jira")
 	root.PersistentFlags().BoolVar(&a.debug, "debug", false,

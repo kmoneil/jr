@@ -292,7 +292,13 @@ func (s *stubSession) Idempotency() *idem.Ledger       { return nil }
 func (s *stubSession) Project() string                 { return "ENG" }
 func (s *stubSession) RequireProject() (string, error) { return "ENG", nil }
 func (s *stubSession) Board() string                   { return "" }
-func (s *stubSession) CheckWritable(string) error      { return nil }
+
+// RequireBoard is what an agile command calls. None of these fixtures set a
+// board, so it fails the way the real session does rather than returning one.
+func (s *stubSession) RequireBoard() (string, error) {
+	return "", errs.Usage("NO_BOARD", "this command needs a board and none is set")
+}
+func (s *stubSession) CheckWritable(string) error { return nil }
 
 // TestTheThreePerProjectListingsRunAsCommands exercises the wrappers, which the
 // client-level tests above do not reach.

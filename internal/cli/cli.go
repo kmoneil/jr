@@ -42,6 +42,7 @@ type app struct {
 	contextName string
 	site        string
 	project     string
+	board       string
 	readOnly    bool
 	debug       bool
 	refresh     bool

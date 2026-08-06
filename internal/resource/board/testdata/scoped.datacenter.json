@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/agile/1.0/board",
+        "query": "maxResults=50&projectKeyOrId=ENG&startAt=0"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"maxResults\":50,\"startAt\":0,\"total\":2,\"isLast\":true,\"values\":[{\"id\":100,\"self\":\"https://jira.acme.invalid/rest/agile/1.0/board/100\",\"name\":\"ENG Kanban\",\"type\":\"kanban\",\"location\":{\"projectId\":10069,\"projectKey\":\"ENG\",\"projectName\":\"Engineering\",\"projectTypeKey\":\"software\"}},{\"id\":99,\"self\":\"https://jira.acme.invalid/rest/agile/1.0/board/99\",\"name\":\"ENG Scrum\",\"type\":\"scrum\",\"location\":{\"projectId\":10069,\"projectKey\":\"ENG\",\"projectName\":\"Engineering\",\"projectTypeKey\":\"software\"}}]}"
+      }
+    }
+  ]
+}

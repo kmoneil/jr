@@ -1392,7 +1392,13 @@ func (s *stubSession) Metadata(context.Context) (*site.Metadata, error) {
 func (s *stubSession) Project() string                 { return "ENG" }
 func (s *stubSession) RequireProject() (string, error) { return "ENG", nil }
 func (s *stubSession) Board() string                   { return "" }
-func (s *stubSession) CheckWritable(string) error      { return nil }
+
+// RequireBoard is what an agile command calls. None of these fixtures set a
+// board, so it fails the way the real session does rather than returning one.
+func (s *stubSession) RequireBoard() (string, error) {
+	return "", errs.Usage("NO_BOARD", "this command needs a board and none is set")
+}
+func (s *stubSession) CheckWritable(string) error { return nil }
 
 // Idempotency implements registry.Session. A nil ledger means no protection,
 // which is what a command that does not mutate should never notice.

@@ -13,6 +13,7 @@ Usage:
 
 Available Commands:
   auth        Authenticate against a Jira site
+  board       Work with boards
   context     Manage named site/project contexts
   contract    Dump the machine-readable output contract for every kind
   field       Discover fields, including custom fields
@@ -25,6 +26,7 @@ Available Commands:
   version     Print the build identity and its compiled-in capabilities
 
 Flags:
+      --board string       board id, overriding the context's
       --context string     use this context for one invocation, without selecting it
       --contract           dump the machine-readable output contract for every kind
       --debug              trace HTTP requests to stderr; credentials are redacted in the transport

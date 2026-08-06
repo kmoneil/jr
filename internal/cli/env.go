@@ -56,6 +56,7 @@ func (a *app) resolve(cfg *jctx.Config) (*jctx.Resolved, error) {
 		Context:  a.contextName,
 		Site:     a.site,
 		Project:  a.project,
+		Board:    a.board,
 		ReadOnly: a.readOnly,
 	}, a.getenv)
 }
