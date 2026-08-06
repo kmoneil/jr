@@ -105,6 +105,14 @@ func (a *app) scrubber(siteURL string) transport.Scrubber {
 			// An avatar URL carries an account id and a hash, and nothing is
 			// ever asserted about one.
 			{Match: transport.AvatarURL, With: "https://" + recordedHost + "/avatar"},
+			// Before the unencoded rule, and with an encoded replacement: a
+			// query carries the separator as %3A, and rewriting it to a literal
+			// colon yields a recording that no request this tool builds can
+			// match.
+			{
+				Match: transport.CloudAccountIDEncoded,
+				With:  "000000%3A00000000-0000-0000-0000-000000000000",
+			},
 			{Match: transport.CloudAccountID, With: "000000:00000000-0000-0000-0000-000000000000"},
 			// After the account ids, so a prefixed one is not reduced to a bare
 			// UUID first and then left with its prefix intact.

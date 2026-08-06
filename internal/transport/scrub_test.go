@@ -43,6 +43,7 @@ func sandboxScrubber() transport.Scrubber {
 		},
 		Patterns: []transport.PatternRule{
 			{Match: transport.AvatarURL, With: "https://recorded.invalid/avatar"},
+			{Match: transport.CloudAccountIDEncoded, With: "000000%3A00000000-0000-0000-0000-000000000000"},
 			{Match: transport.CloudAccountID, With: "000000:00000000-0000-0000-0000-000000000000"},
 			{Match: transport.EmailAddress, With: "ada@example.invalid"},
 		},
@@ -281,5 +282,35 @@ func TestAPageTokenStillPairsAfterScrubbing(t *testing.T) {
 	// And it is still a token, not a mangled string.
 	if _, err := base64.StdEncoding.DecodeString(issued[1]); err != nil {
 		t.Errorf("the rewritten token is not valid base64: %v", err)
+	}
+}
+
+// TestScrubbingDoesNotChangeHowAValueIsEncoded is the fourth encoding bug and
+// the one with the quietest failure.
+//
+// An account id reaches a query percent-encoded. Replacing it with a stand-in
+// that spells the separator as a literal colon produces a cassette that is
+// clean, readable, and unmatchable: the tool escapes the separator when it
+// builds the request, so the replayer asks for %3A and the recording offers
+// `:`. The recording looks right and every test that uses it fails with
+// FIXTURE_MISS, which reads like a bug in the code under test.
+func TestScrubbingDoesNotChangeHowAValueIsEncoded(t *testing.T) {
+	c := recorded(`{"accountId":"70121:5faf8262-12ed-40d0-9358-e554f3352c5a"}`)
+	c.Interactions[0].Request.Query = "accountId=70121%3A5faf8262-12ed-40d0-9358-e554f3352c5a"
+
+	sandboxScrubber().Scrub(c)
+
+	q := c.Interactions[0].Request.Query
+	if strings.Contains(q, ":") {
+		t.Errorf("the encoded query gained a literal colon, so no request can "+
+			"match it: %q", q)
+	}
+	if !strings.Contains(q, "%3A") {
+		t.Errorf("the query no longer carries an encoded separator: %q", q)
+	}
+	// The body's literal form stays literal, for the same reason.
+	if !strings.Contains(c.Interactions[0].Response.Body, ":") {
+		t.Errorf("the body lost its literal separator: %s",
+			c.Interactions[0].Response.Body)
 	}
 }

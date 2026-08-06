@@ -40,11 +40,27 @@ type PatternRule struct {
 //
 // The prefixed form is <prefix>:<uuid> and the prefix is not a fixed width — an
 // earlier version required six or more characters and let a real five-digit one
-// through. The separator may also be percent-encoded, because the same id
-// appears in a query string as well as in a body, and matching only the literal
-// colon left one `%3A` form untouched in exactly one place.
+// through.
+//
+// This matches the literal-colon form only. The percent-encoded form is
+// CloudAccountIDEncoded, and the split is not cosmetic: one pattern with one
+// replacement cannot preserve the encoding of what it matched, and a rule that
+// matched both wrote a literal colon over a `%3A` — which then re-matched this
+// pattern and undid the encoded rule that ran before it.
 var CloudAccountID = regexp.MustCompile(
-	`\b[0-9a-zA-Z]+(?::|%3[Aa])` + uuidPattern + `\b|\b[0-9a-f]{24}\b`,
+	`\b[0-9a-zA-Z]+:` + uuidPattern + `\b|\b[0-9a-f]{24}\b`,
+)
+
+// CloudAccountIDEncoded matches only the percent-encoded form, so it can be
+// replaced with a percent-encoded stand-in.
+//
+// A rule that rewrote `70121%3A5faf...` to `000000:00000000-...` produced a
+// recording no request could ever match: the tool escapes the separator when it
+// builds the query, so the replayer looked for `%3A` and the cassette held a
+// literal colon. Scrubbing must not change how a value is encoded — only what
+// it says.
+var CloudAccountIDEncoded = regexp.MustCompile(
+	`\b[0-9a-zA-Z]+%3[Aa]` + uuidPattern + `\b`,
 )
 
 // uuidPattern is the shape at the heart of an account id, and the one part that
