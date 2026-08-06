@@ -83,6 +83,27 @@ func TestProbeIdentifiesBothDeployments(t *testing.T) {
 	}
 }
 
+// TestAgileBaseIsTheSameOnBothDeployments records why AgileBase exists at all.
+//
+// Boards, sprints, and epics are not on either platform REST version. Jira
+// Software has served them from /rest/agile/1.0 since it shipped and has never
+// versioned that alongside the platform API, so a Cloud site answering v3 for
+// issues still answers 1.0 for boards. Building an agile path out of APIBase
+// produces a 404 that reads like a board that does not exist.
+//
+// If a deployment ever does move, this test is what fails first.
+func TestAgileBaseIsTheSameOnBothDeployments(t *testing.T) {
+	for _, kind := range []site.Kind{site.Cloud, site.DataCenter} {
+		info := site.Info{Kind: kind}
+		if got := info.AgileBase(); got != "/rest/agile/1.0" {
+			t.Errorf("%s AgileBase = %q, want /rest/agile/1.0", kind, got)
+		}
+		if info.AgileBase() == info.APIBase() {
+			t.Errorf("%s: the agile API is not the platform API", kind)
+		}
+	}
+}
+
 // TestUnknownDeploymentIsRefused is the "nothing is guessed" rule at its most
 // consequential. Guessing Cloud would send v3 requests to a v2 server and
 // produce a 404 that reads like a missing issue; guessing Data Center would use

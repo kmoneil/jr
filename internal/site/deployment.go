@@ -59,6 +59,20 @@ func (i Info) APIBase() string {
 	return "/rest/api/2"
 }
 
+// AgileBase is the prefix for the Agile API, which boards, sprints, and epics
+// live behind.
+//
+// It is not a third API version — it is a different API. Jira Software ships
+// `/rest/agile/1.0` on both deployments and has never versioned it alongside
+// the platform REST API, so a Cloud site serving v3 platform endpoints still
+// serves agile 1.0. Sending an agile request to APIBase is a 404 that reads
+// like a missing board.
+//
+// This is a method rather than a constant because it is the honest place to
+// put a split if one ever appears, and because a caller reaching for a package
+// constant would be one edit away from hardcoding the path at every call site.
+func (i Info) AgileBase() string { return "/rest/agile/1.0" }
+
 // CursorPaginated reports whether this deployment pages by opaque cursor.
 //
 // Cloud does. Data Center still pages by offset, which is why the page token
