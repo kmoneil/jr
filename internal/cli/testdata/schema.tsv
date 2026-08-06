@@ -7,6 +7,7 @@ board.get	Fetch one board	false	false	board.get
 board.list	List the boards this credential can see	false	false	board.list
 context.create	Create or replace a named site and project pairing	false	false	context.get
 context.delete	Delete a context	false	true	context.get
+context.edit	Change one setting of a context, leaving the rest alone	false	false	context.get
 context.list	List every configured context	false	false	context.list
 context.show	Show one context, or the effective settings for this invocation	false	false	context.get
 context.use	Select the context every command uses by default	false	false	context.get

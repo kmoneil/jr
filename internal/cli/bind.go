@@ -114,6 +114,12 @@ func validateRequired(cmd *cobra.Command, rc *registry.Command) error {
 		WithRemedy("pass %s", strings.Join(missing, " "))
 }
 
+// validateEnums holds every enum flag to its declared set.
+//
+// A repeatable enum is checked one value at a time. pflag renders a repeated
+// flag as "[a b]", so comparing the whole rendering against the set refused
+// every repeated value including the legal ones — which meant a repeatable
+// enum was a shape the registry could declare and the binder could not honor.
 func validateEnums(cmd *cobra.Command, rc *registry.Command) error {
 	var firstErr error
 	cmd.Flags().Visit(func(pf *pflag.Flag) {
@@ -124,16 +130,34 @@ func validateEnums(cmd *cobra.Command, rc *registry.Command) error {
 		if !ok || f.Type != registry.TypeEnum || len(f.Enum) == 0 {
 			return
 		}
-		got := pf.Value.String()
-		if slices.Contains(f.Enum, got) {
+		for _, got := range enumValues(cmd, f) {
+			if slices.Contains(f.Enum, got) {
+				continue
+			}
+			firstErr = errs.Usage("INVALID_FLAG_VALUE",
+				"--%s does not accept %q", f.Name, got).
+				WithDetail("valid values: %s", strings.Join(f.Enum, ", ")).
+				WithRemedy("pass --%s with one of the listed values", f.Name)
 			return
 		}
-		firstErr = errs.Usage("INVALID_FLAG_VALUE",
-			"--%s does not accept %q", f.Name, got).
-			WithDetail("valid values: %s", strings.Join(f.Enum, ", ")).
-			WithRemedy("pass --%s with one of the listed values", f.Name)
 	})
 	return firstErr
+}
+
+// enumValues returns what a flag was actually given, as one value or several.
+func enumValues(cmd *cobra.Command, f registry.Flag) []string {
+	if !f.Repeatable {
+		v, err := cmd.Flags().GetString(f.Name)
+		if err != nil {
+			return nil
+		}
+		return []string{v}
+	}
+	v, err := cmd.Flags().GetStringSlice(f.Name)
+	if err != nil {
+		return nil
+	}
+	return v
 }
 
 func atoiOrZero(s string) int {

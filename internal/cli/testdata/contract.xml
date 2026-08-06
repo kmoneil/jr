@@ -96,7 +96,7 @@
         </elements>
       </element>
     </kind>
-    <kind name="context.get" v="1" emitters="context.create,context.delete,context.show,context.use">
+    <kind name="context.get" v="1" emitters="context.create,context.delete,context.edit,context.show,context.use">
       <element name="context">
         <attributes count="9">
           <attribute name="name" type="string" optional="false"/>
