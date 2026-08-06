@@ -1,0 +1,905 @@
+=== plain text
+A plain sentence.
+
+=== two paragraphs
+One.
+
+Two.
+
+=== unicode
+héllo wörld — em dash, 日本語, ζ
+
+=== emoji character
+ship it 🚢
+
+=== markdown punctuation as text
+\*\*not bold\*\* \_nor em\_ \[not a link\](x) \`not code\`
+
+=== pipe and backslash
+a | b \\ c
+
+=== html-looking text
+\<script\>alert(1)\</script\> \& \&amp;
+
+=== cdata terminator
+a \]\]\> b
+
+=== leading hash
+\# not a heading
+
+=== leading dash
+\- not a list
+
+=== ordered marker
+1\. not a list
+
+=== long line
+!! the document contains text ending with a space or a tab, which markdown cannot represent
+
+=== hard break
+one\
+two
+
+=== two hard breaks
+a\
+\
+b
+
+=== trailing whitespace
+!! the document contains text ending with a space or a tab, which markdown cannot represent
+
+=== leading whitespace
+!! the document contains text beginning with a space or a tab, which markdown cannot represent
+
+=== heading level 1
+# Level 1
+
+=== heading level 2
+## Level 2
+
+=== heading level 3
+### Level 3
+
+=== heading level 4
+#### Level 4
+
+=== heading level 5
+##### Level 5
+
+=== heading level 6
+###### Level 6
+
+=== empty heading
+##
+
+=== heading with a mark
+## **bold** plain
+
+=== mark: strong
+**marked**
+
+=== mark: em
+*marked*
+
+=== mark: code
+`marked`
+
+=== mark: strike
+~~marked~~
+
+=== mark: underline
+!! the document contains underlined text, which markdown cannot represent
+
+=== mark: superscript
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== mark: subscript
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== mark: text colour
+!! the document contains coloured text, which markdown cannot represent
+
+=== mark: background colour
+!! the document contains coloured text, which markdown cannot represent
+
+=== mark: link
+[marked](https://example.invalid/x)
+
+=== mark: link with a title
+[marked](https://example.invalid/x "Docs")
+
+=== marks: strong + em
+***marked***
+
+=== marks: strong + strike
+**~~marked~~**
+
+=== marks: strong + underline
+!! the document contains underlined text, which markdown cannot represent
+
+=== marks: strong + superscript
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== marks: strong + subscript
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== marks: strong + text colour
+!! the document contains coloured text, which markdown cannot represent
+
+=== marks: strong + background colour
+!! the document contains coloured text, which markdown cannot represent
+
+=== marks: strong + link
+[**marked**](https://example.invalid/x)
+
+=== marks: strong + link with a title
+[**marked**](https://example.invalid/x "Docs")
+
+=== marks: em + strike
+*~~marked~~*
+
+=== marks: em + underline
+!! the document contains underlined text, which markdown cannot represent
+
+=== marks: em + superscript
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== marks: em + subscript
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== marks: em + text colour
+!! the document contains coloured text, which markdown cannot represent
+
+=== marks: em + background colour
+!! the document contains coloured text, which markdown cannot represent
+
+=== marks: em + link
+[*marked*](https://example.invalid/x)
+
+=== marks: em + link with a title
+[*marked*](https://example.invalid/x "Docs")
+
+=== marks: code + link
+[`marked`](https://example.invalid/x)
+
+=== marks: code + link with a title
+[`marked`](https://example.invalid/x "Docs")
+
+=== marks: strike + underline
+!! the document contains underlined text, which markdown cannot represent
+
+=== marks: strike + superscript
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== marks: strike + subscript
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== marks: strike + text colour
+!! the document contains coloured text, which markdown cannot represent
+
+=== marks: strike + background colour
+!! the document contains coloured text, which markdown cannot represent
+
+=== marks: strike + link
+[~~marked~~](https://example.invalid/x)
+
+=== marks: strike + link with a title
+[~~marked~~](https://example.invalid/x "Docs")
+
+=== marks: underline + superscript
+!! the document contains underlined text, which markdown cannot represent
+
+=== marks: underline + subscript
+!! the document contains underlined text, which markdown cannot represent
+
+=== marks: underline + text colour
+!! the document contains underlined text, which markdown cannot represent
+
+=== marks: underline + background colour
+!! the document contains underlined text, which markdown cannot represent
+
+=== marks: underline + link
+!! the document contains underlined text, which markdown cannot represent
+
+=== marks: underline + link with a title
+!! the document contains underlined text, which markdown cannot represent
+
+=== marks: superscript + subscript
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== marks: superscript + text colour
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== marks: superscript + background colour
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== marks: superscript + link
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== marks: superscript + link with a title
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== marks: subscript + text colour
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== marks: subscript + background colour
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== marks: subscript + link
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== marks: subscript + link with a title
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== marks: text colour + background colour
+!! the document contains coloured text, which markdown cannot represent
+
+=== marks: text colour + link
+!! the document contains coloured text, which markdown cannot represent
+
+=== marks: text colour + link with a title
+!! the document contains coloured text, which markdown cannot represent
+
+=== marks: background colour + link
+!! the document contains coloured text, which markdown cannot represent
+
+=== marks: background colour + link with a title
+!! the document contains coloured text, which markdown cannot represent
+
+=== marks: link + link with a title
+[marked](https://example.invalid/x)
+
+=== adjacent nodes, same mark
+**bold**
+
+=== adjacent nodes, different marks
+__a__*b*
+
+=== mark around punctuation
+__\*\*__
+
+=== code holding a backtick
+``a ` b``
+
+=== code holding markdown
+`**x**`
+
+=== link whose href holds brackets
+[x](<https://example.invalid/a(b)>)
+
+=== link whose href holds a space
+[x](<https://example.invalid/a b>)
+
+=== bullet list
+- one
+- two
+
+=== ordered list
+1. one
+2. two
+
+=== ordered list starting at 5
+5. five
+
+=== single item list
+- only
+
+=== empty list item
+-
+
+=== nested bullet list
+- outer
+
+  - inner
+
+=== three deep
+- a
+
+  - b
+
+    - c
+
+=== list item with two paragraphs
+- one
+
+  two
+
+=== list item with a code block
+- run
+
+  ```go
+  x := 1
+  ```
+
+=== ordered inside bullet
+- outer
+
+  1. inner
+
+=== task list
+- [x] done
+- [ ] todo
+
+=== task with a mark
+- [ ] **bold**
+
+=== nested task list
+- [ ] outer
+  - [x] inner
+
+=== blockquote
+> quoted
+
+=== blockquote, two paragraphs
+> one
+>
+> two
+
+=== blockquote holding a list
+> - a
+
+=== rule
+---
+
+=== rule between paragraphs
+a
+
+---
+
+b
+
+=== panel: info
+> [!INFO]
+> a info panel
+
+=== panel: note
+> [!NOTE]
+> a note panel
+
+=== panel: warning
+> [!WARNING]
+> a warning panel
+
+=== panel: success
+> [!SUCCESS]
+> a success panel
+
+=== panel: error
+> [!ERROR]
+> a error panel
+
+=== panel: custom
+!! the document contains a "custom" panel, which markdown cannot represent
+
+=== panel holding a list
+> [!INFO]
+> - a
+
+=== empty panel
+> [!INFO]
+
+=== code block, no language
+```
+plain
+```
+
+=== code block, go
+```go
+client.Do(req)
+```
+
+=== code block holding a fence
+````
+a ``` b
+````
+
+=== code block, several lines
+```
+one
+two
+three
+```
+
+=== empty code block
+```
+
+```
+
+=== code block holding markdown
+```
+# not a heading
+- not a list
+```
+
+=== table 1x1
+| a |
+| --- |
+
+=== table with a body row
+| k | v |
+| --- | --- |
+| a | b |
+
+=== table with no header
+!! the document contains a table with no header row, which markdown cannot represent
+
+=== table with an empty cell
+| a |  |
+| --- | --- |
+
+=== table cell holding a pipe
+| a \| b |
+| --- |
+
+=== table cell spanning columns
+!! the document contains a table cell spanning 2 by col, which markdown cannot represent
+
+=== table cell spanning rows
+!! the document contains a table cell spanning 2 by row, which markdown cannot represent
+
+=== table cell holding two paragraphs
+!! the document contains a table cell holding more than a single paragraph, which markdown cannot represent
+
+=== table cell holding a list
+!! the document contains a table cell holding more than a single paragraph, which markdown cannot represent
+
+=== table with a short row
+| a | b |
+| --- | --- |
+| only |  |
+
+=== media, external
+![](https://example.invalid/a.png)
+
+=== media group
+![](https://example.invalid/a.png)![](https://example.invalid/b.png)
+
+=== mention
+thanks [@557058:fabricated](jira-user:unknown)
+
+=== mention with no text
+[@557058:fabricated](jira-user:unknown)
+
+=== status: neutral
+[Neutral](jira-status:neutral)
+
+=== status: purple
+[Purple](jira-status:purple)
+
+=== status: blue
+[Blue](jira-status:blue)
+
+=== status: red
+[Red](jira-status:red)
+
+=== status: yellow
+[Yellow](jira-status:yellow)
+
+=== status: green
+[Green](jira-status:green)
+
+=== date
+[2026-08-06](jira-date:1785974400000)
+
+=== date with a time
+[2026-08-06T07:00:00Z](jira-date:1785999600000)
+
+=== emoji
+😄
+
+=== emoji with no character
+:jira:
+
+=== inline card
+<https://example.invalid/x>
+
+=== block card
+<https://example.invalid/x>
+
+=== embed card
+<https://example.invalid/x>
+
+=== inline card with data
+!! the document contains a card with no link, which markdown cannot represent
+
+=== expand
+!! the document contains a collapsible section, which markdown cannot represent
+
+=== nested expand
+!! the document contains a collapsible section, which markdown cannot represent
+
+=== two column layout
+!! the document contains a multi-column layout, which markdown cannot represent
+
+=== decision list
+!! the document contains a decision list, which markdown cannot represent
+
+=== extension
+!! the document contains a macro, which markdown cannot represent
+
+=== everything at once
+## Repro
+
+Seen on `9.12.7` only.
+
+1. Start it
+2. Wait
+
+```go
+client.Do(req)
+```
+
+> [!WARNING]
+> It hangs.
+
+---
+
+| env | result |
+| --- | --- |
+| dev | ok |
+
+=== marks: strong + em + strike
+***~~marked~~***
+
+=== marks: strong + underline + strike
+!! the document contains underlined text, which markdown cannot represent
+
+=== marks: strong + text colour + background colour
+!! the document contains coloured text, which markdown cannot represent
+
+=== marks: link + strong + em
+[***marked***](https://example.invalid/x)
+
+=== marks: link + underline + text colour
+!! the document contains underlined text, which markdown cannot represent
+
+=== marks: superscript + strong + em
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== heading with strong
+### **h**
+
+=== list item with strong
+- **i**
+
+=== table cell with strong
+| **c** |
+| --- |
+
+=== quote with strong
+> **q**
+
+=== heading with em
+### *h*
+
+=== list item with em
+- *i*
+
+=== table cell with em
+| *c* |
+| --- |
+
+=== quote with em
+> *q*
+
+=== heading with code
+### `h`
+
+=== list item with code
+- `i`
+
+=== table cell with code
+| `c` |
+| --- |
+
+=== quote with code
+> `q`
+
+=== heading with strike
+### ~~h~~
+
+=== list item with strike
+- ~~i~~
+
+=== table cell with strike
+| ~~c~~ |
+| --- |
+
+=== quote with strike
+> ~~q~~
+
+=== heading with underline
+!! the document contains underlined text, which markdown cannot represent
+
+=== list item with underline
+!! the document contains underlined text, which markdown cannot represent
+
+=== table cell with underline
+!! the document contains underlined text, which markdown cannot represent
+
+=== quote with underline
+!! the document contains underlined text, which markdown cannot represent
+
+=== heading with superscript
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== list item with superscript
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== table cell with superscript
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== quote with superscript
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== heading with subscript
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== list item with subscript
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== table cell with subscript
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== quote with subscript
+!! the document contains superscript or subscript text, which markdown cannot represent
+
+=== heading with text colour
+!! the document contains coloured text, which markdown cannot represent
+
+=== list item with text colour
+!! the document contains coloured text, which markdown cannot represent
+
+=== table cell with text colour
+!! the document contains coloured text, which markdown cannot represent
+
+=== quote with text colour
+!! the document contains coloured text, which markdown cannot represent
+
+=== heading with background colour
+!! the document contains coloured text, which markdown cannot represent
+
+=== list item with background colour
+!! the document contains coloured text, which markdown cannot represent
+
+=== table cell with background colour
+!! the document contains coloured text, which markdown cannot represent
+
+=== quote with background colour
+!! the document contains coloured text, which markdown cannot represent
+
+=== heading with link
+### [h](https://example.invalid/x)
+
+=== list item with link
+- [i](https://example.invalid/x)
+
+=== table cell with link
+| [c](https://example.invalid/x) |
+| --- |
+
+=== quote with link
+> [q](https://example.invalid/x)
+
+=== heading with link with a title
+### [h](https://example.invalid/x "Docs")
+
+=== list item with link with a title
+- [i](https://example.invalid/x "Docs")
+
+=== table cell with link with a title
+| [c](https://example.invalid/x "Docs") |
+| --- |
+
+=== quote with link with a title
+> [q](https://example.invalid/x "Docs")
+
+=== panel info holding a code block
+> [!INFO]
+> ```
+> case 0
+> ```
+
+=== panel note holding a code block
+> [!NOTE]
+> ```
+> case 1
+> ```
+
+=== panel warning holding a code block
+> [!WARNING]
+> ```
+> case 2
+> ```
+
+=== panel success holding a code block
+> [!SUCCESS]
+> ```
+> case 3
+> ```
+
+=== panel error holding a code block
+> [!ERROR]
+> ```
+> case 4
+> ```
+
+=== ordered list of 1
+1. 1
+
+=== bullet list of 1
+- 1
+
+=== ordered list of 2
+1. 1
+2. 2
+
+=== bullet list of 2
+- 1
+- 2
+
+=== ordered list of 3
+1. 1
+2. 2
+3. 3
+
+=== bullet list of 3
+- 1
+- 2
+- 3
+
+=== ordered list of 4
+1. 1
+2. 2
+3. 3
+4. 4
+
+=== bullet list of 4
+- 1
+- 2
+- 3
+- 4
+
+=== ordered list of 5
+1. 1
+2. 2
+3. 3
+4. 4
+5. 5
+
+=== bullet list of 5
+- 1
+- 2
+- 3
+- 4
+- 5
+
+=== ordered list of 6
+1. 1
+2. 2
+3. 3
+4. 4
+5. 5
+6. 6
+
+=== bullet list of 6
+- 1
+- 2
+- 3
+- 4
+- 5
+- 6
+
+=== ordered list of 7
+1. 1
+2. 2
+3. 3
+4. 4
+5. 5
+6. 6
+7. 7
+
+=== bullet list of 7
+- 1
+- 2
+- 3
+- 4
+- 5
+- 6
+- 7
+
+=== ordered list of 8
+1. 1
+2. 2
+3. 3
+4. 4
+5. 5
+6. 6
+7. 7
+8. 8
+
+=== bullet list of 8
+- 1
+- 2
+- 3
+- 4
+- 5
+- 6
+- 7
+- 8
+
+=== table 2 columns
+| c0 | c1 |
+| --- | --- |
+| 0 | 1 |
+
+=== table 3 columns
+| c0 | c1 | c2 |
+| --- | --- | --- |
+| 0 | 1 | 2 |
+
+=== table 4 columns
+| c0 | c1 | c2 | c3 |
+| --- | --- | --- | --- |
+| 0 | 1 | 2 | 3 |
+
+=== table 5 columns
+| c0 | c1 | c2 | c3 | c4 |
+| --- | --- | --- | --- | --- |
+| 0 | 1 | 2 | 3 | 4 |
+
+=== table 6 columns
+| c0 | c1 | c2 | c3 | c4 | c5 |
+| --- | --- | --- | --- | --- | --- |
+| 0 | 1 | 2 | 3 | 4 | 5 |
+
+=== table 7 columns
+| c0 | c1 | c2 | c3 | c4 | c5 | c6 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0 | 1 | 2 | 3 | 4 | 5 | 6 |
+
+=== text: trailing backslash \
+trailing backslash \\
+
+=== text: a*b*c
+a\*b\*c
+
+=== text: a_b_c
+a_b_c
+
+=== text: ~tilde~
+\~tilde\~
+
+=== text: > quoted-looking
+\> quoted-looking
+
+=== text: | pipe | row |
+\| pipe | row |
+
+=== text: --- rule-looking
+\--- rule-looking
+
+=== text:     four spaces
+!! the document contains text beginning with a space or a tab, which markdown cannot represent
+
+=== text: 	 tab char
+!! the document contains text beginning with a space or a tab, which markdown cannot represent
+
+=== text: &amp; &lt; &gt;
+\&amp; \&lt; \&gt;
+
+=== text: http://example.invalid/b
+http://example.invalid/bare
+
+=== text: [!NOTE] alert-looking
+\[\!NOTE\] alert-looking
+
+=== text: ![img](x) image-looking
+\!\[img\](x) image-looking
+
+=== text: :smile: shortcode-lookin
+:smile: shortcode-looking
+
+=== text: 1) paren list-looking
+1\) paren list-looking
+

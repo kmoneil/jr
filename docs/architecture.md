@@ -222,7 +222,7 @@ name to `customfield_10042` should not cost a round trip on every invocation.
 | Layer           | Method                                                         | Gate                                                |
 | --------------- | -------------------------------------------------------------- | --------------------------------------------------- |
 | `jql/`          | Table-driven, plus a fuzzer asserting no input escapes quoting | 100% of renderer branches                           |
-| `adf/`          | Golden files, round-trip property test                         | Corpus of ≥200 real documents                       |
+| `adf/`          | Golden files, round-trip property test, two fuzzers             | Corpus of ≥200 real documents, asserted             |
 | `resource/*`    | Pure struct-in/struct-out unit tests, plus a fuzzer on anything that parses | 90%                                     |
 | `transport/`    | Recorded fixtures, Cloud + DC                                  | Every endpoint                                      |
 | Output contract | Golden files per kind, per format                              | Any diff requires a version bump in the same commit |

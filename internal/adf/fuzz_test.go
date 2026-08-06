@@ -1,0 +1,156 @@
+package adf_test
+
+import (
+	"encoding/json"
+	"testing"
+
+	"github.com/kmoneil/jira-cli/internal/adf"
+	"github.com/kmoneil/jira-cli/internal/errs"
+)
+
+// FuzzToMarkdown asserts the read side has exactly two outcomes for anything
+// that parses as a document: markdown, or a refusal naming the construct.
+//
+// A panic or a third kind of error means a document somewhere on a real Cloud
+// site takes `issue get` down, and the input that does it is not one anybody
+// would think to write in a table.
+func FuzzToMarkdown(f *testing.F) {
+	for _, seed := range []string{
+		`{"type":"doc","version":1,"content":[]}`,
+		`{"type":"doc","version":1,"content":[{"type":"paragraph"}]}`,
+		`{"type":"doc","content":[{"type":"heading","attrs":{"level":1e999}}]}`,
+		`{"type":"doc","content":[{"type":"heading","attrs":{"level":2.5}}]}`,
+		`{"type":"doc","content":[{"type":"text","text":"","marks":[{"type":"link"}]}]}`,
+		`{"type":"doc","content":[{"type":"table","content":[{"type":"tableRow"}]}]}`,
+		`{"type":"doc","content":[{"type":"date","attrs":{"timestamp":"-9223372036854775808"}}]}`,
+		`{"type":"doc","content":[{"type":"media","attrs":{"id":") ("}}]}`,
+		`{"type":"doc","content":[{"type":"orderedList","attrs":{"order":-1},` +
+			`"content":[{"type":"listItem"}]}]}`,
+		`{"type":"doc","content":[{"type":"codeBlock","attrs":{"language":"\n"}}]}`,
+	} {
+		f.Add(seed)
+	}
+
+	f.Fuzz(func(t *testing.T, raw string) {
+		doc, err := adf.Parse([]byte(raw))
+		if err != nil {
+			return
+		}
+		if _, err := adf.ToMarkdown(doc); err != nil {
+			if code := errs.Coerce(err).Code; code != "ADF_UNREPRESENTABLE" {
+				t.Fatalf("code = %q, want ADF_UNREPRESENTABLE: %v", code, err)
+			}
+		}
+	})
+}
+
+// FuzzMarkdownRoundTrips is the property that catches an escaping bug, which is
+// the whole failure mode of a converter like this one.
+//
+// Whatever a caller writes, the markdown this package produces from the
+// document it built has to read back as the same document — otherwise text
+// that survived one conversion means something else after two, and nothing in
+// between reports a problem. Leading whitespace was found exactly this way:
+// four spaces at the start of a paragraph came back out as an indented code
+// block.
+func FuzzMarkdownRoundTrips(f *testing.F) {
+	for _, seed := range []string{
+		"", "plain", "# h", "**b**", "*i*", "`c`", "~~s~~",
+		"a\\\nb", "- x", "1. x", "- [ ] x", "> q", "> [!INFO]\n> x",
+		"| a |\n| --- |\n| b |", "```go\nx\n```", "---",
+		"[t](u)", "<https://x.invalid>", "![a](jira-media:c/i)",
+		"[@a](jira-user:1)", "[s](jira-status:red)", "[d](jira-date:0)",
+		"    four spaces", "trailing ", "\\| pipe | row |", "a_b_c",
+		"*a * b*", "**a\\`b**", "[a](<b c>)", "***x***", "- a\n\n  - b",
+
+		// Crashers this fuzzer found, kept here rather than only in a corpus
+		// file so the regression is visible in the source next to the fix.
+		"trailing ", // built a document ToMarkdown then refused
+		"[0]()",     // a link to nowhere, which ADF has no mark for
+		"`0``0`",    // a code span written with three backticks, which
+		// the block parser then read as a code fence
+		"[](jira-user:)", // a mention of nobody
+		"# \\#",          // a heading whose text is an escaped hash, eaten by
+		// the closing-hash rule
+		"[!](jira-user:0)", // a label kept with its escapes in it, which grew
+		// a backslash on every conversion
+		"0 \\\n0", // a space before a hard break, which markdown strips and
+		// this parser was keeping
+		"**0 *0*0**", // a span across three nodes, emitted as three spans and
+		// five delimiter runs that read back as something else
+		"# 0 \\#", // a heading ending in a hash, read back as decoration and
+		// stripped
+		"*0****0***", // a nested span flush against its parent's delimiter,
+		// which merged into a run that reads back as something else
+		"***both***", "***a* b *c***", "**\\*\\***",
+		"*0****0****0*", // a bold word inside an italic sentence, taken apart
+		// by a closer found inside a longer run
+		"0) * * +\n0",        // nested empty items, which render as a rule
+		"*0*__0__",           // two spans whose delimiters merged into a run of three
+		"*0*___0__!___",      // a delimiter inside the span, which closed it early
+		"*__0__ 0000000*",    // emphasis around a leading space, which opens nothing
+		"**0\t*#",            // a hash escaped as though it began a line
+		"*__0__ 0)*",         // a bracket after a digit, escaped as a list marker
+		"[0](\\\r)",          // a link address holding a line break, encoded one way
+		"![](jira-media://)", // an attachment id holding the scheme's separator
+		"*0\t*\\*",           // a span whose trailing whitespace sits between its own
+		// delimiter and the next one
+		"*__0__\v0*", // whitespace markdown counts and this did not
+		"[\f](0)",    // a link whose text is whitespace, moved out and lost
+		"a\\\n",      // a line break at the end of a block, which writes as a
+		// backslash and reads back as one
+		"**0_0*", // an escaped asterisk counted as a live delimiter, and
+		// an inert underscore taken for a closer
+	} {
+		f.Add(seed)
+	}
+
+	f.Fuzz(func(t *testing.T, source string) {
+		doc, err := adf.FromMarkdown(source)
+		if err != nil {
+			return
+		}
+		encoded, err := json.Marshal(doc)
+		if err != nil {
+			t.Fatalf("a built document did not encode: %v", err)
+		}
+		parsed, err := adf.Parse(encoded)
+		if err != nil {
+			t.Fatalf("a built document did not parse: %v\n%s", err, encoded)
+		}
+		once, err := adf.ToMarkdown(parsed)
+		if err != nil {
+			// FromMarkdown checks this itself before returning, so reaching it
+			// here means that check was removed or is not reached.
+			t.Fatalf("FromMarkdown built what ToMarkdown refuses: %v\n%s", err, encoded)
+		}
+
+		// The output has to be readable by the parser that produced it, and it
+		// has to settle.
+		//
+		// The first pass may normalise: emphasis has two spellings and this
+		// package picks whichever cannot be misread beside its neighbours, so
+		// `_**x**_` and `***x***` are the same document written two ways. What
+		// it may not do is keep changing — drift is how a body that went
+		// through twice stops saying what it said, and every escaping bug this
+		// fuzzer found showed up as text that changed on every pass rather
+		// than settling on the second.
+		twice := once
+		for pass := range 2 {
+			again, err := adf.FromMarkdown(twice)
+			if err != nil {
+				t.Fatalf("this package cannot read its own output: %v\n--- wrote ---\n%s",
+					err, twice)
+			}
+			next, err := adf.ToMarkdown(again)
+			if err != nil {
+				t.Fatalf("pass %d refuses what the one before wrote: %v", pass+2, err)
+			}
+			if pass > 0 && next != twice {
+				t.Errorf("the text is still changing after two conversions"+
+					"\n--- was ---\n%s\n--- now ---\n%s", twice, next)
+			}
+			twice = next
+		}
+	})
+}

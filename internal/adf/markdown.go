@@ -84,7 +84,7 @@ func block(n Node, where string) (string, error) {
 			// empty one reads as stray punctuation. It is still the document.
 			return strings.Repeat("#", int(level)), nil
 		}
-		return strings.Repeat("#", int(level)) + " " + text, nil
+		return strings.Repeat("#", int(level)) + " " + escapeHeadingTail(text), nil
 
 	case "blockquote":
 		inner, err := blockList(n.Content, where)
@@ -100,7 +100,7 @@ func block(n Node, where string) (string, error) {
 		return "---", nil
 
 	case "codeBlock":
-		return codeBlock(n), nil
+		return codeBlock(n, where)
 
 	case "bulletList", "orderedList":
 		return list(n, where)
@@ -121,7 +121,7 @@ func block(n Node, where string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return autolink(url), nil
+		return autolink(url, where)
 
 	case "expand", "nestedExpand":
 		return "", unrepresentable(where, "a collapsible section")
@@ -169,6 +169,22 @@ func panelBlock(n Node, where string) (string, error) {
 	return quote("[!" + alert + "]\n" + body), nil
 }
 
+// escapeHeadingTail escapes a heading's closing run of hashes.
+//
+// `# a #` is a heading whose text is "a": the trailing run is decoration and
+// markdown strips it. A heading whose text really does end in a hash therefore
+// has to escape it, or it comes back one character shorter every time.
+func escapeHeadingTail(s string) string {
+	end := len(s)
+	for end > 0 && s[end-1] == '#' {
+		end--
+	}
+	if end == len(s) || (end > 0 && s[end-1] != ' ') {
+		return s
+	}
+	return s[:end] + strings.Repeat(`\#`, len(s)-end)
+}
+
 // quote prefixes every line for a blockquote. A blank line keeps the bare `>`,
 // because dropping it would end the quote and split one block into two.
 func quote(s string) string {
@@ -183,9 +199,14 @@ func quote(s string) string {
 	return strings.Join(lines, "\n")
 }
 
-// codeBlock fences the code with enough backticks to contain whatever run of
-// them the code itself holds.
-func codeBlock(n Node) string {
+// codeBlock fences the code with enough of a delimiter to contain whatever run
+// of it the code itself holds.
+//
+// The delimiter is a backtick unless the language name contains one, because a
+// backtick fence's info string may not — a language of "a`b" written after
+// ``` produces a fence this package cannot read back. A tilde fence takes
+// anything but a line ending.
+func codeBlock(n Node, where string) (string, error) {
 	var body strings.Builder
 	for _, c := range n.Content {
 		// A codeBlock holds text nodes and nothing else. Marks inside one are
@@ -194,15 +215,27 @@ func codeBlock(n Node) string {
 	}
 	code := body.String()
 
-	fence := strings.Repeat("`", max(3, longestBacktickRun(code)+1))
 	lang, _ := attrString(n.Attrs, "language")
-	return fence + lang + "\n" + code + "\n" + fence
+	if strings.ContainsAny(lang, "\n\r") {
+		// There is no fence at all for this: the info string is the rest of
+		// one line by definition.
+		return "", unrepresentable(where, "a code block whose language holds a line break")
+	}
+
+	char := byte('`')
+	if strings.Contains(lang, "`") {
+		char = '~'
+	}
+	fence := strings.Repeat(string(char), max(3, longestRun(code, char)+1))
+	return fence + lang + "\n" + code + "\n" + fence, nil
 }
 
-func longestBacktickRun(s string) int {
+func longestBacktickRun(s string) int { return longestRun(s, '`') }
+
+func longestRun(s string, char byte) int {
 	longest, run := 0, 0
-	for _, r := range s {
-		if r == '`' {
+	for i := range len(s) {
+		if s[i] == char {
 			run++
 			longest = max(longest, run)
 			continue
@@ -240,7 +273,17 @@ func list(n Node, where string) (string, error) {
 	}
 	// A single newline between items: a blank line would make the list loose,
 	// which renders with paragraph spacing the document did not ask for.
-	return strings.Join(items, "\n"), nil
+	out := strings.Join(items, "\n")
+
+	// Three levels of empty single-item list render as `- - -`, which is a
+	// thematic break and not a list at all. There is no other spelling, so it
+	// is refused rather than written down as something else.
+	for _, line := range strings.Split(out, "\n") {
+		if isThematicBreak(line) {
+			return "", unrepresentable(where, "a list markdown cannot tell from a rule")
+		}
+	}
+	return out, nil
 }
 
 func taskList(n Node, where string) (string, error) {
@@ -277,6 +320,12 @@ func taskList(n Node, where string) (string, error) {
 
 // indent prefixes the first line with first and every later line with rest.
 func indent(s, first, rest string) string {
+	if s == "" {
+		// An empty item is its marker and nothing else. Keeping the marker's
+		// space would leave trailing whitespace on the line, which markdown
+		// strips and this package refuses to write.
+		return strings.TrimRight(first, " ")
+	}
 	lines := strings.Split(s, "\n")
 	for i, line := range lines {
 		switch {
@@ -381,6 +430,27 @@ func tableCell(cell Node, where string) (string, error) {
 		"a table cell holding more than a single paragraph")
 }
 
+// escapePipes escapes the pipes a cell's own content holds, leaving alone any
+// the text escaping already dealt with. A code span is verbatim and can hold a
+// bare one, which would close the cell early.
+func escapePipes(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\\' && i+1 < len(s) {
+			b.WriteByte(s[i])
+			b.WriteByte(s[i+1])
+			i++
+			continue
+		}
+		if s[i] == '|' {
+			b.WriteByte('\\')
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
+}
+
 // tableLine writes one row, padded to width so a short row does not silently
 // become a different shape than the header it sits under.
 func tableLine(cells []string, width int) string {
@@ -389,7 +459,7 @@ func tableLine(cells []string, width int) string {
 	for i := range width {
 		b.WriteString(" ")
 		if i < len(cells) {
-			b.WriteString(strings.ReplaceAll(cells[i], "|", "\\|"))
+			b.WriteString(escapePipes(cells[i]))
 		}
 		b.WriteString(" |")
 	}
@@ -397,15 +467,388 @@ func tableLine(cells []string, width int) string {
 }
 
 func inlineList(nodes []Node, where string) (string, error) {
+	out, err := renderInline(trimEdgeBreaks(coalesce(nodes)), nil, "", where)
+	if err != nil {
+		return "", err
+	}
+	if err := checkEdgeSpace(out, where); err != nil {
+		return "", err
+	}
+	return out, nil
+}
+
+// trimEdgeBreaks drops a line break at the very start or end of a block.
+//
+// Markdown has no way to write one — a trailing backslash there is a backslash,
+// and a leading break is indentation — and neither renders as anything in Jira
+// either, which is the same reason edge whitespace moves outside a span. It is
+// what pressing shift-enter at the end of a paragraph leaves behind.
+func trimEdgeBreaks(nodes []Node) []Node {
+	for len(nodes) > 0 && nodes[0].Type == "hardBreak" {
+		nodes = nodes[1:]
+	}
+	for len(nodes) > 0 && nodes[len(nodes)-1].Type == "hardBreak" {
+		nodes = nodes[:len(nodes)-1]
+	}
+	return nodes
+}
+
+// spanMarks are the marks that become a span, outermost first.
+//
+// The order is fixed so two text nodes carrying the same marks in a different
+// order produce the same markdown - Jira's order is an artefact of how the
+// text was typed. code is not here: it is innermost and verbatim, so it is
+// applied at the leaf.
+var spanMarks = []string{"link", "strong", "em", "strike"}
+
+// renderInline writes a run of inline nodes, grouping neighbours that share a
+// mark into one span.
+//
+// ADF puts a mark on each text node; markdown wraps a span around several. A
+// renderer that emitted each node independently produced
+// **0 *****0*****0** for one bold sentence with a bold-italic word in it -
+// five delimiter runs that no parser reads back as what they came from. Found
+// by the round-trip fuzzer, which is the only thing that would have.
+// written is everything emitted before this run, which is what says whether
+// the next character starts a line. Escaping decided per node instead put a
+// backslash in front of a hash that was mid-line and left one alone that was
+// not — the two passes disagreed, which is how the fuzzer saw it.
+func renderInline(nodes []Node, applied []Mark, written, where string) (string, error) {
 	var b strings.Builder
-	for _, n := range coalesce(nodes) {
-		s, err := inline(n, where+" > "+n.Type)
+	for i := 0; i < len(nodes); {
+		mark, ok := nextSpanMark(nodes[i], applied)
+		if !ok {
+			s, err := inline(nodes[i], atLineStart(written+b.String()), where+" > "+nodes[i].Type)
+			if err != nil {
+				return "", err
+			}
+			b.WriteString(s)
+			i++
+			continue
+		}
+
+		// Extend the span over every neighbour carrying the same mark.
+		j := i + 1
+		for j < len(nodes) && carries(nodes[j], mark) {
+			j++
+		}
+		inner, err := renderInline(nodes[i:j], append(applied, mark),
+			written+b.String(), where)
 		if err != nil {
 			return "", err
 		}
-		b.WriteString(s)
+		// Whitespace at the edge of a span moves outside it. Markdown cannot
+		// emphasise a leading or trailing space — `* x*` is an asterisk and a
+		// word, not a span — and Jira's editor produces one constantly, from
+		// bolding a word and then typing the space after it. The characters
+		// are unchanged and so is what a reader sees; only the extent of the
+		// mark moves, by exactly the whitespace nobody can see it on.
+		lead, core, trail := splitEdgeSpace(inner)
+		if mark.Type == "link" {
+			// A link's brackets are not flanking-sensitive, and its text may
+			// be whitespace and still be a link. Moving it out would drop the
+			// link entirely.
+			lead, core, trail = "", inner, ""
+		}
+		if core == "" {
+			b.WriteString(inner)
+			i = j
+			continue
+		}
+
+		left := b.String() + lead
+		// The trailing whitespace this span moves outside itself sits between
+		// its closing delimiter and whatever comes next, so that is what the
+		// delimiter is up against.
+		next := after(nodes[j:], applied)
+		if trail != "" {
+			next = trail[0]
+		}
+		open, closing, err := delimiters(mark, core,
+			before(left), endsWithLive(left), next, where)
+		if err != nil {
+			return "", err
+		}
+		b.WriteString(lead + open + core + closing + trail)
+		i = j
 	}
 	return b.String(), nil
+}
+
+// nextSpanMark returns the outermost mark on n that is not already open.
+func nextSpanMark(n Node, applied []Mark) (Mark, bool) {
+	if n.Type != "text" {
+		return Mark{}, false
+	}
+	for _, name := range spanMarks {
+		for _, m := range n.Marks {
+			if m.Type != name || carriesAll(applied, m) {
+				continue
+			}
+			return m, true
+		}
+	}
+	return Mark{}, false
+}
+
+func carriesAll(applied []Mark, m Mark) bool {
+	for _, a := range applied {
+		if a.Type == m.Type && reflect.DeepEqual(a.Attrs, m.Attrs) {
+			return true
+		}
+	}
+	return false
+}
+
+// carries reports whether n holds exactly this mark, attributes included. Two
+// links to different addresses are two spans, not one.
+func carries(n Node, m Mark) bool {
+	if n.Type != "text" {
+		return false
+	}
+	return carriesAll(n.Marks, m)
+}
+
+// delimiters returns what opens and closes a span.
+//
+// Emphasis switches to the underscore form when its content begins or ends
+// with an asterisk, which happens whenever a nested span sits flush against
+// this one's delimiter. `*0**0***` is what the asterisk form produces there,
+// and CommonMark reads it as two emphasised words rather than as one holding a
+// bold one — the round-trip fuzzer found it, and nothing else would have.
+func delimiters(
+	m Mark, inner string, prev, prevLive, next byte, where string,
+) (open, closing string, err error) {
+	// The asterisk form unless one of its delimiters would merge into a run
+	// with what sits next to it — a nested span flush against this one on a
+	// single side, or a neighbouring span's own delimiter. `*0*` beside
+	// `**0**` is `*0***0**`, and the run of three in the middle is read as
+	// something neither span says. Both sides flush is the ordinary `***x***`
+	// spelling, where the runs merge symmetrically and read back correctly.
+	char := ""
+	for _, candidate := range []byte{'*', '_'} {
+		if !merges(candidate, inner, prev, prevLive, next) {
+			char = string(candidate)
+			break
+		}
+	}
+	if char == "" {
+		// Markdown has two spellings for emphasis and both of them would be
+		// read as something this document does not say. There is no third, so
+		// this is refused rather than written down and hoped over.
+		return "", "", unrepresentable(where,
+			"emphasis that markdown cannot spell unambiguously here")
+	}
+
+	switch m.Type {
+	case "strong":
+		return char + char, char + char, nil
+	case "em":
+		return char, char, nil
+	case "strike":
+		return "~~", "~~", nil
+	case "link":
+		href, ok := attrString(m.Attrs, "href")
+		if !ok || href == "" {
+			return "", "", unrepresentable(where, "a link with no address")
+		}
+		target, err := linkTarget(href, where)
+		if err != nil {
+			return "", "", err
+		}
+		if title, ok := attrString(m.Attrs, "title"); ok && title != "" {
+			// Markdown's own title syntax. Dropping it would be a silent loss:
+			// it is what a reader sees on hover and it is not the address.
+			target += ` "` + strings.NewReplacer(`\`, `\`+`\`, `"`, `\`+`"`).Replace(title) + `"`
+		}
+		return "[", "](" + target + ")", nil
+	}
+	return "", "", unrepresentable(where, "a %q mark", m.Type)
+}
+
+// splitEdgeSpace separates a span's leading and trailing whitespace from what
+// the delimiters actually go around.
+func splitEdgeSpace(s string) (lead, core, trail string) {
+	// Every character markdown counts as whitespace, not just the two that
+	// come up in practice: a delimiter may not sit against any of them.
+	const space = " \t\n\r\v\f"
+	core = strings.TrimLeft(s, space)
+	lead = s[:len(s)-len(core)]
+	trimmed := strings.TrimRight(core, space)
+	trail = core[len(trimmed):]
+	return lead, trimmed, trail
+}
+
+// merges reports whether a delimiter written with char would run together
+// with something beside it and be read as a different span.
+//
+// A run of delimiters is a single token to markdown: `*0*` written next to
+// `**0**` is `*0***0**`, and the three in the middle belong to neither. The
+// same is true of a nested span flush against one side of this one — flush
+// against both is the ordinary `***x***` spelling, where the runs merge
+// symmetrically and read back correctly.
+//
+// The underscore has one more rule: it is inert against a word character,
+// which is what keeps `customfield_10042` a field id.
+func merges(char byte, inner string, prev, prevLive, next byte) bool {
+	if char == '_' && (isWordByte(prev) || isWordByte(next)) {
+		return true
+	}
+	// Nothing opens or closes against whitespace, so a span written there
+	// would not be a span at all.
+	if isSpaceByte(prev) && isSpaceByte(next) && prev != 0 && next != 0 {
+		return false
+	}
+	if prevLive == char || next == char {
+		return true
+	}
+	// A live delimiter strictly inside would close this span early, wherever
+	// it came from — a nested span that picked the same character, or an
+	// underscore inside a word, which looks like one and is inert.
+	if insideLive(inner, char) {
+		return true
+	}
+	// Flush on one side only.
+	return (len(inner) > 0 && inner[0] == char) != (endsWithLive(inner) == char)
+}
+
+// insideLive reports an unescaped delimiter somewhere other than the two ends.
+func insideLive(s string, char byte) bool {
+	for i := 1; i < len(s)-1; i++ {
+		if s[i] == '\\' {
+			i++
+			continue
+		}
+		if s[i] == char {
+			return true
+		}
+	}
+	return false
+}
+
+// endsWithLive reports the delimiter character a string ends with, or zero.
+// An escaped one is text and merges with nothing.
+func endsWithLive(s string) byte {
+	var live byte
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\\' && i+1 < len(s) {
+			i++
+			live = 0
+			continue
+		}
+		live = 0
+		if s[i] == '*' || s[i] == '_' {
+			live = s[i]
+		}
+	}
+	return live
+}
+
+// atLineStart reports whether the next character written begins a line.
+func atLineStart(written string) bool {
+	return written == "" || written[len(written)-1] == '\n'
+}
+
+// before is the character a span will sit against on its left. Whether that
+// character is a live delimiter is a separate question — an escaped asterisk
+// is punctuation and merges with nothing.
+func before(written string) byte {
+	if written == "" {
+		return 0
+	}
+	return written[len(written)-1]
+}
+
+// after is the character a span will sit against on its right.
+//
+// A neighbouring node carrying emphasis renders starting with its own
+// delimiter, which is the collision this exists to see; anything else is that
+// node's first character. An escaped one begins with a backslash, so reading
+// the unescaped text is conservative in the direction that matters.
+func after(rest []Node, applied []Mark) byte {
+	if len(rest) == 0 || rest[0].Type != "text" {
+		return 0
+	}
+	// Whitespace comes before the next span's delimiter, because that span
+	// moves its own edge whitespace outside itself. Two delimiters with a
+	// space between them do not merge.
+	if rest[0].Text != "" && isSpaceByte(rest[0].Text[0]) {
+		return rest[0].Text[0]
+	}
+	for _, m := range rest[0].Marks {
+		// A mark already open around both nodes is not written between them.
+		// Which delimiter the next span picks is not known yet, so the
+		// asterisk is assumed: it is the one this span then avoids, and the
+		// next span sees an underscore beside it and keeps the asterisk.
+		if (m.Type == "strong" || m.Type == "em") && !carriesAll(applied, m) {
+			return '*'
+		}
+	}
+	if rest[0].Text == "" {
+		return 0
+	}
+	return rest[0].Text[0]
+}
+
+// leaf writes one text node, with every span mark already open around it.
+//
+// It is where a mark this converter cannot write is refused, so the refusal
+// happens once no matter which span the text sits in.
+func leaf(n Node, lineStart bool, where string) (string, error) {
+	code := false
+	for _, m := range n.Marks {
+		switch m.Type {
+		case "code":
+			code = true
+		case "strike", "em", "strong", "link":
+			// Written as a span by renderInline.
+		case "underline":
+			return "", unrepresentable(where, "underlined text")
+		case "subsup":
+			return "", unrepresentable(where, "superscript or subscript text")
+		case "textColor", "backgroundColor":
+			return "", unrepresentable(where, "coloured text")
+		case "alignment", "indentation":
+			return "", unrepresentable(where, "aligned or indented text")
+		case "annotation":
+			return "", unrepresentable(where, "an inline comment")
+		case "border":
+			return "", unrepresentable(where, "a bordered span")
+		default:
+			return "", unrepresentable(where, "a %q mark", m.Type)
+		}
+	}
+	if code {
+		// Verbatim: escaping inside a code span would put backslashes in the
+		// text, and a span needs no escaping to be exact.
+		return codeSpan(n.Text), nil
+	}
+	return escapeText(n.Text, lineStart), nil
+}
+
+// checkEdgeSpace refuses text whose line begins or ends with a space or a tab.
+//
+// Markdown strips both: leading whitespace is indentation, four spaces of it
+// is a code block, and trailing whitespace is either a hard break or nothing.
+// There is no spelling that carries it, so a paragraph that starts with four
+// spaces cannot be written down - and writing it anyway produces markdown that
+// reads back as code, which is the silent alteration this package refuses.
+func checkEdgeSpace(s, where string) error {
+	for _, line := range strings.Split(s, "\n") {
+		// The hard break this package writes is a backslash, so a line ending
+		// in one is not trailing whitespace.
+		trimmed := strings.TrimSuffix(line, "\\")
+		if trimmed == "" {
+			continue
+		}
+		switch {
+		case trimmed[0] == ' ' || trimmed[0] == '\t':
+			return unrepresentable(where, "text beginning with a space or a tab")
+		case trimmed[len(trimmed)-1] == ' ' || trimmed[len(trimmed)-1] == '\t':
+			return unrepresentable(where, "text ending with a space or a tab")
+		}
+	}
+	return nil
 }
 
 // coalesce joins neighbouring text nodes that carry the same marks.
@@ -450,10 +893,10 @@ func sameMarks(a, b []Mark) bool {
 	return true
 }
 
-func inline(n Node, where string) (string, error) {
+func inline(n Node, lineStart bool, where string) (string, error) {
 	switch n.Type {
 	case "text":
-		return marked(n, where)
+		return leaf(n, lineStart, where)
 
 	case "hardBreak":
 		// A backslash, not two trailing spaces. Both are CommonMark hard
@@ -473,16 +916,20 @@ func inline(n Node, where string) (string, error) {
 		if id == "" {
 			return "", unrepresentable(where, "a mention of nobody")
 		}
-		return "[" + escapeText(text) + "](" + linkTarget("jira-user:"+id) + ")", nil
+		target, err := linkTarget("jira-user:"+id, where)
+		if err != nil {
+			return "", err
+		}
+		return "[" + escapeText(text, false) + "](" + target + ")", nil
 
 	case "emoji":
 		// The text attribute is the emoji itself; the short name is what Jira
 		// shows when it has no character to show. Either is the whole content.
 		if text, ok := attrString(n.Attrs, "text"); ok && text != "" {
-			return escapeText(text), nil
+			return escapeText(text, false), nil
 		}
 		if short, ok := attrString(n.Attrs, "shortName"); ok && short != "" {
-			return escapeText(short), nil
+			return escapeText(short, false), nil
 		}
 		return "", unrepresentable(where, "an emoji with no character")
 
@@ -495,7 +942,11 @@ func inline(n Node, where string) (string, error) {
 		if !ok || colour == "" {
 			colour = "neutral"
 		}
-		return "[" + escapeText(text) + "](" + linkTarget("jira-status:"+colour) + ")", nil
+		target, err := linkTarget("jira-status:"+colour, where)
+		if err != nil {
+			return "", err
+		}
+		return "[" + escapeText(text, false) + "](" + target + ")", nil
 
 	case "date":
 		return date(n, where)
@@ -505,7 +956,7 @@ func inline(n Node, where string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return autolink(url), nil
+		return autolink(url, where)
 
 	case "inlineExtension":
 		return "", unrepresentable(where, "an inline macro")
@@ -537,7 +988,11 @@ func date(n Node, where string) (string, error) {
 	if !t.Equal(t.Truncate(24 * time.Hour)) {
 		shown = t.Format(time.RFC3339)
 	}
-	return "[" + shown + "](" + linkTarget("jira-date:"+stamp) + ")", nil
+	target, err := linkTarget("jira-date:"+stamp, where)
+	if err != nil {
+		return "", err
+	}
+	return "[" + shown + "](" + target + ")", nil
 }
 
 func media(n Node, where string) (string, error) {
@@ -546,18 +1001,33 @@ func media(n Node, where string) (string, error) {
 	// An external or linked media carries the URL it points at, which is a
 	// markdown image with nothing invented.
 	if url, ok := attrString(n.Attrs, "url"); ok && url != "" {
-		return "![" + escapeText(alt) + "](" + linkTarget(url) + ")", nil
+		target, err := linkTarget(url, where)
+		if err != nil {
+			return "", err
+		}
+		return "![" + escapeText(alt, false) + "](" + target + ")", nil
 	}
 
 	id, _ := attrText(n.Attrs, "id")
 	if id == "" {
 		return "", unrepresentable(where, "an attachment with no id")
 	}
+	collection, _ := attrString(n.Attrs, "collection")
+	if strings.Contains(id, "/") || strings.Contains(collection, "/") {
+		// The slash is what separates the two in `jira-media:<collection>/<id>`
+		// and there is nowhere to escape one, so an id holding a slash cannot
+		// be written down and read back as itself.
+		return "", unrepresentable(where, "an attachment whose id holds a slash")
+	}
 	target := "jira-media:" + id
-	if collection, ok := attrString(n.Attrs, "collection"); ok && collection != "" {
+	if collection != "" {
 		target = "jira-media:" + collection + "/" + id
 	}
-	return "![" + escapeText(alt) + "](" + linkTarget(target) + ")", nil
+	written, err := linkTarget(target, where)
+	if err != nil {
+		return "", err
+	}
+	return "![" + escapeText(alt, false) + "](" + written + ")", nil
 }
 
 // cardURL reads the link a card points at.
@@ -571,75 +1041,6 @@ func cardURL(n Node, where string) (string, error) {
 		return "", unrepresentable(where, "a card with no link")
 	}
 	return url, nil
-}
-
-// marks this converter can write, innermost first. The order is fixed so that
-// two text nodes with the same marks in a different order produce the same
-// markdown — Jira's order is an artefact of how the text was typed.
-var markOrder = []struct {
-	name  string
-	open  string
-	close string
-}{
-	{"code", "`", "`"},
-	{"strike", "~~", "~~"},
-	{"em", "*", "*"},
-	{"strong", "**", "**"},
-}
-
-func marked(n Node, where string) (string, error) {
-	var link *Mark
-	present := map[string]bool{}
-	for i, m := range n.Marks {
-		switch m.Type {
-		case "code", "strike", "em", "strong":
-			present[m.Type] = true
-		case "link":
-			link = &n.Marks[i]
-		case "underline":
-			return "", unrepresentable(where, "underlined text")
-		case "subsup":
-			return "", unrepresentable(where, "superscript or subscript text")
-		case "textColor", "backgroundColor":
-			return "", unrepresentable(where, "coloured text")
-		case "alignment", "indentation":
-			return "", unrepresentable(where, "aligned or indented text")
-		case "annotation":
-			return "", unrepresentable(where, "an inline comment")
-		case "border":
-			return "", unrepresentable(where, "a bordered span")
-		default:
-			return "", unrepresentable(where, "a %q mark", m.Type)
-		}
-	}
-
-	// Code is verbatim: escaping inside a code span would put backslashes in
-	// the text, and a code span needs no escaping to be exact.
-	out := escapeText(n.Text)
-	if present["code"] {
-		out = codeSpan(n.Text)
-	}
-	for _, m := range markOrder {
-		if m.name == "code" || !present[m.name] {
-			continue
-		}
-		out = m.open + out + m.close
-	}
-
-	if link != nil {
-		href, ok := attrString(link.Attrs, "href")
-		if !ok || href == "" {
-			return "", unrepresentable(where, "a link with no address")
-		}
-		target := linkTarget(href)
-		if title, ok := attrString(link.Attrs, "title"); ok && title != "" {
-			// Markdown's own title syntax. Dropping it would be a silent loss:
-			// it is what a reader sees on hover and it is not the address.
-			target += ` "` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(title) + `"`
-		}
-		out = "[" + out + "](" + target + ")"
-	}
-	return out, nil
 }
 
 // codeSpan wraps text in enough backticks to hold whatever run of them it
@@ -661,12 +1062,12 @@ func codeSpan(s string) string {
 // two letters cannot open emphasis in CommonMark, so `customfield_10042` is
 // written as it is rather than as `customfield\_10042` — the escaping is there
 // to be correct, not to be visible.
-func escapeText(s string) string {
+func escapeText(s string, lineStart bool) string {
 	var b strings.Builder
 	b.Grow(len(s))
 
 	runes := []rune(s)
-	atLineStart := true
+	atLineStart := lineStart
 	for i, r := range runes {
 		switch r {
 		// A pipe is not escaped here. It only closes anything inside a table,
@@ -678,15 +1079,17 @@ func escapeText(s string) string {
 			if !intraword(runes, i) {
 				b.WriteByte('\\')
 			}
-		case '#', '+', '-', '=':
-			// Only meaningful where a block can begin. Mid-line they are text.
+		case '#', '+', '-', '=', '|':
+			// Only meaningful where a block can begin. Mid-line they are text —
+			// except the pipe, which starts a table row given a delimiter under
+			// it, and a hard break can put one under it.
 			if atLineStart {
 				b.WriteByte('\\')
 			}
 		case '.', ')':
 			// An ordered-list marker: a run of digits at the start of a line
 			// followed by one of these.
-			if startsOrderedList(runes, i) {
+			if startsOrderedList(runes, i, lineStart) {
 				b.WriteByte('\\')
 			}
 		}
@@ -714,12 +1117,22 @@ func isWordRune(r rune) bool {
 // startsOrderedList reports whether the rune at i closes an ordered-list marker
 // — that is, whether everything before it back to the line start is digits, and
 // there is at least one.
-func startsOrderedList(runes []rune, i int) bool {
+//
+// Running out of runes means the start of this text, which is a line start only
+// if the text itself begins one. Assuming it did escaped the parenthesis in
+// `*0)*`, which is a digit and a bracket in the middle of a sentence.
+func startsOrderedList(runes []rune, i int, lineStart bool) bool {
 	j := i - 1
 	for j >= 0 && runes[j] >= '0' && runes[j] <= '9' {
 		j--
 	}
-	return j < i-1 && (j < 0 || runes[j] == '\n')
+	if j == i-1 {
+		return false
+	}
+	if j < 0 {
+		return lineStart
+	}
+	return runes[j] == '\n'
 }
 
 // linkTarget writes a link destination.
@@ -729,31 +1142,38 @@ func startsOrderedList(runes []rune, i int) bool {
 // because a `%28` that was already in the URL and one this function wrote are
 // the same three characters — the destination goes inside angle brackets,
 // which is CommonMark's own answer and reverses exactly.
-func linkTarget(s string) string {
-	if s == "" {
-		return "<>"
+func linkTarget(s, where string) (string, error) {
+	if strings.ContainsAny(s, "\n\r") {
+		// A line ending cannot appear in a link destination in either form,
+		// and percent-encoding it is one-way: the encoding and a `%0A` that
+		// was already in the address are the same three characters coming
+		// back. It is not a URL either.
+		return "", unrepresentable(where, "a link whose address holds a line break")
 	}
-	if !strings.ContainsAny(s, " \t\n\r()<>\\") {
-		return s
+	if s == "" {
+		return "<>", nil
+	}
+	if !strings.ContainsAny(s, " \t()<>\\") {
+		return s, nil
 	}
 	r := strings.NewReplacer(
 		`\`, `\\`,
 		"<", `\<`,
 		">", `\>`,
-		// A line ending cannot appear in an angle-bracket destination at all,
-		// so these two are the one place encoding is unavoidable.
-		"\n", "%0A",
-		"\r", "%0D",
 	)
-	return "<" + r.Replace(s) + ">"
+	return "<" + r.Replace(s) + ">", nil
 }
 
 // autolink writes a bare URL. CommonMark's `<url>` form holds no spaces and no
 // angle brackets, so a URL carrying either becomes an ordinary link whose text
 // is the URL — which reads the same and reverses the same.
-func autolink(s string) string {
+func autolink(s, where string) (string, error) {
 	if s != "" && !strings.ContainsAny(s, " \t\n\r<>\\") {
-		return "<" + s + ">"
+		return "<" + s + ">", nil
 	}
-	return "[" + escapeText(s) + "](" + linkTarget(s) + ")"
+	target, err := linkTarget(s, where)
+	if err != nil {
+		return "", err
+	}
+	return "[" + escapeText(s, false) + "](" + target + ")", nil
 }

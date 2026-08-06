@@ -208,8 +208,19 @@ func findCloser(s string, from int, delim string) int {
 				continue
 			}
 			i++
-		case strings.HasPrefix(s[i:], delim):
-			return i
+		case s[i] == delim[0]:
+			// A run longer than the delimiter is not this delimiter: `*` does
+			// not close inside `**`. Matching one was how `*0**0**0*` — a bold
+			// word inside an italic sentence, which CommonMark reads correctly
+			// — came apart into three pieces.
+			run := 0
+			for i+run < len(s) && s[i+run] == delim[0] {
+				run++
+			}
+			if run == len(delim) {
+				return i
+			}
+			i += run
 		default:
 			i++
 		}
@@ -231,8 +242,8 @@ func emphasisAt(s string, start, at int) ([]Node, int, error) {
 	if char == '_' && start > 0 && isWordByte(s[start-1]) {
 		return nil, 0, nil
 	}
-	// Nothing opens a span with a space after it.
-	if start+run >= len(s) || s[start+run] == ' ' || s[start+run] == '\n' {
+	// Nothing opens a span with whitespace after it.
+	if start+run >= len(s) || isSpaceByte(s[start+run]) {
 		return nil, 0, nil
 	}
 
@@ -247,16 +258,19 @@ func emphasisAt(s string, start, at int) ([]Node, int, error) {
 		if found < 0 {
 			return nil, 0, nil
 		}
-		if found > run && rest[found-1] != ' ' && rest[found-1] != '\n' {
+		closes := found > run && !isSpaceByte(rest[found-1])
+		if closes && char == '_' && found+run < len(rest) && isWordByte(rest[found+run]) {
+			// An underscore between two word characters is inert, so it is not
+			// this span's closer — the next one might be. Giving up here left
+			// `_0_0_` unparsed, and its writer had no other spelling to use.
+			closes = false
+		}
+		if closes {
 			end = found
 			break
 		}
 		from = found + run
 	}
-	if char == '_' && end+run < len(rest) && isWordByte(rest[end+run]) {
-		return nil, 0, nil
-	}
-
 	inner, err := scanInline(rest[run:end], at)
 	if err != nil {
 		return nil, 0, err
@@ -275,6 +289,12 @@ func emphasisAt(s string, start, at int) ([]Node, int, error) {
 	return inner, end + run, nil
 }
 
+// isSpaceByte is CommonMark's whitespace, which a delimiter may not sit
+// against.
+func isSpaceByte(c byte) bool {
+	return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f'
+}
+
 func isWordByte(c byte) bool {
 	return c == '_' || c >= 0x80 ||
 		(c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
@@ -289,6 +309,14 @@ func addMark(nodes []Node, mark Mark, at int) error {
 	for i := range nodes {
 		switch nodes[i].Type {
 		case "text":
+			// Jira stores the code mark only on its own, and refuses a text
+			// node carrying it alongside any other with a 400 that names
+			// neither. Emphasised code is refused here instead.
+			if hasMark(nodes[i].Marks, "code") || mark.Type == "code" {
+				if len(nodes[i].Marks) > 0 && !hasMark(nodes[i].Marks, mark.Type) {
+					return unsupported(at, "emphasis on inline code")
+				}
+			}
 			if !hasMark(nodes[i].Marks, mark.Type) {
 				nodes[i].Marks = append(nodes[i].Marks, mark)
 			}
@@ -374,13 +402,28 @@ func linkAt(s string, at int) ([]Node, int, error) {
 
 	if scheme, value, found := strings.Cut(target, ":"); found {
 		switch scheme {
-		case "jira-user":
-			return []Node{{Type: "mention", Attrs: map[string]any{
-				"id": value, "text": text,
-			}}}, width, nil
-		case "jira-status":
+		case "jira-user", "jira-status":
+			// These carry a plain string, not marked-up content, so the label
+			// is read as text rather than left with its escapes in it. Storing
+			// the raw slice put a backslash in the name and grew another on
+			// every conversion, which the round-trip fuzzer found.
+			label, err := literalText(text, at)
+			if err != nil {
+				return nil, 0, err
+			}
+			if scheme == "jira-user" {
+				if value == "" {
+					return nil, 0, unsupported(at, "a mention of nobody")
+				}
+				return []Node{{Type: "mention", Attrs: map[string]any{
+					"id": value, "text": label,
+				}}}, width, nil
+			}
+			if label == "" || value == "" {
+				return nil, 0, unsupported(at, "a status lozenge with no text or colour")
+			}
 			return []Node{{Type: "status", Attrs: map[string]any{
-				"text": text, "color": value,
+				"text": label, "color": value,
 			}}}, width, nil
 		case "jira-date":
 			if _, err := strconv.ParseInt(value, 10, 64); err != nil {
@@ -403,6 +446,12 @@ func linkAt(s string, at int) ([]Node, int, error) {
 		// ADF has no way to store a link with no text.
 		return nil, 0, unsupported(at, "a link with no text")
 	}
+	if target == "" {
+		// `[text]()` is a link to nowhere. ADF's link mark requires an
+		// address, and building one without would be a document ToMarkdown
+		// then refuses — the two halves have to agree on the same subset.
+		return nil, 0, unsupported(at, "a link with no address")
+	}
 	mark := Mark{Type: "link", Attrs: map[string]any{"href": target}}
 	if title != "" {
 		mark.Attrs["title"] = title
@@ -415,11 +464,20 @@ func linkAt(s string, at int) ([]Node, int, error) {
 
 // imageAt reads `![alt](target)`.
 func imageAt(s string, at int) (Node, int, error) {
-	alt, target, _, width, ok := bracketPair(s, 2)
+	label, target, _, width, ok := bracketPair(s, 2)
 	if !ok {
 		return Node{}, 0, nil
 	}
+	// Alt text is a plain string in ADF, for the same reason a mention's name
+	// is: it is read rather than rendered.
+	alt, err := literalText(label, at)
+	if err != nil {
+		return Node{}, 0, err
+	}
 
+	if target == "" {
+		return Node{}, 0, unsupported(at, "an image with no address")
+	}
 	attrs := map[string]any{"type": "external", "url": target}
 	if id, found := strings.CutPrefix(target, "jira-media:"); found {
 		attrs = map[string]any{"type": "file"}
@@ -435,6 +493,27 @@ func imageAt(s string, at int) (Node, int, error) {
 		attrs["alt"] = alt
 	}
 	return Node{Type: "media", Attrs: attrs}, width, nil
+}
+
+// literalText reads inline markdown that has to come out as a plain string.
+//
+// A mention's name, a status lozenge's text, and an image's alt text are all
+// strings in ADF rather than content, so there is nowhere to put a mark on
+// one — and silently dropping the mark would be the alteration this package
+// refuses.
+func literalText(s string, at int) (string, error) {
+	nodes, err := scanInline(s, at)
+	if err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	for _, n := range nodes {
+		if n.Type != "text" || len(n.Marks) > 0 {
+			return "", unsupported(at, "markup where Jira stores a plain label")
+		}
+		b.WriteString(n.Text)
+	}
+	return b.String(), nil
 }
 
 // bracketPair reads `[text](target)` starting at open, where open is the index

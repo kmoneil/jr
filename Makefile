@@ -26,7 +26,7 @@ READER_MAX_BYTES := 12582912
 
 # Packages that own golden files. `make golden` rewrites them; every other
 # package would reject the -update flag.
-GOLDEN_PKGS := ./internal/render/ ./internal/cli/
+GOLDEN_PKGS := ./internal/render/ ./internal/cli/ ./internal/adf/
 
 .DEFAULT_GOAL := help
 

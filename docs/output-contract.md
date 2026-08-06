@@ -177,6 +177,17 @@ and loses its colour, an image keeps its id and alt text and loses its layout
 and width, a status keeps its text and colour and loses its local id. Markdown
 has no page, so there is nowhere for a position on one to go.
 
+Two more things move rather than being dropped or refused. A line break at the
+very start or end of a block is discarded, because markdown cannot write one
+there and Jira does not render one either — it is what pressing shift-enter at
+the end of a paragraph leaves behind. And whitespace at the edge of an
+emphasised span moves outside it. Markdown cannot emphasise a leading or trailing
+space — `* x*` is an asterisk and a word, not a span — and Jira's editor
+produces one whenever somebody bolds a word and then types the space after it.
+The space is written outside the delimiters instead. Every character is
+unchanged and so is what a reader sees; only the extent of the mark moves, by
+exactly the whitespace nobody can see it on.
+
 Everything else is refused by name. That includes underlined, coloured,
 superscript, subscript, aligned, indented, and annotated text; collapsible
 sections; multi-column layouts; decision lists; macros and extensions; custom
@@ -189,7 +200,14 @@ document while silently leaving part of it out.
 Link destinations use CommonMark's angle-bracket form
 (`[text](<https://example.invalid/a(b)>)`) where the URL holds a bracket, a
 space, or an angle bracket. Percent-encoding is not used, because a `%28`
-already in the URL and one this tool wrote are the same three characters.
+already in the URL and one this tool wrote are the same three characters — so
+an address holding a line ending, and an attachment id holding the `/` that
+separates it from its collection, are refused rather than encoded one way.
+
+Emphasis picks between the `*` and `_` spellings so that its delimiters never
+run together with a neighbouring span's. Where neither spelling would be read
+back as what the document says, the conversion is refused rather than written
+down and hoped over.
 
 ## Types
 
@@ -463,19 +481,46 @@ renders the request as the command built it, before the transport attaches one.
 
 ### Body text on write
 
-Text bound for a description or a comment is **contained, never converted**.
+Text bound for a description or a comment is **contained, never converted** —
+unless `--body-format` says otherwise.
 
-Data Center takes a string of wiki markup and gets the text as typed. Cloud will
-not accept a string where a document belongs, so the text is wrapped in the
-minimal Atlassian Document Format document that holds it: a blank line starts a
-paragraph, a single newline is a line break. Nothing is interpreted — `**bold**`
-reaches Jira as six characters on both deployments, and the server decides what
-they mean.
+| `--body-format` | What happens                                              |
+| --------------- | --------------------------------------------------------- |
+| `text` (default) | The text is contained, not interpreted.                  |
+| `markdown`      | The text is parsed and becomes the document it describes.  |
+| `adf`           | The text is a document, as JSON, and is sent as given.     |
 
-That is the difference between containing text, which is exact, and converting
-it, which is not. Turning markdown into real ADF marks is a separate job with
-its own failure modes, and when it lands an unrepresentable construct will be
-refused by name rather than approximated.
+Under `text`, Data Center takes a string of wiki markup and gets the text as
+typed. Cloud will not accept a string where a document belongs, so the text is
+wrapped in the minimal document that holds it: a blank line starts a paragraph,
+a single newline is a line break. Nothing is interpreted — `**bold**` reaches
+Jira as six characters on both deployments, and the server decides what they
+mean. That is the difference between containing text, which is exact, and
+converting it, which is not.
+
+`markdown` and `adf` are **Cloud only**. Data Center stores wiki markup, there
+is no markdown-to-wiki converter here, and it will not take a document at all,
+so both are refused with `BODY_FORMAT_UNSUPPORTED` rather than approximated.
+
+Under `markdown` the subset is CommonMark's block and inline structure minus
+what ADF has no node for, plus GFM tables, task lists, and strikethrough, plus
+the `jira-` link schemes above — so a body read out of Jira goes back in as the
+document it came from. A single newline inside a paragraph joins its lines,
+because that is what markdown means by one; a trailing backslash is a hard
+break.
+
+Anything else exits 2 with `MARKDOWN_UNSUPPORTED`, naming the construct **and
+the line it is on**: setext headings, indented code blocks, unclosed fences,
+lazily continued blockquotes, aligned table columns, an image beside other
+text, emphasis around an image or a mention, and a link with no address.
+Where CommonMark and this parser would read the same text differently, it
+refuses rather than choosing.
+
+Some refusals are Jira's content model rather than markdown's, established by
+posting each combination to a real site: emphasis on inline code, and a
+blockquote, panel, table, rule, heading, or task list nested where Jira will
+not store one. Jira's own answer to those is `INVALID_INPUT; comment:
+INVALID_INPUT`, which names neither the node nor where it was.
 
 Reading is the other direction and is described under [ADF converted to
 markdown](#adf-converted-to-markdown): a Cloud body comes back as markdown, or
@@ -553,3 +598,6 @@ Update this document in the same change that alters any of:
 - An error `code` string, or the conditions under which `retryable` is true.
 - The escaping rules of any writer, or the type-promotion table above.
 - Which format is the default for a content shape.
+- What the ADF converter carries, drops, or refuses, in either direction —
+  including the `jira-` link schemes, which are as much a part of the contract
+  as an element name.

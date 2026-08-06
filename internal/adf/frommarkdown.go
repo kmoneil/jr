@@ -48,6 +48,22 @@ func FromMarkdown(text string) (Node, error) {
 
 	doc := Node{Type: "doc", Version: Version, Content: content}
 	numberTasks(doc.Content, new(int))
+
+	// Anything this builds has to be something ToMarkdown can carry back.
+	//
+	// Otherwise the two halves of this package disagree about the subset, and
+	// a body means one thing going into Jira and another coming out — which is
+	// the exact failure the whole package exists to prevent, arriving from the
+	// inside. Checking it here costs one conversion of a small document and
+	// makes the agreement structural rather than a property the tests happen
+	// to hold: every case the round-trip fuzzer found was one of these.
+	if _, err := ToMarkdown(doc); err != nil {
+		return Node{}, errs.Usage("MARKDOWN_UNSUPPORTED",
+			"this markdown builds something that cannot be written down again").
+			WithDetail("%s", errs.Coerce(err).Message).
+			WithRemedy("remove it, or send the body with --body-format text " +
+				"to store it as the characters you typed")
+	}
 	return doc, nil
 }
 
@@ -84,6 +100,68 @@ func unsupported(line int, what string, args ...any) *errs.Error {
 		WithDetail("line %d", line).
 		WithRemedy("remove it, or send the body with --body-format text to " +
 			"store it as the characters you typed")
+}
+
+// blocksAllowedIn is what Jira Cloud accepts inside each container.
+//
+// It is not the ADF documentation's content model; it is the sandbox's answer
+// to posting each combination. Jira refuses the rest with "INVALID_INPUT;
+// comment: INVALID_INPUT", which names neither the node nor where it was — so
+// a caller who nested a table inside a quote gets a message about their
+// markdown here, and a 400 about nothing there.
+var blocksAllowedIn = map[string]map[string]bool{
+	"blockquote": {
+		"paragraph": true, "codeBlock": true,
+		"bulletList": true, "orderedList": true,
+		"mediaSingle": true, "mediaGroup": true,
+	},
+	"panel": {
+		"paragraph": true, "heading": true, "codeBlock": true,
+		"bulletList": true, "orderedList": true, "taskList": true,
+		"rule": true, "mediaSingle": true, "mediaGroup": true, "blockCard": true,
+	},
+	"listItem": {
+		"paragraph": true, "codeBlock": true,
+		"bulletList": true, "orderedList": true, "taskList": true,
+		"mediaSingle": true, "mediaGroup": true,
+	},
+}
+
+// blockNames read as a sentence, because the refusal is one.
+var blockNames = map[string]string{
+	"paragraph":   "a paragraph",
+	"heading":     "a heading",
+	"blockquote":  "a blockquote",
+	"panel":       "a panel",
+	"table":       "a table",
+	"rule":        "a rule",
+	"codeBlock":   "a code block",
+	"bulletList":  "a list",
+	"orderedList": "a list",
+	"taskList":    "a task list",
+	"listItem":    "a list item",
+	"mediaSingle": "an image",
+	"mediaGroup":  "images",
+}
+
+func blockName(nodeType string) string {
+	if name, ok := blockNames[nodeType]; ok {
+		return name
+	}
+	return "a " + nodeType
+}
+
+// checkContent refuses a block Jira will not accept where it was written.
+func checkContent(container string, content []Node, at int) error {
+	allowed := blocksAllowedIn[container]
+	for _, n := range content {
+		if allowed[n.Type] {
+			continue
+		}
+		return unsupported(at, "%s inside %s", blockName(n.Type), blockName(container)).
+			WithRemedy("Jira does not store one there; move it out")
+	}
+	return nil
 }
 
 // parseBlocks converts a run of lines. first is the 1-based number of lines[0]
@@ -144,6 +222,12 @@ func isIndentedCode(line string) bool {
 }
 
 // fenceOf returns the fence that opens a code block, or "".
+//
+// A backtick fence whose info string holds a backtick is not a fence — that is
+// CommonMark's rule, and it is what keeps a line beginning with a code span of
+// three backticks a paragraph. Reading it as a fence was found by the
+// round-trip fuzzer: a code span holding two backticks is written with three,
+// and the line then opened a block that swallowed the rest of the document.
 func fenceOf(line string) string {
 	trimmed := strings.TrimLeft(line, " ")
 	for _, char := range []string{"`", "~"} {
@@ -151,9 +235,13 @@ func fenceOf(line string) string {
 		for run < len(trimmed) && string(trimmed[run]) == char {
 			run++
 		}
-		if run >= 3 {
-			return trimmed[:run]
+		if run < 3 {
+			continue
 		}
+		if char == "`" && strings.Contains(trimmed[run:], "`") {
+			return ""
+		}
+		return trimmed[:run]
 	}
 	return ""
 }
@@ -161,9 +249,6 @@ func fenceOf(line string) string {
 func parseFence(lines []string, at int) (Node, int, error) {
 	fence := fenceOf(lines[0])
 	info := strings.TrimSpace(strings.TrimPrefix(strings.TrimLeft(lines[0], " "), fence))
-	if strings.HasPrefix(fence, "`") && strings.Contains(info, "`") {
-		return Node{}, 0, unsupported(at, "a backtick in a code fence's language")
-	}
 
 	for end := 1; end < len(lines); end++ {
 		closer := strings.TrimSpace(lines[end])
@@ -202,8 +287,7 @@ func parseHeading(lines []string, at int) (Node, int, error) {
 	trimmed := strings.TrimLeft(lines[0], " ")
 	level := headingLevel(lines[0])
 	text := strings.TrimSpace(trimmed[level:])
-	// A closing run of hashes is decoration, not content.
-	text = strings.TrimRight(text, "#")
+	text = trimClosingHashes(text)
 
 	content, err := parseInline(strings.TrimSpace(text), at)
 	if err != nil {
@@ -214,6 +298,27 @@ func parseHeading(lines []string, at int) (Node, int, error) {
 		Attrs:   map[string]any{"level": float64(level)},
 		Content: content,
 	}, 1, nil
+}
+
+// trimClosingHashes removes a heading's decorative closing run.
+//
+// It is decoration only where a space precedes it, or where it is the whole
+// heading — CommonMark's rule, and the one that keeps `# \#` a heading whose
+// text is a hash. Trimming every trailing hash ate the escape and turned the
+// heading into a stray backslash, which the round-trip fuzzer found by writing
+// one and reading it back.
+func trimClosingHashes(text string) string {
+	end := len(text)
+	for end > 0 && text[end-1] == '#' {
+		end--
+	}
+	if end == len(text) {
+		return text
+	}
+	if end == 0 || text[end-1] == ' ' {
+		return strings.TrimRight(text[:end], " ")
+	}
+	return text
 }
 
 // isThematicBreak reports a rule: three or more of one character, spaces
@@ -276,11 +381,17 @@ func parseQuote(lines []string, at int) (Node, int, error) {
 		return Node{}, 0, err
 	}
 	if kind == "" {
+		if err := checkContent("blockquote", content, at); err != nil {
+			return Node{}, 0, err
+		}
 		return Node{Type: "blockquote", Content: content}, used, nil
 	}
 	if len(content) == 0 {
 		// A panel with no content is not a shape Jira stores.
 		content = []Node{{Type: "paragraph"}}
+	}
+	if err := checkContent("panel", content, at); err != nil {
+		return Node{}, 0, err
 	}
 	return Node{
 		Type:    "panel",
@@ -444,6 +555,9 @@ func parseList(lines []string, at int) (Node, int, error) {
 		}
 		if len(content) == 0 {
 			content = []Node{{Type: "paragraph"}}
+		}
+		if err := checkContent("listItem", content, it.at); err != nil {
+			return Node{}, 0, err
 		}
 		nodes = append(nodes, Node{Type: "listItem", Content: content})
 	}
@@ -660,10 +774,21 @@ func parseParagraph(lines []string, at int) (Node, int, error) {
 		used++
 	}
 
-	content, err := parseInline(strings.Join(lines[:used], "\n"), at)
+	// Each line loses its leading and trailing whitespace, which is what
+	// markdown does with it: indentation before a paragraph line is stripped,
+	// and whitespace after one is either a break or nothing. Keeping it would
+	// build a document ToMarkdown then refuses, because there is no spelling
+	// that carries it — the two halves have to agree on the same subset.
+	trimmed := make([]string, 0, used)
+	for _, line := range lines[:used] {
+		trimmed = append(trimmed, strings.Trim(line, " \t"))
+	}
+
+	content, err := parseInline(strings.Join(trimmed, "\n"), at)
 	if err != nil {
 		return Node{}, 0, err
 	}
+	content = trimAroundBreaks(content)
 
 	// A paragraph holding nothing but images is how ADF spells an attachment,
 	// which is a block of its own rather than a paragraph.
@@ -678,6 +803,40 @@ func parseParagraph(lines []string, at int) (Node, int, error) {
 		}
 	}
 	return Node{Type: "paragraph", Content: content}, used, nil
+}
+
+// trimAroundBreaks drops the whitespace on either side of a line break.
+//
+// Markdown does the same: a space before the backslash is part of the break's
+// spelling and indentation after it is indentation. Keeping either builds a
+// paragraph whose line ends in a space, which ToMarkdown then refuses because
+// there is no way to write it down — the round-trip fuzzer found it with
+// `0 \` and a second line.
+//
+// Only unmarked text is trimmed. A space inside a code span is code.
+func trimAroundBreaks(nodes []Node) []Node {
+	for i := range nodes {
+		if nodes[i].Type != "text" || len(nodes[i].Marks) > 0 {
+			continue
+		}
+		if i+1 < len(nodes) && nodes[i+1].Type == "hardBreak" {
+			nodes[i].Text = strings.TrimRight(nodes[i].Text, " \t")
+		}
+		if i > 0 && nodes[i-1].Type == "hardBreak" {
+			nodes[i].Text = strings.TrimLeft(nodes[i].Text, " \t")
+		}
+	}
+
+	// ADF has no text node holding an empty string, and one left behind by the
+	// trimming above is a node Jira would reject.
+	out := nodes[:0]
+	for _, n := range nodes {
+		if n.Type == "text" && n.Text == "" {
+			continue
+		}
+		out = append(out, n)
+	}
+	return out
 }
 
 // startsBlock reports whether a line interrupts the paragraph above it.

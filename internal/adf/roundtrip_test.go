@@ -55,7 +55,6 @@ func TestMarkdownSurvivesTheRoundTrip(t *testing.T) {
 		{"strikethrough", "~~gone~~ but not forgotten"},
 		{"code span", "call `client.Do(req)` first"},
 		{"a code span holding a backtick", "``a ` b``"},
-		{"code inside strong", "**`x`**"},
 		{"a link", "see [the docs](https://example.invalid/x)"},
 		{"a link with a title", `see [the docs](https://example.invalid/x "Docs")`},
 		{"a link whose address needs brackets", "[a](<https://example.invalid/a(b) c>)"},
@@ -116,6 +115,24 @@ func TestFromMarkdownRefusesWhatItCannotStore(t *testing.T) {
 		{"an attachment written as a link", "[a](jira-media:uuid)", "written as a link"},
 		{"a date that is not a stamp", "[x](jira-date:soon)", "stamped"},
 		{"a task with two paragraphs", "- [ ] one\n\n  two\n", "more than one paragraph"},
+
+		// Jira's own content model, established by posting each of these to
+		// the sandbox rather than read off the ADF documentation. Its refusal
+		// is "INVALID_INPUT; comment: INVALID_INPUT", which names nothing.
+		{"emphasised code", "**`x`**", "emphasis on inline code"},
+		{"struck code", "~~`x`~~", "emphasis on inline code"},
+		{"a quote inside a quote", "> > deep", "a blockquote inside a blockquote"},
+		{"a panel inside a quote", "> > [!INFO]\n> > x", "a panel inside a blockquote"},
+		{"a table inside a quote", "> | a |\n> | --- |", "a table inside a blockquote"},
+		{"a heading inside a quote", "> # x", "a heading inside a blockquote"},
+		{"a rule inside a quote", "> ---", "a rule inside a blockquote"},
+		{"a task list inside a quote", "> - [ ] x", "a task list inside a blockquote"},
+		{"a table inside a panel", "> [!INFO]\n> | a |\n> | --- |", "a table inside a panel"},
+		{"a quote inside a panel", "> [!INFO]\n> > x", "a blockquote inside a panel"},
+		{"a panel inside a panel", "> [!INFO]\n> > [!NOTE]\n> > x", "a panel inside a panel"},
+		{"a table inside a list item", "- x\n\n  | a |\n  | --- |", "a table inside a list item"},
+		{"a rule inside a list item", "- x\n\n  ---", "a rule inside a list item"},
+		{"a heading inside a list item", "- # x", "a heading inside a list item"},
 	}
 
 	for _, c := range cases {

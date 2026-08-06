@@ -1,0 +1,9472 @@
+[
+ {
+  "name": "empty paragraph",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": []
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "plain text",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "A plain sentence."
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "two paragraphs",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "One."
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "Two."
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "unicode",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "héllo wörld — em dash, 日本語, ζ"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "emoji character",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "ship it 🚢"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "markdown punctuation as text",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "**not bold** _nor em_ [not a link](x) `not code`"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "pipe and backslash",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "a | b \\ c"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "html-looking text",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "<script>alert(1)</script> & &amp;"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "cdata terminator",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "a ]]> b"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "leading hash",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "# not a heading"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "leading dash",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "- not a list"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "ordered marker",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "1. not a list"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "long line",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word "
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "hard break",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "one"
+      },
+      {
+       "type": "hardBreak"
+      },
+      {
+       "type": "text",
+       "text": "two"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "two hard breaks",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "a"
+      },
+      {
+       "type": "hardBreak"
+      },
+      {
+       "type": "hardBreak"
+      },
+      {
+       "type": "text",
+       "text": "b"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "trailing whitespace",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "trailing   "
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "leading whitespace",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "   leading"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "heading level 1",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 1
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Level 1"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "heading level 2",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 2
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Level 2"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "heading level 3",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 3
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Level 3"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "heading level 4",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 4
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Level 4"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "heading level 5",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 5
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Level 5"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "heading level 6",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 6
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Level 6"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "empty heading",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 2
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "heading with a mark",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 2
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "bold ",
+       "marks": [
+        {
+         "type": "strong"
+        }
+       ]
+      },
+      {
+       "type": "text",
+       "text": "plain"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "mark: strong",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strong"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "mark: em",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "em"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "mark: code",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "code"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "mark: strike",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strike"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "mark: underline",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "underline"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "mark: superscript",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sup"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "mark: subscript",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sub"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "mark: text colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "textColor",
+         "attrs": {
+          "color": "#ff5630"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "mark: background colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "backgroundColor",
+         "attrs": {
+          "color": "#fff0b3"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "mark: link",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "mark: link with a title",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x",
+          "title": "Docs"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: strong + em",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strong"
+        },
+        {
+         "type": "em"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: strong + code",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strong"
+        },
+        {
+         "type": "code"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "marks: strong + strike",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strong"
+        },
+        {
+         "type": "strike"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: strong + underline",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strong"
+        },
+        {
+         "type": "underline"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: strong + superscript",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strong"
+        },
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sup"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: strong + subscript",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strong"
+        },
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sub"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: strong + text colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strong"
+        },
+        {
+         "type": "textColor",
+         "attrs": {
+          "color": "#ff5630"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: strong + background colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strong"
+        },
+        {
+         "type": "backgroundColor",
+         "attrs": {
+          "color": "#fff0b3"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: strong + link",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strong"
+        },
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: strong + link with a title",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strong"
+        },
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x",
+          "title": "Docs"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: em + code",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "em"
+        },
+        {
+         "type": "code"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "marks: em + strike",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "em"
+        },
+        {
+         "type": "strike"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: em + underline",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "em"
+        },
+        {
+         "type": "underline"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: em + superscript",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "em"
+        },
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sup"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: em + subscript",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "em"
+        },
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sub"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: em + text colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "em"
+        },
+        {
+         "type": "textColor",
+         "attrs": {
+          "color": "#ff5630"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: em + background colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "em"
+        },
+        {
+         "type": "backgroundColor",
+         "attrs": {
+          "color": "#fff0b3"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: em + link",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "em"
+        },
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: em + link with a title",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "em"
+        },
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x",
+          "title": "Docs"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: code + strike",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "code"
+        },
+        {
+         "type": "strike"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "marks: code + underline",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "code"
+        },
+        {
+         "type": "underline"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "marks: code + superscript",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "code"
+        },
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sup"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "marks: code + subscript",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "code"
+        },
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sub"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "marks: code + text colour",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "code"
+        },
+        {
+         "type": "textColor",
+         "attrs": {
+          "color": "#ff5630"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "marks: code + background colour",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "code"
+        },
+        {
+         "type": "backgroundColor",
+         "attrs": {
+          "color": "#fff0b3"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "marks: code + link",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "code"
+        },
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: code + link with a title",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "code"
+        },
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x",
+          "title": "Docs"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: strike + underline",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strike"
+        },
+        {
+         "type": "underline"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: strike + superscript",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strike"
+        },
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sup"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: strike + subscript",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strike"
+        },
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sub"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: strike + text colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strike"
+        },
+        {
+         "type": "textColor",
+         "attrs": {
+          "color": "#ff5630"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: strike + background colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strike"
+        },
+        {
+         "type": "backgroundColor",
+         "attrs": {
+          "color": "#fff0b3"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: strike + link",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strike"
+        },
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: strike + link with a title",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strike"
+        },
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x",
+          "title": "Docs"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: underline + superscript",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "underline"
+        },
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sup"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: underline + subscript",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "underline"
+        },
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sub"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: underline + text colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "underline"
+        },
+        {
+         "type": "textColor",
+         "attrs": {
+          "color": "#ff5630"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: underline + background colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "underline"
+        },
+        {
+         "type": "backgroundColor",
+         "attrs": {
+          "color": "#fff0b3"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: underline + link",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "underline"
+        },
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: underline + link with a title",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "underline"
+        },
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x",
+          "title": "Docs"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: superscript + subscript",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sup"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: superscript + text colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sup"
+         }
+        },
+        {
+         "type": "textColor",
+         "attrs": {
+          "color": "#ff5630"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: superscript + background colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sup"
+         }
+        },
+        {
+         "type": "backgroundColor",
+         "attrs": {
+          "color": "#fff0b3"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: superscript + link",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sup"
+         }
+        },
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: superscript + link with a title",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sup"
+         }
+        },
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x",
+          "title": "Docs"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: subscript + text colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sub"
+         }
+        },
+        {
+         "type": "textColor",
+         "attrs": {
+          "color": "#ff5630"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: subscript + background colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sub"
+         }
+        },
+        {
+         "type": "backgroundColor",
+         "attrs": {
+          "color": "#fff0b3"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: subscript + link",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sub"
+         }
+        },
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: subscript + link with a title",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sub"
+         }
+        },
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x",
+          "title": "Docs"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: text colour + background colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "textColor",
+         "attrs": {
+          "color": "#ff5630"
+         }
+        },
+        {
+         "type": "backgroundColor",
+         "attrs": {
+          "color": "#fff0b3"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: text colour + link",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "textColor",
+         "attrs": {
+          "color": "#ff5630"
+         }
+        },
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: text colour + link with a title",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "textColor",
+         "attrs": {
+          "color": "#ff5630"
+         }
+        },
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x",
+          "title": "Docs"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: background colour + link",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "backgroundColor",
+         "attrs": {
+          "color": "#fff0b3"
+         }
+        },
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: background colour + link with a title",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "backgroundColor",
+         "attrs": {
+          "color": "#fff0b3"
+         }
+        },
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x",
+          "title": "Docs"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: link + link with a title",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "adjacent nodes, same mark",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "bo",
+       "marks": [
+        {
+         "type": "strong"
+        }
+       ]
+      },
+      {
+       "type": "text",
+       "text": "ld",
+       "marks": [
+        {
+         "type": "strong"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "adjacent nodes, different marks",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "a",
+       "marks": [
+        {
+         "type": "strong"
+        }
+       ]
+      },
+      {
+       "type": "text",
+       "text": "b",
+       "marks": [
+        {
+         "type": "em"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "mark around punctuation",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "**",
+       "marks": [
+        {
+         "type": "strong"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "code holding a backtick",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "a ` b",
+       "marks": [
+        {
+         "type": "code"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "code holding markdown",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "**x**",
+       "marks": [
+        {
+         "type": "code"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "link whose href holds brackets",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "x",
+       "marks": [
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/a(b)"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "link whose href holds a space",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "x",
+       "marks": [
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/a b"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "bullet list",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "one"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "two"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "ordered list",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "orderedList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "one"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "two"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "ordered list starting at 5",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "orderedList",
+     "attrs": {
+      "order": 5
+     },
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "five"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "single item list",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "only"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "empty list item",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "nested bullet list",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "outer"
+          }
+         ]
+        },
+        {
+         "type": "bulletList",
+         "content": [
+          {
+           "type": "listItem",
+           "content": [
+            {
+             "type": "paragraph",
+             "content": [
+              {
+               "type": "text",
+               "text": "inner"
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "three deep",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "a"
+          }
+         ]
+        },
+        {
+         "type": "bulletList",
+         "content": [
+          {
+           "type": "listItem",
+           "content": [
+            {
+             "type": "paragraph",
+             "content": [
+              {
+               "type": "text",
+               "text": "b"
+              }
+             ]
+            },
+            {
+             "type": "bulletList",
+             "content": [
+              {
+               "type": "listItem",
+               "content": [
+                {
+                 "type": "paragraph",
+                 "content": [
+                  {
+                   "type": "text",
+                   "text": "c"
+                  }
+                 ]
+                }
+               ]
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "list item with two paragraphs",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "one"
+          }
+         ]
+        },
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "two"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "list item with a code block",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "run"
+          }
+         ]
+        },
+        {
+         "type": "codeBlock",
+         "attrs": {
+          "language": "go"
+         },
+         "content": [
+          {
+           "type": "text",
+           "text": "x := 1"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "ordered inside bullet",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "outer"
+          }
+         ]
+        },
+        {
+         "type": "orderedList",
+         "content": [
+          {
+           "type": "listItem",
+           "content": [
+            {
+             "type": "paragraph",
+             "content": [
+              {
+               "type": "text",
+               "text": "inner"
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "task list",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "taskList",
+     "content": [
+      {
+       "type": "taskItem",
+       "content": [
+        {
+         "type": "text",
+         "text": "done"
+        }
+       ],
+       "attrs": {
+        "localId": "a",
+        "state": "DONE"
+       }
+      },
+      {
+       "type": "taskItem",
+       "content": [
+        {
+         "type": "text",
+         "text": "todo"
+        }
+       ],
+       "attrs": {
+        "localId": "b",
+        "state": "TODO"
+       }
+      }
+     ],
+     "attrs": {
+      "localId": "t1"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "task with a mark",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "taskList",
+     "content": [
+      {
+       "type": "taskItem",
+       "content": [
+        {
+         "type": "text",
+         "text": "bold",
+         "marks": [
+          {
+           "type": "strong"
+          }
+         ]
+        }
+       ],
+       "attrs": {
+        "localId": "c",
+        "state": "TODO"
+       }
+      }
+     ],
+     "attrs": {
+      "localId": "t2"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "nested task list",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "taskList",
+     "content": [
+      {
+       "type": "taskItem",
+       "content": [
+        {
+         "type": "text",
+         "text": "outer"
+        }
+       ],
+       "attrs": {
+        "localId": "d",
+        "state": "TODO"
+       }
+      },
+      {
+       "type": "taskList",
+       "content": [
+        {
+         "type": "taskItem",
+         "content": [
+          {
+           "type": "text",
+           "text": "inner"
+          }
+         ],
+         "attrs": {
+          "localId": "e",
+          "state": "DONE"
+         }
+        }
+       ],
+       "attrs": {
+        "localId": "t4"
+       }
+      }
+     ],
+     "attrs": {
+      "localId": "t3"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "blockquote",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "blockquote",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "quoted"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "blockquote, two paragraphs",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "blockquote",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "one"
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "two"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "blockquote holding a list",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "blockquote",
+     "content": [
+      {
+       "type": "bulletList",
+       "content": [
+        {
+         "type": "listItem",
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "a"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "nested blockquote",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "blockquote",
+     "content": [
+      {
+       "type": "blockquote",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "deep"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "rule",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "rule"
+    }
+   ]
+  }
+ },
+ {
+  "name": "rule between paragraphs",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "a"
+      }
+     ]
+    },
+    {
+     "type": "rule"
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "b"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "panel: info",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "panel",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "a info panel"
+        }
+       ]
+      }
+     ],
+     "attrs": {
+      "panelType": "info"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "panel: note",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "panel",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "a note panel"
+        }
+       ]
+      }
+     ],
+     "attrs": {
+      "panelType": "note"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "panel: warning",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "panel",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "a warning panel"
+        }
+       ]
+      }
+     ],
+     "attrs": {
+      "panelType": "warning"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "panel: success",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "panel",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "a success panel"
+        }
+       ]
+      }
+     ],
+     "attrs": {
+      "panelType": "success"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "panel: error",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "panel",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "a error panel"
+        }
+       ]
+      }
+     ],
+     "attrs": {
+      "panelType": "error"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "panel: custom",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "panel",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "custom"
+        }
+       ]
+      }
+     ],
+     "attrs": {
+      "panelType": "custom",
+      "panelColor": "#FF5630"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "panel holding a list",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "panel",
+     "content": [
+      {
+       "type": "bulletList",
+       "content": [
+        {
+         "type": "listItem",
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "a"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "attrs": {
+      "panelType": "info"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "empty panel",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "panel",
+     "content": [
+      {
+       "type": "paragraph"
+      }
+     ],
+     "attrs": {
+      "panelType": "info"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "code block, no language",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "codeBlock",
+     "content": [
+      {
+       "type": "text",
+       "text": "plain"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "code block, go",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "codeBlock",
+     "attrs": {
+      "language": "go"
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "client.Do(req)"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "code block holding a fence",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "codeBlock",
+     "content": [
+      {
+       "type": "text",
+       "text": "a ``` b"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "code block, several lines",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "codeBlock",
+     "content": [
+      {
+       "type": "text",
+       "text": "one\ntwo\nthree"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "empty code block",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "codeBlock"
+    }
+   ]
+  }
+ },
+ {
+  "name": "code block holding markdown",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "codeBlock",
+     "content": [
+      {
+       "type": "text",
+       "text": "# not a heading\n- not a list"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table 1x1",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "a"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table with a body row",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "k"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "v"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "a"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "b"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table with no header",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "a"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "b"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table with an empty cell",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "a"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table cell holding a pipe",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "a | b"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table cell spanning columns",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {
+          "colspan": 2
+         },
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "wide"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table cell spanning rows",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {
+          "rowspan": 2
+         },
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "tall"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table cell holding two paragraphs",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "a"
+            }
+           ]
+          },
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "b"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table cell holding a list",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "bulletList",
+           "content": [
+            {
+             "type": "listItem",
+             "content": [
+              {
+               "type": "paragraph",
+               "content": [
+                {
+                 "type": "text",
+                 "text": "a"
+                }
+               ]
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table with a short row",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "a"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "b"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "only"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "media, file",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "mediaSingle",
+     "attrs": {
+      "layout": "center"
+     },
+     "content": [
+      {
+       "type": "media",
+       "attrs": {
+        "type": "file",
+        "id": "0e1f2a3b-4c5d-6e7f-8a9b-0c1d2e3f4a5b",
+        "collection": "contentId-10001"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "media with alt text",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "mediaSingle",
+     "attrs": {
+      "layout": "center"
+     },
+     "content": [
+      {
+       "type": "media",
+       "attrs": {
+        "type": "file",
+        "id": "1e1f2a3b-4c5d-6e7f-8a9b-0c1d2e3f4a5b",
+        "collection": "contentId-10001",
+        "alt": "the crash"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "media, external",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "mediaSingle",
+     "attrs": {
+      "layout": "center"
+     },
+     "content": [
+      {
+       "type": "media",
+       "attrs": {
+        "type": "external",
+        "url": "https://example.invalid/a.png"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "media group",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "mediaGroup",
+     "content": [
+      {
+       "type": "media",
+       "attrs": {
+        "type": "external",
+        "url": "https://example.invalid/a.png"
+       }
+      },
+      {
+       "type": "media",
+       "attrs": {
+        "type": "external",
+        "url": "https://example.invalid/b.png"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "mention",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "thanks "
+      },
+      {
+       "type": "mention",
+       "attrs": {
+        "id": "unknown",
+        "text": "@557058:fabricated",
+        "accessLevel": ""
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "mention with no text",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "mention",
+       "attrs": {
+        "id": "unknown",
+        "text": "@557058:fabricated",
+        "accessLevel": ""
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "status: neutral",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "status",
+       "attrs": {
+        "text": "Neutral",
+        "color": "neutral"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "status: purple",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "status",
+       "attrs": {
+        "text": "Purple",
+        "color": "purple"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "status: blue",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "status",
+       "attrs": {
+        "text": "Blue",
+        "color": "blue"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "status: red",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "status",
+       "attrs": {
+        "text": "Red",
+        "color": "red"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "status: yellow",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "status",
+       "attrs": {
+        "text": "Yellow",
+        "color": "yellow"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "status: green",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "status",
+       "attrs": {
+        "text": "Green",
+        "color": "green"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "status with no colour",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "status",
+       "attrs": {
+        "text": "Plain"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "date",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "date",
+       "attrs": {
+        "timestamp": "1785974400000"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "date with a time",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "date",
+       "attrs": {
+        "timestamp": "1785999600000"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "emoji",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "emoji",
+       "attrs": {
+        "shortName": ":smile:",
+        "id": "1f604",
+        "text": "😄"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "emoji with no character",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "emoji",
+       "attrs": {
+        "shortName": ":jira:",
+        "id": "atlassian-jira"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "inline card",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "inlineCard",
+       "attrs": {
+        "url": "https://example.invalid/x"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "block card",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "blockCard",
+     "attrs": {
+      "url": "https://example.invalid/x"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "embed card",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "embedCard",
+     "attrs": {
+      "layout": "center",
+      "url": "https://example.invalid/x"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "inline card with data",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "inlineCard",
+       "attrs": {
+        "data": {
+         "@type": "Object"
+        }
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "expand",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "expand",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "hidden"
+        }
+       ]
+      }
+     ],
+     "attrs": {
+      "title": "more"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "nested expand",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "expand",
+     "content": [
+      {
+       "type": "nestedExpand",
+       "attrs": {
+        "title": "inner"
+       },
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "deep"
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "attrs": {
+      "title": "outer"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "two column layout",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "layoutSection",
+     "content": [
+      {
+       "type": "layoutColumn",
+       "attrs": {
+        "width": 50
+       },
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "left"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "layoutColumn",
+       "attrs": {
+        "width": 50
+       },
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "right"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "decision list",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "decisionList",
+     "content": [
+      {
+       "type": "decisionItem",
+       "content": [
+        {
+         "type": "text",
+         "text": "we ship"
+        }
+       ],
+       "attrs": {
+        "localId": "d2",
+        "state": "DECIDED"
+       }
+      }
+     ],
+     "attrs": {
+      "localId": "d1"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "extension",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "extension",
+     "attrs": {
+      "extensionKey": "widget",
+      "extensionType": "com.example.invalid"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "everything at once",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 2
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Repro"
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "Seen on "
+      },
+      {
+       "type": "text",
+       "text": "9.12.7",
+       "marks": [
+        {
+         "type": "code"
+        }
+       ]
+      },
+      {
+       "type": "text",
+       "text": " only."
+      }
+     ]
+    },
+    {
+     "type": "orderedList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "Start it"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "Wait"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "codeBlock",
+     "attrs": {
+      "language": "go"
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "client.Do(req)"
+      }
+     ]
+    },
+    {
+     "type": "panel",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "It hangs."
+        }
+       ]
+      }
+     ],
+     "attrs": {
+      "panelType": "warning"
+     }
+    },
+    {
+     "type": "rule"
+    },
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "env"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "result"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "dev"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "ok"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "deeply nested",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "blockquote",
+     "content": [
+      {
+       "type": "panel",
+       "attrs": {
+        "panelType": "info"
+       },
+       "content": [
+        {
+         "type": "bulletList",
+         "content": [
+          {
+           "type": "listItem",
+           "content": [
+            {
+             "type": "paragraph",
+             "content": [
+              {
+               "type": "text",
+               "text": "a",
+               "marks": [
+                {
+                 "type": "strong"
+                },
+                {
+                 "type": "em"
+                }
+               ]
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "marks: strong + em + strike",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strong"
+        },
+        {
+         "type": "em"
+        },
+        {
+         "type": "strike"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: strong + em + code",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strong"
+        },
+        {
+         "type": "em"
+        },
+        {
+         "type": "code"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "marks: strong + underline + strike",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strong"
+        },
+        {
+         "type": "underline"
+        },
+        {
+         "type": "strike"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: em + code + strike",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "em"
+        },
+        {
+         "type": "code"
+        },
+        {
+         "type": "strike"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "marks: strong + text colour + background colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "strong"
+        },
+        {
+         "type": "textColor",
+         "attrs": {
+          "color": "#ff5630"
+         }
+        },
+        {
+         "type": "backgroundColor",
+         "attrs": {
+          "color": "#fff0b3"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: link + strong + em",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x"
+         }
+        },
+        {
+         "type": "strong"
+        },
+        {
+         "type": "em"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: link + code + strike",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x"
+         }
+        },
+        {
+         "type": "code"
+        },
+        {
+         "type": "strike"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "marks: link + underline + text colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x"
+         }
+        },
+        {
+         "type": "underline"
+        },
+        {
+         "type": "textColor",
+         "attrs": {
+          "color": "#ff5630"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: superscript + strong + em",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sup"
+         }
+        },
+        {
+         "type": "strong"
+        },
+        {
+         "type": "em"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "marks: subscript + code + strike",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "marked",
+       "marks": [
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sub"
+         }
+        },
+        {
+         "type": "code"
+        },
+        {
+         "type": "strike"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "heading with strong",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 3
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "h",
+       "marks": [
+        {
+         "type": "strong"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "list item with strong",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "i",
+           "marks": [
+            {
+             "type": "strong"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table cell with strong",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c",
+             "marks": [
+              {
+               "type": "strong"
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "quote with strong",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "blockquote",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "q",
+         "marks": [
+          {
+           "type": "strong"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "heading with em",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 3
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "h",
+       "marks": [
+        {
+         "type": "em"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "list item with em",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "i",
+           "marks": [
+            {
+             "type": "em"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table cell with em",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c",
+             "marks": [
+              {
+               "type": "em"
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "quote with em",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "blockquote",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "q",
+         "marks": [
+          {
+           "type": "em"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "heading with code",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 3
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "h",
+       "marks": [
+        {
+         "type": "code"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "list item with code",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "i",
+           "marks": [
+            {
+             "type": "code"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table cell with code",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c",
+             "marks": [
+              {
+               "type": "code"
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "quote with code",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "blockquote",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "q",
+         "marks": [
+          {
+           "type": "code"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "heading with strike",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 3
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "h",
+       "marks": [
+        {
+         "type": "strike"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "list item with strike",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "i",
+           "marks": [
+            {
+             "type": "strike"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table cell with strike",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c",
+             "marks": [
+              {
+               "type": "strike"
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "quote with strike",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "blockquote",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "q",
+         "marks": [
+          {
+           "type": "strike"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "heading with underline",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 3
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "h",
+       "marks": [
+        {
+         "type": "underline"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "list item with underline",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "i",
+           "marks": [
+            {
+             "type": "underline"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table cell with underline",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c",
+             "marks": [
+              {
+               "type": "underline"
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "quote with underline",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "blockquote",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "q",
+         "marks": [
+          {
+           "type": "underline"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "heading with superscript",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 3
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "h",
+       "marks": [
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sup"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "list item with superscript",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "i",
+           "marks": [
+            {
+             "type": "subsup",
+             "attrs": {
+              "type": "sup"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table cell with superscript",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c",
+             "marks": [
+              {
+               "type": "subsup",
+               "attrs": {
+                "type": "sup"
+               }
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "quote with superscript",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "blockquote",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "q",
+         "marks": [
+          {
+           "type": "subsup",
+           "attrs": {
+            "type": "sup"
+           }
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "heading with subscript",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 3
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "h",
+       "marks": [
+        {
+         "type": "subsup",
+         "attrs": {
+          "type": "sub"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "list item with subscript",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "i",
+           "marks": [
+            {
+             "type": "subsup",
+             "attrs": {
+              "type": "sub"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table cell with subscript",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c",
+             "marks": [
+              {
+               "type": "subsup",
+               "attrs": {
+                "type": "sub"
+               }
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "quote with subscript",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "blockquote",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "q",
+         "marks": [
+          {
+           "type": "subsup",
+           "attrs": {
+            "type": "sub"
+           }
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "heading with text colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 3
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "h",
+       "marks": [
+        {
+         "type": "textColor",
+         "attrs": {
+          "color": "#ff5630"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "list item with text colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "i",
+           "marks": [
+            {
+             "type": "textColor",
+             "attrs": {
+              "color": "#ff5630"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table cell with text colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c",
+             "marks": [
+              {
+               "type": "textColor",
+               "attrs": {
+                "color": "#ff5630"
+               }
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "quote with text colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "blockquote",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "q",
+         "marks": [
+          {
+           "type": "textColor",
+           "attrs": {
+            "color": "#ff5630"
+           }
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "heading with background colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 3
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "h",
+       "marks": [
+        {
+         "type": "backgroundColor",
+         "attrs": {
+          "color": "#fff0b3"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "list item with background colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "i",
+           "marks": [
+            {
+             "type": "backgroundColor",
+             "attrs": {
+              "color": "#fff0b3"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table cell with background colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c",
+             "marks": [
+              {
+               "type": "backgroundColor",
+               "attrs": {
+                "color": "#fff0b3"
+               }
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "quote with background colour",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "blockquote",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "q",
+         "marks": [
+          {
+           "type": "backgroundColor",
+           "attrs": {
+            "color": "#fff0b3"
+           }
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "heading with link",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 3
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "h",
+       "marks": [
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "list item with link",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "i",
+           "marks": [
+            {
+             "type": "link",
+             "attrs": {
+              "href": "https://example.invalid/x"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table cell with link",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c",
+             "marks": [
+              {
+               "type": "link",
+               "attrs": {
+                "href": "https://example.invalid/x"
+               }
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "quote with link",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "blockquote",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "q",
+         "marks": [
+          {
+           "type": "link",
+           "attrs": {
+            "href": "https://example.invalid/x"
+           }
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "heading with link with a title",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "heading",
+     "attrs": {
+      "level": 3
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "h",
+       "marks": [
+        {
+         "type": "link",
+         "attrs": {
+          "href": "https://example.invalid/x",
+          "title": "Docs"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "list item with link with a title",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "i",
+           "marks": [
+            {
+             "type": "link",
+             "attrs": {
+              "href": "https://example.invalid/x",
+              "title": "Docs"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table cell with link with a title",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c",
+             "marks": [
+              {
+               "type": "link",
+               "attrs": {
+                "href": "https://example.invalid/x",
+                "title": "Docs"
+               }
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "quote with link with a title",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "blockquote",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "q",
+         "marks": [
+          {
+           "type": "link",
+           "attrs": {
+            "href": "https://example.invalid/x",
+            "title": "Docs"
+           }
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "panel info holding a code block",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "panel",
+     "content": [
+      {
+       "type": "codeBlock",
+       "content": [
+        {
+         "type": "text",
+         "text": "case 0"
+        }
+       ]
+      }
+     ],
+     "attrs": {
+      "panelType": "info"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "panel info holding a table",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "panel",
+     "attrs": {
+      "panelType": "info"
+     },
+     "content": [
+      {
+       "type": "table",
+       "content": [
+        {
+         "type": "tableRow",
+         "content": [
+          {
+           "type": "tableHeader",
+           "content": [
+            {
+             "type": "paragraph",
+             "content": [
+              {
+               "type": "text",
+               "text": "t"
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "panel note holding a code block",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "panel",
+     "content": [
+      {
+       "type": "codeBlock",
+       "content": [
+        {
+         "type": "text",
+         "text": "case 1"
+        }
+       ]
+      }
+     ],
+     "attrs": {
+      "panelType": "note"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "panel note holding a table",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "panel",
+     "attrs": {
+      "panelType": "note"
+     },
+     "content": [
+      {
+       "type": "table",
+       "content": [
+        {
+         "type": "tableRow",
+         "content": [
+          {
+           "type": "tableHeader",
+           "content": [
+            {
+             "type": "paragraph",
+             "content": [
+              {
+               "type": "text",
+               "text": "t"
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "panel warning holding a code block",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "panel",
+     "content": [
+      {
+       "type": "codeBlock",
+       "content": [
+        {
+         "type": "text",
+         "text": "case 2"
+        }
+       ]
+      }
+     ],
+     "attrs": {
+      "panelType": "warning"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "panel warning holding a table",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "panel",
+     "attrs": {
+      "panelType": "warning"
+     },
+     "content": [
+      {
+       "type": "table",
+       "content": [
+        {
+         "type": "tableRow",
+         "content": [
+          {
+           "type": "tableHeader",
+           "content": [
+            {
+             "type": "paragraph",
+             "content": [
+              {
+               "type": "text",
+               "text": "t"
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "panel success holding a code block",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "panel",
+     "content": [
+      {
+       "type": "codeBlock",
+       "content": [
+        {
+         "type": "text",
+         "text": "case 3"
+        }
+       ]
+      }
+     ],
+     "attrs": {
+      "panelType": "success"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "panel success holding a table",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "panel",
+     "attrs": {
+      "panelType": "success"
+     },
+     "content": [
+      {
+       "type": "table",
+       "content": [
+        {
+         "type": "tableRow",
+         "content": [
+          {
+           "type": "tableHeader",
+           "content": [
+            {
+             "type": "paragraph",
+             "content": [
+              {
+               "type": "text",
+               "text": "t"
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "panel error holding a code block",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "panel",
+     "content": [
+      {
+       "type": "codeBlock",
+       "content": [
+        {
+         "type": "text",
+         "text": "case 4"
+        }
+       ]
+      }
+     ],
+     "attrs": {
+      "panelType": "error"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "panel error holding a table",
+  "sent": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "panel",
+     "attrs": {
+      "panelType": "error"
+     },
+     "content": [
+      {
+       "type": "table",
+       "content": [
+        {
+         "type": "tableRow",
+         "content": [
+          {
+           "type": "tableHeader",
+           "content": [
+            {
+             "type": "paragraph",
+             "content": [
+              {
+               "type": "text",
+               "text": "t"
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "refused-by-jira": true
+ },
+ {
+  "name": "ordered list of 1",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "orderedList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "1"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "bullet list of 1",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "1"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "ordered list of 2",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "orderedList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "1"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "2"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "bullet list of 2",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "1"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "2"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "ordered list of 3",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "orderedList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "1"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "2"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "3"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "bullet list of 3",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "1"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "2"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "3"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "ordered list of 4",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "orderedList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "1"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "2"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "3"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "4"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "bullet list of 4",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "1"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "2"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "3"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "4"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "ordered list of 5",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "orderedList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "1"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "2"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "3"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "4"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "5"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "bullet list of 5",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "1"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "2"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "3"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "4"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "5"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "ordered list of 6",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "orderedList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "1"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "2"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "3"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "4"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "5"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "6"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "bullet list of 6",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "1"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "2"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "3"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "4"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "5"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "6"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "ordered list of 7",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "orderedList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "1"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "2"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "3"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "4"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "5"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "6"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "7"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "bullet list of 7",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "1"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "2"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "3"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "4"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "5"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "6"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "7"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "ordered list of 8",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "orderedList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "1"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "2"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "3"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "4"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "5"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "6"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "7"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "8"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "bullet list of 8",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "bulletList",
+     "content": [
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "1"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "2"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "3"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "4"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "5"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "6"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "7"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "listItem",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "8"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table 2 columns",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c0"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c1"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "0"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "1"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table 3 columns",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c0"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c1"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c2"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "0"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "1"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "2"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table 4 columns",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c0"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c1"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c2"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c3"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "0"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "1"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "2"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "3"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table 5 columns",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c0"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c1"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c2"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c3"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c4"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "0"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "1"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "2"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "3"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "4"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table 6 columns",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c0"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c1"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c2"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c3"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c4"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c5"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "0"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "1"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "2"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "3"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "4"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "5"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "table 7 columns",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "table",
+     "content": [
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c0"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c1"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c2"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c3"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c4"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c5"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableHeader",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "c6"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableRow",
+       "content": [
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "0"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "1"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "2"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "3"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "4"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "5"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "tableCell",
+         "attrs": {},
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "6"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "text: trailing backslash \\",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "trailing backslash \\"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "text: a*b*c",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "a*b*c"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "text: a_b_c",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "a_b_c"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "text: ~tilde~",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "~tilde~"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "text: > quoted-looking",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "> quoted-looking"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "text: | pipe | row |",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "| pipe | row |"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "text: --- rule-looking",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "--- rule-looking"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "text:     four spaces",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "    four spaces"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "text: \t tab char",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "\t tab char"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "text: &amp; &lt; &gt;",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "&amp; &lt; &gt;"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "text: http://example.invalid/b",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "http://example.invalid/bare"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "text: [!NOTE] alert-looking",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "[!NOTE] alert-looking"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "text: ![img](x) image-looking",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "![img](x) image-looking"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "text: :smile: shortcode-lookin",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": ":smile: shortcode-looking"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "text: 1) paren list-looking",
+  "adf": {
+   "type": "doc",
+   "version": 1,
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "1) paren list-looking"
+      }
+     ]
+    }
+   ]
+  }
+ }
+]
