@@ -35,6 +35,16 @@ release, sorts against nothing, and does not announce that it is not a version.
 The User-Agent also carries the build profile — `jr/1.2.0 (reader)` tells an
 administrator the client that touched an issue could not have written to it.
 
+A tag that is not itself a semantic version fails the build rather than being
+stamped. `git tag nightly` produced `nightly+1.g2acd8a4` and `git tag rel/2024`
+produced a string holding a character semver does not allow at all, both
+straight through `${tag#v}` into the binary and out onto the wire. The script
+now validates its own output and names the offending tag, and the Makefile
+checks it — `$(shell)` keeps a script's output and discards its exit status, so
+a refusal alone would have stamped an empty release and built anyway. The four
+cases and the refusals are exercised in repositories the test builds, because
+this repository is only ever in one of them at a time.
+
 All four formats — `tsv`, `xml`, `json`, `yaml` — are available on every
 command. The defaults are a convenience; `--format` is the contract.
 `JIRA_FORMAT` sets the default globally; `--format` overrides it. An
@@ -721,6 +731,12 @@ Update this document in the same change that alters any of:
   subset — this tree emits some two hundred codes — so a code missing from them
   is one the contract does not promise, not one that is undocumented by
   accident.
+- The format of `jr version`'s `release` string, or what `scripts/version.sh`
+  accepts and refuses. The guarantee above is one a consumer can parse, and
+  nothing used to tell the next person editing that script that a document
+  depended on it. `internal/lint/version_test.go` asserts both — the four cases
+  in repositories it builds, and every worked `jr 1.2.0 (…)` example in this
+  file and in `docs/build-profiles.md` against the profiles the Makefile ships.
 - The escaping rules of any writer, or the type-promotion table above.
 - Which format is the default for a content shape.
 - What the ADF converter carries, drops, or refuses, in either direction —

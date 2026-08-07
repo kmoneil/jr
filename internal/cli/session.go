@@ -224,8 +224,6 @@ func (a *app) explainMissingSite(err error) error {
 		buildinfo.App)
 }
 
-// userAgent identifies this build to the server, including the profile, so a
-// site administrator can tell an agent build from a human one.
 // userAgent identifies this build to the server, e.g. `jr/1.2.0 (reader)`.
 //
 // The profile stays in it, which was an open question. It names the compile-out

@@ -1,7 +1,10 @@
 package lint_test
 
 import (
+	"bytes"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -34,8 +37,10 @@ var semver = regexp.MustCompile(
 // nothing had ever looked at the value.
 //
 // This runs in the repository it is testing, so it exercises whichever case
-// that tree is actually in — tagged, untagged, or dirty. The other cases are
-// exercised by the script's own logic and named in its header comment.
+// that tree happens to be in. That is one case out of the documented four, and
+// this tree is the untagged one — which is why the branch every release will
+// take is covered by TestTheVersionScriptCoversEveryDocumentedCase instead, in
+// repositories it builds.
 func TestTheStampedVersionIsSemver(t *testing.T) {
 	cmd := exec.Command("sh", "scripts/version.sh")
 	cmd.Dir = "../.."
@@ -56,21 +61,352 @@ func TestTheStampedVersionIsSemver(t *testing.T) {
 	}
 }
 
+// releaseDefault matches the declaration `Release = "0.0.0-unknown"`.
+var releaseDefault = regexp.MustCompile(`(?m)^\s*Release\s*=\s*"([^"]*)"`)
+
 // TestTheDefaultVersionIsSemver covers the build the Makefile did not make.
 //
 // `go build ./cmd/jr` stamps nothing, so the binary reports whatever the
 // package default is. That default used to be `0.1.0-dev`, which is a
 // plausible-looking release number for a build that has no idea what it is.
 // 0.0.0 is the honest answer, and it still has to parse.
+//
+// The literal is read out of the source rather than through buildinfo.Release,
+// which is a package variable any test may pin — `internal/cli/cli_test.go`
+// pins it to keep golden output stable. Nothing in this package does today, so
+// reading the variable was correct today, which is a different thing from
+// correct: the day something here pins it, this test would go on passing while
+// checking the pinned value instead of the default.
 func TestTheDefaultVersionIsSemver(t *testing.T) {
-	if !semver.MatchString(buildinfo.Release) {
-		t.Errorf("buildinfo.Release defaults to %q, which is not a semantic version",
-			buildinfo.Release)
+	const path = "../buildinfo/buildinfo.go"
+
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
 	}
-	if strings.HasPrefix(buildinfo.Release, "0.0.0") {
-		return
+	m := releaseDefault.FindSubmatch(body)
+	if m == nil {
+		t.Fatalf("%s no longer declares Release with a literal default; this "+
+			"test cannot see what an unstamped build reports", path)
 	}
-	t.Errorf("buildinfo.Release defaults to %q, which claims a release number. "+
-		"An unstamped build does not know what it is and should say so",
-		buildinfo.Release)
+	got := string(m[1])
+
+	if !semver.MatchString(got) {
+		t.Errorf("buildinfo.Release defaults to %q, which is not a semantic version", got)
+	}
+	if !strings.HasPrefix(got, "0.0.0") {
+		t.Errorf("buildinfo.Release defaults to %q, which claims a release number. "+
+			"An unstamped build does not know what it is and should say so", got)
+	}
+}
+
+// TestTheVersionScriptCoversEveryDocumentedCase builds a repository per case
+// and runs the script in it.
+//
+// The script's header names four cases and `docs/output-contract.md` promises
+// all four produce a semantic version. Until this existed, exactly one of them
+// ran under test — whichever one this repository was in, which is the untagged
+// one — and the test's own comment said the others "are exercised by the
+// script's own logic". The script's logic is the thing under test, so that
+// sentence asserted nothing, and the tagged branch is the branch every release
+// takes.
+func TestTheVersionScriptCoversEveryDocumentedCase(t *testing.T) {
+	const sha = `[0-9a-f]{7,}`
+
+	cases := []struct {
+		name  string
+		build func(t *testing.T, dir string)
+		want  *regexp.Regexp
+	}{{
+		name:  "no git at all",
+		build: func(*testing.T, string) {},
+		want:  regexp.MustCompile(`^0\.0\.0-unknown$`),
+	}, {
+		name:  "never tagged",
+		build: func(t *testing.T, dir string) { initRepo(t, dir) },
+		want:  regexp.MustCompile(`^0\.0\.0-untagged\+` + sha + `$`),
+	}, {
+		name: "never tagged, dirty",
+		build: func(t *testing.T, dir string) {
+			initRepo(t, dir)
+			// Untracked rather than modified, because that is the case
+			// `git describe --dirty` misses and this script does not: an
+			// untracked .go file in a package is compiled into the binary.
+			writeFile(t, dir, "untracked.go", "package x\n")
+		},
+		want: regexp.MustCompile(`^0\.0\.0-untagged\+` + sha + `\.dirty$`),
+	}, {
+		name: "tagged, clean",
+		build: func(t *testing.T, dir string) {
+			initRepo(t, dir)
+			git(t, dir, "tag", "v1.2.0")
+		},
+		want: regexp.MustCompile(`^1\.2\.0$`),
+	}, {
+		name: "tagged, moved on",
+		build: func(t *testing.T, dir string) {
+			initRepo(t, dir)
+			git(t, dir, "tag", "v1.2.0")
+			commit(t, dir, "second")
+		},
+		want: regexp.MustCompile(`^1\.2\.0\+1\.g` + sha + `$`),
+	}, {
+		name: "tagged, moved on, dirty",
+		build: func(t *testing.T, dir string) {
+			initRepo(t, dir)
+			git(t, dir, "tag", "v1.2.0")
+			commit(t, dir, "second")
+			writeFile(t, dir, "untracked.go", "package x\n")
+		},
+		want: regexp.MustCompile(`^1\.2\.0\+1\.g` + sha + `\.dirty$`),
+	}, {
+		// At the tag but not at what the tag points to. The count is 0 and the
+		// version is still not 1.2.0, which is the whole reason the dirty flag
+		// is consulted before the count.
+		name: "tagged, at the tag, dirty",
+		build: func(t *testing.T, dir string) {
+			initRepo(t, dir)
+			git(t, dir, "tag", "v1.2.0")
+			writeFile(t, dir, "untracked.go", "package x\n")
+		},
+		want: regexp.MustCompile(`^1\.2\.0\+0\.g` + sha + `\.dirty$`),
+	}}
+
+	script := versionScript(t)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			dir := t.TempDir()
+			c.build(t, dir)
+
+			stdout, stderr, err := run(t, script, dir)
+			if err != nil {
+				t.Fatalf("scripts/version.sh: %v\n%s", err, stderr)
+			}
+			got := strings.TrimSpace(stdout)
+			if !c.want.MatchString(got) {
+				t.Errorf("scripts/version.sh printed %q, want %v", got, c.want)
+			}
+			if !semver.MatchString(got) {
+				t.Errorf("scripts/version.sh printed %q, which is not a semantic version", got)
+			}
+		})
+	}
+}
+
+// TestTheVersionScriptRefusesATagThatIsNotAVersion covers the branch the
+// guarantee was written for and never had.
+//
+// `version=${tag#v}` passes anything through. Every tag below used to reach the
+// binary and the access log: `nightly`, `rel/2024` — which holds a character
+// semver does not allow at all — and `v1.2.0+meta`, whose own build metadata
+// collides with the commit count this script appends.
+//
+// The refusal has to be silent on stdout as well as non-zero. The Makefile
+// reads this script with `$(shell)`, which keeps the output and discards the
+// status, so anything printed here is stamped into a binary whatever the exit
+// code says.
+func TestTheVersionScriptRefusesATagThatIsNotAVersion(t *testing.T) {
+	cases := []struct {
+		name  string
+		tag   string
+		moved bool
+	}{
+		{name: "a word", tag: "nightly"},
+		{name: "a word, moved on", tag: "nightly", moved: true},
+		{name: "a path, holding a character semver forbids", tag: "rel/2024"},
+		{name: "a two-part version", tag: "v1.2"},
+		{name: "a tag carrying its own build metadata", tag: "v1.2.0+meta", moved: true},
+	}
+
+	script := versionScript(t)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			dir := t.TempDir()
+			initRepo(t, dir)
+			git(t, dir, "tag", c.tag)
+			if c.moved {
+				commit(t, dir, "second")
+			}
+
+			stdout, stderr, err := run(t, script, dir)
+			if err == nil {
+				t.Fatalf("the tag %q was accepted and produced %q", c.tag, strings.TrimSpace(stdout))
+			}
+			if stdout != "" {
+				t.Errorf("the tag %q was refused and %q still reached stdout, "+
+					"which is what the Makefile stamps", c.tag, stdout)
+			}
+			if !strings.Contains(stderr, c.tag) {
+				t.Errorf("the refusal for %q does not name the tag, and `git tag` "+
+					"is the fix:\n%s", c.tag, stderr)
+			}
+		})
+	}
+}
+
+// versionBanner is the shape buildinfo.Display prints, and userAgentBanner the
+// shape internal/cli builds for the wire. Both are asserted against the code
+// below before any documentation is read against them.
+var (
+	versionBanner   = regexp.MustCompile(`\bjr (\S+) \((\w+); tags=([^)]*)\)`)
+	userAgentBanner = regexp.MustCompile(`\bjr/(\S+) \((\w+)\)`)
+)
+
+// TestTheWorkedVersionExamplesAreOnesTheCodeCouldPrint reads every version
+// banner written into a doc or a doc comment and holds it to the code.
+//
+// The example used to be `0.1.0-dev`, which was literally what an unstamped
+// binary printed; it became `1.2.0`, which no build of this tree produces. That
+// is fine as a placeholder and not fine as an unchecked one — the number is
+// illustrative, but the shape around it is a contract, and `profiles_test.go`
+// parses the table and the tag block out of build-profiles.md while never
+// looking at the fenced example below them.
+//
+// So the release is held to the semver grammar rather than to a literal, and
+// the profile and its tag set are held to the ones the Makefile ships. A
+// rendering change in Display or userAgent fails at the first check, before any
+// file is read.
+func TestTheWorkedVersionExamplesAreOnesTheCodeCouldPrint(t *testing.T) {
+	if !versionBanner.MatchString(buildinfo.Display()) {
+		t.Fatalf("buildinfo.Display() prints %q, which this test no longer "+
+			"recognises; the pattern and every documented example need the "+
+			"same edit", buildinfo.Display())
+	}
+
+	shipped := map[string]string{}
+	for _, p := range profilesFromMakefile(t) {
+		shipped[p.name] = p.tags
+	}
+
+	files := []string{
+		"../../docs/build-profiles.md",
+		"../../docs/output-contract.md",
+		"../../internal/buildinfo/buildinfo.go",
+		"../../internal/cli/session.go",
+	}
+
+	for _, path := range files {
+		body, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+
+		found := 0
+		for _, m := range versionBanner.FindAllStringSubmatch(string(body), -1) {
+			found++
+			release, name, tags := m[1], m[2], m[3]
+			if !semver.MatchString(release) {
+				t.Errorf("%s: the example %q shows a release that is not a "+
+					"semantic version", path, m[0])
+			}
+			want, ok := shipped[name]
+			if !ok {
+				t.Errorf("%s: the example %q names a %q profile the Makefile "+
+					"does not ship", path, m[0], name)
+				continue
+			}
+			if tags != want {
+				t.Errorf("%s: the example %q gives the %s profile tags=%q and "+
+					"the Makefile builds it with %q", path, m[0], name, tags, want)
+			}
+		}
+
+		for _, m := range userAgentBanner.FindAllStringSubmatch(string(body), -1) {
+			found++
+			release, name := m[1], m[2]
+			if !semver.MatchString(release) {
+				t.Errorf("%s: the example %q shows a release that is not a "+
+					"semantic version", path, m[0])
+			}
+			if _, ok := shipped[name]; !ok {
+				t.Errorf("%s: the example %q names a %q profile the Makefile "+
+					"does not ship", path, m[0], name)
+			}
+		}
+
+		// A file that matched nothing is a file this test read and did not
+		// check. Each of the four carries a worked example today; one that
+		// stops matching has either lost it or been reformatted past what the
+		// patterns above recognise, and both need a person.
+		if found == 0 {
+			t.Errorf("%s holds no version example this test recognises", path)
+		}
+	}
+}
+
+// versionScript is the absolute path of the script under test, because every
+// case below runs it with the working directory set to a repository it built.
+func versionScript(t *testing.T) string {
+	t.Helper()
+	path, err := filepath.Abs("../../scripts/version.sh")
+	if err != nil {
+		t.Fatalf("locate scripts/version.sh: %v", err)
+	}
+	return path
+}
+
+// gitEnv isolates a git invocation from whoever is running the test. A signing
+// key, a commit template, or an alternative default branch in the developer's
+// own config would otherwise change what these repositories look like — and
+// GIT_CEILING_DIRECTORIES stops the "no git at all" case from finding a
+// repository somewhere above the temporary directory.
+func gitEnv(dir string) []string {
+	return append(
+		os.Environ(),
+		"GIT_CONFIG_GLOBAL=/dev/null",
+		"GIT_CONFIG_SYSTEM=/dev/null",
+		"GIT_CEILING_DIRECTORIES="+dir,
+		"GIT_AUTHOR_NAME=jr test",
+		"GIT_AUTHOR_EMAIL=jr@example.invalid",
+		"GIT_COMMITTER_NAME=jr test",
+		"GIT_COMMITTER_EMAIL=jr@example.invalid",
+	)
+}
+
+// git runs one git command in dir and fails the test if it does not succeed.
+func git(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Env = gitEnv(dir)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
+	}
+}
+
+// initRepo builds a repository with one commit in it, which is the least a
+// version can be computed from.
+func initRepo(t *testing.T, dir string) {
+	t.Helper()
+	git(t, dir, "init", "-q", "-b", "main")
+	commit(t, dir, "first")
+}
+
+// commit adds a tracked file and commits it, so the tree is clean afterwards.
+func commit(t *testing.T, dir, name string) {
+	t.Helper()
+	writeFile(t, dir, name+".txt", name+"\n")
+	git(t, dir, "add", ".")
+	git(t, dir, "commit", "-q", "-m", name)
+}
+
+func writeFile(t *testing.T, dir, name, body string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+		t.Fatalf("write %s: %v", name, err)
+	}
+}
+
+// run executes the version script in dir and returns both streams separately.
+// They are separate because the split is the assertion: a refusal writes to
+// stderr and must leave stdout empty.
+func run(t *testing.T, script, dir string) (stdout, stderr string, err error) {
+	t.Helper()
+	cmd := exec.Command("sh", script)
+	cmd.Dir = dir
+	cmd.Env = gitEnv(dir)
+	var out, errs bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &errs
+	err = cmd.Run()
+	return out.String(), errs.String(), err
 }

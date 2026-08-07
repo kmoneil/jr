@@ -6,7 +6,19 @@ BIN     := bin
 # Always semver, in every case — tagged, untagged, dirty, and no git at all.
 # `git describe --always` degraded to a bare commit hash, which is what a Jira
 # administrator saw in their access logs. See scripts/version.sh.
-VERSION ?= $(shell sh scripts/version.sh)
+#
+# Expanded here and checked, rather than left to `?=`. `$(shell)` takes the
+# script's output and discards its exit status, so a refusal would otherwise
+# stamp an empty release and build anyway — the script would refuse and the
+# build would not notice. `?=` also defers expansion to first use, which is too
+# late to check. This keeps the override: `make build VERSION=1.2.3` still
+# skips the script, because a command-line variable is already defined.
+ifeq ($(origin VERSION),undefined)
+VERSION := $(shell sh scripts/version.sh)
+ifeq ($(strip $(VERSION)),)
+$(error scripts/version.sh refused to produce a version — see its message above)
+endif
+endif
 COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
