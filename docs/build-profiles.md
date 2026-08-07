@@ -106,7 +106,7 @@ survives in a build without `write`.
 
 ## Enforcement
 
-The capability set is a compile-time constant, and three things follow:
+The capability set is a compile-time constant, and these things follow:
 
 **`jr schema` tells the truth.** A reader build does not list `issue create`. An
 agent introspecting the binary sees what is there, not a list of commands that
@@ -122,6 +122,16 @@ because it is not there.
 $ jr version --format tsv | grep display
 display	jr 1.2.0 (reader; tags=mcp)
 ```
+
+**A profile carries no code it cannot reach.** `make lint-untagged` runs
+`staticcheck -checks=U1000 ./...` with no build tags, which is the build a `ci`
+or `reader` user actually gets. `.golangci.yml` turns all eight tags on
+deliberately — code behind a tag is still shipped code — and the cost is that
+`unused` then analyses one build in which every file is present, so a symbol
+reachable only from a `//go:build write` file looks used. `echoMode` sat in an
+untagged file and was called from two write-tagged ones, so it compiled into
+the reader and the ci binary and could never run there. Nothing in the tree
+could see it: the linter that would have said so was the one configured not to.
 
 **A command declares the tags it needs.** `internal/cli/contract_test.go`
 iterates every registered command and asserts:
@@ -172,3 +182,8 @@ Update this document in the same change that alters any of:
 - The reader size budget in the Makefile.
 - What a profile is guaranteed not to contain.
 - The way tag-gated commands register themselves.
+- Which pass proves a profile contains no code it cannot reach, or the tool it
+  runs. `internal/lint/vuln_test.go` asserts that `make lint-untagged` is
+  wired into both `make lint` and the workflow, and that it uses staticcheck:
+  a second `golangci-lint run` inherits the config's build tags and reports
+  a clean answer it was never able to fail.

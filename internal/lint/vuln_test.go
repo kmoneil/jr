@@ -14,6 +14,13 @@ const (
 	vulnTarget    = "vuln"
 	vulnInstall   = "golang.org/x/vuln/cmd/govulncheck"
 	goDirectiveRe = `(?m)^go\s+(\S+)\s*$`
+
+	// The lint pass that runs with no build tags: its target, the tool it
+	// has to use, the check it has to enable, and what CI must install.
+	untaggedTarget  = "lint-untagged"
+	untaggedTool    = "staticcheck"
+	untaggedCheck   = "U1000"
+	untaggedInstall = "honnef.co/go/tools/cmd/staticcheck"
 )
 
 // TestTheVulnerabilityScanIsWiredIntoBothCIs is the gate on the gate.
@@ -88,4 +95,64 @@ func readFile(t *testing.T, path string) string {
 		t.Fatalf("read %s: %v", path, err)
 	}
 	return string(b)
+}
+
+// TestTheUntaggedUnusedPassIsWiredIntoBothCIs is the same gate as the one
+// above, on a check with the same failure mode.
+//
+// `.golangci.yml` sets build-tags to all eight on purpose — a capability that
+// only compiles under a tag is still shipped code. The side effect is that
+// `unused` analyses one build in which every file is present, so a symbol
+// reachable only from a `//go:build write` file looks used. `echoMode` and a
+// test fixture were both dead in the `ci` and `reader` profiles for as long as
+// they existed, and every gate in the tree reported green.
+//
+// Two places again, because the workflow calls targets one at a time: a pass
+// wired only into `make lint` is a pass CI does not run.
+func TestTheUntaggedUnusedPassIsWiredIntoBothCIs(t *testing.T) {
+	makefile := readFile(t, makefilePath)
+
+	target := regexp.MustCompile(`(?m)^` + untaggedTarget + `:\s*\n\t(.*)$`).
+		FindStringSubmatch(makefile)
+	if target == nil {
+		t.Fatalf("the Makefile has no %s target", untaggedTarget)
+	}
+	// staticcheck, not golangci-lint. `golangci-lint run --build-tags=` does
+	// not override `run.build-tags` from the config: that pass loads the same
+	// eight tags and reports the same clean answer, which is a gate that runs
+	// and cannot fail. This assertion is what keeps somebody from folding the
+	// two passes back together on the reasonable-looking grounds that the
+	// repository already has a linter.
+	if !strings.Contains(target[1], untaggedTool) {
+		t.Errorf("`make %s` runs %q rather than %s; a second golangci-lint run "+
+			"inherits the config's build tags and cannot see what this pass "+
+			"exists for", untaggedTarget, target[1], untaggedTool)
+	}
+	if !strings.Contains(target[1], untaggedCheck) {
+		t.Errorf("`make %s` runs %q, which does not enable %s",
+			untaggedTarget, target[1], untaggedCheck)
+	}
+
+	lint := regexp.MustCompile(`(?m)^lint:\s*(.*)$`).FindStringSubmatch(makefile)
+	if lint == nil {
+		t.Fatal("the Makefile has no lint target")
+	}
+	if !slices.Contains(strings.Fields(lint[1]), untaggedTarget) {
+		t.Errorf("`make lint` does not run %s; its prerequisites are %q",
+			untaggedTarget, lint[1])
+	}
+
+	workflow := readFile(t, ciWorkflow)
+	if !strings.Contains(workflow, "make "+untaggedTarget) {
+		t.Errorf("%s never runs `make %s`, so the pass is enforced only for "+
+			"whoever runs the Makefile by hand", ciWorkflow, untaggedTarget)
+	}
+	// Same reason govulncheck's install is asserted: the tool is not part of
+	// the Go distribution, and a workflow that calls the target without it
+	// fails on a missing binary, which reads like a broken runner rather than
+	// like a missing check.
+	if !strings.Contains(workflow, untaggedInstall) {
+		t.Errorf("%s runs `make %s` without installing %s",
+			ciWorkflow, untaggedTarget, untaggedInstall)
+	}
 }

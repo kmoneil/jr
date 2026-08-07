@@ -25,6 +25,16 @@ var dateLayouts = []string{
 // number, and a unit. `-7d`, `2w`, `+30m`.
 var relativePattern = regexp.MustCompile(`^[-+]?\d+[mhdwM]$`)
 
+// datePattern and dateSeparator tell an out-of-range date from a word, so
+// dateHint can say which part is wrong. Compiled once, beside relativePattern
+// rather than inside the function that uses them — every date on a query goes
+// through here, and one file compiling the same expression two ways is a
+// question a reader has to answer before they can trust either.
+var (
+	datePattern   = regexp.MustCompile(`^\d{4}[-/]\d{1,2}[-/]\d{1,2}$`)
+	dateSeparator = regexp.MustCompile(`[-/]`)
+)
+
 // dateFunctions are the JQL functions valid in a date comparison.
 var dateFunctions = map[string]bool{
 	"now":                  true,
@@ -83,11 +93,10 @@ func ParseDate(input string) (Value, error) {
 // dateHint explains a near-miss, so an off-by-one month is not reported the
 // same way as a word.
 func dateHint(s string) string {
-	digitsAndSeps := regexp.MustCompile(`^\d{4}[-/]\d{1,2}[-/]\d{1,2}$`)
-	if !digitsAndSeps.MatchString(s) {
+	if !datePattern.MatchString(s) {
 		return ""
 	}
-	parts := regexp.MustCompile(`[-/]`).Split(s, 3)
+	parts := dateSeparator.Split(s, 3)
 	month, _ := strconv.Atoi(parts[1])
 	day, _ := strconv.Atoi(parts[2])
 	switch {

@@ -226,10 +226,32 @@ golden:
 	@echo "Golden files rewritten. Any diff is a change to the public output"
 	@echo "contract: bump the schema version of the affected kind in the same commit."
 
-## lint: run golangci-lint
+## lint: run golangci-lint, with every tag on and with none
 .PHONY: lint
-lint:
+lint: lint-untagged
 	golangci-lint run
+
+# The config lints with all eight tags on, deliberately: a capability that only
+# compiles under a tag is still shipped code. The cost is that `unused` then
+# sees every file at once, so a symbol that is live under `write` and dead
+# without it looks used — which is how `echoMode` and a test fixture compiled
+# into the reader and ci binaries with nothing in the tree able to notice. This
+# pass looks at the build a user of those profiles actually gets.
+#
+# staticcheck rather than a second golangci-lint run. `golangci-lint run
+# --build-tags=` does not override `run.build-tags` from the config, so that
+# pass loads the same eight tags and reports the same clean answer — a gate
+# that runs and cannot fail. Checked by reverting both symbols and watching it
+# report zero. staticcheck is what golangci wraps for this check anyway, and it
+# takes the tags from the environment.
+#
+# What it reports is not a false positive. A symbol reachable only under a tag
+# belongs in a file that declares the tag; that is the whole guarantee the
+# profiles are sold on.
+## lint-untagged: the unused check the tagged pass cannot see
+.PHONY: lint-untagged
+lint-untagged:
+	staticcheck -checks=U1000 ./...
 
 # Vulnerability scan, over the module and the toolchain it is built with.
 #

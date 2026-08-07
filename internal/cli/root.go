@@ -170,6 +170,12 @@ func rejectUnknownSubcommand(cmd *cobra.Command, args []string) error {
 	return e.WithRemedy("run `%s --help` for the available commands", cmd.CommandPath())
 }
 
+// newLeaf builds the cobra command for one registered command.
+//
+// The two callbacks are methods returning closures rather than closures
+// written inline. Cobra wants functions, so something has to close over `rc`
+// and the flag binder; putting the bodies here made one function out of three
+// and hid the order the pieces actually run in.
 func (a *app) newLeaf(rc *registry.Command) *cobra.Command {
 	use := rc.Path[len(rc.Path)-1]
 	if spec := rc.ArgSpec(); spec != "" {
@@ -186,8 +192,14 @@ func (a *app) newLeaf(rc *registry.Command) *cobra.Command {
 	}
 
 	binder := bindFlags(cc, rc)
+	cc.Args = a.checkArity(rc)
+	cc.RunE = a.runLeaf(rc, binder)
+	return cc
+}
 
-	cc.Args = func(cmd *cobra.Command, args []string) error {
+// checkArity holds a call to the argument count the command declared.
+func (a *app) checkArity(rc *registry.Command) func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, args []string) error {
 		// --describe asks what this command needs. Requiring the caller to
 		// already supply it would make the question unanswerable for exactly
 		// the commands someone would ask it about.
@@ -205,8 +217,15 @@ func (a *app) newLeaf(rc *registry.Command) *cobra.Command {
 		}
 		return nil
 	}
+}
 
-	cc.RunE = func(cmd *cobra.Command, args []string) error {
+// runLeaf is what a command does when it is invoked: describe, or gate,
+// validate, run, and emit.
+func (a *app) runLeaf(
+	rc *registry.Command,
+	binder func(*cobra.Command) registry.Flags,
+) func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, args []string) error {
 		// --describe answers "what would this do" without doing it, so it runs
 		// before any validation the real invocation would have to satisfy.
 		if a.describe {
@@ -216,36 +235,10 @@ func (a *app) newLeaf(rc *registry.Command) *cobra.Command {
 			return err
 		}
 
-		inv := &registry.Invocation{
-			Args:     args,
-			Flags:    binder(cmd),
-			Limit:    registry.Limit{N: registry.DefaultLimit},
-			Stderr:   a.stderr,
-			Stdout:   a.stdout,
-			Progress: registry.NoProgress,
-		}
-		// Built lazily inside: a command that never connects never resolves a
-		// credential and never probes the deployment.
-		if rc.NeedsJira {
-			jira, err := a.jiraSession()
-			if err != nil {
-				return err
-			}
-			inv.Jira = jira
-		}
-		if rc.Paginated {
-			limit, err := registry.ParseLimit(cmd.Flags().Lookup("limit").Value.String())
-			if err != nil {
-				return err
-			}
-			inv.Limit = limit
-		}
-
-		format, err := a.resolveFormat(nil)
+		inv, err := a.newInvocation(cmd, rc, binder, args)
 		if err != nil {
 			return err
 		}
-		inv.Format = format
 
 		// A command's own validation runs before anything is written, which
 		// matters for a streaming command: its header goes out before its body
@@ -287,8 +280,49 @@ func (a *app) newLeaf(rc *registry.Command) *cobra.Command {
 		}
 		return a.emit(doc)
 	}
+}
 
-	return cc
+// newInvocation assembles everything a command is handed before it runs.
+//
+// Nothing here reaches Jira. The session is built lazily inside jiraSession, so
+// a command that never connects never resolves a credential and never probes
+// the deployment.
+func (a *app) newInvocation(
+	cmd *cobra.Command,
+	rc *registry.Command,
+	binder func(*cobra.Command) registry.Flags,
+	args []string,
+) (*registry.Invocation, error) {
+	inv := &registry.Invocation{
+		Args:     args,
+		Flags:    binder(cmd),
+		Limit:    registry.Limit{N: registry.DefaultLimit},
+		Stderr:   a.stderr,
+		Stdout:   a.stdout,
+		Progress: registry.NoProgress,
+	}
+
+	if rc.NeedsJira {
+		jira, err := a.jiraSession()
+		if err != nil {
+			return nil, err
+		}
+		inv.Jira = jira
+	}
+	if rc.Paginated {
+		limit, err := registry.ParseLimit(cmd.Flags().Lookup("limit").Value.String())
+		if err != nil {
+			return nil, err
+		}
+		inv.Limit = limit
+	}
+
+	format, err := a.resolveFormat(nil)
+	if err != nil {
+		return nil, err
+	}
+	inv.Format = format
+	return inv, nil
 }
 
 // describeArity renders an argument count for an error message.

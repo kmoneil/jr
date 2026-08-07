@@ -1646,47 +1646,6 @@ func (s *stubDoer) Do(_ context.Context, r transport.Request) (*transport.Respon
 	}, nil
 }
 
-// directoryJSON is a user directory per deployment, for the commands that
-// resolve an assignee.
-//
-// The two carry different identifiers on purpose. Cloud names a user by
-// accountId and Data Center by name, and a fixture carrying both would hide
-// which one the code picked — which is how a /myself fixture once tested
-// nothing at all.
-var directoryJSON = map[site.Kind]string{
-	site.Cloud: `[
- {
-  "accountId": "712020:8f3a",
-  "displayName": "Ada Lovelace",
-  "emailAddress": "ada@example.invalid",
-  "active": true
- },
- {
-  "accountId": "712020:9c1b",
-  "displayName": "Grace Hopper",
-  "emailAddress": "grace@example.invalid",
-  "active": true
- }
-]`,
-
-	site.DataCenter: `[
- {
-  "name": "ada",
-  "key": "ada",
-  "displayName": "Ada Lovelace",
-  "emailAddress": "ada@example.invalid",
-  "active": true
- },
- {
-  "name": "grace",
-  "key": "grace",
-  "displayName": "Grace Hopper",
-  "emailAddress": "grace@example.invalid",
-  "active": true
- }
-]`,
-}
-
 // TestListRunsAsARegisteredCommand exercises the layer a user actually
 // invokes. Every other test here drives Client directly, which left runList
 // and runGet at zero coverage — and "the test covered the function and not the

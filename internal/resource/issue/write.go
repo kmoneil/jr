@@ -39,6 +39,23 @@ func init() {
 	registry.Register(moveCommand())
 }
 
+// echoMode is bodyMode for the report a write makes about what it just did.
+//
+// A caller who asked for the document still gets the document. A caller who
+// did not gets markdown where it converts and the document where it does not,
+// because the write has already happened and refusing to describe it would
+// send them to do it again.
+//
+// It lives here rather than beside bodyMode in comment.go because only the
+// write verbs echo, and a file with no tag compiles into every profile: a
+// reader binary carried this function and could never reach it.
+func echoMode(mode BodyMode) BodyMode {
+	if mode == ModeRaw {
+		return ModeRaw
+	}
+	return ModeEcho
+}
+
 // writeExits are the statuses every mutating verb can end with. Blocked is what
 // read-only mode and a missing confirmation produce; Conflict is a precondition
 // that failed, including a reused idempotency key.
