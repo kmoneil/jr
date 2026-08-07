@@ -180,12 +180,27 @@ func unescape(src []rune, i int) (r rune, width int, err error) {
 				WithDetail("%s", string(src)).
 				WithRemedy(`a unicode escape needs four hex digits, e.g. é`)
 		}
-		code, convErr := strconv.ParseUint(string(src[i+1:i+5]), 16, 32)
+		// Four digits, so 16 bits: the width is the slice above, and saying so
+		// here keeps the bound in the code rather than in arithmetic a reader
+		// has to redo.
+		code, convErr := strconv.ParseUint(string(src[i+1:i+5]), 16, 16)
 		if convErr != nil {
 			return 0, 0, errs.Usage("JQL_SYNTAX",
 				"Invalid \\u escape in JQL at position %d", i).
 				WithDetail("%s", string(src)).
 				WithRemedy(`a unicode escape needs four hex digits, e.g. é`)
+		}
+		// A surrogate half is not a character. rune(0xD800) is a legal rune
+		// value and an illegal scalar, so it survives this conversion and dies
+		// at the first WriteRune, which substitutes U+FFFD without saying so —
+		// the silent corruption quote() forty lines away exists to prevent, and
+		// which quote() cannot catch because U+FFFD is valid UTF-8 by then.
+		if code >= 0xD800 && code <= 0xDFFF {
+			return 0, 0, errs.Usage("JQL_SYNTAX",
+				"Surrogate \\u escape in JQL at position %d", i).
+				WithDetail("%s", string(src)).
+				WithRemedy("U+D800 to U+DFFF are half of a pair and name no " +
+					"character; write the character itself")
 		}
 		return rune(code), 5, nil
 	default:

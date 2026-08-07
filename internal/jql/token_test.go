@@ -141,6 +141,12 @@ func TestTokenizeErrors(t *testing.T) {
 		{"unknown escape", `summary ~ "a\qb"`, "Unknown escape"},
 		{"truncated unicode escape", `summary ~ "a\u00"`, "Truncated"},
 		{"invalid unicode escape", `summary ~ "a\uzzzz"`, "Invalid"},
+		// A surrogate half is a legal rune value and an illegal scalar: it
+		// survives rune(code) and is replaced by U+FFFD at the first WriteRune,
+		// which is the substitution this package exists to refuse.
+		{"high surrogate escape", `summary ~ "a\uD800b"`, "Surrogate"},
+		{"low surrogate escape", `summary ~ "a\uDC00b"`, "Surrogate"},
+		{"last surrogate escape", `summary ~ "a\uDFFFb"`, "Surrogate"},
 		{"bare bang", `project ! ENG`, "Unexpected"},
 	}
 
@@ -302,12 +308,63 @@ func TestValidateIgnoresParensInsideStrings(t *testing.T) {
 	}
 }
 
+// FuzzTokenizeNeverSubstitutesACharacter is the property the package was
+// missing, and its absence is why a surrogate escape went unnoticed through
+// 100% statement coverage and two green fuzzers.
+//
+// FuzzValuesRoundTrip does compare values, but it starts from a value and
+// renders it — and quote() never emits a \uXXXX escape, so the round trip could
+// not produce the input that breaks. FuzzTokenizeDoesNotPanic does start from a
+// query and reaches the escape, but asserts only that nothing crashes. A quiet
+// substitution does not crash. Between the two there was a hole exactly the
+// shape of \u.
+//
+// U+FFFD is the marker every lossy conversion in Go leaves behind, so the
+// property is simply that the lexer never invents one. Anything that did was a
+// value silently changed into a different value, which is the one outcome this
+// package exists to prevent.
+func FuzzTokenizeNeverSubstitutesACharacter(f *testing.F) {
+	for _, seed := range []string{
+		`summary ~ "a\uD800b"`, `summary ~ "\uDFFF"`, `summary ~ "�"`,
+		`summary ~ "café"`, `summary ~ "aAb"`, "summary ~ \"�\"",
+		// Found by this fuzzer on its first run, against a property that was
+		// too strong rather than against the lexer: a caller who writes �
+		// is asking for U+FFFD, and producing it is faithful. Seeded so the
+		// distinction stays visible in the source.
+		`"�"`, `"�"`, `summary ~ "a�b"`,
+	} {
+		f.Add(seed)
+	}
+
+	f.Fuzz(func(t *testing.T, query string) {
+		tokens, err := jql.Tokenize(query)
+		if err != nil {
+			return
+		}
+		// Asked for, in either spelling, is not substituted. The escape is
+		// hex and case-insensitive, so the lowered form is what to look for.
+		if strings.ContainsRune(query, '�') ||
+			strings.Contains(strings.ToLower(query), `�`) {
+			return
+		}
+		for _, tok := range tokens {
+			if strings.ContainsRune(tok.Text, '�') {
+				t.Fatalf("Tokenize(%q) put U+FFFD in token %+v; the input had "+
+					"none, so a character was silently replaced", query, tok)
+			}
+		}
+	})
+}
+
 // FuzzTokenizeDoesNotPanic asserts the lexer either returns tokens or a
 // structured error for any input, and never panics on a slice bound.
 func FuzzTokenizeDoesNotPanic(f *testing.F) {
 	for _, seed := range []string{
 		``, `project = ENG`, `"`, `'`, `\`, `"\u`, `"\uzzzz`, `((((`, `))))`,
 		`!`, `!=`, `a!=b`, "\x00", "é", `"a\`,
+		// The surrogate escapes, seeded here too so the crasher-shaped input is
+		// visible in the source rather than only in a corpus file.
+		`"\uD800"`, `"\uDBFF"`, `"\uDC00"`, `"\uDFFF"`,
 	} {
 		f.Add(seed)
 	}
