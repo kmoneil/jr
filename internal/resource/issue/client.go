@@ -155,7 +155,7 @@ func (c *Client) ListStream(
 		if !opt.Limit.All {
 			remaining := opt.Limit.N - out.Fetched
 			if remaining <= 0 {
-				break
+				return truncated(out, token)
 			}
 			// Never ask for more than is wanted: over-fetching costs the
 			// caller's rate limit for rows that are thrown away.
@@ -167,9 +167,7 @@ func (c *Client) ListStream(
 			// A spent request budget is not a failure: it means there is more,
 			// and the caller gets what was fetched plus a way to resume.
 			if transport.IsBudgetExceeded(err) && out.Fetched > 0 {
-				out.NextPageToken = EncodePageToken(token)
-				out.Complete = false
-				return out, nil
+				return truncated(out, token)
 			}
 			return nil, err
 		}
@@ -207,19 +205,37 @@ func (c *Client) ListStream(
 		token = next
 
 		if !opt.Limit.All && out.Fetched >= opt.Limit.N {
-			break
+			return truncated(out, token)
 		}
 		if len(issues) == 0 {
 			// A page with no rows that also does not claim to be last would
 			// loop forever. Report what there is and say it is not exhaustive.
-			out.Complete = false
-			out.NextPageToken = EncodePageToken(token)
-			return out, nil
+			return truncated(out, token)
 		}
 	}
+}
 
-	// The loop ended because the limit was reached, not because the result set
-	// ran out, so this is explicitly not complete.
+// truncated is the one place a result becomes incomplete.
+//
+// Four paths through ListStream stop early: the request budget ran out
+// mid-run, the limit was already satisfied before a page was asked for, the
+// limit was reached by the page just fetched, or the server sent an empty page
+// without claiming it was the last. All four mean one thing to a caller, and
+// all four have to say it the same way — not complete, plus the cursor that
+// would have fetched the next page.
+//
+// They were four spellings of that answer: two computing it inline and two
+// falling through to a shared postlude, which also meant the postlude could not
+// say which case had reached it. `complete="false"` or exit 3 is the single
+// invariant this project exists to hold, and this is where it is decided for
+// the most-used command in the tool. Four sites computing one answer is four
+// places for them to drift, and the drift would be silent in the one way that
+// matters: a result reported complete when it was cut short.
+//
+// The error return is always nil. It is there so every early exit is one line
+// that reads as a return of the same answer, rather than two assignments a
+// future edit can separate.
+func truncated(out *ListResult, token PageToken) (*ListResult, error) {
 	out.Complete = false
 	out.NextPageToken = EncodePageToken(token)
 	return out, nil

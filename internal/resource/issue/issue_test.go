@@ -907,6 +907,103 @@ func TestBudgetStopsALongRun(t *testing.T) {
 	}
 }
 
+// TestAnEmptyPageThatIsNotTheLastStops covers the one truncation path nothing
+// had ever executed.
+//
+// Cloud is authoritative about the end of a result set: a page is the last one
+// when it says isLast, or when it carries no further token. A page that says
+// neither and holds no rows is a server telling this client to keep going and
+// giving it nothing to go on. Without the guard the loop asks again with the
+// same cursor forever.
+//
+// It is not reachable on Data Center, where an empty page is the end by
+// definition, and no recording has ever produced it on Cloud — a page whose
+// rows were all filtered by permissions would. The branch was correct as
+// written and was the one nothing ran, which is the state this card exists to
+// end.
+func TestAnEmptyPageThatIsNotTheLastStops(t *testing.T) {
+	cassette, err := transport.LoadCassette(
+		filepath.Join("testdata", "empty-page.cloud.json"),
+	)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	conn, err := transport.New(transport.Options{
+		BaseURL:    "https://recorded.invalid",
+		HTTPClient: transport.NewReplayer(cassette).Client(),
+		Retries:    -1,
+	})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+	client := &issue.Client{Transport: conn, Site: site.Info{Kind: site.Cloud}}
+
+	result, err := client.List(t.Context(), issue.ListOptions{
+		Query: issue.QueryOptions{Project: "ENG"}, Limit: registry.Limit{All: true},
+		PageSize: 2, Fields: issue.DefaultFields(),
+	})
+	if err != nil {
+		t.Fatalf("an empty page became an error rather than a short result: %v", err)
+	}
+
+	// What was fetched before the empty page is kept, and reported as partial.
+	if len(result.Issues) != 1 {
+		t.Errorf("kept %d rows, want the page that had rows", len(result.Issues))
+	}
+	if result.Complete {
+		t.Error("a run stopped by an empty page claimed to be complete")
+	}
+	if result.Requests != 2 {
+		t.Errorf("made %d requests, want 2; a third means the loop did not stop",
+			result.Requests)
+	}
+	if result.NextPageToken == "" {
+		t.Fatal("no way to resume after the empty page")
+	}
+	// The cursor is the one the empty page supplied, not the one that fetched
+	// it: resuming has to move forward or it is the same loop by hand.
+	token, err := issue.DecodePageToken(result.NextPageToken, site.Cloud)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if token.Cursor != "CURSOR-PAGE-3" {
+		t.Errorf("resume cursor = %q, want the one the empty page supplied",
+			token.Cursor)
+	}
+}
+
+// TestALimitOfNothingAsksForNothing covers the other truncation path no test
+// reached.
+//
+// It is the guard on a zero-value registry.Limit, which the CLI never builds —
+// --limit refuses 0 — and any in-repo caller can. Without it, `want` becomes
+// min(pageSize, 0) and the client asks the server for a page of no rows.
+//
+// The result is deliberately not complete. Nothing was fetched because nothing
+// was asked for, and saying complete would claim the result set itself was
+// empty.
+func TestALimitOfNothingAsksForNothing(t *testing.T) {
+	doer := &stubDoer{body: `{"issues":[],"isLast":true}`}
+	client := &issue.Client{Transport: doer, Site: site.Info{Kind: site.Cloud}}
+
+	result, err := client.List(t.Context(), issue.ListOptions{
+		Query: issue.QueryOptions{Project: "ENG"}, Limit: registry.Limit{N: 0},
+		Fields: issue.DefaultFields(),
+	})
+	if err != nil {
+		t.Fatalf("a limit of zero became an error: %v", err)
+	}
+	if doer.calls != 0 {
+		t.Errorf("made %d requests for a limit of zero", doer.calls)
+	}
+	if len(result.Issues) != 0 {
+		t.Errorf("returned %d rows for a limit of zero", len(result.Issues))
+	}
+	if result.Complete {
+		t.Error("a limit of zero reported the result set as complete")
+	}
+}
+
 // TestRequestedFieldsReachTheOutput is the fix for a flag that did nothing.
 //
 // --field changed what was fetched and not what was shown, so a caller asking

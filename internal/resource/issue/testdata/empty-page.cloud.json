@@ -1,0 +1,38 @@
+{
+ "deployment": "cloud",
+ "source": "constructed",
+ "interactions": [
+  {
+   "request": {
+    "method": "GET",
+    "path": "/rest/api/3/search/jql",
+    "query": "fields=summary%2Cstatus%2Cassignee%2Creporter%2Cpriority%2Cissuetype%2Cproject%2Ccreated%2Cupdated%2Clabels&jql=project+%3D+%22ENG%22+ORDER+BY+issuekey+DESC&maxResults=2"
+   },
+   "response": {
+    "status": 200,
+    "header": {
+     "Content-Type": [
+      "application/json"
+     ]
+    },
+    "body": "{\"issues\": [{\"id\": \"10001\", \"key\": \"ENG-101\", \"fields\": {\"summary\": \"Retry logic drops the last error\", \"status\": {\"name\": \"In Progress\", \"statusCategory\": {\"key\": \"indeterminate\", \"name\": \"In Progress\"}}, \"assignee\": null, \"reporter\": null, \"priority\": {\"name\": \"High\"}, \"issuetype\": {\"name\": \"Bug\"}, \"project\": {\"key\": \"ENG\"}, \"created\": \"2026-08-01T09:15:00.000+0000\", \"updated\": \"2026-08-02T11:00:00.000+0000\", \"labels\": []}}], \"nextPageToken\": \"CURSOR-PAGE-2\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "/rest/api/3/search/jql",
+    "query": "fields=summary%2Cstatus%2Cassignee%2Creporter%2Cpriority%2Cissuetype%2Cproject%2Ccreated%2Cupdated%2Clabels&jql=project+%3D+%22ENG%22+ORDER+BY+issuekey+DESC&maxResults=2&nextPageToken=CURSOR-PAGE-2"
+   },
+   "response": {
+    "status": 200,
+    "header": {
+     "Content-Type": [
+      "application/json"
+     ]
+    },
+    "body": "{\"issues\": [], \"nextPageToken\": \"CURSOR-PAGE-3\"}"
+   }
+  }
+ ]
+}
