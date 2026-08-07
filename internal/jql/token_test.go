@@ -331,7 +331,8 @@ func FuzzTokenizeNeverSubstitutesACharacter(f *testing.F) {
 		// too strong rather than against the lexer: a caller who writes �
 		// is asking for U+FFFD, and producing it is faithful. Seeded so the
 		// distinction stays visible in the source.
-		`"�"`, `"�"`, `summary ~ "a�b"`,
+		"\"\ufffd\"", "\"\\uFFFD\"", "\"\\ufffd\"",
+		"summary ~ \"a\\uFFFDb\"",
 	} {
 		f.Add(seed)
 	}
@@ -343,8 +344,8 @@ func FuzzTokenizeNeverSubstitutesACharacter(f *testing.F) {
 		}
 		// Asked for, in either spelling, is not substituted. The escape is
 		// hex and case-insensitive, so the lowered form is what to look for.
-		if strings.ContainsRune(query, '�') ||
-			strings.Contains(strings.ToLower(query), `�`) {
+		if strings.ContainsRune(query, '\ufffd') ||
+			strings.Contains(strings.ToLower(query), "\\ufffd") {
 			return
 		}
 		for _, tok := range tokens {
