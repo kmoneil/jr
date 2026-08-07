@@ -556,7 +556,6 @@ func renderInline(nodes []Node, applied []Mark, written, where string) (string, 
 			continue
 		}
 
-		left := b.String() + lead
 		// The trailing whitespace this span moves outside itself sits between
 		// its closing delimiter and whatever comes next, so that is what the
 		// delimiter is up against.
@@ -565,7 +564,7 @@ func renderInline(nodes []Node, applied []Mark, written, where string) (string, 
 			next = trail[0]
 		}
 		open, closing, err := delimiters(mark, core,
-			before(left), endsWithLive(left), next, where)
+			beforeOf(b.String(), lead), endsWithLiveOf(b.String(), lead), next, where)
 		if err != nil {
 			return "", err
 		}
@@ -757,6 +756,67 @@ func before(written string) byte {
 		return 0
 	}
 	return written[len(written)-1]
+}
+
+// beforeOf and endsWithLiveOf answer before and endsWithLive over two pieces
+// without joining them.
+//
+// The pieces are everything written so far and the whitespace this span moved
+// outside itself, and joining them is what made this converter quadratic. Both
+// questions are about the very end of that text — the last byte, and whether a
+// backslash escapes it — and the caller was building the whole of it, once per
+// span, to look at the tail. A paragraph of 1600 inline nodes spent 982MB of
+// 1.01GB on that one concatenation and took 393 times as long as one of 50,
+// for output that is byte-identical either way.
+//
+// Worth saying which line it was, because two others in this function have the
+// same shape and are harmless: `written+b.String()` at the plain-node and
+// recursive calls is a copy too, and the profile puts both at 2MB. The cost is
+// not the concatenation, it is doing it once per span against a buffer that
+// grows with the output. Measure before assuming the tidy explanation.
+//
+// They are separate from before and endsWithLive rather than replacing them
+// because the originals are the specification: FuzzSplitHelpersMatchJoined
+// fuzzes the pair against the joined form, which is what makes this a
+// behaviour-preserving change by proof rather than by argument.
+func beforeOf(prefix, suffix string) byte {
+	if suffix != "" {
+		return suffix[len(suffix)-1]
+	}
+	return before(prefix)
+}
+
+// endsWithLiveOf is endsWithLive over the same two pieces.
+//
+// Only the final byte can be the answer, and whether it is live is the parity
+// of the backslash run immediately behind it: an even run is escaped
+// backslashes and leaves the delimiter live, an odd one escapes it. That is
+// exactly what endsWithLive's forward scan computes, and it is the half of this
+// pair worth fuzzing hardest — the parity is easy to state and easy to get one
+// off.
+func endsWithLiveOf(prefix, suffix string) byte {
+	last := func(i int) byte {
+		if i < len(suffix) {
+			return suffix[len(suffix)-1-i]
+		}
+		return prefix[len(prefix)-1-(i-len(suffix))]
+	}
+	n := len(prefix) + len(suffix)
+	if n == 0 {
+		return 0
+	}
+	c := last(0)
+	if c != '*' && c != '_' {
+		return 0
+	}
+	slashes := 0
+	for i := 1; i < n && last(i) == '\\'; i++ {
+		slashes++
+	}
+	if slashes%2 == 1 {
+		return 0
+	}
+	return c
 }
 
 // after is the character a span will sit against on its right.
