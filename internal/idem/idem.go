@@ -30,6 +30,13 @@ import (
 	"github.com/kmoneil/jira-cli/internal/errs"
 )
 
+// ledgerPerm is the mode the ledger is written at.
+//
+// Not a credential, and not public either: it records which mutating requests
+// were made against which site, with the idempotency key of each. Another user
+// on the machine has no business reading what this account changed in Jira.
+const ledgerPerm fs.FileMode = 0o600
+
 // Status is where an entry is in its life.
 type Status string
 
@@ -460,6 +467,19 @@ func (l *Ledger) write(file *ledgerFile) error {
 	tmpName := tmp.Name()
 	defer func() { _ = os.Remove(tmpName) }()
 
+	// Set before the write, not after, so the ledger never exists on disk at a
+	// wider mode even briefly — the same ordering writeSecretFile uses.
+	//
+	// os.CreateTemp already returns 0600, so this changes nothing today. It is
+	// here because `docs/architecture.md` publishes 0600 for this file, and
+	// until now that was a statement about the standard library's default
+	// restated as a guarantee of ours: swapping this for os.WriteFile, or
+	// reopening the file anywhere, would have moved the mode with the document
+	// still saying 0600. TestTheDocumentedModesAreTheOnesOnDisk asserts it.
+	if err := tmp.Chmod(ledgerPerm); err != nil {
+		_ = tmp.Close()
+		return errs.Runtime("LEDGER_UNWRITABLE", "cannot restrict %s", tmpName).Wrap(err)
+	}
 	if _, err := tmp.Write(buf.Bytes()); err != nil {
 		_ = tmp.Close()
 		return errs.Runtime("LEDGER_UNWRITABLE", "cannot write %s", tmpName).Wrap(err)

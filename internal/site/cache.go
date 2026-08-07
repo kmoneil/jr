@@ -103,7 +103,11 @@ func (c *Cache) Put(key string, value any) error {
 		return errs.Runtime("CACHE_ENCODE", "cannot encode a cache entry").Wrap(err)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	// 0700, because the entries in this directory are named for the site. Every
+	// file under it is already 0600, so the directory mode was the only thing
+	// publishing the Jira hostname to other users on the machine — a listing is
+	// enough, no file needs to be readable.
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return errs.Runtime("CACHE_UNWRITABLE", "cannot create %s", filepath.Dir(path)).Wrap(err)
 	}
 	return writeAtomic(path, data)

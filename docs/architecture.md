@@ -183,13 +183,36 @@ a token cannot reach a fixture file even if recording is interrupted.
 
 ## Config, state, cache
 
-| Path                                  | Contents                                           | Mode |
-| ------------------------------------- | -------------------------------------------------- | ---- |
-| `$XDG_CONFIG_HOME/jr/config.toml`     | Contexts, defaults. Hand-editable.                 | 0644 |
-| `$XDG_STATE_HOME/jr/credentials.toml` | Stored credentials                                 | 0600 |
-| `$XDG_STATE_HOME/jr/idempotency.toml` | What a mutating request already did                | 0600 |
-| `$XDG_STATE_HOME/jr/`                 | View history, last cursor                          | —    |
-| `$XDG_CACHE_HOME/jr/<site>/`          | Deployment probe, field catalogue, create metadata | —    |
+| Path                                     | Contents                                           | Mode |
+| ---------------------------------------- | -------------------------------------------------- | ---- |
+| `$XDG_CONFIG_HOME/jr/`                   | The config directory                               | 0700 |
+| `$XDG_CONFIG_HOME/jr/config.toml`        | Contexts, defaults. Hand-editable.                 | 0644 |
+| `$XDG_STATE_HOME/jr/`                    | The state directory                                | 0700 |
+| `$XDG_STATE_HOME/jr/credentials.toml`    | Stored credentials                                 | 0600 |
+| `$XDG_STATE_HOME/jr/idempotency.toml`    | What a mutating request already did                | 0600 |
+| `$XDG_CACHE_HOME/jr/<site>/`             | One site's cache directory                         | 0700 |
+| `$XDG_CACHE_HOME/jr/<site>/<key>.json`   | Deployment probe, field catalogue, create metadata | 0600 |
+
+Every row is asserted by `TestTheDocumentedModesAreTheOnesOnDisk` in
+`internal/lint`, which drives each file's real write path and stats the result.
+The table is parsed from this document rather than repeated in the test, so a
+mode changed in one place and not the other fails rather than drifting. It was
+written before that test existed and one row was already describing something
+other than a decision: `idempotency.toml` reached 0600 because that is
+`os.CreateTemp`'s default, with no `Chmod` anywhere and nothing reading the mode
+back.
+
+`config.toml` is 0644 inside a 0700 directory, and the asymmetry is deliberate.
+The file mode is what travels when the file is copied into a dotfiles
+repository, and 0644 says it is not a secret; the directory mode stays behind,
+so 0700 costs nothing the 0644 was buying and keeps site hostnames and project
+keys away from other users of the machine. The cache directory is 0700 for a
+sharper version of the same reason: its entries are *named* for the site, so a
+listing publishes the hostname even though every file in it is 0600.
+
+`os.MkdirAll` leaves an existing directory's mode alone, so these apply to a new
+install. An existing 0755 is not repaired on read — changing permissions nobody
+asked this tool to change is its own surprise.
 
 User resolution is deliberately not cached: the field catalogue is one
 immutable snapshot of a whole site, and this is one search per input. A cached

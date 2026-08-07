@@ -189,7 +189,20 @@ func (c *Config) Save() error {
 	if c.path == "" {
 		return errs.Runtime("NO_CONFIG_PATH", "this config has no path to save to")
 	}
-	if err := os.MkdirAll(filepath.Dir(c.path), 0o755); err != nil {
+	// 0700, matching the state directory, even though the file inside it is
+	// deliberately 0644.
+	//
+	// The two modes answer different questions and only one of them travels.
+	// 0644 on config.toml says the file is not a secret and survives being
+	// committed to a dotfiles repository, which is what it is for; the
+	// directory mode is left behind by that copy entirely. So 0700 costs
+	// nothing 0644 was buying, and it stops another user on this machine
+	// reading the site hostnames, context names, and project keys.
+	//
+	// MkdirAll does not touch a directory that already exists, so this applies
+	// to new installs and leaves an existing 0755 alone. Repairing one on read
+	// would be this tool changing permissions nobody asked it to change.
+	if err := os.MkdirAll(filepath.Dir(c.path), 0o700); err != nil {
 		return errs.Runtime("CONFIG_UNWRITABLE",
 			"cannot create %s", filepath.Dir(c.path)).Wrap(err)
 	}
