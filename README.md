@@ -276,10 +276,22 @@ work     true     https://acme.atlassian.net  ENG             false
 $ jr context show --project OPS      # what would this invocation actually use?
 ```
 
-`--readonly` is a **one-way latch**. Any of the flag, `JIRA_READONLY`, or a
-context created read-only turns it on, and nothing turns it off — a context
-created for auditing is a statement about what it is for, and an invocation that
-merely omits the flag must not quietly promote itself to read-write.
+`--readonly` is a **one-way latch within an invocation**. Any of the flag,
+`JIRA_READONLY`, or a context created read-only turns it on, and nothing a
+command does turns it off — a context created for auditing is a statement about
+what it is for, and an invocation that merely omits the flag must not quietly
+promote itself to read-write. `JIRA_READONLY=0` does not clear it either.
+
+Changing what a context is for is a separate act, and there is one way to do it:
+
+```console
+$ jr context edit audit --unset readonly
+```
+
+That is an edit of your configuration rather than something an invocation can
+do to itself. Without it, narrowing a context to read-only would be undoable
+only by deleting and re-creating it, which loses its project, board, and field
+defaults — a latch that punished the cautious choice.
 
 Credentials never touch the config file. `config.toml` is meant to be
 hand-edited and kept in a dotfiles repository, so it holds a *reference*; the

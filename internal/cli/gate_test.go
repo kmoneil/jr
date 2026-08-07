@@ -2,6 +2,7 @@ package cli_test
 
 import (
 	"context"
+	"maps"
 	"strings"
 	"testing"
 
@@ -46,19 +47,54 @@ func fakeMutating(ran *bool, destructive bool) *registry.Registry {
 // thing it exists to stop. It is enforced in the CLI layer from the
 // declaration, so a resource author who forgot the check cannot ship a verb
 // that ignores it.
+//
+// All three sources, because the invariant names three and this gate is where
+// the guarantee is actually cashed. It covered the flag and the environment for
+// a long time and not the context — which is the one the read-only story is
+// really about, since a context created for auditing is the case where nobody
+// is passing a flag to remind themselves.
 func TestReadOnlyRefusesAMutationBeforeItRuns(t *testing.T) {
+	// readOnlyContext writes a config whose current context is read-only, and
+	// returns the environment that finds it. The context's site is irrelevant —
+	// nothing here reaches the network — but it has to be a reserved TLD like
+	// every other host in this suite.
+	readOnlyContext := func(t *testing.T) map[string]string {
+		t.Helper()
+		env := session(t)
+		mustRun(t, env, "context", "create", "audit",
+			"--site", "acme.atlassian.invalid", "--readonly")
+		return env
+	}
+
 	for _, how := range []struct {
-		name string
-		args []string
-		env  map[string]string
+		name  string
+		args  []string
+		env   map[string]string
+		setup func(*testing.T) map[string]string
 	}{
-		{"flag", []string{"--readonly"}, nil},
-		{"environment", nil, map[string]string{"JIRA_READONLY": "1"}},
+		{name: "flag", args: []string{"--readonly"}},
+		{name: "environment", env: map[string]string{"JIRA_READONLY": "1"}},
+		{name: "context", setup: readOnlyContext},
+		{
+			// JIRA_READONLY=0 is a caller asking to turn it off. The latch ORs
+			// its three sources, so it cannot: the resolution half of this is
+			// pinned by jctx.TestReadOnlyIsAOneWayLatch, and this is the same
+			// claim at the gate, where refusing is what it means.
+			name:  "context, with the environment asking for write",
+			env:   map[string]string{"JIRA_READONLY": "0"},
+			setup: readOnlyContext,
+		},
 	} {
 		t.Run(how.name, func(t *testing.T) {
 			var ran bool
+			env := how.env
+			if how.setup != nil {
+				merged := how.setup(t)
+				maps.Copy(merged, how.env)
+				env = merged
+			}
 			args := append([]string{"fake", "write"}, how.args...)
-			got := runGated(t, fakeMutating(&ran, false), how.env, args...)
+			got := runGated(t, fakeMutating(&ran, false), env, args...)
 
 			if got.exit != exitcode.Blocked {
 				t.Errorf("exit = %v, want %v\nstderr: %s",
