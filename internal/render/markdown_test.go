@@ -209,3 +209,60 @@ func TestARecordKeepsItsOwnText(t *testing.T) {
 		t.Errorf("a record's own text was dropped:\n%s", got)
 	}
 }
+
+// TestACollectionOfDocumentsRendersAsSections is the fix for a comment thread
+// arriving in one table cell.
+//
+// The escaping was right — a raw newline ends the row and a raw pipe ends the
+// cell — and the result was still unreadable, because the assumption one layer
+// up was that rows are short. Every collection this writer was tested against
+// had short cells; `issue comment list` is the first whose rows are prose.
+func TestACollectionOfDocumentsRendersAsSections(t *testing.T) {
+	body := "Reproduced on 9.4.\n\n```\nGET /rest/api/2/issue/ENG-1\n```\n\nThe **retry** loop swallows it."
+	doc := render.List("issue.comment.list", 1, &render.Collection{
+		Name: "comments", Complete: true,
+		Items: []*render.Node{
+			render.El("comment").Attr("id", "10001").
+				Child(render.El("author").Attr("display", "Ada Lovelace")).
+				Child(render.El("body").SetCDATA(body)),
+		},
+		Columns: []render.Column{
+			{Header: "id", Path: "@id"},
+			{Header: "body", Path: "body"},
+		},
+	})
+
+	got := markdownOf(t, doc)
+	if strings.Contains(got, "<br>") {
+		t.Errorf("a document was flattened into a table cell:\n%s", got)
+	}
+	for _, want := range []string{
+		"## comment 10001",
+		"### body",
+		// The fence survives, which is the entire point.
+		"```\nGET /rest/api/2/issue/ENG-1\n```",
+		// A child with attributes and no text is its attributes.
+		"| author | Ada Lovelace |",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output is missing %q:\n%s", want, got)
+		}
+	}
+	// The collection's own facts survive the change of shape.
+	if !strings.Contains(got, "# comments") || !strings.Contains(got, "complete") {
+		t.Errorf("the collection lost its heading or its count:\n%s", got)
+	}
+}
+
+// TestACollectionWithoutDocumentsStaysATable is the direction that would break
+// quietly. A rule that turned every collection into sections would pass the
+// test above and make `issue list` unreadable for the opposite reason.
+func TestACollectionWithoutDocumentsStaysATable(t *testing.T) {
+	got := markdownOf(t, collectionDoc(true, ""))
+	if !strings.Contains(got, "| key | summary |") {
+		t.Errorf("a collection of short rows stopped being a table:\n%s", got)
+	}
+	if strings.Contains(got, "## issue") {
+		t.Errorf("a collection of short rows became sections:\n%s", got)
+	}
+}

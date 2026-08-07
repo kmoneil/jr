@@ -54,7 +54,8 @@ func writeMarkdown(w *writer, d *Doc) {
 	writeMarkdownCollection(w, d)
 }
 
-// writeMarkdownCollection emits a table of the declared columns.
+// writeMarkdownCollection emits a table of the declared columns, or a section
+// per item when the items carry documents.
 //
 // The columns are the ones TSV uses, so the two agree about what a row is and a
 // caller switching between them sees the same fields in the same order.
@@ -68,6 +69,13 @@ func writeMarkdownCollection(w *writer, d *Doc) {
 		// A heading and a count with no table under it reads as a rendering
 		// bug. Say the thing that is true instead.
 		w.raw("_No rows._\n")
+		return
+	}
+
+	if holdsDocuments(c) {
+		for _, item := range c.Items {
+			writeMarkdownRecord(w, item, 2)
+		}
 		return
 	}
 
@@ -86,6 +94,36 @@ func writeMarkdownCollection(w *writer, d *Doc) {
 		}
 		w.raw(markdownRow(row))
 	}
+}
+
+// holdsDocuments reports whether a collection's items carry mixed content, in
+// which case a table is the wrong shape for them.
+//
+// `issue comment list` was rendering a whole thread into one cell — newlines
+// replaced by `<br>`, the code fence destroyed — and the escaping was correct:
+// a raw newline ends the row and a raw pipe ends the cell. The defect was one
+// layer up, in assuming rows are short, which every collection tested when this
+// writer was written happens to be.
+//
+// The record path already handles a CDATA child properly, as its own section
+// with the markdown verbatim. So the two paths disagreed about the same node
+// shape, and this is which one wins.
+//
+// It reads the data rather than a list of command names, and that is deliberate.
+// `issue list` rows carry no CDATA today — `DefaultFields()` has no description,
+// and `--field description` adds nothing because ExtraFieldNames drops what the
+// package already models — so the flip cannot fire there by surprise. If one
+// ever did carry prose, sections would be the right answer rather than a
+// regression, because a table still could not hold it.
+func holdsDocuments(c *Collection) bool {
+	for _, item := range c.Items {
+		for _, child := range item.Children {
+			if child.CDATA {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // countLine states the completeness of a result set in words.
@@ -127,17 +165,7 @@ func writeMarkdownRecord(w *writer, n *Node, depth int) {
 		case c.CDATA, c.ListOf != "", len(c.Children) > 0:
 			sections = append(sections, c)
 		default:
-			// A leaf with both text and attributes renders its text, and the
-			// attributes are dropped: `<status category="in-progress">In
-			// Progress</status>` becomes "In Progress". The text is what a
-			// person is reading for and the attribute is the machine's half of
-			// the same fact.
-			//
-			// This is the one place this format is lossy against the other
-			// four, and it is why it is presentation rather than contract —
-			// every attribute is still in XML, JSON, and YAML, which is where
-			// anything parsing should be looking.
-			scalars = append(scalars, pair{c.Name, c.Text})
+			scalars = append(scalars, pair{c.Name, markdownScalar(c)})
 		}
 	}
 
@@ -201,6 +229,27 @@ func writeMarkdownList(w *writer, n *Node, depth int) {
 		w.raw("- " + markdownListItem(item) + "\n")
 	}
 	w.raw("\n")
+}
+
+// markdownScalar reduces a leaf to the one value a reader wants from it.
+//
+// Text wins when there is text: `<status category="in-progress">In
+// Progress</status>` reads as "In Progress", because the text is what a person
+// is reading for and the attribute is the machine's half of the same fact.
+// That is the one place this format is lossy against the other four, and the
+// reason it is presentation rather than contract — every attribute is still in
+// XML, JSON, and YAML, which is where anything parsing should be looking.
+//
+// A leaf with attributes and *no* text is the case that made this a function.
+// `<author display="Ada Lovelace"/>` has nothing in Text, and rendering that
+// gave `| author |  |` — a field that exists and is blank, when the name was
+// sitting in an attribute. Third time this shape has bitten: the tag
+// descriptions in `jr version` and the empty list container were the others.
+func markdownScalar(n *Node) string {
+	if n.Text != "" {
+		return n.Text
+	}
+	return markdownListItem(n)
 }
 
 // markdownListItem renders one list entry that has no children of its own.
