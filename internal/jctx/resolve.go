@@ -29,7 +29,6 @@ type Overrides struct {
 	Site    string
 	Project string
 	Board   string
-	Fields  []string
 	// ReadOnly forces read-only mode on. It cannot force it off: see Resolved.
 	ReadOnly bool
 	// APIVersion forces the REST version, skipping the deployment probe.
@@ -134,12 +133,19 @@ func Resolve(cfg *Config, over Overrides, getenv Getenv) (*Resolved, error) {
 		CredentialRef: ctx.Credential,
 	}
 
-	switch {
-	case len(over.Fields) > 0:
-		r.Fields = slices.Clone(over.Fields)
-	default:
-		r.Fields = slices.Clone(ctx.Fields)
-	}
+	// Fields come from the context and from nowhere else at this layer.
+	//
+	// There was a precedence rule here — a flag's fields replaced the context's
+	// — and nothing could reach it: no persistent --field exists, so
+	// Overrides.Fields was never populated by any caller. Only a test
+	// constructed one, which is what made the branch look alive.
+	//
+	// The rule was also the wrong one. `--field` is per-command and additive,
+	// so an ad-hoc field adds to the context's set rather than replacing it;
+	// the union happens where the request is built, because that is the only
+	// layer that knows which command asked. See validateFields in
+	// internal/resource/issue.
+	r.Fields = slices.Clone(ctx.Fields)
 
 	if v := firstNonEmpty(over.APIVersion, getenv(EnvAPIVersion)); v != "" {
 		n, err := strconv.Atoi(strings.TrimSpace(v))

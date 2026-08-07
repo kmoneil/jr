@@ -45,6 +45,12 @@ The project is a default, not a requirement: any command can override it with
 --project or omit it entirely. The few commands that genuinely cannot proceed
 without one exit 2 and name the flag.
 
+--field is the set of custom fields every issue read should include, by id or by
+name, so a team's own fields do not have to be named on each command. It is
+added to what --field asks for rather than replacing it, because an ad-hoc field
+should not silently drop the set; --no-context-fields on a read ignores it for
+one invocation.
+
 --readonly bakes read-only mode into the context. It is a one-way latch: an
 invocation that simply omits --readonly does not become read-write, because a
 context created read-only is a statement about what it is for.
@@ -135,8 +141,10 @@ so clearing needs its own spelling. --unset site is refused: a context without a
 site is not a context with one fewer setting, it is one that cannot be used, and
 ` + "`" + buildinfo.App + ` context delete` + "`" + ` is how you say that.
 
---field replaces the whole default set, exactly as --label does on issue edit.
---unset field empties it.
+--field replaces the whole stored set, exactly as --label does on issue edit.
+--unset field empties it. What is stored is added to whatever a read's own
+--field asks for, so editing here changes every issue read rather than
+overriding one.
 
 --unset readonly makes a read-only context writable again. The one-way latch
 governs an invocation — nothing a command does can promote itself — and not the

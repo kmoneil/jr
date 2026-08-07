@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -56,6 +57,9 @@ func (s *session) Project() string { return s.resolved.Project }
 
 // Board implements registry.Session.
 func (s *session) Board() string { return s.resolved.Board }
+
+// Fields implements registry.Session.
+func (s *session) Fields() []string { return slices.Clone(s.resolved.Fields) }
 
 // RequireProject implements registry.Session.
 func (s *session) RequireProject() (string, error) { return s.resolved.RequireProject() }

@@ -337,31 +337,33 @@ func TestRequireSiteAndBoard(t *testing.T) {
 	}
 }
 
-func TestFieldsOverride(t *testing.T) {
+// TestFieldsComeFromTheContext pins where the default field set is resolved,
+// and that this layer does not decide anything else about it.
+//
+// It used to assert that a flag's fields replaced the context's. No caller
+// could reach that branch — there is no persistent `--field`, so nothing ever
+// populated Overrides.Fields, and this test was the only thing constructing
+// one. A test that builds an input production cannot build is a test that keeps
+// dead code looking alive.
+//
+// The rule was wrong as well as unreachable: `--field` is per-command and adds
+// to the set rather than replacing it, so the union belongs where the request
+// is built. See validateFields in internal/resource/issue.
+func TestFieldsComeFromTheContext(t *testing.T) {
 	cfg := configWith(t, "work", map[string]jctx.Context{
 		"work": {Site: "acme.atlassian.invalid", Fields: []string{"summary", "status"}},
 	})
 
-	fromContext, err := jctx.Resolve(cfg, jctx.Overrides{}, nil)
+	resolved, err := jctx.Resolve(cfg, jctx.Overrides{}, nil)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
-	if strings.Join(fromContext.Fields, ",") != "summary,status" {
-		t.Errorf("Fields = %v", fromContext.Fields)
-	}
-
-	// Flags replace the context's fields rather than appending, so a caller
-	// asking for one field gets one field.
-	overridden, err := jctx.Resolve(cfg, jctx.Overrides{Fields: []string{"key"}}, nil)
-	if err != nil {
-		t.Fatalf("resolve: %v", err)
-	}
-	if strings.Join(overridden.Fields, ",") != "key" {
-		t.Errorf("Fields = %v, want only the override", overridden.Fields)
+	if strings.Join(resolved.Fields, ",") != "summary,status" {
+		t.Errorf("Fields = %v", resolved.Fields)
 	}
 
 	// And the result must not alias the config.
-	overridden.Fields[0] = "mutated"
+	resolved.Fields[0] = "mutated"
 	again, _ := cfg.Get("work")
 	if again.Fields[0] != "summary" {
 		t.Errorf("the resolved fields alias the stored context: %v", again.Fields)

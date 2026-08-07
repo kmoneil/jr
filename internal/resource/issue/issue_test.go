@@ -1545,8 +1545,9 @@ const catalogueJSON = `[
 // stubSession is a registry.Session backed by a stubbed transport, so a command
 // is exercised with no auth, no config, and no network.
 type stubSession struct {
-	doer *stubDoer
-	meta *site.Metadata
+	fields []string
+	doer   *stubDoer
+	meta   *site.Metadata
 	// conn and kind are set when a test needs the command to reach a recorded
 	// conversation rather than only the catalogue.
 	conn *transport.Client
@@ -1605,6 +1606,9 @@ func (s *stubSession) RequireProject() (string, error) {
 	return "", errs.Usage("NO_PROJECT", "this command needs a project and none is set")
 }
 func (s *stubSession) Board() string { return "" }
+
+// Fields is the context default field set. Empty unless a test sets it.
+func (s *stubSession) Fields() []string { return s.fields }
 
 // RequireBoard is what an agile command calls. None of these fixtures set a
 // board, so it fails the way the real session does rather than returning one.
@@ -2358,5 +2362,144 @@ func TestTheRecordedListingPagesToTheEnd(t *testing.T) {
 	}
 	if keys[0] != "OPS-10" || keys[len(keys)-1] != "OPS-1" {
 		t.Errorf("keys = %v, want OPS-10 first and OPS-1 last", keys)
+	}
+}
+
+// TestAContextFieldSetReachesTheRequest is the test that would have caught the
+// defect this fixes.
+//
+// `context edit --field 'Story Points'` validated the name, wrote it to
+// config.toml, and printed it back from `context show`. Nothing sent it:
+// registry.Session had Project() and Board() and no Fields(), so validateFields
+// asked the flag and nothing else. Every existing test round-tripped the value
+// through the config, which is why they all passed while the feature did
+// nothing.
+//
+// So this drives the command, not the config, and asserts on the columns a
+// caller sees rather than on stored state.
+func TestAContextFieldSetReachesTheRequest(t *testing.T) {
+	const catalogue = `[{"id":"customfield_10042","name":"Story Points","custom":true,
+		"schema":{"type":"number"}},
+		{"id":"customfield_10077","name":"Team","custom":true,"schema":{"type":"string"}}]`
+
+	for _, tc := range []struct {
+		name    string
+		context []string
+		flag    []string
+		noCtx   bool
+		want    []string
+	}{
+		{
+			name:    "the context's set is sent with no flag at all",
+			context: []string{"Story Points"},
+			want:    []string{"customfield_10042"},
+		},
+		{
+			// The whole point of the union. Replace would have dropped
+			// customfield_10042 here, which is the original --field bug.
+			name:    "a flag adds to the context rather than replacing it",
+			context: []string{"Story Points"},
+			flag:    []string{"Team"},
+			want:    []string{"customfield_10042", "customfield_10077"},
+		},
+		{
+			name:    "context first, so a flag does not reorder the columns",
+			context: []string{"Team"},
+			flag:    []string{"Story Points"},
+			want:    []string{"customfield_10077", "customfield_10042"},
+		},
+		{
+			// Two spellings of one field are one column, not two.
+			name:    "a field named in both places appears once",
+			context: []string{"Story Points"},
+			flag:    []string{"customfield_10042"},
+			want:    []string{"customfield_10042"},
+		},
+		{
+			name:    "--no-context-fields leaves only what was typed",
+			context: []string{"Story Points"},
+			flag:    []string{"Team"},
+			noCtx:   true,
+			want:    []string{"customfield_10077"},
+		},
+		{
+			name:    "--no-context-fields with no flag asks for nothing extra",
+			context: []string{"Story Points"},
+			noCtx:   true,
+			want:    nil,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd, ok := registry.Lookup("issue.list")
+			if !ok {
+				t.Fatal("issue list is not registered")
+			}
+
+			flags := registry.NewFlags()
+			for _, f := range tc.flag {
+				// SetString appends for a repeatable flag, which is how a real
+				// `--field a --field b` arrives.
+				flags.SetString("field", f)
+			}
+			if tc.noCtx {
+				flags.SetBool("no-context-fields", true)
+			}
+			inv := &registry.Invocation{
+				Jira: &stubSession{
+					fields:     tc.context,
+					metaClient: &stubDoer{body: catalogue},
+					doer:       &stubDoer{body: catalogue},
+				},
+				Flags: flags, Stderr: io.Discard, Progress: registry.NoProgress,
+			}
+
+			if err := cmd.Validate(t.Context(), inv); err != nil {
+				t.Fatalf("validate: %v", err)
+			}
+
+			// The columns are what a caller sees, and they are computed from
+			// the ids validation resolved — so asserting here covers the whole
+			// path without reaching into unexported state.
+			var extra []string
+			for _, col := range cmd.ColumnsFor(inv) {
+				if strings.HasPrefix(col.Header, "customfield_") {
+					extra = append(extra, col.Header)
+				}
+			}
+			if strings.Join(extra, ",") != strings.Join(tc.want, ",") {
+				t.Errorf("extra columns = %v, want %v", extra, tc.want)
+			}
+		})
+	}
+}
+
+// TestAStaleContextFieldSaysWhereItCameFrom covers the cost of the union: a
+// field the context names and Jira no longer has now fails every read, not just
+// the invocations that passed --field.
+//
+// The refusal is correct — §5.2, nothing is guessed — but it has to point at
+// the context, because the caller did not type this name on this command line
+// and has no reason to look there.
+func TestAStaleContextFieldSaysWhereItCameFrom(t *testing.T) {
+	cmd, _ := registry.Lookup("issue.list")
+	inv := &registry.Invocation{
+		Jira: &stubSession{
+			fields:     []string{"Retired Field"},
+			metaClient: &stubDoer{body: `[{"id":"customfield_10042","name":"Story Points","custom":true}]`},
+			doer:       &stubDoer{body: `[]`},
+		},
+		Flags: registry.NewFlags(), Stderr: io.Discard, Progress: registry.NoProgress,
+	}
+
+	err := cmd.Validate(t.Context(), inv)
+	if err == nil {
+		t.Fatal("a context field that resolves to nothing was accepted")
+	}
+	remedy := errs.Coerce(err).Remedy
+	if !strings.Contains(remedy, "context") {
+		t.Errorf("the remedy does not point at the context: %q", remedy)
+	}
+	if !strings.Contains(remedy, "--unset field") {
+		t.Errorf("the remedy does not say how to clear it: %q", remedy)
 	}
 }

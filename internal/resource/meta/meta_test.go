@@ -299,6 +299,7 @@ func runStream(
 // stubSession is a registry.Session backed by a stubbed transport, so a command
 // is exercised with no auth, no config, and no network.
 type stubSession struct {
+	fields []string
 	// doer is an interface because createmeta needs a transport that answers
 	// two different requests, and a single-body stub cannot.
 	doer   site.Doer
@@ -327,6 +328,10 @@ func (s *stubSession) Board() string                   { return "" }
 
 // RequireBoard is what an agile command calls. None of these fixtures set a
 // board, so it fails the way the real session does rather than returning one.
+// Fields is the context default field set. Empty here: a stub that
+// invented one would make every resource test assert a request nobody made.
+func (s *stubSession) Fields() []string { return s.fields }
+
 func (s *stubSession) RequireBoard() (string, error) {
 	return "", errs.Usage("NO_BOARD", "this command needs a board and none is set")
 }

@@ -167,8 +167,10 @@ contains only a fragment that balances.`),
 				Name: "field", Type: registry.TypeString, Repeatable: true,
 				Usage: "extra field to include, by id or name, e.g. " +
 					"customfield_10042 or 'Story Points'; " +
-					"added to the default set, repeat for several",
+					"added to the default set and to the context's, " +
+					"repeat for several",
 			},
+			contextFieldsFlag(),
 			{
 				Name: "all-projects", Type: registry.TypeBool,
 				Usage: "search every project the credential can see, ignoring " +
@@ -263,6 +265,31 @@ func requestedFields(resolved []string) []string {
 // the rest of the invocation.
 const resolvedFieldsKey = "issue.fields"
 
+// noContextFieldsFlag suppresses the context's default field set for one
+// invocation.
+//
+// Named for the *context*, not for "defaults". `--no-default-fields` was the
+// obvious spelling and it is ambiguous here: DefaultFields() already means the
+// native set this tool always asks for — summary, status, assignee — and a flag
+// that reads as though it drops those is a flag that gets used by mistake once.
+const noContextFieldsFlag = "no-context-fields"
+
+// contextFieldsFlag is the opt-out, declared once because both commands that
+// take --field need the same question answered the same way.
+//
+// It exists so the union has an escape hatch: fields from the context always
+// apply, and a caller who wants only what they typed can say so. Without it,
+// nothing on the command line could produce a request narrower than the
+// context, and a value the caller cannot suppress is a value the caller does
+// not control.
+func contextFieldsFlag() registry.Flag {
+	return registry.Flag{
+		Name: noContextFieldsFlag, Type: registry.TypeBool,
+		Usage: "ignore the field set stored in the context, and ask only for " +
+			"the fields named by --field",
+	}
+}
+
 // validateList refuses a --jql fragment that cannot be contained and the one
 // invocation that is a sweep rather than a query, then resolves the field
 // names.
@@ -356,10 +383,17 @@ var constrainingFlags = []string{
 // goes out first — and because a name that resolves to nothing has to be
 // refused before any bytes reach stdout.
 func validateFields(ctx context.Context, inv *registry.Invocation) error {
-	requested := inv.Flags.StringSlice("field")
-	if len(requested) == 0 {
-		// No --field means no catalogue, and no catalogue means no request. The
-		// common invocation must not pay for a feature it did not ask for.
+	fromContext := contextFields(inv)
+	fromFlag := inv.Flags.StringSlice("field")
+
+	if len(fromContext) == 0 && len(fromFlag) == 0 {
+		// No fields from either source means no catalogue, and no catalogue
+		// means no request. The common invocation must not pay for a feature it
+		// did not ask for.
+		//
+		// A context *with* a field set now always pays, once per TTL. That is
+		// the trade the set exists for — not having to remember — but it is a
+		// real cost on a cold cache and it is why the set is opt-in.
 		inv.SetValue(resolvedFieldsKey, []string(nil))
 		return nil
 	}
@@ -376,12 +410,45 @@ func validateFields(ctx context.Context, inv *registry.Invocation) error {
 		return err
 	}
 
-	resolved, err := ResolveFields(catalogue, requested)
+	// Resolved separately so a failure can say which source named the field.
+	// A context carrying a field Jira has since renamed would otherwise fail
+	// every read with an error that reads as though the caller mistyped a flag
+	// they never passed.
+	contextIDs, err := ResolveFields(catalogue, fromContext)
+	if err != nil {
+		return contextFieldFailure(err)
+	}
+	flagIDs, err := ResolveFields(catalogue, fromFlag)
 	if err != nil {
 		return err
 	}
-	inv.SetValue(resolvedFieldsKey, resolved)
+
+	// Context first, so column order does not change when a caller adds an
+	// ad-hoc --field. ExtraFieldNames collapses two spellings of one field to a
+	// single id, so a field named in both places produces one column.
+	inv.SetValue(resolvedFieldsKey, append(contextIDs, flagIDs...))
 	return nil
+}
+
+// contextFields is the default field set, unless this invocation opted out.
+func contextFields(inv *registry.Invocation) []string {
+	if inv.Jira == nil || inv.Flags.Bool(noContextFieldsFlag) {
+		return nil
+	}
+	return inv.Jira.Fields()
+}
+
+// contextFieldFailure re-points a resolution error at the context that supplied
+// the name, because nothing the caller typed on this command line caused it.
+//
+// The original error keeps its code and message — it is still the same unknown
+// field — and only the remedy changes, since the fix is somewhere the caller was
+// not looking.
+func contextFieldFailure(err error) error {
+	e := errs.Coerce(err)
+	return e.WithRemedy("this field comes from your context, not this command: "+
+		"run `%s context show` to see the set, and "+
+		"`%s context edit <name> --unset field` to clear it", buildinfo.App, buildinfo.App)
 }
 
 // resolvedFields returns the ids validation resolved.
@@ -611,8 +678,9 @@ parses both identically. It simply has more of it filled in.`),
 			Name: "field", Type: registry.TypeString, Repeatable: true,
 			Usage: "extra field to include, by id or name, e.g. " +
 				"customfield_10042 or 'Story Points'; " +
-				"added to the default set, repeat for several",
-		}, rawBodyFlag()},
+				"added to the default set and to the context's, " +
+				"repeat for several",
+		}, contextFieldsFlag(), rawBodyFlag()},
 		NeedsJira: true,
 		Outputs:   []registry.Output{{Kind: KindGet, Version: VersionGet}},
 		ExitCodes: []exitcode.Code{

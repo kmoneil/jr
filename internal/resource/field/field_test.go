@@ -176,8 +176,9 @@ func run(t *testing.T, limit registry.Limit, format render.Format) (string, regi
 // stubSession is a registry.Session backed by a stubbed transport, so the
 // command is exercised with no auth, no config, and no network.
 type stubSession struct {
-	doer *stubDoer
-	meta *site.Metadata
+	fields []string
+	doer   *stubDoer
+	meta   *site.Metadata
 }
 
 func (s *stubSession) Connect(context.Context) (*transport.Client, site.Info, error) {
@@ -197,6 +198,10 @@ func (s *stubSession) Board() string                   { return "" }
 
 // RequireBoard is what an agile command calls. None of these fixtures set a
 // board, so it fails the way the real session does rather than returning one.
+// Fields is the context default field set. Empty here: a stub that
+// invented one would make every resource test assert a request nobody made.
+func (s *stubSession) Fields() []string { return s.fields }
+
 func (s *stubSession) RequireBoard() (string, error) {
 	return "", errs.Usage("NO_BOARD", "this command needs a board and none is set")
 }

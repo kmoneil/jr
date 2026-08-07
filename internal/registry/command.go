@@ -250,6 +250,18 @@ type Session interface {
 	RequireProject() (string, error)
 	// Board is the resolved default board, which may be empty.
 	Board() string
+	// Fields is the context's default field set: the custom fields this caller
+	// wants on every issue without naming them each time. Ids or names, in the
+	// order the context lists them, and possibly empty.
+	//
+	// A command adds these to whatever --field asked for rather than choosing
+	// between them. Choosing would mean one ad-hoc --field silently dropped the
+	// set, which is the shape of the bug that produced the rule that a flag
+	// either affects the output or does not exist.
+	//
+	// This method is why the card existed: the value was resolved, stored, and
+	// printed by `context show`, and no resource could reach it.
+	Fields() []string
 	// RequireBoard returns the board or a usage error naming the flag, for the
 	// agile commands that have nothing to list without one.
 	RequireBoard() (string, error)

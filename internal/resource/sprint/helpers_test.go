@@ -82,9 +82,10 @@ func replayConn(t *testing.T, fixture string) (*transport.Client, *transport.Rep
 // stubSession is a registry.Session over a recorded conversation, so a command
 // runs with no auth, no config, and no network.
 type stubSession struct {
-	conn  *transport.Client
-	kind  site.Kind
-	board string
+	fields []string
+	conn   *transport.Client
+	kind   site.Kind
+	board  string
 }
 
 func (s *stubSession) Connect(context.Context) (*transport.Client, site.Info, error) {
@@ -103,6 +104,10 @@ func (s *stubSession) CheckWritable(string) error { return nil }
 func (s *stubSession) RequireProject() (string, error) {
 	return "", errs.Usage("NO_PROJECT", "this command needs a project and none is set")
 }
+
+// Fields is the context default field set. Empty here: a stub that
+// invented one would make every resource test assert a request nobody made.
+func (s *stubSession) Fields() []string { return s.fields }
 
 func (s *stubSession) RequireBoard() (string, error) {
 	if s.board == "" {
