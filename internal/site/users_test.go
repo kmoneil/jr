@@ -257,8 +257,8 @@ func TestAnEntryWithNoIdIsNotACandidate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
-	if len(got) != 0 {
-		t.Errorf("got %+v, want an entry with no id dropped", got)
+	if len(got.Users) != 0 {
+		t.Errorf("got %+v, want an entry with no id dropped", got.Users)
 	}
 }
 

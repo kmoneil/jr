@@ -54,15 +54,46 @@ func (r rawUser) convert() User {
 	}
 }
 
-// SearchUsers finds accounts matching a query.
+// UserPage is one page of search results plus whether the directory held more.
+//
+// Every other listing in this tool pages to exhaustion and then compares what
+// it holds against what was asked for, so it can always say whether the set is
+// whole. This endpoint cannot be paged that way here, so the answer has to come
+// out of the one request — which is why the bound and the verdict travel
+// together rather than the caller inferring one from the other.
+type UserPage struct {
+	Users []User
+	// Complete is false when the directory held more than the bound allowed.
+	//
+	// It is a field rather than something a caller works out from len(Users),
+	// because len(Users) cannot answer it: the bound and the test for the bound
+	// would be the same number, and the comparison is then unreachable. That is
+	// exactly how `user list` came to report every truncated search as
+	// exhaustive.
+	Complete bool
+}
+
+// SearchUsers finds accounts matching a query, up to limit.
 //
 // The parameter name differs by deployment: Cloud takes `query` and matches
 // display name and email, Data Center takes `username` and matches rather more
 // loosely. Sending the wrong one is not an error — it is an empty result,
 // which is why the split lives here rather than in each caller.
+//
+// It asks the server for one more row than the caller wanted. `/user/search`
+// answers with a bare array — no total, no isLast, on either deployment — so a
+// full page is the only evidence there is that more exist, and asking for
+// exactly the bound makes a truncated result indistinguishable from a whole
+// one. The extra row is a probe: it is never converted, never counted, and
+// never emitted.
+//
+// The alternative was to send the bound and call a page that came back full
+// incomplete. That is the guess `attachComments` deliberately refused for the
+// comment thread — it reports every result whose size happens to equal the
+// limit as partial, forever. A probe row costs nothing and is exact.
 func SearchUsers(
 	ctx context.Context, client Doer, info Info, query string, limit int,
-) ([]User, error) {
+) (UserPage, error) {
 	param := "username"
 	if info.Kind == Cloud {
 		param = "query"
@@ -74,22 +105,27 @@ func SearchUsers(
 		Path:   path,
 		Query: url.Values{
 			param:        {query},
-			"maxResults": {strconv.Itoa(limit)},
+			"maxResults": {strconv.Itoa(limit + 1)},
 		},
 	})
 	if err != nil {
-		return nil, err
+		return UserPage{}, err
 	}
 	if err := transport.Err(resp); err != nil {
-		return nil, err
+		return UserPage{}, err
 	}
 
 	var raw []rawUser
 	if err := json.Unmarshal(resp.Body, &raw); err != nil {
-		return nil, errs.Remote("MALFORMED_USERS",
+		return UserPage{}, errs.Remote("MALFORMED_USERS",
 			"%s did not return usable users", path).
 			WithRequestID(resp.RequestID).Wrap(err)
 	}
+	// The probe row came back, so the directory holds more than was asked for.
+	// Decided on the raw count, before the id filter below: an entry dropped
+	// for having no id is still an entry the server had, so counting after the
+	// filter would report a full page as whole.
+	more := len(raw) > limit
 
 	out := make([]User, 0, len(raw))
 	for _, r := range raw {
@@ -102,6 +138,13 @@ func SearchUsers(
 		}
 		out = append(out, u)
 	}
+	// Trimmed here, in the order the server sent, rather than after the sort.
+	// Sorting first would let the probe row displace a real one — it would land
+	// wherever its display name falls and push the last row out — so which
+	// users a caller sees would depend on a row fetched only to be discarded.
+	if len(out) > limit {
+		out = out[:limit]
+	}
 	// Ordered so two runs agree; neither endpoint promises one.
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Display != out[j].Display {
@@ -109,7 +152,7 @@ func SearchUsers(
 		}
 		return out[i].ID < out[j].ID
 	})
-	return out, nil
+	return UserPage{Users: out, Complete: !more}, nil
 }
 
 // FetchUser looks one account up by the id this deployment identifies it with.
@@ -169,10 +212,16 @@ func ResolveUser(ctx context.Context, client Doer, info Info, input string) (Use
 		return User{}, errs.Usage("INVALID_USER", "a user cannot be empty")
 	}
 
-	found, err := SearchUsers(ctx, client, info, want, userSearchLimit)
+	// Completeness is deliberately ignored here. This is a resolution, not a
+	// listing: an exact match either is in the candidate set or the input is
+	// refused with what was found, and both answers are honest whether or not
+	// the directory held more. `user list` is where the caller is owed the
+	// verdict, because there the candidates are the result.
+	page, err := SearchUsers(ctx, client, info, want, userSearchLimit)
 	if err != nil {
 		return User{}, err
 	}
+	found := page.Users
 
 	// Each class in turn, so a display name that happens to equal somebody
 	// else's email does not make an exact email match ambiguous.

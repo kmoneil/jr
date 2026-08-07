@@ -6,7 +6,7 @@
       "request": {
         "method": "GET",
         "path": "/rest/api/3/user/search",
-        "query": "maxResults=50&query=ada"
+        "query": "maxResults=51&query=ada"
       },
       "response": {
         "status": 200,

@@ -118,7 +118,12 @@ same as "has none", and nothing here infers one from the other.
 
 A query is required. Listing every user on an instance is not a thing this tool
 does: it is slow, it is rarely what was meant, and the endpoint that allows it
-is not the same on both deployments.`),
+is not the same on both deployments.
+
+This command does not page, so --limit all is bounded like any other limit and
+is not a way to get the whole directory. Whatever the bound, a search with more
+matches than it allows is never reported as complete: it says so in the output,
+warns on stderr, and exits 3. Narrow the query, or raise --limit.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " user list ada",
 			buildinfo.App + " user list ada --format json",
@@ -146,8 +151,9 @@ is not the same on both deployments.`),
 	}
 }
 
-// Search finds users matching a query.
-func (c *Client) Search(ctx context.Context, query string, limit int) ([]User, error) {
+// Search finds users matching a query, up to limit, and reports whether the
+// directory held more.
+func (c *Client) Search(ctx context.Context, query string, limit int) (site.UserPage, error) {
 	return site.SearchUsers(ctx, c.Transport, c.Site, query, limit)
 }
 
@@ -159,30 +165,34 @@ func runList(
 		return registry.StreamResult{}, err
 	}
 
-	// The server bound and the caller's bound are the same thing here: there is
-	// nothing to page through, so asking for more than will be printed would
-	// spend somebody's rate limit on rows nobody sees.
-	limit := 50
+	// This command does not page, so --limit all is bounded like any other
+	// limit — at the same default every command applies when none is given.
+	// The bound is honest rather than hidden: a directory with more in it comes
+	// back complete="false" and exit 3, exactly as a numeric --limit would.
+	//
+	// Bounding is the point. Listing an entire user directory is slow, rarely
+	// what was meant, and not the same endpoint on both deployments — which is
+	// why the search query is required. What was wrong before was not the bound
+	// but the silence: 50 rows reported as the whole answer.
+	limit := registry.DefaultLimit
 	if !inv.Limit.All {
 		limit = inv.Limit.N
 	}
-	users, err := client.Search(ctx, inv.Args[0], limit)
+	page, err := client.Search(ctx, inv.Args[0], limit)
 	if err != nil {
 		return registry.StreamResult{}, err
 	}
 
-	complete := true
-	if !inv.Limit.All && len(users) > inv.Limit.N {
-		users = users[:inv.Limit.N]
-		complete = false
-	}
-	for _, u := range users {
+	for _, u := range page.Users {
 		if err := out.Write(Node(u)); err != nil {
 			return registry.StreamResult{}, err
 		}
 	}
 	inv.Progress.Update(out.Count(), out.Count())
-	return registry.StreamResult{Complete: complete}, nil
+	// The search decides this, not a comparison here. The bound reaches the
+	// server as maxResults, so a check against len(page.Users) would be testing
+	// a number the request already enforced and could never fail.
+	return registry.StreamResult{Complete: page.Complete}, nil
 }
 
 func getCommand() *registry.Command {

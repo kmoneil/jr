@@ -39,7 +39,8 @@ func TestTheIdIsTheDeploymentsOwn(t *testing.T) {
 			conn, replayer := replayConn(t, "search."+string(tc.kind)+".json")
 			client := &user.Client{Transport: conn, Site: site.Info{Kind: tc.kind}}
 
-			users, err := client.Search(t.Context(), "ada", 50)
+			page, err := client.Search(t.Context(), "ada", 50)
+			users := page.Users
 			if err != nil {
 				t.Fatalf("search: %v", err)
 			}
@@ -73,7 +74,8 @@ func TestUsersAreOrderedByDisplayName(t *testing.T) {
 	conn, _ := replayConn(t, "search-private.cloud.json")
 	client := &user.Client{Transport: conn, Site: site.Info{Kind: site.Cloud}}
 
-	users, err := client.Search(t.Context(), "ada", 50)
+	page, err := client.Search(t.Context(), "ada", 50)
+	users := page.Users
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
@@ -94,7 +96,8 @@ func TestAnAbsentEmailIsNotAnAbsentAddress(t *testing.T) {
 	conn, _ := replayConn(t, "search-private.cloud.json")
 	client := &user.Client{Transport: conn, Site: site.Info{Kind: site.Cloud}}
 
-	users, err := client.Search(t.Context(), "ada", 50)
+	page, err := client.Search(t.Context(), "ada", 50)
+	users := page.Users
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
@@ -117,7 +120,8 @@ func TestAnAbsentEmailIsNotAnAbsentAddress(t *testing.T) {
 	// Data Center's fixture does carry them, and they come through.
 	dcConn, _ := replayConn(t, "search.datacenter.json")
 	dc := &user.Client{Transport: dcConn, Site: site.Info{Kind: site.DataCenter}}
-	dcUsers, err := dc.Search(t.Context(), "ada", 50)
+	dcPage, err := dc.Search(t.Context(), "ada", 50)
+	dcUsers := dcPage.Users
 	if err != nil {
 		t.Fatalf("data center: %v", err)
 	}
@@ -132,7 +136,8 @@ func TestAppAccountsAreDistinguishable(t *testing.T) {
 	conn, _ := replayConn(t, "search.cloud.json")
 	client := &user.Client{Transport: conn, Site: site.Info{Kind: site.Cloud}}
 
-	users, err := client.Search(t.Context(), "ada", 50)
+	page, err := client.Search(t.Context(), "ada", 50)
+	users := page.Users
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
@@ -434,5 +439,68 @@ func TestTheCloudFixturesAreRecordings(t *testing.T) {
 			t.Errorf("%s is no longer a recording, so the tests that replay it "+
 				"assert nothing about the API", name)
 		}
+	}
+}
+
+// TestAFullPageIsNeverReportedComplete covers the one listing where the server,
+// not this client, decides how much comes back.
+//
+// `/user/search` answers with a bare array — no total, no isLast — so a page as
+// large as the bound it was given is the only evidence there is that more
+// exist. Every other listing pages to exhaustion first and can compare what it
+// holds against what was asked for; this one cannot, and a result that cannot
+// prove it is exhaustive must not claim to be.
+//
+// Both halves matter. A bounded --limit truncates against a directory that has
+// more, and --limit all is bounded too — this command does not page — so it has
+// the same duty to say so.
+func TestAFullPageIsNeverReportedComplete(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		limit    registry.Limit
+		wantRows int
+	}{
+		{"limit all", registry.Limit{All: true}, registry.DefaultLimit},
+		{"bounded", registry.Limit{N: 5}, 5},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd, ok := registry.Lookup("user.list")
+			if !ok {
+				t.Fatal("user list is not registered")
+			}
+			conn, _ := replayConn(t, "search-full.cloud.json")
+			inv := &registry.Invocation{
+				Jira: &stubSession{conn: conn, kind: site.Cloud},
+				Args: []string{"ada"}, Flags: registry.NewFlags(),
+				Limit:  tc.limit,
+				Stderr: io.Discard, Progress: registry.NoProgress,
+			}
+
+			var buf strings.Builder
+			stream, err := render.NewStream(&buf, render.TSV, render.StreamSpec{
+				Kind: cmd.Kind(), Version: cmd.KindVersion(),
+				Name: cmd.CollectionName, Columns: cmd.Columns,
+			})
+			if err != nil {
+				t.Fatalf("stream: %v", err)
+			}
+			result, err := cmd.Stream(t.Context(), inv, stream)
+			if err != nil {
+				t.Fatalf("run: %v", err)
+			}
+			if err := stream.Close(result.Complete, result.NextPageToken); err != nil {
+				t.Fatalf("close: %v", err)
+			}
+
+			if result.Complete {
+				t.Error("a page as large as the bound it was given was reported " +
+					"complete; nothing in the response says the directory held no more")
+			}
+			// The bound is the caller's and is honoured exactly: a probe row
+			// fetched to detect truncation is not a row the caller asked for.
+			if rows := strings.Count(strings.TrimRight(buf.String(), "\n"), "\n"); rows != tc.wantRows {
+				t.Errorf("emitted %d rows, want %d:\n%s", rows, tc.wantRows, buf.String())
+			}
+		})
 	}
 }
