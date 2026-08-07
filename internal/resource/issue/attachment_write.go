@@ -5,11 +5,13 @@ package issue
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 
 	"github.com/kmoneil/jira-cli/internal/buildinfo"
@@ -179,24 +181,74 @@ func multipartSource(path, name, boundary string) func() (io.ReadCloser, error) 
 
 		go func() {
 			defer func() { _ = file.Close() }()
-			part, err := form.CreateFormFile(multipartField, name)
-			if err != nil {
-				_ = pw.CloseWithError(err)
-				return
-			}
-			if _, err := io.Copy(part, file); err != nil {
-				_ = pw.CloseWithError(err)
-				return
-			}
-			if err := form.Close(); err != nil {
-				_ = pw.CloseWithError(err)
-				return
-			}
-			_ = pw.Close()
+			writeMultipartBody(pw, form, name, file)
 		}()
 
 		return pipeCloser{PipeReader: pr}, nil
 	}
+}
+
+// writeMultipartBody streams src as one multipart form and closes the pipe,
+// carrying any failure to the reader rather than truncating the body.
+//
+// It is a named function rather than the goroutine's closure so the recover has
+// something to sit on that a test can call. A panic in a goroutine is not caught
+// by a recover anywhere else: not by the one in mcp.Server.dispatch, not by one
+// in Command.Run, and there is no equivalent of net/http's per-connection
+// recovery that reaches it. Without this, a panic here ends the process — and
+// under `mcp serve` that is the session, not the upload.
+//
+// This is the only `go func(` in the module reachable from a request. Nothing
+// below looks able to panic today: CreateFormFile and Close return errors,
+// io.Copy on a file returns errors, and CloseWithError is safe to call twice.
+// The recover is here because the guarantee has to be given from inside the
+// goroutine or not at all, and because the cost of being wrong is the process.
+func writeMultipartBody(
+	pw *io.PipeWriter, form *multipart.Writer, name string, src io.Reader,
+) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			_ = pw.CloseWithError(bodyPanic(recovered))
+		}
+	}()
+
+	part, err := form.CreateFormFile(multipartField, name)
+	if err != nil {
+		_ = pw.CloseWithError(err)
+		return
+	}
+	if _, err := io.Copy(part, src); err != nil {
+		_ = pw.CloseWithError(err)
+		return
+	}
+	if err := form.Close(); err != nil {
+		_ = pw.CloseWithError(err)
+		return
+	}
+	_ = pw.Close()
+}
+
+// bodyPanic turns a panic in the body producer into the failure the reader can
+// already receive, so the upload fails instead of the process.
+//
+// CloseWithError is the path every other failure in that goroutine takes, and
+// the transport already knows how to report a body that could not be produced.
+// A panic is one more way to fail to produce bytes.
+//
+// The panic value is wrapped rather than put in the message or the detail.
+// errs.Wrap keeps it reachable through errors.Unwrap and never renders it — so
+// a developer and a test can get at it while the caller cannot, which matters
+// because under `mcp serve` this error becomes a tool result and the caller is
+// the peer. The same rule the MCP recover follows, for the same reason.
+//
+// Wrapped and not dropped: a recover that discards what it caught turns a
+// reproducible crash into an unexplained failed upload.
+func bodyPanic(recovered any) error {
+	return errs.Runtime("UPLOAD_BODY_FAILED",
+		"the attachment could not be read into a request body").
+		WithRemedy("check the file is readable and has not changed, and report this").
+		Wrap(fmt.Errorf("panic in the multipart body producer: %v\n%s",
+			recovered, debug.Stack()))
 }
 
 // pipeCloser makes closing the read end also stop the writer, so an abandoned
