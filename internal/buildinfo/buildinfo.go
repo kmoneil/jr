@@ -53,7 +53,7 @@ var KnownTags = []string{
 var TagDescriptions = map[string]string{
 	"tui":       "Interactive terminal UI (jr ui)",
 	"prompt":    "Interactive prompts and the setup wizard",
-	"render":    "ADF to terminal markdown rendering",
+	"render":    "Human-readable rendering: the markdown output format",
 	"browser":   "Opening URLs and the OAuth browser flow",
 	"clipboard": "Copying keys and URLs to the system clipboard",
 	"mcp":       "MCP server (jr mcp serve)",

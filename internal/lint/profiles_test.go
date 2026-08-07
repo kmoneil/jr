@@ -139,6 +139,16 @@ func TestTheGatesTodayColumnMatchesTheBinaries(t *testing.T) {
 		t.Run(tag, func(t *testing.T) {
 			gates := gatedCommands(t, bin, full, present, tag)
 			switch want := readGatesCell(t, cell); {
+			case want.format != "":
+				// A format is not visible in `jr schema`, so it is measured by
+				// asking each build to use it: the tagged one accepts it and
+				// the one without refuses it. That is the same thing a caller
+				// finds out, rather than a proxy for it.
+				if len(gates) > 0 {
+					t.Errorf("the table says %s gates a format and it also gates %v",
+						tag, gates)
+				}
+				assertFormatIsGated(t, bin, full, tag, want.format)
 			case want.nothing:
 				if len(gates) > 0 {
 					t.Errorf("the table says %s gates nothing and it gates %v",
@@ -171,10 +181,22 @@ type gatesCell struct {
 	nothing  bool
 	commands []string
 	count    int
+	// format is the output format a tag adds, for a tag that gates something
+	// other than a command.
+	format string
 }
 
 // docCommand matches a command named in a doc cell, e.g. `jr sprint close`.
 var docCommand = regexp.MustCompile("`jr ([a-z]+(?: [a-z]+)*)`")
+
+// docFormat matches an output format named in a doc cell, e.g.
+// `--format markdown`.
+//
+// `render` is the first tag to gate something that is not a command, and the
+// column had no way to say so: a cell is read by shape, and this shape did not
+// exist. It cannot collide with docCommand, which requires the backticked text
+// to begin "jr ".
+var docFormat = regexp.MustCompile("`--format ([a-z]+)`")
 
 // docCount matches the count in a cell like "the 18 mutating verbs".
 var docCount = regexp.MustCompile(`\b(\d+)\b`)
@@ -190,6 +212,9 @@ func readGatesCell(t *testing.T, cell string) gatesCell {
 
 	if strings.HasPrefix(strings.TrimSpace(cell), "**nothing**") {
 		return gatesCell{nothing: true}
+	}
+	if m := docFormat.FindStringSubmatch(cell); m != nil {
+		return gatesCell{format: m[1]}
 	}
 	if m := docCommand.FindAllStringSubmatch(cell, -1); m != nil {
 		var out []string
@@ -210,6 +235,36 @@ func readGatesCell(t *testing.T, cell string) gatesCell {
 		"test reads the column by shape, so a reworded cell asserts nothing",
 		profilesDoc, cell)
 	return gatesCell{}
+}
+
+// assertFormatIsGated checks that a format exists in the full build and not in
+// the same build without one tag.
+//
+// Both halves matter and the second is the one worth having. Asserting only
+// that the tagged build accepts the format would pass just as well against a
+// format that was never gated at all — which is the whole claim being made, and
+// the reason the reader, agent, and ci profiles can be said not to emit it.
+func assertFormatIsGated(t *testing.T, dir string, full profile, tag, format string) {
+	t.Helper()
+
+	kept := slices.DeleteFunc(strings.Split(full.tags, ","),
+		func(s string) bool { return s == tag })
+	without := profile{name: "full-no-" + tag, tags: strings.Join(kept, ",")}
+
+	// `version` is the cheapest command that emits a document, needs no
+	// network, and exists in every profile.
+	askBinary(t, buildProfile(t, dir, full), full, "version", "--format", format)
+
+	bin := buildProfile(t, dir, without)
+	cmd := exec.Command(bin, "version", "--format", format) //nolint:gosec // a binary this test just built.
+	cmd.Env = append(os.Environ(), "JIRA_FORMAT=", "JIRA_READONLY=")
+	if out, err := cmd.Output(); err == nil {
+		t.Errorf("%s accepts --format %s without the %s tag:\n%s",
+			without.name, format, tag, out)
+	} else if stderr := stderrOf(err); !strings.Contains(stderr, "INVALID_FORMAT") {
+		t.Errorf("%s refused --format %s with something other than INVALID_FORMAT:\n%s",
+			without.name, format, stderr)
+	}
 }
 
 // gatedCommands returns the commands one tag gates, as the difference between

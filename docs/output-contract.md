@@ -50,6 +50,39 @@ command. The defaults are a convenience; `--format` is the contract.
 `JIRA_FORMAT` sets the default globally; `--format` overrides it. An
 unrecognized value is exit 2 listing the valid ones, never a silent fallback.
 
+### `markdown` is presentation, and carries no promise
+
+A build with the `render` tag has a fifth format, `markdown`. **It is not part
+of this contract.** Everything else in this document — the envelope, the kinds,
+the schema versions, the stability policy — describes the four formats above.
+`markdown` exists so a person reading an issue on a terminal does not have to
+read XML, and it may change in any release, with no version bump and no note.
+
+Do not parse it. If something is parsing output, it wants `tsv`, `json`, or
+`xml`, all of which are versioned and none of which will change shape without a
+major bump.
+
+Three things keep the exception contained rather than making it a hole:
+
+- It is **never a default.** `DefaultFor` stays TSV for collections and XML for
+  records, so no existing script can receive markdown by accident — a caller has
+  to ask for it by name.
+- It is **absent from a build without the tag.** The agent, reader, and ci
+  profiles refuse `--format markdown` with exit 2, do not list it in `--format`,
+  and do not advertise it in the MCP tool schema. Asserted from both sides in
+  `internal/render` and by `internal/lint/profiles_test.go`.
+- It is **lossy on purpose, in one place.** A leaf carrying both text and
+  attributes renders its text and drops the attributes:
+  `<status category="in-progress">In Progress</status>` reads as `In Progress`.
+  The text is what a person is reading for. Every attribute is still in the
+  other three formats, which is where anything parsing should be looking.
+
+It is still goldened in `internal/render/testdata`, and that is not a
+contradiction. Those files are regression tests — change the writer and the diff
+shows up — and they carry none of the schema-version obligation that
+`internal/cli/testdata/kinds` does, which is the only golden set
+`internal/lint/goldens_test.go` holds to a version bump.
+
 ### What the defaults cost
 
 The split is per content shape rather than one format everywhere, and that was

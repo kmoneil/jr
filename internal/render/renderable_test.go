@@ -179,3 +179,52 @@ func reparse(f render.Format, s string) error {
 	}
 	return nil
 }
+
+// TestEveryFormatCanWriteEverything guards the format registry.
+//
+// Write and writeDiagnostic name the four core formats in a switch and send
+// anything else to a map that a build-tagged init fills. A format registered in
+// `formats` with no writer beside it would be a nil map entry — a panic on the
+// first document, in a build nobody ran the suite under.
+//
+// So this sweeps whatever the current build advertises rather than a list
+// written here: Formats() is the same source ParseFormat and the --format flag
+// read, and a new format is covered the day it is registered without anyone
+// remembering to add it.
+func TestEveryFormatCanWriteEverything(t *testing.T) {
+	for _, f := range render.Formats() {
+		t.Run(string(f), func(t *testing.T) {
+			record := render.Record("issue.get", 1,
+				render.El("issue").Attr("key", "ENG-1").Leaf("summary", "a summary"))
+			collection := render.List("issue.list", 1, &render.Collection{
+				Name: "issues", Complete: true,
+				Items: []*render.Node{render.El("issue").Attr("key", "ENG-1").Leaf("summary", "s")},
+				Columns: []render.Column{
+					{Header: "key", Path: "@key"},
+					{Header: "summary", Path: "summary"},
+				},
+			})
+
+			for name, doc := range map[string]*render.Doc{
+				"record": record, "collection": collection,
+			} {
+				var out strings.Builder
+				if err := render.Write(&out, doc, f); err != nil {
+					t.Fatalf("%s: %v", name, err)
+				}
+				if out.Len() == 0 {
+					t.Errorf("%s produced no output", name)
+				}
+			}
+
+			var diag strings.Builder
+			err := render.WriteError(&diag, errs.NotFound("GONE", "no such thing"), f)
+			if err != nil {
+				t.Fatalf("diagnostic: %v", err)
+			}
+			if diag.Len() == 0 {
+				t.Error("the diagnostic produced no output")
+			}
+		})
+	}
+}

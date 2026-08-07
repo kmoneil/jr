@@ -34,9 +34,32 @@ func Write(w io.Writer, d *Doc, f Format) error {
 			writeJSONValue(bw, docValue(d))
 		case YAML:
 			writeYAMLValue(bw, docValue(d))
+		default:
+			extraDoc[f](bw, d)
 		}
 	})
 }
+
+// extraDoc and extraDiagnostic hold the writers for a format a build tag adds.
+//
+// The four above are in every build and are named in the switch, because they
+// are the output contract and reading the dispatch should show them. A tagged
+// format registers here instead, so the format list and the writer set cannot
+// disagree — registerFormat is the only way in and it sets all three.
+//
+// Indexing without the comma-ok form is deliberate: encode has already refused
+// anything not in `formats`, and registerFormat is the only thing that adds to
+// it. A format in the list with no writer would be a nil map entry and a panic
+// here, which is the right outcome for a registration bug and is what
+// TestEveryFormatCanWriteEverything exists to catch before it ships.
+// registerFormat, which fills them, lives in the build-tagged file that calls
+// it: in a build with no tagged format it would have no caller, and
+// `make lint-untagged` reports exactly that — the gate added after `echoMode`
+// compiled into the reader profile and could never run there.
+var (
+	extraDoc        = map[Format]func(*writer, *Doc){}
+	extraDiagnostic = map[Format]func(*writer, *Node){}
+)
 
 // WriteError encodes a structured error to w, which is always stderr.
 func WriteError(w io.Writer, e *errs.Error, f Format) error {
@@ -66,6 +89,8 @@ func writeDiagnostic(w io.Writer, n *Node, f Format) error {
 			writeJSONValue(bw, diagnosticValue(n))
 		case YAML:
 			writeYAMLValue(bw, diagnosticValue(n))
+		default:
+			extraDiagnostic[f](bw, n)
 		}
 	})
 }

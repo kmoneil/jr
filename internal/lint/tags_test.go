@@ -25,7 +25,6 @@ import (
 // contains the code.
 var notYetGating = map[string]string{
 	"tui":       "internal/tui is a package doc and nothing else; there is no `jr ui`",
-	"render":    "ADF becomes markdown in every build, because the conversion is\n		part of the output contract rather than a display choice; this tag is for\n		styling that markdown for a terminal, and nothing styles anything yet",
 	"browser":   "there is no OAuth browser flow yet",
 	"clipboard": "nothing copies to the clipboard yet",
 }

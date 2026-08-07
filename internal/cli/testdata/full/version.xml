@@ -9,7 +9,7 @@
     <tags count="8">
       <tag name="tui">Interactive terminal UI (jr ui)</tag>
       <tag name="prompt">Interactive prompts and the setup wizard</tag>
-      <tag name="render">ADF to terminal markdown rendering</tag>
+      <tag name="render">Human-readable rendering: the markdown output format</tag>
       <tag name="browser">Opening URLs and the OAuth browser flow</tag>
       <tag name="clipboard">Copying keys and URLs to the system clipboard</tag>
       <tag name="mcp">MCP server (jr mcp serve)</tag>
