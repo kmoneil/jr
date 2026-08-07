@@ -715,6 +715,12 @@ Update this document in the same change that alters any of:
 - The result, error, or warning envelope.
 - An exit code's meaning, or the addition of a new one.
 - An error `code` string, or the conditions under which `retryable` is true.
+  The tables above are asserted against the source by
+  `internal/lint/errorcodes_test.go`: a documented code has to exist, produce
+  the exit printed beside it, and produce only that one. They are a curated
+  subset — this tree emits some two hundred codes — so a code missing from them
+  is one the contract does not promise, not one that is undocumented by
+  accident.
 - The escaping rules of any writer, or the type-promotion table above.
 - Which format is the default for a content shape.
 - What the ADF converter carries, drops, or refuses, in either direction —

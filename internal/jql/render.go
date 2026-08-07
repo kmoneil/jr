@@ -239,7 +239,12 @@ func renderFunc(f *Func) (string, error) {
 // Points` and a field literally named `order` are quoted.
 func renderField(name string) (string, error) {
 	if strings.TrimSpace(name) == "" {
-		return "", errs.Runtime("INVALID_FIELD", "clause has no field name")
+		// Its own code, not INVALID_FIELD. That one is a caller's bad --field
+		// and exits 2, which is what the contract publishes for it; this is a
+		// clause built with no field at all, which no input can produce and no
+		// caller can act on. One code with two exits gives a caller a different
+		// answer depending on how deep the input got before something noticed.
+		return "", errs.Runtime("INVALID_CLAUSE", "clause has no field name")
 	}
 	if isCustomFieldRef(name) {
 		return name, nil

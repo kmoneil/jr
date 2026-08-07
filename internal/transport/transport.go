@@ -764,8 +764,14 @@ func (c *Client) relative(raw string) (string, error) {
 // offSite is the refusal for a server-supplied URL that points away from the
 // configured site. The detail names the one part that differs and never the
 // whole URL, which can carry userinfo or a signed query parameter.
+//
+// Runtime, not Remote, which is what the output contract has always published
+// for this code. Remote is exit 9, and errs.New marks 9 retryable — so every
+// off-site refusal went out advertising that trying again might work. It
+// cannot: the server returns the same URL next time, and the field exists so
+// an agent does not spend its budget on a failure that has no other outcome.
 func offSite(message, detail string, args ...any) error {
-	return errs.Remote("OFF_SITE_URL", "%s", message).
+	return errs.Runtime("OFF_SITE_URL", "%s", message).
 		WithDetail(detail, args...).
 		WithRemedy("report this: a credential is not sent anywhere but the " +
 			"configured site")

@@ -13,7 +13,7 @@ converts a class of runtime bugs into link errors.
 
 | Tag         | Intends to gate                                         | Gates today                    |
 | ----------- | ------------------------------------------------------- | ------------------------------ |
-| `write`     | All mutating commands                                   | the 18 mutating verbs          |
+| `write`     | All mutating commands                                   | the 19 mutating verbs          |
 | `mcp`       | `jr mcp serve`                                          | `jr mcp serve`                 |
 | `prompt`    | Interactive prompts, the setup wizard, completion       | `jr completion`                |
 | `admin`     | Project, board, and sprint administration               | `jr sprint close`              |
@@ -22,12 +22,23 @@ converts a class of runtime bugs into link errors.
 | `browser`   | `jr open`, the OAuth browser flow                       | **nothing** — no OAuth yet     |
 | `clipboard` | Copying keys and URLs                                   | **nothing** — nothing copies   |
 
-The right-hand column is not documentation that can drift.
-`internal/lint/tags_test.go` asserts it: a tag gating nothing must be listed in
-`notYetGating` with a reason, and a tag that starts gating something fails the
-test until it is taken off that list. A file that only records the tag is set,
-or a package that is nothing but a doc comment, does not count as gating — that
-would report exactly the reassurance the audit exists to withhold.
+The right-hand column is not documentation that can drift. Two tests hold it,
+because it makes two different claims.
+
+`internal/lint/tags_test.go` asserts that a tag gates *code at all*: one gating
+nothing must be listed in `notYetGating` with a reason, and one that starts
+gating something fails the test until it is taken off that list. A file that
+only records the tag is set, or a package that is nothing but a doc comment,
+does not count as gating — that would report exactly the reassurance the audit
+exists to withhold.
+
+`internal/lint/profiles_test.go` asserts what each cell actually says, by
+building the full profile without each tag in turn and comparing what
+disappears against the cell. That test exists because this one said 18 mutating
+verbs while the binary held 19: the first check was passing the whole time,
+because "does `write` gate anything" and "does `write` gate what this row
+claims" are not the same question. A cell may name commands, count them, or say
+**nothing**; anything else fails as unreadable rather than passing unchecked.
 
 ### Tags that combine
 

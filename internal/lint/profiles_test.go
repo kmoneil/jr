@@ -7,9 +7,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/kmoneil/jira-cli/internal/buildinfo"
 )
 
 // The two files this test holds to each other. The Makefile is the authority on
@@ -95,6 +98,139 @@ func TestTheDocumentedTagSetsAreTheOnesTheMakefileBuilds(t *testing.T) {
 	}
 }
 
+// TestTheGatesTodayColumnMatchesTheBinaries reads the third column of the tag
+// table, which was the one column of that document nothing asserted.
+//
+// The doc says of it: "The right-hand column is not documentation that can
+// drift. internal/lint/tags_test.go asserts it." That was half true.
+// tags_test asserts whether a tag gates *any file*, which is what catches a tag
+// listed as gating nothing once it starts gating something. It never read what
+// the cell says. So `write` claimed 18 mutating verbs against a real 19, in a
+// column captioned as un-driftable, in a document whose other two tables are
+// asserted precisely because they went four releases stale.
+//
+// What the column claims is about a binary — what a build without the tag turns
+// out not to contain — so it is measured that way, by building the full profile
+// without each tag in turn and taking the difference. A command's RequiresTags
+// is a declaration; the two agree only while the registration file is gated to
+// match, and this is the check that would notice if it were not.
+func TestTheGatesTodayColumnMatchesTheBinaries(t *testing.T) {
+	documented := gatesTodayFromDoc(t)
+
+	var full profile
+	for _, p := range profilesFromMakefile(t) {
+		if p.name == "full" {
+			full = p
+		}
+	}
+	if full.tags == "" {
+		t.Fatal("the Makefile ships no full profile to measure against")
+	}
+
+	bin := t.TempDir()
+	present := commandsIn(t, bin, full)
+
+	for _, tag := range buildinfo.KnownTags {
+		cell, ok := documented[tag]
+		if !ok {
+			t.Errorf("the tag table does not list %q", tag)
+			continue
+		}
+		t.Run(tag, func(t *testing.T) {
+			gates := gatedCommands(t, bin, full, present, tag)
+			switch want := readGatesCell(t, cell); {
+			case want.nothing:
+				if len(gates) > 0 {
+					t.Errorf("the table says %s gates nothing and it gates %v",
+						tag, gates)
+				}
+			case want.commands != nil:
+				if !slices.Equal(gates, want.commands) {
+					t.Errorf("the table says %s gates %v and it gates %v",
+						tag, want.commands, gates)
+				}
+			default:
+				if len(gates) != want.count {
+					t.Errorf("the table says %s gates %d commands and it gates "+
+						"%d: %v", tag, want.count, len(gates), gates)
+				}
+			}
+		})
+	}
+
+	for tag := range documented {
+		if !slices.Contains(buildinfo.KnownTags, tag) {
+			t.Errorf("the tag table lists %q, which is not a known tag", tag)
+		}
+	}
+}
+
+// gatesCell is one parsed "Gates today" cell. A cell names commands, counts
+// them, or says the tag gates nothing.
+type gatesCell struct {
+	nothing  bool
+	commands []string
+	count    int
+}
+
+// docCommand matches a command named in a doc cell, e.g. `jr sprint close`.
+var docCommand = regexp.MustCompile("`jr ([a-z]+(?: [a-z]+)*)`")
+
+// docCount matches the count in a cell like "the 18 mutating verbs".
+var docCount = regexp.MustCompile(`\b(\d+)\b`)
+
+// readGatesCell decides what one cell claims.
+//
+// "nothing" is tested first and deliberately: three of those four cells name a
+// command as the thing that does not exist yet — "**nothing** — no `jr ui` yet"
+// — and reading them as a command list would assert the opposite of what they
+// say.
+func readGatesCell(t *testing.T, cell string) gatesCell {
+	t.Helper()
+
+	if strings.HasPrefix(strings.TrimSpace(cell), "**nothing**") {
+		return gatesCell{nothing: true}
+	}
+	if m := docCommand.FindAllStringSubmatch(cell, -1); m != nil {
+		var out []string
+		for _, one := range m {
+			out = append(out, strings.ReplaceAll(one[1], " ", "."))
+		}
+		slices.Sort(out)
+		return gatesCell{commands: out}
+	}
+	if m := docCount.FindStringSubmatch(cell); m != nil {
+		n, err := strconv.Atoi(m[1])
+		if err != nil {
+			t.Fatalf("unreadable count in %q", cell)
+		}
+		return gatesCell{count: n}
+	}
+	t.Fatalf("%s: cannot read %q as a count, a command list, or nothing; this "+
+		"test reads the column by shape, so a reworded cell asserts nothing",
+		profilesDoc, cell)
+	return gatesCell{}
+}
+
+// gatedCommands returns the commands one tag gates, as the difference between
+// the full build and the full build without that tag.
+func gatedCommands(t *testing.T, dir string, full profile, present []string, tag string) []string {
+	t.Helper()
+
+	kept := slices.DeleteFunc(strings.Split(full.tags, ","),
+		func(s string) bool { return s == tag })
+	without := profile{name: "full-no-" + tag, tags: strings.Join(kept, ",")}
+
+	var out []string
+	remaining := commandsIn(t, dir, without)
+	for _, name := range present {
+		if !slices.Contains(remaining, name) {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
 // commandCount builds one profile and asks the binary what it contains.
 //
 // It runs the real binary rather than counting registrations in-process,
@@ -102,6 +238,12 @@ func TestTheDocumentedTagSetsAreTheOnesTheMakefileBuilds(t *testing.T) {
 // binary is compiled with one tag set, and the whole point is what the other
 // three contain.
 func commandCount(t *testing.T, dir string, p profile) int {
+	t.Helper()
+	return len(commandsIn(t, dir, p))
+}
+
+// commandsIn builds one profile and returns the dotted command names it holds.
+func commandsIn(t *testing.T, dir string, p profile) []string {
 	t.Helper()
 
 	// --limit all rather than the default, so this measures the surface and not
@@ -112,7 +254,16 @@ func commandCount(t *testing.T, dir string, p profile) int {
 	if len(lines) < 2 {
 		t.Fatalf("%s schema returned no rows:\n%s", p.name, stdout)
 	}
-	return len(lines) - 1 // the header is not a command
+	out := make([]string, 0, len(lines)-1)
+	for _, line := range lines[1:] { // the header is not a command
+		name, _, ok := strings.Cut(line, "\t")
+		if !ok {
+			t.Fatalf("%s schema wrote a row with no tab: %q", p.name, line)
+		}
+		out = append(out, name)
+	}
+	slices.Sort(out)
+	return out
 }
 
 func stderrOf(err error) string {
@@ -169,6 +320,34 @@ func profileCountsFromDoc(t *testing.T) map[string]int {
 	}
 	if len(out) == 0 {
 		t.Fatalf("%s: no profile table found; this test reads it by shape, so a "+
+			"reformatted table silently asserts nothing", profilesDoc)
+	}
+	return out
+}
+
+// gatesTodayRow matches a row of the tag table:
+//
+//	| `write` | All mutating commands | the 18 mutating verbs |
+//
+// The first cell has to be a known tag. The profile-count table further down
+// has the same shape with a backticked lowercase name in the same place, and a
+// row of it would otherwise be read as a tag that gates `—`.
+var gatesTodayRow = regexp.MustCompile("^\\|\\s*`([a-z]+)`\\s*\\|[^|]*\\|([^|]*)\\|")
+
+// gatesTodayFromDoc reads the third column of the tag table, keyed by tag.
+func gatesTodayFromDoc(t *testing.T) map[string]string {
+	t.Helper()
+
+	out := map[string]string{}
+	for _, line := range readLines(t, profilesDoc) {
+		m := gatesTodayRow.FindStringSubmatch(line)
+		if m == nil || !slices.Contains(buildinfo.KnownTags, m[1]) {
+			continue
+		}
+		out[m[1]] = strings.TrimSpace(m[2])
+	}
+	if len(out) == 0 {
+		t.Fatalf("%s: no tag table found; this test reads it by shape, so a "+
 			"reformatted table silently asserts nothing", profilesDoc)
 	}
 	return out
