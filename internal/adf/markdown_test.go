@@ -404,6 +404,84 @@ func TestParseRefusesWhatIsNotOneDocument(t *testing.T) {
 	}
 }
 
+// nestedDocument builds a document `levels` paragraphs deep. Each level is an
+// object inside an array, so the JSON nesting depth is about twice the count.
+func nestedDocument(levels int) []byte {
+	var b strings.Builder
+	b.WriteString(`{"type":"doc","version":1,"content":[`)
+	for range levels {
+		b.WriteString(`{"type":"paragraph","content":[`)
+	}
+	b.WriteString(`{"type":"text","text":"x"}`)
+	for range levels {
+		b.WriteString(`]}`)
+	}
+	b.WriteString(`]}`)
+	return []byte(b.String())
+}
+
+// nestedLists builds `levels` of bulletList inside listItem, which is a shape
+// ADF genuinely permits and ToMarkdown therefore has to recurse through.
+func nestedLists(levels int) []byte {
+	var b strings.Builder
+	b.WriteString(`{"type":"doc","version":1,"content":[`)
+	for range levels {
+		b.WriteString(`{"type":"bulletList","content":[{"type":"listItem","content":[`)
+	}
+	b.WriteString(`{"type":"paragraph","content":[{"type":"text","text":"x"}]}`)
+	for range levels {
+		b.WriteString(`]}]}`)
+	}
+	b.WriteString(`]}`)
+	return []byte(b.String())
+}
+
+// TestParseBoundsNesting states a bound this package inherits rather than
+// declares. Nothing here counts depth: what refuses a pathologically nested
+// document is encoding/json's own limit, which is why the detail reads
+// "exceeded max depth" in words this package did not write.
+//
+// That inheritance is the reason to pin it. Every other bound in this tool is
+// stated — the 64MB response cap, --max-requests — and an undocumented one is
+// a guarantee only until somebody changes the decoder. Both fuzz targets seed
+// shallow documents, so neither reaches this.
+//
+// The two halves are equally load-bearing. The refusal is what makes the
+// recursion below safe, so the deep-list case asserts the other direction: a
+// document Parse accepts converts without exhausting the stack. If the bound
+// ever moved up, this is what would notice.
+func TestParseBoundsNesting(t *testing.T) {
+	for _, levels := range []int{10_000, 100_000, 500_000} {
+		_, err := adf.Parse(nestedDocument(levels))
+		if err == nil {
+			t.Errorf("a document %d deep was accepted", levels)
+			continue
+		}
+		e := errs.Coerce(err)
+		if e.Code != "MALFORMED_ADF" {
+			t.Errorf("%d deep: code = %q, want MALFORMED_ADF", levels, e.Code)
+		}
+		if !strings.Contains(e.Detail, "max depth") {
+			t.Errorf("%d deep: detail %q does not name the bound that fired", levels, e.Detail)
+		}
+	}
+
+	// Just inside the bound, in the deepest shape ADF allows: four JSON
+	// containers per level, so this is a little under the ceiling the loop
+	// above is over.
+	doc, err := adf.Parse(nestedLists(2400))
+	if err != nil {
+		t.Fatalf("a list 2400 deep was refused, so the bound is tighter than a document can be: %v", err)
+	}
+	markdown, err := adf.ToMarkdown(doc)
+	if err != nil {
+		t.Fatalf("ToMarkdown: %v", err)
+	}
+	if _, err := adf.FromMarkdown(markdown); err != nil {
+		t.Fatalf("FromMarkdown: %v", err)
+	}
+}
+
 // quoteJSON is a JSON string literal for a test case, kept local so a case can
 // be written as the text it is about.
 func quoteJSON(s string) string {

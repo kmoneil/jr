@@ -550,85 +550,132 @@ func bracketPair(s string, open int) (text, target, title string, width int, ok 
 
 // destination reads `(target)` or `(<target>)`, with an optional quoted title,
 // starting at the opening parenthesis.
+//
+// The three scans below each end where the next one begins, so each returns the
+// index its caller resumes at. That is what keeps them separable: the shape
+// this replaced ran all three over one shared index and jumped out of a switch
+// inside a loop to reach the title, which is a control flow you have to
+// simulate to read.
 func destination(s string, i int) (target, title string, width int, ok bool) {
 	if i >= len(s) || s[i] != '(' {
 		return "", "", 0, false
 	}
 	i++
 
-	var b strings.Builder
 	if i < len(s) && s[i] == '<' {
-		// The angle-bracket form, which is what ToMarkdown writes for a URL
-		// holding a bracket or a space.
-		i++
-		for i < len(s) && s[i] != '>' {
-			if s[i] == '\\' && i+1 < len(s) {
-				b.WriteByte(s[i+1])
-				i += 2
-				continue
-			}
-			if s[i] == '\n' {
-				return "", "", 0, false
-			}
-			b.WriteByte(s[i])
-			i++
-		}
-		if i >= len(s) {
-			return "", "", 0, false
-		}
-		i++
+		target, i, ok = scanAngleTarget(s, i)
 	} else {
-		depth := 0
-		for i < len(s) {
-			switch {
-			case s[i] == '\\' && i+1 < len(s):
-				b.WriteByte(s[i+1])
-				i += 2
-				continue
-			case s[i] == '(':
-				depth++
-			case s[i] == ')':
-				if depth == 0 {
-					goto done
-				}
-				depth--
-			case s[i] == ' ' || s[i] == '\n':
-				goto done
-			}
-			b.WriteByte(s[i])
-			i++
-		}
+		target, i, ok = scanBareTarget(s, i)
+	}
+	if !ok {
 		return "", "", 0, false
 	}
 
-done:
-	for i < len(s) && (s[i] == ' ' || s[i] == '\n') {
-		i++
-	}
-	if i < len(s) && (s[i] == '"' || s[i] == '\'') {
-		quote := s[i]
-		i++
-		var t strings.Builder
-		for i < len(s) && s[i] != quote {
-			if s[i] == '\\' && i+1 < len(s) {
-				t.WriteByte(s[i+1])
-				i += 2
-				continue
-			}
-			t.WriteByte(s[i])
-			i++
-		}
-		if i >= len(s) {
-			return "", "", 0, false
-		}
-		title = t.String()
-		i++
-		for i < len(s) && s[i] == ' ' {
-			i++
-		}
+	title, i, ok = scanTitle(s, i)
+	if !ok {
+		return "", "", 0, false
 	}
 	if i >= len(s) || s[i] != ')' {
 		return "", "", 0, false
 	}
-	return b.String(), title, i + 1, true
+	return target, title, i + 1, true
+}
+
+// scanAngleTarget reads the `<target>` form starting at the opening angle
+// bracket, and returns the index just past the closing one. This is what
+// ToMarkdown writes for any address holding a space, a tab, a parenthesis, an
+// angle bracket, or a backslash — see linkTarget.
+func scanAngleTarget(s string, i int) (target string, next int, ok bool) {
+	i++
+	var b strings.Builder
+	for i < len(s) && s[i] != '>' {
+		if s[i] == '\\' && i+1 < len(s) {
+			b.WriteByte(s[i+1])
+			i += 2
+			continue
+		}
+		if s[i] == '\n' {
+			// A line ending cannot appear in either destination form, and an
+			// unclosed `<` that ran to the end of the line is not one.
+			return "", 0, false
+		}
+		b.WriteByte(s[i])
+		i++
+	}
+	if i >= len(s) {
+		return "", 0, false
+	}
+	return b.String(), i + 1, true
+}
+
+// scanBareTarget reads the unbracketed form, which ends at a space, a newline,
+// or a closing parenthesis that no `(` inside the address opened. It returns
+// the index of that terminator rather than the index past it, because a `)`
+// terminator is also the one closing the whole construct.
+//
+// Tab is deliberately not a terminator, which is a divergence from CommonMark
+// and is safe in one direction only: linkTarget writes any address holding a
+// tab in the angle form, so nothing this package emits reaches here with one
+// in it. A tab arriving in hand-written markdown is read as part of the
+// address, and converts back out as `<a\tb>` — lossless, which is the property
+// that matters, rather than identical to a reference implementation.
+func scanBareTarget(s string, i int) (target string, next int, ok bool) {
+	var b strings.Builder
+	depth := 0
+	for i < len(s) {
+		switch {
+		case s[i] == '\\' && i+1 < len(s):
+			b.WriteByte(s[i+1])
+			i += 2
+			continue
+		case s[i] == '(':
+			depth++
+		case s[i] == ')':
+			if depth == 0 {
+				return b.String(), i, true
+			}
+			depth--
+		case s[i] == ' ' || s[i] == '\n':
+			return b.String(), i, true
+		}
+		b.WriteByte(s[i])
+		i++
+	}
+	return "", 0, false
+}
+
+// scanTitle reads the optional `"title"` or `'title'` that may follow a
+// destination, along with the whitespace around it, and returns the index of
+// the closing parenthesis the caller still has to check for.
+//
+// A destination with no title is not a failure, so ok reports only that a title
+// which started was also finished.
+func scanTitle(s string, i int) (title string, next int, ok bool) {
+	for i < len(s) && (s[i] == ' ' || s[i] == '\n') {
+		i++
+	}
+	if i >= len(s) || (s[i] != '"' && s[i] != '\'') {
+		return "", i, true
+	}
+
+	quote := s[i]
+	i++
+	var b strings.Builder
+	for i < len(s) && s[i] != quote {
+		if s[i] == '\\' && i+1 < len(s) {
+			b.WriteByte(s[i+1])
+			i += 2
+			continue
+		}
+		b.WriteByte(s[i])
+		i++
+	}
+	if i >= len(s) {
+		return "", 0, false
+	}
+	i++
+	for i < len(s) && s[i] == ' ' {
+		i++
+	}
+	return b.String(), i, true
 }

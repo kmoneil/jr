@@ -57,6 +57,9 @@ func TestMarkdownSurvivesTheRoundTrip(t *testing.T) {
 		{"a code span holding a backtick", "``a ` b``"},
 		{"a link", "see [the docs](https://example.invalid/x)"},
 		{"a link with a title", `see [the docs](https://example.invalid/x "Docs")`},
+		// The escape is the whole case: a title holding the quote that would
+		// otherwise close it has to come back out as one character, not two.
+		{"a link title holding a quote", `see [the docs](https://example.invalid/x "The \"Docs\"")`},
 		{"a link whose address needs brackets", "[a](<https://example.invalid/a(b) c>)"},
 		{"an autolink", "<https://example.invalid/x>"},
 		{"a fenced code block", "```go\nclient.Do(req)\n```"},
@@ -191,5 +194,102 @@ func TestAnEmptyBodyIsStillADocument(t *testing.T) {
 	}
 	if doc.Type != "doc" || len(doc.Content) != 1 || doc.Content[0].Type != "paragraph" {
 		t.Errorf("empty markdown produced %+v", doc)
+	}
+}
+
+// linkHref pulls the address off the first link mark in a document.
+func linkHref(doc adf.Node) (string, bool) {
+	for _, block := range doc.Content {
+		for _, inline := range block.Content {
+			for _, mark := range inline.Marks {
+				if mark.Type != "link" {
+					continue
+				}
+				href, ok := mark.Attrs["href"].(string)
+				return href, ok
+			}
+		}
+	}
+	return "", false
+}
+
+// TestALinkAddressSurvivesEveryByte holds the two halves of the destination
+// scanner to one subset. linkTarget decides which addresses go inside angle
+// brackets on the way out; scanBareTarget decides where an unbracketed one
+// ends on the way back in — at a space, a newline, or a `)` that nothing in
+// the address opened. If those two ever disagree about a byte, an address goes
+// out bare and comes back truncated, which is a link to somewhere else
+// reported as the description.
+//
+// Sweeping the bytes is the point rather than listing the interesting ones.
+// Tab is the case that prompted this: it is not a terminator here, which
+// diverges from CommonMark and is safe only because linkTarget's set includes
+// it — reasoning that holds today and is one edit from not holding. A list
+// written by hand is a list of the bytes somebody already thought of.
+func TestALinkAddressSurvivesEveryByte(t *testing.T) {
+	for b := range 0x80 {
+		if b == '\n' || b == '\r' {
+			// linkTarget refuses a line ending outright: it is not an address,
+			// and percent-encoding it is one-way.
+			continue
+		}
+		href := "https://example.invalid/a" + string(rune(b)) + "b"
+		quoted, err := json.Marshal(href)
+		if err != nil {
+			t.Fatalf("byte %#02x: marshal: %v", b, err)
+		}
+		doc := para(`{"type":"text","text":"x","marks":[{"type":"link","attrs":{"href":` +
+			string(quoted) + `}}]}`)
+
+		markdown, err := convert(t, doc)
+		if err != nil {
+			t.Errorf("byte %#02x: ToMarkdown: %v", b, err)
+			continue
+		}
+		back, err := adf.FromMarkdown(markdown)
+		if err != nil {
+			t.Errorf("byte %#02x: FromMarkdown(%q): %v", b, markdown, err)
+			continue
+		}
+		got, ok := linkHref(back)
+		if !ok {
+			t.Errorf("byte %#02x: %q did not come back as a link", b, markdown)
+			continue
+		}
+		if got != href {
+			t.Errorf("byte %#02x: the address changed\n sent %q\n  got %q\n  via %q",
+				b, href, got, markdown)
+		}
+	}
+}
+
+// TestAMalformedDestinationIsNotAShortLink covers the refusals in each of the
+// three destination scans. They matter more than they look: every one of them
+// is a point where the scanner has already read a prefix of something that
+// could have been an address, and the wrong answer is not an error but a link
+// to that prefix. `[x](a b)` becoming a link to `a` is the failure this whole
+// file exists to prevent, arriving through the parser instead of the renderer.
+//
+// A refused construct stays literal text, which is what CommonMark does too.
+func TestAMalformedDestinationIsNotAShortLink(t *testing.T) {
+	for _, markdown := range []string{
+		"[x]",                            // no destination at all
+		"[x](",                           // an unterminated bare address
+		"[x](https://example.invalid/a",  // the same, having read a whole URL
+		"[x](<https://example.invalid/a", // an unterminated angle address
+		"[x](<a\nb>)",                    // a line ending inside the angle form
+		"[x](a b)",                       // a second word that is not a title
+		"[x](a 'unterminated)",           // a title whose quote never closes
+		`[x](a "title" trailing)`,        // a title with something after it
+		"[x](a(b)",                       // a `(` the closing paren balances
+	} {
+		doc, err := adf.FromMarkdown(markdown)
+		if err != nil {
+			t.Errorf("FromMarkdown(%q): %v", markdown, err)
+			continue
+		}
+		if href, ok := linkHref(doc); ok {
+			t.Errorf("FromMarkdown(%q) built a link to %q", markdown, href)
+		}
 	}
 }
