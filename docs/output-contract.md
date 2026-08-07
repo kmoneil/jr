@@ -203,7 +203,7 @@ Every successful XML response:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<result kind="issue.list" v="1">
+<result kind="issue.list" v="3">
   <issues count="3" complete="true">
     <issue key="ENG-101">
       <summary>Retry logic drops the last error</summary>
@@ -228,7 +228,7 @@ the XML tree:
 ```json
 {
   "kind": "issue.list",
-  "v": 1,
+  "v": 3,
   "count": 3,
   "complete": true,
   "issues": [ … ]
@@ -741,6 +741,15 @@ an `<extra>` element saying where the names come from. Every other kind is
 closed, and an element outside the schema is a contract violation rather than a
 curiosity.
 
+**An optional element is still declared.** `issue.list` and `issue.get` carry a
+`<url>` that appears only under `--url`. It is declared in the schema and so is
+part of the contract — `jr contract` shows it, a consumer can branch on it —
+and it is absent by default because §2.4 admits no field into the output that
+was neither requested nor documented as a default. It is not a field Jira sends:
+Jira's own `self` is the REST endpoint, which returns JSON, so this is built
+from the deployment's `baseUrl`. A site that reports no `baseUrl` makes `--url`
+exit 1 with `NO_BASE_URL` rather than producing a link built from a guess.
+
 **The schema is checked on every document this tool writes.** That is the only
 reason to trust it. `render.Write` validates before it emits a byte, so a
 payload that does not match its published shape fails with `SCHEMA_VIOLATION`
@@ -782,7 +791,14 @@ profile and asserts each kind it emits has a golden, so a kind behind the
 
 Update this document in the same change that alters any of:
 
-- A `kind` or its schema version.
+- A `kind` or its schema version, **including the worked examples above**.
+  `internal/lint/kindversions_test.go` compares every `kind="…" v="…"` printed
+  in this file and in the README against `registry.Kinds`, the same source
+  `jr contract` prints from. `make golden` pins each kind's *shape* and refuses
+  a changed shape at an unchanged version; nothing pinned the number where a
+  reader looks for it, and the examples here had been stale for two bumps
+  before the test existed. A document whose first instruction is "branch on `v`"
+  cannot print a `v` no build has emitted.
 - A command's default column set.
 - The result, error, or warning envelope.
 - An exit code's meaning, or the addition of a new one.

@@ -59,14 +59,70 @@ func (o Operator) takesList() bool {
 	return false
 }
 
-// Clause is a single comparison: `field op value`.
+// takesPredicates reports whether the operator accepts history predicates.
+//
+// Only the operators that ask a question about the past do. `assignee =
+// currentUser() AFTER "-7d"` is not a narrower present-tense query, it is not
+// JQL at all, and the renderer refuses it rather than letting Jira explain it.
+func (o Operator) takesPredicates() bool {
+	switch o {
+	case OpWas, OpWasIn, OpWasNot, OpWasNotIn, OpChanged:
+		return true
+	}
+	return false
+}
+
+// Clause is a single comparison: `field op value`, with optional history
+// predicates on the operators that take them.
 type Clause struct {
 	Field string
 	Op    Operator
 	Value Value
+	// Predicates narrow a WAS or CHANGED clause by who made the change and
+	// when. They are a separate field rather than part of Value because they
+	// are syntax, not data: a value is quoted and a predicate is not, and the
+	// only way to keep that distinction is for the two never to share a slot.
+	Predicates []Predicate
 }
 
 func (*Clause) isExpr() {}
+
+// PredicateKeyword is the word introducing a history predicate.
+//
+// It is a distinct type for the same reason Keyword is: a user-supplied string
+// can never become one by accident, so no caller can put arbitrary text where
+// the renderer emits bare syntax.
+type PredicateKeyword string
+
+// The history predicates JQL defines.
+const (
+	PredFrom   PredicateKeyword = "FROM"
+	PredTo     PredicateKeyword = "TO"
+	PredBy     PredicateKeyword = "BY"
+	PredBefore PredicateKeyword = "BEFORE"
+	PredAfter  PredicateKeyword = "AFTER"
+	PredOn     PredicateKeyword = "ON"
+	PredDuring PredicateKeyword = "DURING"
+)
+
+// predicateKeywords is the closed set. Anything else is a caller inventing
+// syntax, which is what this package exists to make impossible.
+var predicateKeywords = map[PredicateKeyword]bool{
+	PredFrom: true, PredTo: true, PredBy: true,
+	PredBefore: true, PredAfter: true, PredOn: true, PredDuring: true,
+}
+
+// changedOnlyPredicates are the two that describe a transition rather than a
+// moment, so they mean nothing on WAS, which names a single state.
+var changedOnlyPredicates = map[PredicateKeyword]bool{
+	PredFrom: true, PredTo: true,
+}
+
+// Predicate is one `KEYWORD value` qualifier on a WAS or CHANGED clause.
+type Predicate struct {
+	Keyword PredicateKeyword
+	Value   Value
+}
 
 // And is a conjunction. An empty And renders as nothing.
 type And struct{ Exprs []Expr }

@@ -73,19 +73,233 @@ func TestChanged(t *testing.T) {
 	if got != "status CHANGED" {
 		t.Errorf("got %q", got)
 	}
+}
 
-	// CHANGED with a predicate carries it as the value.
-	got, err = jql.Render(&jql.Query{
-		Where: &jql.Clause{
-			Field: "status", Op: jql.OpChanged,
-			Value: &jql.Func{Name: "after", Args: []jql.Value{jql.Text("-7d")}},
+// TestChangedTakesNoValue pins the replacement for what this used to do.
+//
+// A value on CHANGED was rendered through renderValue, so a Text became
+// `status CHANGED "BY currentUser()"` and a Func became
+// `status CHANGED after("-7d")`. Both are a quoted string or a function call
+// where JQL wants a bare keyword, so both were rejected by Jira — the operator
+// was declared, tokenized, and unusable except through Raw.
+func TestChangedTakesNoValue(t *testing.T) {
+	for name, v := range map[string]jql.Value{
+		"text":     jql.Text("BY currentUser() AFTER -7d"),
+		"function": &jql.Func{Name: "after", Args: []jql.Value{jql.Text("-7d")}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := jql.Render(&jql.Query{Where: &jql.Clause{
+				Field: "status", Op: jql.OpChanged, Value: v,
+			}})
+			if err == nil {
+				t.Fatal("Render accepted a value on CHANGED")
+			}
+			if !strings.Contains(err.Error(), "takes no value") {
+				t.Errorf("unhelpful error: %v", err)
+			}
+		})
+	}
+}
+
+func TestPredicatesRender(t *testing.T) {
+	cases := map[string]struct {
+		clause *jql.Clause
+		want   string
+	}{
+		"changed by and after": {
+			clause: &jql.Clause{
+				Field: "status", Op: jql.OpChanged,
+				Predicates: []jql.Predicate{
+					jql.By(&jql.Func{Name: "currentUser"}),
+					jql.After(jql.Text("-7d")),
+				},
+			},
+			want: `status CHANGED BY currentUser() AFTER "-7d"`,
 		},
-	})
+		"changed before": {
+			clause: &jql.Clause{
+				Field: "status", Op: jql.OpChanged,
+				Predicates: []jql.Predicate{jql.Before(jql.Text("2026-01-01"))},
+			},
+			want: `status CHANGED BEFORE "2026-01-01"`,
+		},
+		"changed from and to": {
+			clause: &jql.Clause{
+				Field: "status", Op: jql.OpChanged,
+				Predicates: []jql.Predicate{
+					{Keyword: jql.PredFrom, Value: jql.Text("To Do")},
+					{Keyword: jql.PredTo, Value: jql.Text("Done")},
+				},
+			},
+			want: `status CHANGED FROM "To Do" TO "Done"`,
+		},
+		"was with a predicate": {
+			clause: &jql.Clause{
+				Field: "assignee", Op: jql.OpWas,
+				Value:      &jql.Func{Name: "currentUser"},
+				Predicates: []jql.Predicate{jql.After(jql.Text("-30d"))},
+			},
+			want: `assignee WAS currentUser() AFTER "-30d"`,
+		},
+		"during takes a pair": {
+			clause: &jql.Clause{
+				Field: "status", Op: jql.OpChanged,
+				Predicates: []jql.Predicate{{
+					Keyword: jql.PredDuring,
+					Value:   jql.List{jql.Text("-30d"), jql.Text("-7d")},
+				}},
+			},
+			want: `status CHANGED DURING ("-30d", "-7d")`,
+		},
+		"on a moment": {
+			clause: &jql.Clause{
+				Field: "status", Op: jql.OpChanged,
+				Predicates: []jql.Predicate{{
+					Keyword: jql.PredOn, Value: jql.Text("2026-01-01"),
+				}},
+			},
+			want: `status CHANGED ON "2026-01-01"`,
+		},
+		"was in a list, qualified": {
+			clause: &jql.Clause{
+				Field: "assignee", Op: jql.OpWasIn,
+				Value:      jql.List{jql.Text("ada"), jql.Text("grace")},
+				Predicates: []jql.Predicate{jql.Before(jql.Text("-1d"))},
+			},
+			want: `assignee WAS IN ("ada", "grace") BEFORE "-1d"`,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got, err := jql.Render(&jql.Query{Where: tc.clause})
+			if err != nil {
+				t.Fatalf("render: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("got  %s\nwant %s", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestPredicateValuesAreQuotedLikeAnyOther is the injection case for the one
+// place a bare keyword is emitted. The keyword comes from a closed set and the
+// value goes through the same escaper as every other value, so a hostile user
+// name cannot close the predicate and open a clause.
+func TestPredicateValuesAreQuotedLikeAnyOther(t *testing.T) {
+	got, err := jql.New().
+		Project("ENG").
+		Changed("status", jql.By(jql.Text(`ada" OR project = "OPS`))).
+		Render()
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
-	if got != `status CHANGED after("-7d")` {
-		t.Errorf("got %q", got)
+	want := `project = "ENG" AND status CHANGED BY "ada\" OR project = \"OPS"`
+	if got != want {
+		t.Errorf("got  %s\nwant %s", got, want)
+	}
+}
+
+func TestPredicatesAreRefused(t *testing.T) {
+	cases := map[string]struct {
+		clause *jql.Clause
+		want   string
+	}{
+		"on an operator with no history": {
+			clause: &jql.Clause{
+				Field: "assignee", Op: jql.OpEq, Value: jql.Text("ada"),
+				Predicates: []jql.Predicate{jql.After(jql.Text("-7d"))},
+			},
+			want: "takes no history predicates",
+		},
+		"unknown keyword": {
+			clause: &jql.Clause{
+				Field: "status", Op: jql.OpChanged,
+				Predicates: []jql.Predicate{{Keyword: "SINCE", Value: jql.Text("-7d")}},
+			},
+			want: "unknown history predicate",
+		},
+		"empty keyword": {
+			clause: &jql.Clause{
+				Field: "status", Op: jql.OpChanged,
+				Predicates: []jql.Predicate{{Value: jql.Text("-7d")}},
+			},
+			want: "unknown history predicate",
+		},
+		"the same predicate twice": {
+			clause: &jql.Clause{
+				Field: "status", Op: jql.OpChanged,
+				Predicates: []jql.Predicate{
+					jql.After(jql.Text("-7d")), jql.After(jql.Text("-1d")),
+				},
+			},
+			want: "appears twice",
+		},
+		"FROM on WAS": {
+			clause: &jql.Clause{
+				Field: "status", Op: jql.OpWas, Value: jql.Text("Done"),
+				Predicates: []jql.Predicate{{Keyword: jql.PredFrom, Value: jql.Text("To Do")}},
+			},
+			want: "only valid on CHANGED",
+		},
+		"DURING with one date": {
+			clause: &jql.Clause{
+				Field: "status", Op: jql.OpChanged,
+				Predicates: []jql.Predicate{{Keyword: jql.PredDuring, Value: jql.Text("-7d")}},
+			},
+			want: "two dates, not one value",
+		},
+		"DURING with three dates": {
+			clause: &jql.Clause{
+				Field: "status", Op: jql.OpChanged,
+				Predicates: []jql.Predicate{{
+					Keyword: jql.PredDuring,
+					Value:   jql.List{jql.Text("a"), jql.Text("b"), jql.Text("c")},
+				}},
+			},
+			want: "got 3",
+		},
+		"a list where one value belongs": {
+			clause: &jql.Clause{
+				Field: "status", Op: jql.OpChanged,
+				Predicates: []jql.Predicate{{
+					Keyword: jql.PredBy, Value: jql.List{jql.Text("ada")},
+				}},
+			},
+			want: "one value, not a list",
+		},
+		"an unrenderable value": {
+			clause: &jql.Clause{
+				Field: "status", Op: jql.OpChanged,
+				Predicates: []jql.Predicate{{Keyword: jql.PredBy, Value: unknownValue{}}},
+			},
+			want: "unknown value type",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := jql.Render(&jql.Query{Where: tc.clause})
+			if err == nil {
+				t.Fatal("Render accepted it")
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("error %q does not mention %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestBuilderHistoryClauses(t *testing.T) {
+	got, err := jql.New().
+		Changed("status", jql.By(&jql.Func{Name: "currentUser"}), jql.After(jql.Text("-7d"))).
+		Was("assignee", &jql.Func{Name: "currentUser"}).
+		Render()
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	want := `status CHANGED BY currentUser() AFTER "-7d" AND assignee WAS currentUser()`
+	if got != want {
+		t.Errorf("got  %s\nwant %s", got, want)
 	}
 }
 

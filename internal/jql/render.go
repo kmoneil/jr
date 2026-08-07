@@ -156,35 +156,148 @@ func renderClause(c *Clause) (string, error) {
 		return "", errs.Runtime("INVALID_EXPR", "clause on %s has no operator", field)
 	}
 
+	head, err := renderClauseHead(c, field)
+	if err != nil {
+		return "", err
+	}
+	preds, err := renderPredicates(c, field)
+	if err != nil {
+		return "", err
+	}
+	if preds == "" {
+		return head, nil
+	}
+	return head + " " + preds, nil
+}
+
+// renderClauseHead serializes everything up to the predicates.
+func renderClauseHead(c *Clause, field string) (string, error) {
 	if c.Op == OpChanged {
-		// CHANGED takes no right-hand side of its own; any predicates are
-		// carried in the value when there is one.
-		if c.Value == nil {
-			return field + " CHANGED", nil
+		// CHANGED has no right-hand side at all. It used to accept one and
+		// render it through renderValue, which produced `status CHANGED
+		// "BY currentUser()"` for a Text and `status CHANGED after("-7d")` for
+		// a Func — a quoted string and a function call, where JQL wants a bare
+		// keyword. Both parse here and are rejected by Jira, so the only way to
+		// write a working CHANGED was Raw, the path reserved for fragments the
+		// caller typed. Predicates are the right-hand side now, and a value is
+		// refused rather than silently mis-rendered.
+		if c.Value != nil {
+			return "", errs.Runtime("INVALID_EXPR",
+				"%s CHANGED takes no value; qualify it with a predicate such as BY or AFTER",
+				field)
 		}
+		return field + " CHANGED", nil
 	}
 
-	list, isList := c.Value.(List)
-	switch {
-	case c.Op.takesList() && !isList:
-		return "", errs.Runtime("INVALID_EXPR",
-			"operator %s on %s needs a list of values", c.Op, field)
-	case !c.Op.takesList() && isList:
-		return "", errs.Runtime("INVALID_EXPR",
-			"operator %s on %s takes a single value, not a list", c.Op, field)
-	case isList && len(list) == 0:
-		// `field IN ()` is not valid JQL and, worse, an empty IN reads as "no
-		// filter" to a human skimming the query. Refuse it.
-		return "", errs.Usage("EMPTY_VALUE_LIST",
-			"%s %s was given no values", field, c.Op).
-			WithRemedy("omit the filter entirely, or supply at least one value")
+	if err := checkListShape(c, field); err != nil {
+		return "", err
 	}
-
 	value, err := renderValue(c.Value)
 	if err != nil {
 		return "", err
 	}
 	return field + " " + string(c.Op) + " " + value, nil
+}
+
+// checkListShape holds an operator and its right-hand side to the same idea of
+// how many values there are.
+func checkListShape(c *Clause, field string) error {
+	list, isList := c.Value.(List)
+	switch {
+	case c.Op.takesList() && !isList:
+		return errs.Runtime("INVALID_EXPR",
+			"operator %s on %s needs a list of values", c.Op, field)
+	case !c.Op.takesList() && isList:
+		return errs.Runtime("INVALID_EXPR",
+			"operator %s on %s takes a single value, not a list", c.Op, field)
+	case isList && len(list) == 0:
+		// `field IN ()` is not valid JQL and, worse, an empty IN reads as "no
+		// filter" to a human skimming the query. Refuse it.
+		return errs.Usage("EMPTY_VALUE_LIST",
+			"%s %s was given no values", field, c.Op).
+			WithRemedy("omit the filter entirely, or supply at least one value")
+	}
+	return nil
+}
+
+// renderPredicates serializes the history qualifiers on a clause.
+func renderPredicates(c *Clause, field string) (string, error) {
+	if len(c.Predicates) == 0 {
+		return "", nil
+	}
+	if !c.Op.takesPredicates() {
+		return "", errs.Runtime("INVALID_EXPR",
+			"operator %s on %s takes no history predicates", c.Op, field)
+	}
+
+	seen := make(map[PredicateKeyword]bool, len(c.Predicates))
+	parts := make([]string, 0, len(c.Predicates))
+	for _, p := range c.Predicates {
+		s, err := renderPredicate(c.Op, p, seen)
+		if err != nil {
+			return "", err
+		}
+		parts = append(parts, s)
+	}
+	return strings.Join(parts, " "), nil
+}
+
+// renderPredicate serializes one qualifier, after establishing that it is one.
+//
+// The keyword is emitted bare, so it is checked against a closed set rather
+// than trusted. Its value goes through renderValue like any other, which is
+// what keeps `BY` from becoming the one place a caller's string reaches Jira
+// unquoted.
+func renderPredicate(
+	op Operator, p Predicate, seen map[PredicateKeyword]bool,
+) (string, error) {
+	if !predicateKeywords[p.Keyword] {
+		return "", errs.Runtime("INVALID_EXPR",
+			"unknown history predicate %q", string(p.Keyword))
+	}
+	if seen[p.Keyword] {
+		// Jira takes the last one, so a repeat is a caller who thinks they have
+		// narrowed a query and has replaced half of it.
+		return "", errs.Runtime("INVALID_EXPR",
+			"history predicate %s appears twice", string(p.Keyword))
+	}
+	seen[p.Keyword] = true
+
+	if changedOnlyPredicates[p.Keyword] && op != OpChanged {
+		return "", errs.Runtime("INVALID_EXPR",
+			"predicate %s describes a transition and is only valid on CHANGED, not %s",
+			string(p.Keyword), string(op))
+	}
+	if err := checkPredicateShape(p); err != nil {
+		return "", err
+	}
+
+	value, err := renderValue(p.Value)
+	if err != nil {
+		return "", err
+	}
+	return string(p.Keyword) + " " + value, nil
+}
+
+// checkPredicateShape holds DURING to its pair of dates and everything else to
+// a single value.
+//
+// DURING is the only predicate whose right-hand side is a list, and the only
+// one where the wrong shape would still render: `DURING "-7d"` looks like every
+// other predicate and asks Jira a question with half an answer in it.
+func checkPredicateShape(p Predicate) error {
+	list, isList := p.Value.(List)
+	switch {
+	case p.Keyword == PredDuring && !isList:
+		return errs.Runtime("INVALID_EXPR", "DURING takes two dates, not one value")
+	case p.Keyword == PredDuring && len(list) != 2:
+		return errs.Runtime("INVALID_EXPR",
+			"DURING takes two dates, got %d", len(list))
+	case p.Keyword != PredDuring && isList:
+		return errs.Runtime("INVALID_EXPR",
+			"predicate %s takes one value, not a list", string(p.Keyword))
+	}
+	return nil
 }
 
 func renderValue(v Value) (string, error) {

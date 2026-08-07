@@ -6,11 +6,7 @@ import (
 
 	"github.com/kmoneil/jira-cli/internal/errs"
 	"github.com/kmoneil/jira-cli/internal/registry"
-	"github.com/kmoneil/jira-cli/internal/site"
 )
-
-// resolvedAssigneeKey is where validation leaves the id it resolved.
-const resolvedAssigneeKey = "issue.assignee"
 
 // assigneeSentinels name no user.
 //
@@ -40,64 +36,103 @@ func isCurrentUser(value string) bool {
 	return v == "currentuser" || v == "currentuser()"
 }
 
-// validateAssigneeFilter resolves the assignee `issue list` filters on.
+// resolvedUsersKey is where `issue list` leaves the ids it resolved for its
+// user-valued filters, keyed by flag name.
 //
-// It differs from the write verbs in one word: JQL has a currentUser function,
-// so the query says "whoever is running this" rather than naming an account,
-// and asking the server who that is would be a request for an answer the query
-// already carries.
-func validateAssigneeFilter(ctx context.Context, inv *registry.Invocation, input string) error {
-	if isCurrentUser(input) {
-		return nil
-	}
-	return validateAssignee(ctx, inv, input)
+// Separate from resolvedAssigneeKey, which the write verbs use for the one
+// assignee they are about to set. A filter and a value being written are
+// different things that happen to share a spelling on one flag.
+const resolvedUsersKey = "issue.users"
+
+// userFilterFlags are the `issue list` filters whose value names a person.
+//
+// Every one resolves the same way --assignee always has. A tool that took a
+// display name on one flag and required an opaque account id on the next would
+// have two flags with one spelling, and the failure is silent: `watcher = "Ada
+// Lovelace"` against Cloud matches nothing and comes back as a complete, empty,
+// successful result — indistinguishable from "you are watching nothing".
+var userFilterFlags = []string{
+	"assignee", "reporter", "creator", "involving", "watcher", "voter",
+	"worklog-author", "was-assignee", "changed-by",
 }
 
-// validateAssignee resolves a caller's assignee to the id this deployment
-// wants, and leaves it on the invocation for the command body.
+// sentinelFilterFlags are the filters for which the words in assigneeSentinels
+// mean something.
 //
-// It happens in Validate rather than in the body for the usual reason: `issue
-// list` streams, so its header goes out before its body runs, and a refusal
-// from inside the body would arrive after bytes were on stdout.
-func validateAssignee(ctx context.Context, inv *registry.Invocation, input string) error {
-	if input == "" || IsAssigneeSentinel(input) {
-		return nil
-	}
-	if inv.Jira == nil {
-		return errs.Runtime("NO_SESSION",
-			"an assignee cannot be resolved without a connection to Jira")
-	}
+// Only --assignee. `unassigned` is a real state of the assignee field and is
+// not a state of the others in any useful sense: `creator IS EMPTY` matches
+// nothing, and a predicate has no empty form at all — `CHANGED BY EMPTY` is not
+// JQL. Accepting the word everywhere would turn a nonsense filter into an empty
+// result set and exit 0.
+var sentinelFilterFlags = map[string]bool{"assignee": true}
 
-	if isCurrentUser(input) {
-		conn, info, err := inv.Jira.Connect(ctx)
+// validateUserFilters resolves every user-valued filter on `issue list`.
+//
+// It happens in Validate for the usual reason — this command streams, so a
+// refusal from the body would arrive after the header was on stdout — and it
+// resolves all of them before returning, so a caller who mistyped two names is
+// told about the first rather than about neither.
+func validateUserFilters(ctx context.Context, inv *registry.Invocation) error {
+	resolved := make(map[string]string, len(userFilterFlags))
+	for _, name := range userFilterFlags {
+		id, err := resolveUserFilter(ctx, inv, name)
 		if err != nil {
 			return err
 		}
-		account, err := site.Whoami(ctx, conn, info)
-		if err != nil {
-			return err
+		if id != "" {
+			resolved[name] = id
 		}
-		inv.SetValue(resolvedAssigneeKey, account.ID)
-		return nil
 	}
-
-	meta, err := inv.Jira.Metadata(ctx)
-	if err != nil {
-		return err
-	}
-	user, err := meta.ResolveUser(ctx, input)
-	if err != nil {
-		return err
-	}
-	inv.SetValue(resolvedAssigneeKey, user.ID)
+	inv.SetValue(resolvedUsersKey, resolved)
 	return nil
 }
 
-// resolvedAssignee returns the id validation resolved, or what the caller
-// typed where there was nothing to resolve.
-func resolvedAssignee(inv *registry.Invocation, input string) string {
-	if id, ok := inv.Value(resolvedAssigneeKey).(string); ok && id != "" {
-		return id
+// resolveUserFilter turns one flag's value into the id this deployment wants,
+// or the empty string when there is nothing to resolve.
+func resolveUserFilter(
+	ctx context.Context, inv *registry.Invocation, name string,
+) (string, error) {
+	value := strings.TrimSpace(inv.Flags.String(name))
+	switch {
+	case value == "":
+		return "", nil
+	case isCurrentUser(value):
+		// JQL has a function for it, so the query says "whoever is running
+		// this" rather than naming an account. Asking the server who that is
+		// would be a request for an answer the query already carries.
+		return "", nil
+	case IsAssigneeSentinel(value):
+		if sentinelFilterFlags[name] {
+			return "", nil
+		}
+		return "", errs.Usage("INVALID_USER",
+			"--%s names a person, and %q names nobody", name, value).
+			WithRemedy("use a display name, an email, an id, " +
+				"or the word currentUser")
 	}
-	return input
+
+	if inv.Jira == nil {
+		return "", errs.Runtime("NO_SESSION",
+			"--%s cannot be resolved without a connection to Jira", name)
+	}
+	meta, err := inv.Jira.Metadata(ctx)
+	if err != nil {
+		return "", err
+	}
+	user, err := meta.ResolveUser(ctx, value)
+	if err != nil {
+		return "", err
+	}
+	return user.ID, nil
+}
+
+// resolvedUser returns the id validation resolved for a filter, or what the
+// caller typed where there was nothing to resolve.
+func resolvedUser(inv *registry.Invocation, name string) string {
+	if ids, ok := inv.Value(resolvedUsersKey).(map[string]string); ok {
+		if id := ids[name]; id != "" {
+			return id
+		}
+	}
+	return inv.Flags.String(name)
 }

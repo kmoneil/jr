@@ -9,6 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/kmoneil/jira-cli/internal/render"
+	"github.com/kmoneil/jira-cli/internal/resource/issue"
 )
 
 // The parse side of §12.2.
@@ -269,7 +270,12 @@ func TestEveryFormatParsesBackToTheSameRows(t *testing.T) {
 				got.Summary != want.summary {
 				t.Errorf("first issue = %+v", got)
 			}
-			if d.Kind != "issue.list" || d.V != 2 || d.Count != 100 || !d.Complete {
+			// The version comes from the constant, not a literal. What this
+			// test is about is that every format parses back to the same rows;
+			// the version is pinned where versions are pinned, in
+			// internal/cli/testdata/kinds.
+			if d.Kind != "issue.list" || d.V != issue.VersionList ||
+				d.Count != 100 || !d.Complete {
 				t.Errorf("envelope = kind %q v%d count %d complete %v",
 					d.Kind, d.V, d.Count, d.Complete)
 			}

@@ -127,7 +127,7 @@ starts gating something, the build fails until this list is corrected.
 
 ```console
 $ jr issue get ENG-101
-<result kind="issue.get" v="1">
+<result kind="issue.get" v="4">
   <issue key="ENG-101" type="Story" priority="High" project="ENG" parent="ENG-1">
     <summary>...</summary>
     <status category="in-progress">In Progress</status>
@@ -236,6 +236,87 @@ field renamed in Jira fails `issue get` and `issue list` until the context is
 corrected. The error says so and names the fix. And every read consults the
 field catalogue, which is one request per TTL rather than per command, but is
 not free on a cold cache.
+
+### Who touched an issue
+
+`--assignee` and `--reporter` ask who an issue belongs to. That is a different
+question from who worked on it, and the difference is the kind that returns a
+plausible answer:
+
+```console
+$ jr issue list --assignee currentUser --updated-after -7d
+```
+
+reads like "what I worked on this week" and is not. `updated` means somebody
+updated the issue. A ticket assigned to you that a bot relabelled on Tuesday is
+in that result, and everything you did to somebody else's ticket is not.
+
+The filters that ask the second question:
+
+```console
+$ jr issue list --involving currentUser --updated-after -7d
+$ jr issue list --changed-by currentUser --changed-after -1w
+$ jr issue list --worklog-author currentUser --worklog-after -7d
+$ jr issue list --was-assignee ada@example.com   # whoever holds it now
+$ jr issue list --creator currentUser            # who filed it, which cannot be edited
+```
+
+`--involving` is one person across `assignee`, `reporter`, `creator`, and
+`worklogAuthor`, OR-ed together and parenthesized inside your project scope.
+Its `--help` names those four fields, and a test holds the help to the query —
+a bundle that does not say what it covers is a bundle whose result is short for
+reasons you cannot see.
+
+Two limits, stated rather than worked around. **Comments are not searchable.**
+JQL has no field for comment authorship, so nothing here answers "issues I
+commented on"; `--involving` says so instead of quietly approximating it. And
+**`CHANGED` names one field at a time** — there is no way to ask whether *any*
+field changed — so `--changed-field` defaults to `status` and anything else has
+to be asked for by name. It is refused on its own, because a flag that selects
+what another flag looks at changes no output by itself.
+
+`--watcher` and `--voter` exist and are deliberately outside `--involving`:
+Jira allows both for yourself only unless your credential can manage watchers
+or view voters, and folding them in would make the bundle succeed or fail by
+permission rather than by what it matched.
+
+Every one of these takes a display name, an email, an id, or the word
+`currentUser`, and an unresolvable name is refused rather than sent. `watcher =
+"Ada Lovelace"` against Cloud matches nothing and comes back complete, empty,
+and successful — indistinguishable from "you are watching nothing".
+
+### Opening one in a browser
+
+`--url` appends the browse link, on `issue list` and `issue get`:
+
+```console
+$ jr issue list --involving currentUser --url
+key       status       assignee  updated               summary       url
+ENG-1000  Done                   2026-08-02T10:00:00Z  Second        https://acme.atlassian.net/browse/ENG-1000
+ENG-101   In Progress  Ada       2026-08-01T10:00:00Z  First         https://acme.atlassian.net/browse/ENG-101
+```
+
+**A bare URL, deliberately.** A terminal hyperlink is an OSC 8 escape sequence
+wrapped around display text; it would make the cell clickable and it would put
+escape bytes in a data column, and stdout is data only. Most terminals linkify
+a bare URL anyway, so ⌘/ctrl-click works *and* `cut -f6 | xargs open` works —
+the clickable string and the parseable string are the same string.
+
+Off by default, because forty bytes a row for something most callers throw away
+is not a default. The column is **appended**, after any `--field` columns, so
+turning it on cannot move a column you already parse. In the structured formats
+it is a `<url>` element, declared optional in the schema — `jr contract` shows
+it, and adding it bumped `issue.list` to v3 and `issue.get` to v4.
+
+The link is built from the base URL the deployment reports about itself, not
+from the site you configured. Those are usually the same string and are allowed
+to differ — a reverse proxy, an internal hostname, a context path — and the one
+Jira reports is the one its own notification emails use. A site that reports no
+base URL is `NO_BASE_URL` and exit 1, refused in validation before a single row
+reaches stdout, rather than a link assembled from a guess.
+
+Jira's own `self` on an issue is not this. It is the REST endpoint, and it
+opens JSON.
 
 ### Pagination
 

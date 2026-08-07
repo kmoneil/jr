@@ -22,9 +22,9 @@ import (
 // commit that changes the corresponding golden file.
 const (
 	KindList    = "issue.list"
-	VersionList = 2
+	VersionList = 3
 	KindGet     = "issue.get"
-	VersionGet  = 3
+	VersionGet  = 4
 )
 
 // Body formats a description can arrive in.
@@ -101,6 +101,15 @@ type Issue struct {
 	// has no native shape for. They are carried through rather than dropped:
 	// a field that was fetched and then discarded is a flag that did nothing.
 	Extra []ExtraField
+
+	// URL is where a person opens this issue, set by --url and empty
+	// otherwise.
+	//
+	// It is not a field Jira sends. Jira's `self` is the REST endpoint, which
+	// is the wrong link for a human: it returns JSON. This is built from the
+	// deployment's own baseUrl, so it is one string per row that nobody asked
+	// for unless they did.
+	URL string
 }
 
 // ExtraField is one field requested by id and reduced to a scalar.
@@ -497,6 +506,7 @@ func (i Issue) Node() *render.Node {
 	n.AttrIf("parent", i.Parent)
 	n.LeafIf("created", i.Created)
 	n.LeafIf("updated", i.Updated)
+	n.LeafIf("url", i.URL)
 
 	// Long text is a child element with its markup named, and mixed content
 	// goes in a CDATA section so newlines and fenced code survive untouched.

@@ -111,6 +111,34 @@ func (b *Builder) Lte(field string, v Value) *Builder {
 	return b.Clause(field, OpLte, v)
 }
 
+// Changed appends `field CHANGED` with its history predicates.
+//
+// With no predicates it asks whether the field ever changed, which is a real
+// question and rarely the one anybody means; the caller is expected to qualify
+// it.
+func (b *Builder) Changed(field string, preds ...Predicate) *Builder {
+	return b.Where(&Clause{Field: field, Op: OpChanged, Predicates: preds})
+}
+
+// Was appends `field WAS value`, optionally qualified by when.
+func (b *Builder) Was(field string, v Value, preds ...Predicate) *Builder {
+	return b.Where(&Clause{Field: field, Op: OpWas, Value: v, Predicates: preds})
+}
+
+// By, After, and Before build the three predicates this project uses.
+//
+// The other four — FROM, TO, ON, DURING — are rendered and validated but have
+// no constructor, because nothing here builds one and an untested convenience
+// is a claim about behaviour nobody has checked. A caller that needs one writes
+// the Predicate literal, and the renderer holds it to the same rules.
+func By(v Value) Predicate { return Predicate{Keyword: PredBy, Value: v} }
+
+// After qualifies a history clause with a lower time bound.
+func After(v Value) Predicate { return Predicate{Keyword: PredAfter, Value: v} }
+
+// Before qualifies a history clause with an upper time bound.
+func Before(v Value) Predicate { return Predicate{Keyword: PredBefore, Value: v} }
+
 // Raw appends a user-supplied fragment. It is always parenthesized when
 // rendered, so a user's OR cannot escape the scope the other conditions set.
 //

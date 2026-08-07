@@ -547,11 +547,198 @@ func TestAnUnbalancedFragmentIsRefusedBeforeItIsSent(t *testing.T) {
 	}
 }
 
+// TestParticipationFiltersBecomeJQL covers the filters that ask who touched an
+// issue rather than who owns it.
+func TestParticipationFiltersBecomeJQL(t *testing.T) {
+	const byKey = " ORDER BY issuekey DESC"
+
+	cases := []struct {
+		name string
+		opt  issue.QueryOptions
+		want string
+	}{
+		{
+			"creator is not reporter",
+			issue.QueryOptions{Creator: "currentUser"},
+			`creator = currentUser()` + byKey,
+		},
+		{
+			"watcher and voter",
+			issue.QueryOptions{Watcher: "currentUser", Voter: "currentUser"},
+			`watcher = currentUser() AND voter = currentUser()` + byKey,
+		},
+		{
+			"work logged in a window",
+			issue.QueryOptions{
+				WorklogAuthor: "currentUser",
+				WorklogAfter:  "-7d", WorklogBefore: "-1d",
+			},
+			`worklogAuthor = currentUser() AND worklogDate >= "-7d" ` +
+				`AND worklogDate <= "-1d"` + byKey,
+		},
+		{
+			// One clause, not three. Three separate clauses would ask for an
+			// issue whose status changed at some point, and was changed by this
+			// person at some point, and changed in this window at some point —
+			// three facts that need not be the same event.
+			"changed by, in a window, is one clause",
+			issue.QueryOptions{
+				ChangedBy: "currentUser", ChangedAfter: "-7d", ChangedBefore: "-1d",
+			},
+			`status CHANGED BY currentUser() AFTER "-7d" BEFORE "-1d"` + byKey,
+		},
+		{
+			"a named field changed",
+			issue.QueryOptions{ChangedField: "assignee", ChangedAfter: "-7d"},
+			`assignee CHANGED AFTER "-7d"` + byKey,
+		},
+		{
+			"changed dates alone need no author",
+			issue.QueryOptions{ChangedAfter: "-1w"},
+			`status CHANGED AFTER "-1w"` + byKey,
+		},
+		{
+			"was assigned, whoever holds it now",
+			issue.QueryOptions{WasAssignee: "ada@example.invalid"},
+			`assignee WAS "ada@example.invalid"` + byKey,
+		},
+		{
+			// The disjunction is one condition, so the builder parenthesizes it
+			// beside the project. Four separate clauses would AND, and ask for
+			// an issue where one person is all four at once.
+			"involving is an OR bundle inside the scope",
+			issue.QueryOptions{Project: "ENG", Involving: "currentUser"},
+			`project = "ENG" AND (assignee = currentUser() OR ` +
+				`reporter = currentUser() OR creator = currentUser() OR ` +
+				`worklogAuthor = currentUser())` + byKey,
+		},
+		{
+			"updated-before closes the window created-before already had",
+			issue.QueryOptions{UpdatedAfter: "-7d", UpdatedBefore: "-1d"},
+			`updated >= "-7d" AND updated <= "-1d"` + byKey,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := issue.BuildQuery(tc.opt)
+			if err != nil {
+				t.Fatalf("BuildQuery: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("got  %s\nwant %s", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestInvolvingCoversTheFieldsItAdvertises holds the flag's help text to what
+// the query does.
+//
+// The help names the fields because a bundle that does not say what it covers
+// is a bundle whose result is short for reasons the caller cannot see. Naming
+// them in prose and building something else would be worse than saying nothing.
+func TestInvolvingCoversTheFieldsItAdvertises(t *testing.T) {
+	got, err := issue.BuildQuery(issue.QueryOptions{Involving: "ada@example.invalid"})
+	if err != nil {
+		t.Fatalf("BuildQuery: %v", err)
+	}
+	for _, field := range issue.InvolvingFields {
+		if !strings.Contains(got, field+` = "ada@example.invalid"`) {
+			t.Errorf("--involving advertises %s and the query does not use it: %s",
+				field, got)
+		}
+	}
+
+	cmd, _ := registry.Lookup("issue.list")
+	for _, f := range cmd.Flags {
+		if f.Name != "involving" {
+			continue
+		}
+		for _, field := range issue.InvolvingFields {
+			if !strings.Contains(f.Usage, field) {
+				t.Errorf("--involving covers %s and does not say so: %q", field, f.Usage)
+			}
+		}
+	}
+}
+
+// TestChangedFieldAloneIsRefused covers the flag that cannot narrow anything by
+// itself. It selects what --changed-by asks about, so on its own it would
+// change no output at all.
+func TestChangedFieldAloneIsRefused(t *testing.T) {
+	cmd, _ := registry.Lookup("issue.list")
+	flags := registry.NewFlags()
+	flags.SetString("changed-field", "assignee")
+
+	err := cmd.Validate(t.Context(), &registry.Invocation{
+		Jira: &stubSession{project: "ENG"}, Flags: flags,
+		Limit: registry.Limit{N: 50}, Progress: registry.NoProgress,
+	})
+	if err == nil {
+		t.Fatal("--changed-field was accepted on its own")
+	}
+	if code := errs.Coerce(err).Code; code != "INCOMPLETE_FILTER" {
+		t.Errorf("code = %q", code)
+	}
+	if errs.ExitOf(err) != exitcode.Usage {
+		t.Errorf("exit = %v, want %v", errs.ExitOf(err), exitcode.Usage)
+	}
+
+	// With a companion it is exactly what it says it is.
+	flags.SetString("changed-after", "-7d")
+	if err := cmd.Validate(t.Context(), &registry.Invocation{
+		Jira: &stubSession{project: "ENG"}, Flags: flags,
+		Limit: registry.Limit{N: 50}, Progress: registry.NoProgress,
+	}); err != nil {
+		t.Errorf("--changed-field with --changed-after: %v", err)
+	}
+}
+
+// TestSentinelsAreRefusedWhereTheyMeanNothing covers the words that name a
+// state of the assignee field and no state of anything else.
+//
+// `creator IS EMPTY` matches nothing and `CHANGED BY EMPTY` is not JQL, so
+// accepting the word everywhere would turn a nonsense filter into an empty
+// result set and exit 0 — a wrong answer that looks like a right one.
+func TestSentinelsAreRefusedWhereTheyMeanNothing(t *testing.T) {
+	cmd, _ := registry.Lookup("issue.list")
+
+	for _, name := range []string{"creator", "involving", "changed-by", "was-assignee"} {
+		t.Run(name, func(t *testing.T) {
+			flags := registry.NewFlags()
+			flags.SetString(name, "unassigned")
+			err := cmd.Validate(t.Context(), &registry.Invocation{
+				Jira: &stubSession{project: "ENG"}, Flags: flags,
+				Limit: registry.Limit{N: 50}, Progress: registry.NoProgress,
+			})
+			if err == nil {
+				t.Fatalf("--%s accepted a word that names nobody", name)
+			}
+			if code := errs.Coerce(err).Code; code != "INVALID_USER" {
+				t.Errorf("code = %q", code)
+			}
+		})
+	}
+
+	// --assignee is the one filter for which it is a real answer.
+	flags := registry.NewFlags()
+	flags.SetString("assignee", "unassigned")
+	if err := cmd.Validate(t.Context(), &registry.Invocation{
+		Jira: &stubSession{project: "ENG"}, Flags: flags,
+		Limit: registry.Limit{N: 50}, Progress: registry.NoProgress,
+	}); err != nil {
+		t.Errorf("--assignee unassigned was refused: %v", err)
+	}
+}
+
 func TestBuildQueryRejectsBadInput(t *testing.T) {
 	cases := map[string]issue.QueryOptions{
-		"impossible date": {CreatedAfter: "2020-13-45"},
-		"word as a date":  {UpdatedAfter: "yesterday"},
-		"bad order":       {Sort: "updated", Order: "sideways"},
+		"impossible date":         {CreatedAfter: "2020-13-45"},
+		"word as a date":          {UpdatedAfter: "yesterday"},
+		"bad order":               {Sort: "updated", Order: "sideways"},
+		"impossible changed date": {ChangedAfter: "2020-13-45"},
+		"word as a worklog date":  {WorklogAfter: "yesterday"},
 	}
 	for name, opt := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -1561,6 +1748,10 @@ type stubSession struct {
 	// can point transitions at a recorded conversation while the field
 	// catalogue stays a stub.
 	metaClient site.Doer
+	// baseURL is what the deployment reports as its own address. Empty is the
+	// realistic default here — most tests do not care — and is also the case
+	// --url has to refuse.
+	baseURL string
 }
 
 func (s *stubSession) Connect(context.Context) (*transport.Client, site.Info, error) {
@@ -1568,7 +1759,7 @@ func (s *stubSession) Connect(context.Context) (*transport.Client, site.Info, er
 	if kind == "" {
 		kind = site.Cloud
 	}
-	return s.conn, site.Info{Kind: kind}, nil
+	return s.conn, site.Info{Kind: kind, BaseURL: s.baseURL}, nil
 }
 
 func (s *stubSession) Metadata(context.Context) (*site.Metadata, error) {
@@ -2209,37 +2400,70 @@ func TestAnUnconstrainedSweepIsRefused(t *testing.T) {
 	}
 }
 
+// guardFlagValue is a value for each filter that narrows a query without
+// needing a network: currentUser resolves through JQL rather than the
+// directory, and a relative date parses locally.
+var guardFlagValue = map[string]string{
+	"jql": "labels = retry", "status": "Open", "label": "retry",
+	"not-label": "wontfix", "type": "Bug",
+	"assignee": "currentUser", "reporter": "currentUser",
+	"creator": "currentUser", "involving": "currentUser",
+	"watcher": "currentUser", "voter": "currentUser",
+	"worklog-author": "currentUser", "was-assignee": "currentUser",
+	"changed-by":    "currentUser",
+	"created-after": "-7d", "created-before": "-1d",
+	"updated-after": "-7d", "updated-before": "-1d",
+	"changed-after": "-7d", "changed-before": "-1d",
+	"worklog-after": "-7d", "worklog-before": "-1d",
+}
+
+// notAFilter are the flags on `issue list` that do not narrow the result set,
+// with the reason each one does not.
+var notAFilter = map[string]string{
+	"sort":              "ordering an unbounded query does not make it smaller",
+	"order":             "same, and it is meaningless without --sort",
+	"field":             "it widens each row rather than narrowing the set",
+	"no-context-fields": "it removes columns, not rows",
+	"all-projects":      "it is the way past the guard, not a way to satisfy it",
+	"page-size":         "transport tuning",
+	"page-token":        "a resume point, which the guard has already run for",
+	"changed-field":     "it selects what --changed-by asks about and filters nothing",
+	"url":               "it adds a column, not a condition",
+}
+
 // TestAnyFilterSatisfiesTheGuard covers what counts as constraining, one flag
 // at a time, because a guard that fires on a query somebody did narrow is worse
 // than no guard.
+//
+// It is driven off ConstrainingFlags rather than a list of its own. That list
+// is what the refusal offers the caller as a way out, and QueryOptions
+// .Constrained is what actually decides — two lists that have to agree and
+// have no reason to. A flag offered as a remedy that does not work is a dead
+// end with a helpful tone; the reverse, a filter Constrained does not see, is
+// how a --watcher query becomes a full-instance sweep.
 func TestAnyFilterSatisfiesTheGuard(t *testing.T) {
 	cmd, _ := registry.Lookup("issue.list")
 
-	for _, tc := range []struct {
-		flag  string
-		apply func(registry.Flags)
-	}{
-		{"--jql", func(f registry.Flags) { f.SetString("jql", "labels = retry") }},
-		{"--status", func(f registry.Flags) { f.SetString("status", "Open") }},
-		{"--label", func(f registry.Flags) { f.SetString("label", "retry") }},
-		{"--not-label", func(f registry.Flags) { f.SetString("not-label", "wontfix") }},
-		{"--type", func(f registry.Flags) { f.SetString("type", "Bug") }},
-		{"--assignee", func(f registry.Flags) { f.SetString("assignee", "currentUser") }},
-		{"--reporter", func(f registry.Flags) { f.SetString("reporter", "ada") }},
-		{"--created-after", func(f registry.Flags) { f.SetString("created-after", "-7d") }},
-		{"--created-before", func(f registry.Flags) { f.SetString("created-before", "-1d") }},
-		{"--updated-after", func(f registry.Flags) { f.SetString("updated-after", "-7d") }},
-	} {
-		t.Run(tc.flag, func(t *testing.T) {
+	for _, flag := range issue.ConstrainingFlags() {
+		name := strings.TrimPrefix(flag, "--")
+		if name == "project" {
+			continue // Comes from the context, not from a flag; covered below.
+		}
+		t.Run(flag, func(t *testing.T) {
+			value, ok := guardFlagValue[name]
+			if !ok {
+				t.Fatalf("%s is offered as a way to constrain a query and this "+
+					"test has no value for it", flag)
+			}
 			flags := registry.NewFlags()
-			tc.apply(flags)
+			flags.SetString(name, value)
 			err := cmd.Validate(t.Context(), &registry.Invocation{
 				Jira:  &stubSession{unscoped: true},
 				Flags: flags, Limit: registry.Limit{All: true},
 				Progress: registry.NoProgress,
 			})
 			if err != nil {
-				t.Errorf("%s did not satisfy the guard: %v", tc.flag, err)
+				t.Errorf("%s did not satisfy the guard: %v", flag, err)
 			}
 		})
 	}
@@ -2253,6 +2477,39 @@ func TestAnyFilterSatisfiesTheGuard(t *testing.T) {
 	})
 	if err != nil {
 		t.Errorf("a context project did not satisfy the guard: %v", err)
+	}
+}
+
+// TestEveryFlagIsAFilterOrIsNot makes adding a filter and forgetting the guard
+// a failing test rather than a silent widening.
+//
+// Every flag on `issue list` has to be classified: either it narrows the result
+// set, in which case it belongs in ConstrainingFlags and in
+// QueryOptions.Constrained, or it does not, in which case notAFilter says why.
+// A new filter lands in neither list by default, and the failure it would
+// otherwise cause is invisible — the guard keeps passing, and one day it passes
+// on a query nobody narrowed.
+func TestEveryFlagIsAFilterOrIsNot(t *testing.T) {
+	cmd, _ := registry.Lookup("issue.list")
+
+	constraining := map[string]bool{}
+	for _, flag := range issue.ConstrainingFlags() {
+		constraining[strings.TrimPrefix(flag, "--")] = true
+	}
+
+	for _, f := range cmd.Flags {
+		if constraining[f.Name] {
+			if _, both := notAFilter[f.Name]; both {
+				t.Errorf("--%s is listed as constraining and as not a filter", f.Name)
+			}
+			continue
+		}
+		if _, ok := notAFilter[f.Name]; !ok {
+			t.Errorf("--%s is neither offered as a constraint nor explained as "+
+				"not being one: add it to constrainingFlags and to "+
+				"QueryOptions.Constrained, or to notAFilter with the reason",
+				f.Name)
+		}
 	}
 }
 

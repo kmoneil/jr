@@ -2,6 +2,7 @@ package issue
 
 import (
 	"context"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -63,6 +64,10 @@ func Schema() *render.Schema {
 			}},
 			{Schema: render.Leaf("created", render.TypeTimestamp), Optional: true},
 			{Schema: render.Leaf("updated", render.TypeTimestamp), Optional: true},
+			// Present only with --url. It is not a field Jira sends: it is
+			// built here from the deployment's baseUrl, because Jira's own
+			// `self` is the REST endpoint and opens JSON rather than an issue.
+			{Schema: render.Leaf("url", render.TypeString), Optional: true},
 			{Schema: &render.Schema{
 				// Mixed content in CDATA, with the markup named rather than
 				// guessed at: wiki on Data Center, adf on Cloud.
@@ -145,11 +150,24 @@ complete. It exits 3, says so on stderr, and carries a token to resume from.
 Raw JQL from --jql is always parenthesized before being combined with the other
 filters, so an OR inside it cannot escape the project scope. A fragment whose
 own parentheses do not balance is refused rather than sent, because wrapping
-contains only a fragment that balances.`),
+contains only a fragment that balances.
+
+--assignee and --reporter ask who an issue belongs to. --involving,
+--was-assignee, --worklog-author, and --changed-by ask who touched it, which is
+a different question: --updated-after means somebody updated the issue, not
+that you did.
+
+Two limits are worth knowing rather than discovering. JQL cannot search comment
+authorship at all, so nothing here finds "issues I commented on" and --involving
+says so rather than approximating it. And CHANGED names one field at a time —
+there is no way to ask whether any field changed — so --changed-field defaults
+to status and everything else has to be asked for.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue list --project ENG --status 'In Progress'",
 			buildinfo.App + " issue list --jql 'labels IN (retry, transport)' --limit all",
 			buildinfo.App + " issue list --assignee currentUser --sort updated --order desc",
+			buildinfo.App + " issue list --involving currentUser --updated-after -7d",
+			buildinfo.App + " issue list --changed-by currentUser --changed-after -1w",
 		}, "\n"),
 		Flags: []registry.Flag{
 			{
@@ -179,7 +197,48 @@ contains only a fragment that balances.`),
 			},
 			{
 				Name: "reporter", Type: registry.TypeString,
-				Usage: "reporter; the word currentUser resolves to the caller",
+				Usage: "reporter, by display name, email, or id; " +
+					"the word currentUser resolves to the caller",
+			},
+			{
+				Name: "creator", Type: registry.TypeString,
+				Usage: "who filed the issue, which unlike the reporter cannot " +
+					"be changed afterwards",
+			},
+			{
+				Name: "involving", Type: registry.TypeString,
+				Usage: "one person across any of " +
+					strings.Join(InvolvingFields, ", ") +
+					"; comment authorship is not searchable in JQL, " +
+					"so it is not included",
+			},
+			{
+				Name: "watcher", Type: registry.TypeString,
+				Usage: "who is watching; Jira allows this for yourself only, " +
+					"unless you can manage watchers",
+			},
+			{
+				Name: "voter", Type: registry.TypeString,
+				Usage: "who voted; Jira allows this for yourself only, " +
+					"unless you can view voters",
+			},
+			{
+				Name: "worklog-author", Type: registry.TypeString,
+				Usage: "who logged work against the issue",
+			},
+			{
+				Name: "was-assignee", Type: registry.TypeString,
+				Usage: "who the issue was assigned to at any point, whoever holds it now",
+			},
+			{
+				Name: "changed-by", Type: registry.TypeString,
+				Usage: "who changed --changed-field",
+			},
+			{
+				Name: "changed-field", Type: registry.TypeString,
+				Default: DefaultChangedField,
+				Usage: "the field --changed-by and --changed-after apply to; " +
+					"JQL cannot ask whether any field changed, only a named one",
 			},
 			{
 				Name: "created-after", Type: registry.TypeString,
@@ -191,7 +250,28 @@ contains only a fragment that balances.`),
 			},
 			{
 				Name: "updated-after", Type: registry.TypeString,
-				Usage: "only issues updated on or after this date or offset",
+				Usage: "only issues updated on or after this date or offset; " +
+					"updated by anyone, which is not the same as updated by you",
+			},
+			{
+				Name: "updated-before", Type: registry.TypeString,
+				Usage: "only issues updated on or before this date or offset",
+			},
+			{
+				Name: "changed-after", Type: registry.TypeString,
+				Usage: "only issues whose --changed-field changed on or after this date",
+			},
+			{
+				Name: "changed-before", Type: registry.TypeString,
+				Usage: "only issues whose --changed-field changed on or before this date",
+			},
+			{
+				Name: "worklog-after", Type: registry.TypeString,
+				Usage: "only issues with work logged on or after this date",
+			},
+			{
+				Name: "worklog-before", Type: registry.TypeString,
+				Usage: "only issues with work logged on or before this date",
 			},
 			{
 				Name: "sort", Short: "s", Type: registry.TypeString,
@@ -210,6 +290,7 @@ contains only a fragment that balances.`),
 					"repeat for several",
 			},
 			contextFieldsFlag(),
+			urlFlag(),
 			{
 				Name: "all-projects", Type: registry.TypeBool,
 				Usage: "search every project the credential can see, ignoring " +
@@ -268,6 +349,11 @@ func runList(
 		PageToken: inv.Flags.String("page-token"),
 		Fields:    requestedFields(resolvedFields(inv)),
 	}, func(page []Issue, total int) error {
+		if inv.Flags.Bool(urlFlagName) {
+			if err := stampURLs(page, info); err != nil {
+				return err
+			}
+		}
 		nodes := make([]*render.Node, 0, len(page))
 		for _, i := range page {
 			nodes = append(nodes, i.Node())
@@ -343,10 +429,43 @@ func validateList(ctx context.Context, inv *registry.Invocation) error {
 	if err := refuseUnconstrainedSweep(inv); err != nil {
 		return err
 	}
-	if err := validateAssigneeFilter(ctx, inv, inv.Flags.String("assignee")); err != nil {
+	if err := validateChangedFilter(inv); err != nil {
+		return err
+	}
+	if err := validateUserFilters(ctx, inv); err != nil {
+		return err
+	}
+	if err := validateBrowseURL(ctx, inv); err != nil {
 		return err
 	}
 	return validateFields(ctx, inv)
+}
+
+// validateChangedFilter refuses --changed-field on its own.
+//
+// It selects what --changed-by and the changed dates ask about and narrows
+// nothing by itself, so `--changed-field assignee` alone is a flag that changes
+// no output — the one thing a flag is not allowed to be.
+//
+// The default value is exempt because it is not something the caller typed, and
+// cobra fills it in before the harvest, so nothing downstream can tell an
+// explicit `--changed-field status` from an absent one. That case is accepted
+// and is a genuine no-op rather than a wrong answer.
+func validateChangedFilter(inv *registry.Invocation) error {
+	// Empty counts as the default: cobra fills the flag in, but an Invocation
+	// built in code — a library caller, or a test — carries only what was set.
+	switch inv.Flags.String("changed-field") {
+	case "", DefaultChangedField:
+		return nil
+	}
+	for _, companion := range []string{"changed-by", "changed-after", "changed-before"} {
+		if inv.Flags.String(companion) != "" {
+			return nil
+		}
+	}
+	return errs.Usage("INCOMPLETE_FILTER",
+		"--changed-field names the field to ask about and does not filter on its own").
+		WithRemedy("add --changed-by, --changed-after, or --changed-before")
 }
 
 // refuseUncontainableJQL holds the guarantee --help states: a fragment from
@@ -408,11 +527,23 @@ func refuseUnconstrainedSweep(inv *registry.Invocation) error {
 
 // constrainingFlags is what the refusal offers instead, so the caller does not
 // have to go and read --help to find out what would have been enough.
+//
+// Every filter belongs here and in QueryOptions.Constrained, which are two
+// lists that have to agree. A filter missing from Constrained talks the guard
+// out of firing and turns a --watcher query into a full-instance sweep; a
+// filter missing from here narrows the query and is not offered as a way to.
+// TestEveryFilterConstrainsTheSweepGuard holds the two to each other.
 var constrainingFlags = []string{
 	"--project", "--jql", "--status", "--label", "--not-label", "--type",
-	"--assignee", "--reporter", "--created-after", "--created-before",
-	"--updated-after",
+	"--assignee", "--reporter", "--creator", "--involving", "--watcher",
+	"--voter", "--worklog-author", "--was-assignee", "--changed-by",
+	"--created-after", "--created-before", "--updated-after", "--updated-before",
+	"--changed-after", "--changed-before", "--worklog-after", "--worklog-before",
 }
+
+// ConstrainingFlags exposes that list to the test that holds it to
+// QueryOptions.Constrained.
+func ConstrainingFlags() []string { return slices.Clone(constrainingFlags) }
 
 // validateFields resolves --field against the site's catalogue and leaves the
 // ids on the invocation.
@@ -498,8 +629,15 @@ func resolvedFields(inv *registry.Invocation) []string {
 
 // listColumnsFor appends a column per requested field, so asking for one
 // changes the default TSV output rather than only the structured formats.
+//
+// --url appends after those, not before, so turning it on cannot move a column
+// that --field already placed.
 func listColumnsFor(inv *registry.Invocation) []render.Column {
-	return append(ListColumns(), ExtraColumns(resolvedFields(inv))...)
+	cols := append(ListColumns(), ExtraColumns(resolvedFields(inv))...)
+	if inv.Flags.Bool(urlFlagName) {
+		cols = append(cols, urlColumn())
+	}
+	return cols
 }
 
 // DefaultFields is what `issue list` asks Jira for.
@@ -542,18 +680,35 @@ func ListQueryFor(inv *registry.Invocation) QueryOptions { return listQuery(inv)
 // the one thing the guard exists to be right about.
 func listQuery(inv *registry.Invocation) QueryOptions {
 	opt := QueryOptions{
-		JQL:           inv.Flags.String("jql"),
-		Statuses:      inv.Flags.StringSlice("status"),
-		Labels:        inv.Flags.StringSlice("label"),
-		NotLabels:     inv.Flags.StringSlice("not-label"),
-		Types:         inv.Flags.StringSlice("type"),
-		Assignee:      resolvedAssignee(inv, inv.Flags.String("assignee")),
-		Reporter:      inv.Flags.String("reporter"),
+		JQL:       inv.Flags.String("jql"),
+		Statuses:  inv.Flags.StringSlice("status"),
+		Labels:    inv.Flags.StringSlice("label"),
+		NotLabels: inv.Flags.StringSlice("not-label"),
+		Types:     inv.Flags.StringSlice("type"),
+
+		Assignee: resolvedUser(inv, "assignee"),
+		Reporter: resolvedUser(inv, "reporter"),
+		Creator:  resolvedUser(inv, "creator"),
+
+		Involving:     resolvedUser(inv, "involving"),
+		Watcher:       resolvedUser(inv, "watcher"),
+		Voter:         resolvedUser(inv, "voter"),
+		WorklogAuthor: resolvedUser(inv, "worklog-author"),
+		WasAssignee:   resolvedUser(inv, "was-assignee"),
+		ChangedBy:     resolvedUser(inv, "changed-by"),
+		ChangedField:  inv.Flags.String("changed-field"),
+
 		CreatedAfter:  inv.Flags.String("created-after"),
 		CreatedBefore: inv.Flags.String("created-before"),
 		UpdatedAfter:  inv.Flags.String("updated-after"),
-		Sort:          inv.Flags.String("sort"),
-		Order:         inv.Flags.String("order"),
+		UpdatedBefore: inv.Flags.String("updated-before"),
+		ChangedAfter:  inv.Flags.String("changed-after"),
+		ChangedBefore: inv.Flags.String("changed-before"),
+		WorklogAfter:  inv.Flags.String("worklog-after"),
+		WorklogBefore: inv.Flags.String("worklog-before"),
+
+		Sort:  inv.Flags.String("sort"),
+		Order: inv.Flags.String("order"),
 	}
 	// Project comes from the resolved context rather than a local flag:
 	// --project is global, and it is a default, never a requirement.
@@ -571,10 +726,19 @@ func listQuery(inv *registry.Invocation) QueryOptions {
 // The sort does not count. Ordering an unbounded query does not make it
 // smaller, and treating it as a filter is how a guard against sweeping the
 // instance gets talked out of firing by --sort updated.
+//
+// --changed-field does not count either, and is the one exception worth
+// naming: it carries a default, so it is never empty, and reading it as a
+// filter would mean every invocation looked constrained. It selects what
+// --changed-by looks at rather than narrowing anything by itself, which is
+// also why validateChangedFilter refuses it on its own.
 func (o QueryOptions) Constrained() bool {
 	for _, v := range []string{
-		o.Project, o.JQL, o.Assignee, o.Reporter,
-		o.CreatedAfter, o.CreatedBefore, o.UpdatedAfter,
+		o.Project, o.JQL,
+		o.Assignee, o.Reporter, o.Creator, o.Involving,
+		o.Watcher, o.Voter, o.WorklogAuthor, o.WasAssignee, o.ChangedBy,
+		o.CreatedAfter, o.CreatedBefore, o.UpdatedAfter, o.UpdatedBefore,
+		o.ChangedAfter, o.ChangedBefore, o.WorklogAfter, o.WorklogBefore,
 	} {
 		if strings.TrimSpace(v) != "" {
 			return true
@@ -586,19 +750,42 @@ func (o QueryOptions) Constrained() bool {
 
 // QueryOptions are the filter flags, before they become JQL.
 type QueryOptions struct {
-	Project       string
-	JQL           string
-	Statuses      []string
-	Labels        []string
-	NotLabels     []string
-	Types         []string
-	Assignee      string
-	Reporter      string
+	Project   string
+	JQL       string
+	Statuses  []string
+	Labels    []string
+	NotLabels []string
+	Types     []string
+
+	// Who the issue belongs to now.
+	Assignee string
+	Reporter string
+	Creator  string
+
+	// Who touched it. Involving is the OR bundle over InvolvingFields;
+	// WasAssignee and ChangedBy ask the changelog rather than the issue.
+	Involving     string
+	Watcher       string
+	Voter         string
+	WorklogAuthor string
+	WasAssignee   string
+	ChangedBy     string
+	// ChangedField is what ChangedBy and the changed dates apply to. JQL has no
+	// way to ask whether *any* field changed, so this is always one field and
+	// defaults to DefaultChangedField.
+	ChangedField string
+
 	CreatedAfter  string
 	CreatedBefore string
 	UpdatedAfter  string
-	Sort          string
-	Order         string
+	UpdatedBefore string
+	ChangedAfter  string
+	ChangedBefore string
+	WorklogAfter  string
+	WorklogBefore string
+
+	Sort  string
+	Order string
 	// BeforeKey bounds the query below an issue key, which is how keyset
 	// pagination resumes. It is set by the client, never by a flag.
 	BeforeKey string
@@ -620,29 +807,12 @@ func BuildQuery(opt QueryOptions) (string, error) {
 	b.NotIn("labels", opt.NotLabels...)
 	b.In("issuetype", opt.Types...)
 
-	addUser(b, "assignee", opt.Assignee)
-	addUser(b, "reporter", opt.Reporter)
-
-	for _, d := range []struct {
-		field, value string
-		since        bool
-	}{
-		{"created", opt.CreatedAfter, true},
-		{"created", opt.CreatedBefore, false},
-		{"updated", opt.UpdatedAfter, true},
-	} {
-		if d.value == "" {
-			continue
-		}
-		build := jql.Until
-		if d.since {
-			build = jql.Since
-		}
-		expr, err := build(d.field, d.value)
-		if err != nil {
-			return "", err
-		}
-		b.Where(expr)
+	addParticipants(b, opt)
+	if err := addDates(b, opt); err != nil {
+		return "", err
+	}
+	if err := addHistory(b, opt); err != nil {
+		return "", err
 	}
 
 	if opt.JQL != "" {
@@ -673,19 +843,181 @@ const SortKey = jql.DefaultSortField
 // place, which is what keyset pagination requires.
 func (o QueryOptions) SortsByKey() bool { return jql.SortsByKey(o.Sort, o.Order) }
 
-// addUser handles the one value with a special meaning. currentUser is a JQL
-// function, and quoting it as a string would search for a user literally named
-// "currentUser" and return nothing.
-func addUser(b *jql.Builder, field, value string) {
+// DefaultChangedField is what --changed-by looks at when nothing names a field.
+//
+// JQL's CHANGED operator takes one field. There is no way to ask whether *any*
+// field changed, so "issues I edited" is not a question this or any other Jira
+// client can put to the server — only "issues whose status I changed", and the
+// same for each field named one at a time.
+const DefaultChangedField = "status"
+
+// InvolvingFields is what --involving expands to.
+//
+// Exported because the flag's own help text is built from it: a bundle that
+// does not say which fields it covers is a bundle whose result is short for
+// reasons the caller cannot see.
+//
+// Watchers and voters are deliberately absent. Jira restricts both to the
+// calling user unless the credential can manage watchers or view voters, so
+// folding them in would make --involving succeed or fail by permission rather
+// than by what it matched. They stay as their own flags, where the caller opts
+// into that.
+//
+// Comments are absent because they cannot be present. JQL has no field for
+// comment authorship — `comment ~ text` searches bodies, and the
+// `issueFunction in commented(...)` everyone reaches for is ScriptRunner.
+var InvolvingFields = []string{"assignee", "reporter", "creator", "worklogAuthor"}
+
+// addParticipants adds the filters that name a person.
+func addParticipants(b *jql.Builder, opt QueryOptions) {
+	addUser(b, "assignee", opt.Assignee)
+	addUser(b, "reporter", opt.Reporter)
+	addUser(b, "creator", opt.Creator)
+	addUser(b, "watcher", opt.Watcher)
+	addUser(b, "voter", opt.Voter)
+	addUser(b, "worklogAuthor", opt.WorklogAuthor)
+	addInvolving(b, opt.Involving)
+}
+
+// addInvolving ORs one user across every field that can name them.
+//
+// The disjunction goes in as a single condition, so the builder parenthesizes
+// it when it renders beside the others. Adding the four clauses individually
+// would AND them, which asks for issues where one person is all four at once.
+func addInvolving(b *jql.Builder, value string) {
+	if value == "" {
+		return
+	}
+	exprs := make([]jql.Expr, 0, len(InvolvingFields))
+	for _, field := range InvolvingFields {
+		exprs = append(exprs, userExpr(field, value))
+	}
+	b.Where(jql.AnyOf(exprs...))
+}
+
+// addDates adds every window filter. A missing value is not a filter.
+func addDates(b *jql.Builder, opt QueryOptions) error {
+	for _, d := range []struct {
+		field, value string
+		since        bool
+	}{
+		{"created", opt.CreatedAfter, true},
+		{"created", opt.CreatedBefore, false},
+		{"updated", opt.UpdatedAfter, true},
+		{"updated", opt.UpdatedBefore, false},
+		{"worklogDate", opt.WorklogAfter, true},
+		{"worklogDate", opt.WorklogBefore, false},
+	} {
+		if d.value == "" {
+			continue
+		}
+		build := jql.Until
+		if d.since {
+			build = jql.Since
+		}
+		expr, err := build(d.field, d.value)
+		if err != nil {
+			return err
+		}
+		b.Where(expr)
+	}
+	return nil
+}
+
+// addHistory adds the filters that ask the changelog rather than the issue.
+func addHistory(b *jql.Builder, opt QueryOptions) error {
+	if opt.WasAssignee != "" {
+		b.Was("assignee", userValue(opt.WasAssignee))
+	}
+	return addChanged(b, opt)
+}
+
+// addChanged builds the one CHANGED clause, from up to three flags.
+//
+// They are one clause rather than three because CHANGED's qualifiers are
+// predicates on a single operator. Three separate clauses would ask for an
+// issue whose status changed at some point, and was changed by this person at
+// some point, and changed within this window at some point — three facts that
+// need not be the same event.
+func addChanged(b *jql.Builder, opt QueryOptions) error {
+	if opt.ChangedBy == "" && opt.ChangedAfter == "" && opt.ChangedBefore == "" {
+		return nil
+	}
+
+	preds := make([]jql.Predicate, 0, 3)
+	if opt.ChangedBy != "" {
+		preds = append(preds, jql.By(userValue(opt.ChangedBy)))
+	}
+	for _, d := range []struct {
+		value string
+		after bool
+	}{
+		{opt.ChangedAfter, true},
+		{opt.ChangedBefore, false},
+	} {
+		if d.value == "" {
+			continue
+		}
+		when, err := jql.ParseDate(d.value)
+		if err != nil {
+			return err
+		}
+		build := jql.Before
+		if d.after {
+			build = jql.After
+		}
+		preds = append(preds, build(when))
+	}
+
+	b.Changed(changedField(opt), preds...)
+	return nil
+}
+
+// changedField is the field a CHANGED clause asks about.
+//
+// The flag carries the default, so this only fires for a QueryOptions built by
+// hand — a caller of the library, or a test. Defaulting in both places means
+// the two cannot disagree about what an unset field means.
+func changedField(opt QueryOptions) string {
+	if opt.ChangedField != "" {
+		return opt.ChangedField
+	}
+	return DefaultChangedField
+}
+
+// addUser appends the clause a user-valued filter becomes.
+func addUser(b *jql.Builder, field, value string) { b.Where(userExpr(field, value)) }
+
+// userExpr is the clause a user-valued filter becomes, or nil for an unset one.
+//
+// It exists separately from addUser because --involving needs the clauses as
+// values to OR together rather than as conditions to AND onto the builder.
+func userExpr(field, value string) jql.Expr {
 	switch {
 	case value == "":
-	case strings.EqualFold(value, "currentUser"), strings.EqualFold(value, "currentUser()"):
-		b.Clause(field, jql.OpEq, &jql.Func{Name: "currentUser"})
-	case strings.EqualFold(value, "unassigned"), strings.EqualFold(value, "empty"):
-		b.IsEmpty(field)
+		return nil
+	case isCurrentUser(value):
+		// currentUser is a JQL function, and quoting it as a string would
+		// search for a user literally named "currentUser" and return nothing.
+		return &jql.Clause{Field: field, Op: jql.OpEq, Value: &jql.Func{Name: "currentUser"}}
+	case IsAssigneeSentinel(value):
+		return &jql.Clause{Field: field, Op: jql.OpIs, Value: jql.Empty}
 	default:
-		b.Eq(field, value)
+		return jql.Eq(field, value)
 	}
+}
+
+// userValue is the right-hand side of a predicate naming a person.
+//
+// Unlike userExpr there is no empty case. `BY EMPTY` is not JQL, and a
+// predicate with nobody in it is not built at all — validateUserFilters
+// refuses the sentinel words everywhere except --assignee, which is the one
+// filter for which "unassigned" is a real answer rather than a word.
+func userValue(value string) jql.Value {
+	if isCurrentUser(value) {
+		return &jql.Func{Name: "currentUser"}
+	}
+	return jql.Text(value)
 }
 
 func getCommand() *registry.Command {
@@ -709,6 +1041,7 @@ parses both identically. It simply has more of it filled in.`),
 			buildinfo.App + " issue get ENG-101 --format json",
 			buildinfo.App + " issue get ENG-101 --field customfield_10042",
 			buildinfo.App + " issue get ENG-101 --raw-body",
+			buildinfo.App + " issue get ENG-101 --url",
 		}, "\n"),
 		Args: []registry.Arg{{
 			Name: "key", Usage: "issue key, e.g. ENG-101", Required: true,
@@ -719,7 +1052,7 @@ parses both identically. It simply has more of it filled in.`),
 				"customfield_10042 or 'Story Points'; " +
 				"added to the default set and to the context's, " +
 				"repeat for several",
-		}, contextFieldsFlag(), rawBodyFlag(), {
+		}, contextFieldsFlag(), rawBodyFlag(), urlFlag(), {
 			Name: withCommentsFlag, Type: registry.TypeBool,
 			Usage: "include the comment thread, oldest first; costs a second " +
 				"request, and a thread longer than " +
@@ -731,9 +1064,19 @@ parses both identically. It simply has more of it filled in.`),
 			exitcode.Partial, exitcode.Usage, exitcode.Auth, exitcode.NotFound,
 			exitcode.Permission, exitcode.RateLimit, exitcode.Remote,
 		},
-		Validate: validateFields,
+		Validate: validateGet,
 		Run:      runGet,
 	}
+}
+
+// validateGet resolves the field names and settles --url before anything is
+// fetched, so a site that cannot supply a base URL is a refusal rather than a
+// record with the one element the caller asked for missing.
+func validateGet(ctx context.Context, inv *registry.Invocation) error {
+	if err := validateBrowseURL(ctx, inv); err != nil {
+		return err
+	}
+	return validateFields(ctx, inv)
 }
 
 func runGet(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) {
@@ -751,6 +1094,17 @@ func runGet(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) 
 	issue, err := client.Get(ctx, inv.Args[0], fields)
 	if err != nil {
 		return nil, err
+	}
+
+	if inv.Flags.Bool(urlFlagName) {
+		// Through the same helper the listing uses, so one issue and a row
+		// carry the same string. Two builders would eventually disagree about
+		// a trailing slash.
+		one := []Issue{issue}
+		if err := stampURLs(one, info); err != nil {
+			return nil, err
+		}
+		issue = one[0]
 	}
 
 	doc := GetDoc(issue)

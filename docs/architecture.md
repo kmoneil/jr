@@ -285,6 +285,7 @@ name to `customfield_10042` should not cost a round trip on every invocation.
 | `resource/*`    | Pure struct-in/struct-out unit tests, plus a fuzzer on anything that parses | 90%                                     |
 | `transport/`    | Recorded fixtures, Cloud + DC                                  | Every endpoint                                      |
 | Output contract | Golden files per kind, per format                              | Any diff requires a version bump in the same commit |
+| Documented contract | Every `kind="…" v="…"` in the docs compared to `registry.Kinds` | The number a reader copies matches the one the binary emits |
 | CLI surface     | Snapshot tests of `--help`, `schema`, exit codes               | Any diff is reviewed                                |
 | Architecture    | Import-graph assertions                                        | Every PR                                            |
 | Build profiles  | Matrix build of all profiles, a size assertion, and a command count per profile | Every PR                           |
