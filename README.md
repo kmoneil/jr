@@ -39,35 +39,40 @@ make build          # → bin/jr
 
 ## What works today
 
+60 commands in the full build, 40 in the reader.
+
 ```
-jr issue list       # query issues; pages until --limit is satisfied
-jr issue get KEY    # one issue in full, with its description
-
-jr context create|list|use|show|delete   # named site/project pairings
-jr auth login|logout|status|token        # credentials, per site
-
-jr version          # build identity and compiled-in capabilities
-jr schema           # every command this build contains, as data
-jr schema <name>    # one command in full: flags, args, exit codes, output kinds
-jr contract         # every output kind this build can emit, and its version
+jr auth      login logout status token
+jr context   create edit list use show delete
+jr issue     list get create edit move assign delete clone watch
+jr issue     comment list add edit delete
+jr issue     link list add remove | worklog list add delete
+jr issue     attachment list download upload
+jr project   list get components versions statuses
+jr user      list get me
+jr board     list get
+jr sprint    list get add close
+jr epic      list get add remove
+jr jql       validate explain
+jr field     list
+jr meta      transitions createmeta
+jr mcp       serve
+jr version | schema | contract
 ```
 
-Global: `--format tsv|xml|json|yaml`, `--context`, `--site`, `--project`,
-`--readonly`, `--describe`, `--debug`, `--refresh`, `--retries`,
+Global: `--format tsv|xml|json|yaml`, plus `markdown` in a build with the
+`render` tag — for reading, never for parsing. Also `--context`, `--site`,
+`--project`, `--readonly`, `--describe`, `--debug`, `--refresh`, `--retries`,
 `--max-requests`, and `--limit` on collections. `JIRA_FORMAT`, `JIRA_CONTEXT`,
 `JIRA_SITE`, `JIRA_PROJECT`, and `JIRA_READONLY` set the same things from the
 environment.
 
 ```console
-$ jr schema
-name      summary                                                     mutating  destructive  kind
-contract  Dump the machine-readable output contract for every kind    false     false        contract
-schema    Describe every command this build contains                  false     false        schema.commands
-version   Print the build identity and its compiled-in capabilities    false     false        version
-
-$ jr schema --limit 1; echo "exit $?"
-name      summary                                                   mutating  destructive  kind
-contract  Dump the machine-readable output contract for every kind  false     false        contract
+$ jr schema --limit 3; echo "exit $?"
+name         summary                                                            mutating  destructive  kind
+auth.login   Store a credential for a site                                      false     false        auth.status
+auth.logout  Remove a stored credential                                         false     true         auth.status
+auth.status  Report which credential a site would use, and where it comes from  false     false        auth.status
 exit 3
 ```
 
@@ -79,25 +84,19 @@ parseable.
 Nothing below is stubbed or partially wired — a flag that would silently no-op
 is not shipped at all.
 
-- The rest of the resources: `epic`, `sprint`, `board`, `project`, `user`,
-  `field`, `meta`, and every `issue` verb other than `list` and `get`.
-- `adf` — the package exists with its contract documented and no
-  implementation. Until it lands, a Cloud description is emitted as raw ADF
-  JSON with `format="adf"`, and a Data Center one as wiki markup with
-  `format="wiki"`. Both are carried through unchanged: a half-conversion called
-  markdown would be worse than either.
-- OAuth, mTLS, and a system-keyring credential provider. The provider interface
-  is in place; a keyring implementation shells out, so it will arrive behind its
-  own build tag rather than in the reader profile.
-- `jr jql validate` and `jr jql explain`. The JQL library is complete (see
-  below) but `validate` is specified as a round trip to Jira's parse endpoint,
-  and shipping a local-only check under that name would overclaim.
-- `--dry-run` and `--no-color`. Nothing mutates yet, and nothing is colored.
-- `jr ui`.
-- `--contract` reports each kind's name, version, and emitters. Per-kind element
-  schemas land with the resources that define them.
-- Only the `mcp` tag gates code so far, so `ci` differs from the other three
-  profiles and they do not yet differ from each other.
+- `jr ui`, and the `tui` tag that would gate it. The TUI is a consumer of this
+  tool, not the product, so it is the lowest priority there is.
+- OAuth, mTLS, and a system-keyring credential provider, with the `browser` tag
+  that would gate the first. The provider interface is in place; a keyring
+  implementation shells out, so it will arrive behind its own build tag rather
+  than in the reader profile.
+- `--no-color`, and the `clipboard` tag. Nothing emits ANSI and nothing copies,
+  so both flags would be flags that do nothing.
+
+Everything else described in this README is built. 60 commands in the full
+build, and `internal/lint` asserts the tag table above against the binaries
+rather than against this sentence — if a tag here is said to gate nothing and
+starts gating something, the build fails until this list is corrected.
 
 ### Reading one issue
 
@@ -121,6 +120,30 @@ both identically — `get` simply has more of it filled in.
 
 A malformed key is rejected locally: `jr issue get foo` is exit 2 without a
 round trip, because a 404 for a typo reads like a missing issue.
+
+For reading rather than parsing, a build with the `render` tag has a fifth
+format:
+
+```console
+$ jr issue get ENG-101 --format markdown
+# issue ENG-101
+
+| Field | Value |
+| --- | --- |
+| key | ENG-101 |
+| summary | Retry logic drops the last error |
+| status | In Progress |
+
+## description
+
+## Repro
+...
+```
+
+`markdown` is the one format outside the output contract. It is never a
+default, it carries no schema version, it may change in any release, and the
+agent, reader, and ci profiles do not have it. Do not parse it — that is what
+`tsv`, `json`, and `xml` are for.
 
 ### Streaming
 
@@ -163,9 +186,31 @@ Anything that will not reduce is emitted as compact JSON rather than dropped. A
 field the server did not return is present and empty, so "no value" is
 distinguishable from "I asked for something that does not exist".
 
-Field *names* are not resolved yet, only ids. `--field "Story Points"` is
-refused with what to pass instead, rather than being sent for Jira to reject
-opaquely. Name resolution needs `jr field list` and the metadata cache.
+A field can be named or given by id. `--field "Story Points"` resolves against
+the site's field catalogue, which is cached with a TTL, so a name costs one
+request on a cold cache and none after it. A name that matches nothing is
+refused locally with the near matches, rather than being sent for Jira to
+reject opaquely.
+
+If your team has fields that belong on every issue, store them on the context
+instead of typing them each time:
+
+```console
+$ jr context edit work --field "Story Points" --field Team
+$ jr issue get ENG-250          # both fields included
+$ jr issue list --field Sprint  # both, plus Sprint
+```
+
+The context's set and `--field` are added together — the context first, so an
+ad-hoc field never reorders your columns and never drops the set. A field named
+in both places appears once. `--no-context-fields` ignores the stored set for
+one invocation.
+
+Two things to know before storing a set. Every read then resolves it, so a
+field renamed in Jira fails `issue get` and `issue list` until the context is
+corrected — the error says so and names the fix. And every read consults the
+field catalogue, which is one request per TTL rather than per command, but is
+not free on a cold cache.
 
 ### Pagination
 

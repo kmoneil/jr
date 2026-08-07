@@ -117,8 +117,9 @@ list. They cannot drift because there is only one of them.
 
 A command never writes to stdout. It returns a `render.Doc` — a
 format-independent tree — and `internal/cli` decides the format and writes it.
-That is what lets every command support all four formats without knowing any of
-them exist.
+That is what lets every command support every format without knowing any of them
+exist, and it is why adding the fifth — `markdown`, in a build carrying the
+`render` tag — needed one writer and no change to any command.
 
 A command that returns a kind it did not declare is rejected before anything is
 written, because a consumer dispatching on the declared kind would silently
