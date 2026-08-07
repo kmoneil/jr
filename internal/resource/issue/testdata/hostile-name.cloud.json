@@ -1,0 +1,25 @@
+{
+  "deployment": "cloud",
+  "source": "constructed",
+  "note": "The Cloud half of the same hostile answer. Cloud never returns a filename on the attachment; it names one in Content-Disposition, which filenameFrom already reduces to its base. This cassette exists so that guard is asserted rather than assumed, and so both deployments are held to the same outcome by the same test.",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/attachment/content/10042"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/pdf"
+          ],
+          "Content-Disposition": [
+            "attachment; filename=\"../jr-escaped.txt\""
+          ]
+        },
+        "body": "%PDF-1.4 pretend contents"
+      }
+    }
+  ]
+}

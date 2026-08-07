@@ -1,0 +1,37 @@
+{
+  "deployment": "datacenter",
+  "source": "constructed",
+  "note": "Hand-written, not recorded: no real instance reports a filename that escapes the working directory, which is exactly why nothing caught the one deployment that used the value unchecked. Only `filename` is hostile here; `content` stays on-site so the request is allowed and the write is what gets refused.",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/attachment/10042"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"id\":\"10042\",\"filename\":\"../jr-escaped.txt\",\"mimeType\":\"application/pdf\",\"size\":1048576,\"created\":\"2026-08-01T09:00:00.000+0000\",\"content\":\"https://recorded.invalid/secure/attachment/10042/report.pdf\",\"author\":{\"displayName\":\"Ada Lovelace\"}}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/secure/attachment/10042/report.pdf"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/pdf"
+          ]
+        },
+        "body": "%PDF-1.4 pretend contents"
+      }
+    }
+  ]
+}

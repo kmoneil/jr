@@ -454,6 +454,14 @@ func runAttachmentDownload(ctx context.Context, inv *registry.Invocation) (*rend
 
 	dest := inv.Flags.String("output")
 	if dest == "" {
+		// The server named the file, so the server does not also get to name
+		// the directory. Checked here rather than where the filename is read,
+		// because the value is only dangerous at the moment it becomes a path:
+		// reporting it is what `attachment list` already does, and refusing to
+		// report a name Jira really stored would be this tool hiding data.
+		if err := usableAsDestination(filename); err != nil {
+			return nil, err
+		}
 		dest = filename
 	}
 
@@ -474,6 +482,40 @@ func runAttachmentDownload(ctx context.Context, inv *registry.Invocation) (*rend
 	return render.Record(KindAttachmentGet, VersionAttachmentGet, Downloaded{
 		ID: id, Issue: key, Filename: filename, Path: dest, Bytes: written,
 	}.Node()), nil
+}
+
+// usableAsDestination reports whether a filename this tool did not choose can
+// be the path it writes to.
+//
+// A filename is one path element. `../../../../home/you/.bashrc` is a filename
+// only in the sense that it parses as one, and joining it to the working
+// directory is how an attachment lands somewhere nobody asked for.
+//
+// The rule was already written down one function below, in filenameFrom: a
+// server-supplied name containing a directory separator is not a suggestion
+// this tool acts on. It was enforced only on the path Cloud takes. Data Center
+// reports a filename on the attachment itself and reaches here with the raw
+// value, so the same sentence had to hold in two places and held in one.
+//
+// Refusing rather than reducing to the base name is the call offSite makes
+// about a server-supplied URL, for the same reason: repairing the value is this
+// tool deciding what the server meant. Here the caller has a better answer than
+// either — --output, which names the destination without guessing.
+//
+// filepath.IsLocal carries the platform's own rules, which is why it is used
+// rather than a scan for "..": it refuses an absolute path, a parent reference,
+// and on Windows the reserved device names. The two extra cases are this tool's
+// own, not the filesystem's — "." is a directory, and "-" is the flag value
+// meaning stdout.
+func usableAsDestination(name string) error {
+	if filepath.IsLocal(name) && filepath.Base(name) == name &&
+		name != "." && name != stdoutDestination {
+		return nil
+	}
+	return errs.Runtime("UNSAFE_FILENAME",
+		"the server named a file this tool will not write to").
+		WithDetail("%q is not a filename", name).
+		WithRemedy("pass --output <path> to choose the destination yourself")
 }
 
 // writeFile streams to disk, refusing to replace what is already there.

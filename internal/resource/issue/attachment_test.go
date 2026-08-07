@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -229,6 +230,146 @@ func TestDownloadToStdoutIsRefusedWithoutOne(t *testing.T) {
 	if code := errs.Coerce(err).Code; code != "NO_STDOUT" {
 		t.Errorf("code = %q, want NO_STDOUT", code)
 	}
+}
+
+// TestAServerSuppliedFilenameNeverBecomesAPath covers the branch every other
+// download test skipped: the one where --output is absent, so the destination
+// comes from the server's own answer.
+//
+// Both deployments are held to one outcome — nothing is written outside the
+// working directory — by two different mechanisms, and the difference is the
+// bug. Cloud returns no filename on the attachment and reaches filenameFrom,
+// which reduces Content-Disposition to its base name. Data Center reports a
+// filename on the attachment itself and used it raw, so a server answering
+// `../../../../jr-escaped.txt` chose where the bytes landed. Asserting the
+// outcome rather than the mechanism is what stops the two drifting again.
+func TestAServerSuppliedFilenameNeverBecomesAPath(t *testing.T) {
+	for _, tc := range []struct {
+		kind    site.Kind
+		refuses bool
+		// contained is what the working directory holds afterwards. Cloud
+		// contains the name and writes it; Data Center refuses and writes
+		// nothing.
+		contained string
+	}{
+		{site.Cloud, false, "jr-escaped.txt"},
+		{site.DataCenter, true, ""},
+	} {
+		t.Run(string(tc.kind), func(t *testing.T) {
+			// The escape target has to be somewhere the test could really be
+			// written, or the assertion passes because the filesystem refused
+			// rather than because this tool did. `../` from a directory inside
+			// the temp dir lands on the temp dir itself: writable, and checked
+			// below. An earlier draft used `../../../../`, which resolved above
+			// the root and was blocked by permissions — a green test proving
+			// nothing.
+			root := t.TempDir()
+			dir := filepath.Join(root, "work")
+			if err := os.Mkdir(dir, 0o700); err != nil {
+				t.Fatalf("seed: %v", err)
+			}
+			conn, _ := replayConn(t, "hostile-name."+string(tc.kind)+".json")
+			// --output is absent, so the working directory is the destination.
+			t.Chdir(dir)
+			escaped := filepath.Join(root, "jr-escaped.txt")
+
+			_, err := downloadToWorkingDir(t, tc.kind, conn)
+
+			switch {
+			// Error rather than Fatal: the file check below is the assertion
+			// that matters, and short-circuiting here would leave it decorative.
+			case tc.refuses && err == nil:
+				t.Error("a server-chosen path was accepted as the destination")
+			case tc.refuses:
+				e := errs.Coerce(err)
+				if e.Code != "UNSAFE_FILENAME" {
+					t.Errorf("code = %q, want UNSAFE_FILENAME", e.Code)
+				}
+				// Not Remote: the server returns the same filename next time,
+				// and 9 publishes a refusal as retryable.
+				if e.Exit != exitcode.Error {
+					t.Errorf("exit = %d, want %d", e.Exit, exitcode.Error)
+				}
+			case err != nil:
+				t.Fatalf("download: %v", err)
+			}
+
+			if _, statErr := os.Stat(escaped); statErr == nil {
+				t.Fatalf("the attachment was written outside the working "+
+					"directory, at %s", escaped)
+			}
+
+			entries, readErr := os.ReadDir(dir)
+			if readErr != nil {
+				t.Fatalf("read back: %v", readErr)
+			}
+			var got []string
+			for _, e := range entries {
+				got = append(got, e.Name())
+			}
+			var want []string
+			if tc.contained != "" {
+				want = []string{tc.contained}
+			}
+			if !slices.Equal(got, want) {
+				t.Errorf("working directory holds %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+// TestTheDefaultDestinationIsTheAttachmentsOwnName is the other half: the guard
+// refuses a name that is a path and must leave an ordinary one alone, on both
+// deployments. Without this, refusing everything would pass the test above.
+func TestTheDefaultDestinationIsTheAttachmentsOwnName(t *testing.T) {
+	for _, kind := range deployments {
+		t.Run(string(kind), func(t *testing.T) {
+			dir := t.TempDir()
+			conn, _ := replayConn(t, "download."+string(kind)+".json")
+			t.Chdir(dir)
+
+			doc, err := downloadToWorkingDir(t, kind, conn)
+			if err != nil {
+				t.Fatalf("download: %v", err)
+			}
+
+			written, readErr := os.ReadFile(filepath.Join(dir, "report.pdf")) //nolint:gosec // test temp dir.
+			if readErr != nil {
+				t.Fatalf("the attachment did not land under its own name: %v", readErr)
+			}
+			if string(written) != pretendPDF {
+				t.Errorf("wrote %q", written)
+			}
+			if path, _ := doc.Record.ChildNamed("path"); path == nil || path.Text != "report.pdf" {
+				t.Errorf("path = %+v, want the name it was written under", path)
+			}
+		})
+	}
+}
+
+// downloadToWorkingDir runs the command with no --output, which is the branch
+// where the server's filename becomes the destination. Every other helper here
+// sets one, which is how that branch went untested.
+//
+// It takes the connection already built, because the caller has to load the
+// cassette before it changes directory: replayConn resolves testdata relative
+// to the working directory, and the whole point of these tests is to move it.
+func downloadToWorkingDir(
+	t *testing.T, kind site.Kind, conn *transport.Client,
+) (*render.Doc, error) {
+	t.Helper()
+
+	cmd, ok := registry.Lookup("issue.attachment.download")
+	if !ok {
+		t.Fatal("issue attachment download is not registered")
+	}
+
+	return cmd.Run(t.Context(), &registry.Invocation{
+		Jira:  &stubSession{conn: conn, kind: kind},
+		Args:  []string{"ENG-101", "10042"},
+		Flags: registry.NewFlags(), Stderr: io.Discard, Stdout: io.Discard,
+		Progress: registry.NoProgress,
+	})
 }
 
 // TestAttachmentReadsNeedNoTag keeps listing and downloading in every build.
