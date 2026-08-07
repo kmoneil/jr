@@ -72,7 +72,7 @@ func WriteError(w io.Writer, e *errs.Error, f Format) error {
 // WriteTruncationWarning encodes the warning that accompanies exit 3 to w,
 // which is always stderr. It is a no-op for a result that is complete.
 func WriteTruncationWarning(w io.Writer, d *Doc, f Format) error {
-	if d == nil || d.Collection == nil || d.Collection.Complete {
+	if d == nil || d.IsComplete() {
 		return nil
 	}
 	return writeDiagnostic(w, truncationNode(d), f)

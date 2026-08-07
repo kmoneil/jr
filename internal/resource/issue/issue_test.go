@@ -2503,3 +2503,99 @@ func TestAStaleContextFieldSaysWhereItCameFrom(t *testing.T) {
 		t.Errorf("the remedy does not say how to clear it: %q", remedy)
 	}
 }
+
+func runGetWithComments(t *testing.T, fixture string, withComments bool) (*render.Doc, *transport.Replayer) {
+	t.Helper()
+	cmd, ok := registry.Lookup("issue.get")
+	if !ok {
+		t.Fatal("issue get is not registered")
+	}
+	conn, replayer := replayConn(t, fixture)
+
+	flags := registry.NewFlags()
+	if withComments {
+		flags.SetBool("with-comments", true)
+	}
+	doc, err := cmd.Run(t.Context(), &registry.Invocation{
+		Jira: &stubSession{conn: conn, kind: site.DataCenter}, Args: []string{"ENG-101"},
+		Flags: flags, Stderr: io.Discard, Progress: registry.NoProgress,
+	})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	return doc, replayer
+}
+
+// TestWithCommentsFoldsTheThreadIntoTheRecord covers the ordinary case, and the
+// one that must stay true when the flag is absent: comments cost a second
+// request and nobody pays it unasked.
+func TestWithCommentsFoldsTheThreadIntoTheRecord(t *testing.T) {
+	doc, replayer := runGetWithComments(t, "get-comments.datacenter.json", true)
+	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+		t.Errorf("the comments were never fetched: %v", unplayed)
+	}
+
+	comments, ok := doc.Record.ChildNamed("comments")
+	if !ok {
+		t.Fatal("the record carries no comments")
+	}
+	if count, _ := comments.AttrValue("count"); count != "2" {
+		t.Errorf("count = %q, want 2", count)
+	}
+	if complete, _ := comments.AttrValue(render.CompleteAttr); complete != "true" {
+		t.Errorf("complete = %q, want true for a whole thread", complete)
+	}
+	if !doc.IsComplete() {
+		t.Error("a record holding a whole thread reports itself partial")
+	}
+}
+
+// TestCommentsCostNothingWithoutTheFlag is the other half. A second request
+// nobody asked for is a second request against --max-requests.
+func TestCommentsCostNothingWithoutTheFlag(t *testing.T) {
+	doc, replayer := runGetWithComments(t, "get-comments.datacenter.json", false)
+	if _, has := doc.Record.ChildNamed("comments"); has {
+		t.Error("comments arrived without --with-comments")
+	}
+	// The comment interaction is deliberately left unplayed here, which is the
+	// assertion: the cassette holds it and the command must not reach for it.
+	unplayed := replayer.Unplayed()
+	if len(unplayed) != 1 || !strings.Contains(unplayed[0], "/comment") {
+		t.Errorf("unplayed = %v, want exactly the comment request", unplayed)
+	}
+}
+
+// TestATruncatedThreadIsNeverReportedAsComplete is the assertion this whole
+// design decision exists for.
+//
+// A record had no way to say it held part of something: `complete` lived only
+// on a collection envelope, and Doc.IsComplete said so in its own comment —
+// "a record is always complete". A comment thread is paged, so a bounded one is
+// the normal case rather than an edge, and reporting it as whole is the single
+// failure this output contract exists to prevent.
+func TestATruncatedThreadIsNeverReportedAsComplete(t *testing.T) {
+	doc, _ := runGetWithComments(t, "get-comments-truncated.datacenter.json", true)
+
+	comments, ok := doc.Record.ChildNamed("comments")
+	if !ok {
+		t.Fatal("the record carries no comments")
+	}
+	if complete, _ := comments.AttrValue(render.CompleteAttr); complete != "false" {
+		t.Errorf("complete = %q, want false: 2 of 57 comments is not a thread", complete)
+	}
+	if doc.IsComplete() {
+		t.Fatal("a record holding part of a thread reports itself complete")
+	}
+
+	// The warning that accompanies exit 3 has to name what was cut, because
+	// "this issue is partial" does not say which part.
+	var warning strings.Builder
+	if err := render.WriteTruncationWarning(&warning, doc, render.XML); err != nil {
+		t.Fatalf("warning: %v", err)
+	}
+	for _, want := range []string{"RESULT_TRUNCATED", "comments", "issue.get"} {
+		if !strings.Contains(warning.String(), want) {
+			t.Errorf("the warning does not mention %q:\n%s", want, warning.String())
+		}
+	}
+}

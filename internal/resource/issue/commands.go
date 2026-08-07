@@ -2,6 +2,7 @@ package issue
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
 	"github.com/kmoneil/jira-cli/internal/buildinfo"
@@ -18,7 +19,7 @@ func init() {
 	registry.Register(getCommand())
 
 	render.RegisterSchema(KindList, Schema())
-	render.RegisterSchema(KindGet, Schema())
+	render.RegisterSchema(KindGet, GetSchema())
 }
 
 // Schema is the shape of an issue, as `jr contract` reports it and as
@@ -84,6 +85,44 @@ func Schema() *render.Schema {
 			Type:  render.TypeString,
 		},
 	}
+}
+
+// GetSchema is the issue shape plus what only `issue get` can carry.
+//
+// `issue list` and `issue get` deliberately share `Schema()` — a row and a
+// record parse identically, and get "simply has more of it filled in". Adding
+// the comment thread to the shared schema said that a *list row* could carry
+// one, which is false, and changed the shape of `issue.list` without changing
+// its version. `make golden` refused it, which is the gate doing exactly its
+// job: one edit, two kinds, and only one of them meant.
+//
+// So get gets a superset instead. Everything list has, plus one element list
+// cannot have, which keeps the shared-shape promise true in the direction it
+// was actually making.
+func GetSchema() *render.Schema {
+	s := Schema()
+	s.Children = append(s.Children, render.Child{
+		// Present only with --with-comments, which is why it is optional. It
+		// carries `complete` as well as `count`: the thread is paged, so a
+		// bounded one is the normal case and the container is the only place in
+		// a record that can say so.
+		Schema: commentsSchema(), Optional: true,
+	})
+	return s
+}
+
+// commentsSchema is the thread an issue carries with --with-comments.
+//
+// ListSchema plus one attribute. `complete` is not part of ListSchema because
+// most containers cannot be partial — labels and components arrive whole with
+// the issue — and declaring it on all of them would invite a consumer to check
+// a value that is always true.
+func commentsSchema() *render.Schema {
+	s := render.ListSchema("comments", "comment", CommentSchema())
+	s.Attrs = append(s.Attrs, render.Field{
+		Name: render.CompleteAttr, Type: render.TypeBool,
+	})
+	return s
 }
 
 func listCommand() *registry.Command {
@@ -680,12 +719,17 @@ parses both identically. It simply has more of it filled in.`),
 				"customfield_10042 or 'Story Points'; " +
 				"added to the default set and to the context's, " +
 				"repeat for several",
-		}, contextFieldsFlag(), rawBodyFlag()},
+		}, contextFieldsFlag(), rawBodyFlag(), {
+			Name: withCommentsFlag, Type: registry.TypeBool,
+			Usage: "include the comment thread, oldest first; costs a second " +
+				"request, and a thread longer than " +
+				strconv.Itoa(commentCap) + " is reported incomplete with exit 3",
+		}},
 		NeedsJira: true,
 		Outputs:   []registry.Output{{Kind: KindGet, Version: VersionGet}},
 		ExitCodes: []exitcode.Code{
-			exitcode.Usage, exitcode.Auth, exitcode.NotFound, exitcode.Permission,
-			exitcode.RateLimit, exitcode.Remote,
+			exitcode.Partial, exitcode.Usage, exitcode.Auth, exitcode.NotFound,
+			exitcode.Permission, exitcode.RateLimit, exitcode.Remote,
 		},
 		Validate: validateFields,
 		Run:      runGet,
@@ -708,7 +752,57 @@ func runGet(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) 
 	if err != nil {
 		return nil, err
 	}
-	return GetDoc(issue), nil
+
+	doc := GetDoc(issue)
+	if inv.Flags.Bool(withCommentsFlag) {
+		// A second request, always, and only when asked for. Comments are a
+		// subresource with their own endpoint and their own paging, not a
+		// field, so they cannot arrive with the issue.
+		if err := attachComments(ctx, client, doc, inv.Args[0]); err != nil {
+			return nil, err
+		}
+	}
+	return doc, nil
+}
+
+// commentCap bounds the thread an issue carries.
+//
+// registry.DefaultLimit, because this is the same question `--limit` answers
+// everywhere else — how much of an unbounded remote set to take by default —
+// and answering it with a different number here would be a second convention
+// for one idea.
+const commentCap = registry.DefaultLimit
+
+// withCommentsFlag folds the discussion into the record.
+const withCommentsFlag = "with-comments"
+
+// attachComments fetches the thread and hangs it off the issue.
+//
+// The container carries complete="false" when the thread is longer than the
+// cap, which is what makes the record able to admit it holds part of something
+// — the whole reason this needed a design decision rather than a fetch. Exit 3
+// and the stderr warning follow from render.Doc.IsComplete with no branch here.
+func attachComments(ctx context.Context, c *Client, doc *render.Doc, key string) error {
+	page, err := c.ListComments(ctx, key, 0, commentCap)
+	if err != nil {
+		return err
+	}
+
+	items := make([]*render.Node, 0, len(page.Comments))
+	for _, comment := range page.Comments {
+		items = append(items, comment.Node())
+	}
+	container := render.ListEl("comments", "comment", items...)
+
+	// Total is the server's count of the whole thread, so it decides this
+	// rather than a full page doing so: exactly `commentCap` comments is a
+	// complete thread, not a truncated one, and guessing from the page size
+	// would report every such issue as partial forever.
+	container.Attr(render.CompleteAttr,
+		strconv.FormatBool(len(page.Comments) >= page.Total))
+
+	doc.Record.Child(container)
+	return nil
 }
 
 // GetDoc renders one issue as a record, so it defaults to XML: a description

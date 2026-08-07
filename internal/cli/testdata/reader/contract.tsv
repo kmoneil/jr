@@ -12,7 +12,7 @@ field.list	1	field.list
 issue.attachment.download	1	issue.attachment.download
 issue.attachment.list	1	issue.attachment.list
 issue.comment.list	2	issue.comment.list
-issue.get	2	issue.get
+issue.get	3	issue.get
 issue.link.list	1	issue.link.list
 issue.list	2	issue.list
 issue.worklog.list	2	issue.worklog.list

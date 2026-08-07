@@ -50,6 +50,33 @@ command. The defaults are a convenience; `--format` is the contract.
 `JIRA_FORMAT` sets the default globally; `--format` overrides it. An
 unrecognized value is exit 2 listing the valid ones, never a silent fallback.
 
+### `complete` can appear inside a record, not only on a collection
+
+A collection says whether it is exhaustive in its envelope. A record could not
+say it at all — `Doc.IsComplete` returned true for every record, and said so in
+its own comment — until `issue get --with-comments` had to carry a comment
+thread. A thread is paged, so a bounded one is the normal case rather than an
+edge, and *`complete="false"` or exit 3* is unqualified.
+
+So a **container inside a record** may carry `complete`, beside the `count` it
+already has:
+
+```xml
+<issue key="ENG-101">
+  ...
+  <comments count="50" complete="false">
+```
+
+A record holding any container marked incomplete is itself incomplete: it exits
+3 and writes the same structured stderr warning a truncated collection does,
+with `element` naming which part was cut, because "this issue is partial" does
+not say which.
+
+**A consumer that learned to look for `complete` on the collection envelope must
+now also look inside a record.** Only containers that can genuinely be bounded
+declare it — `labels` and `components` arrive whole with the issue and do not,
+so a value that is always true is not something to check.
+
 ### `markdown` is presentation, and carries no promise
 
 A build with the `render` tag has a fifth format, `markdown`. **It is not part

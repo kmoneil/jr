@@ -65,13 +65,56 @@ func (d *Doc) Count() int {
 	return 1
 }
 
-// IsComplete reports whether the result set is exhaustive. A record is always
-// complete; only a collection can be truncated.
+// CompleteAttr is the attribute a container carries when it holds a bounded
+// slice of something larger.
+//
+// A collection says this in its envelope. A record could not say it at all
+// until an issue learned to carry its comment thread: the thread is paged, so a
+// bounded one is the normal case, and "`complete="false"` or exit 3" is
+// unqualified. So a container *inside* a record may carry it, and everything
+// downstream — the stderr warning, exit 3 — keys off IsComplete rather than off
+// the envelope's shape.
+const CompleteAttr = "complete"
+
+// IsComplete reports whether the result set is exhaustive.
+//
+// A collection answers from its envelope. A record answers from its contents:
+// any container within it carrying complete="false" makes the whole document
+// partial, because a caller who asked for an issue and got most of its
+// conversation has been given less than they asked for, and nothing else in the
+// document would say so.
 func (d *Doc) IsComplete() bool {
 	if d.Collection != nil {
 		return d.Collection.Complete
 	}
+	return d.Record == nil || d.Record.complete()
+}
+
+// complete reports whether this node and everything under it is exhaustive.
+func (n *Node) complete() bool {
+	if v, ok := n.AttrValue(CompleteAttr); ok && v == "false" {
+		return false
+	}
+	for _, c := range n.Children {
+		if !c.complete() {
+			return false
+		}
+	}
 	return true
+}
+
+// incompleteContainer finds the first container that says it is partial, so a
+// warning can name it. Nil when everything is exhaustive.
+func (n *Node) incompleteContainer() *Node {
+	if v, ok := n.AttrValue(CompleteAttr); ok && v == "false" {
+		return n
+	}
+	for _, c := range n.Children {
+		if found := c.incompleteContainer(); found != nil {
+			return found
+		}
+	}
+	return nil
 }
 
 // Validate enforces every invariant the writers rely on. Write calls it before
