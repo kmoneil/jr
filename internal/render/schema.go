@@ -237,22 +237,7 @@ func (s *Schema) conformText(n *Node, at string) error {
 func (s *Schema) conformChildren(n *Node, at string) error {
 	counts := map[string]int{}
 	for _, c := range n.Children {
-		child, ok := s.child(c.Name)
-		if !ok {
-			if s.Extra != nil {
-				if err := checkValue(at, "<"+c.Name+">", c.Text,
-					Field{Type: s.Extra.Type}); err != nil {
-					return err
-				}
-				continue
-			}
-			return violation(at, "undeclared element <%s>", c.Name)
-		}
-		counts[c.Name]++
-		if counts[c.Name] > 1 && !child.Repeated {
-			return violation(at, "<%s> appears more than once and is not repeated", c.Name)
-		}
-		if err := child.Schema.Conform(c, at); err != nil {
+		if err := s.conformChild(c, at, counts); err != nil {
 			return err
 		}
 	}
@@ -262,6 +247,23 @@ func (s *Schema) conformChildren(n *Node, at string) error {
 		}
 	}
 	return nil
+}
+
+// conformChild holds one child element to its declaration, counting it so the
+// repeated check and the required check downstream both have something to read.
+func (s *Schema) conformChild(c *Node, at string, counts map[string]int) error {
+	child, ok := s.child(c.Name)
+	if !ok {
+		if s.Extra == nil {
+			return violation(at, "undeclared element <%s>", c.Name)
+		}
+		return checkValue(at, "<"+c.Name+">", c.Text, Field{Type: s.Extra.Type})
+	}
+	counts[c.Name]++
+	if counts[c.Name] > 1 && !child.Repeated {
+		return violation(at, "<%s> appears more than once and is not repeated", c.Name)
+	}
+	return child.Schema.Conform(c, at)
 }
 
 func (s *Schema) attr(name string) (Field, bool) {
@@ -403,38 +405,56 @@ func (s *Schema) ResolveColumn(path string) error {
 	segs := strings.Split(path, "/")
 
 	for i, seg := range segs {
-		last := i == len(segs)-1
 		name, attr, hasAttr := strings.Cut(seg, "@")
 
 		if name != "" {
-			next, ok := cur.childNamed(name)
-			if !ok {
-				if cur.Extra != nil {
-					return nil // A kind whose shape depends on the request.
-				}
-				return errs.Runtime("UNKNOWN_COLUMN",
-					"%q names element %q, which %q does not contain",
-					path, name, cur.Element)
+			next, err := cur.descend(path, name)
+			if err != nil {
+				return err
+			}
+			if next == nil {
+				return nil // A kind whose shape depends on the request.
 			}
 			cur = next
 		}
-		if !last {
+		if i < len(segs)-1 {
 			continue
 		}
-		if hasAttr {
-			if cur.hasAttr(attr) || cur.Extra != nil {
-				return nil
-			}
-			return errs.Runtime("UNKNOWN_COLUMN",
-				"%q names attribute %q, which %q does not have",
-				path, attr, cur.Element)
+		return cur.resolveLeaf(path, attr, hasAttr)
+	}
+	return nil
+}
+
+// descend follows one element segment. A nil schema with a nil error means the
+// element is undeclared but the parent accepts extra children, so the path
+// cannot be judged from the schema alone.
+func (s *Schema) descend(path, name string) (*Schema, error) {
+	next, ok := s.childNamed(name)
+	if ok {
+		return next, nil
+	}
+	if s.Extra != nil {
+		return nil, nil
+	}
+	return nil, errs.Runtime("UNKNOWN_COLUMN",
+		"%q names element %q, which %q does not contain", path, name, s.Element)
+}
+
+// resolveLeaf checks the last segment, which is what a cell is actually read
+// from: an attribute, or the element's own text.
+func (s *Schema) resolveLeaf(path, attr string, hasAttr bool) error {
+	if hasAttr {
+		if s.hasAttr(attr) || s.Extra != nil {
+			return nil
 		}
-		if cur.Text == nil {
-			return errs.Runtime("UNKNOWN_COLUMN",
-				"%q names element %q, which carries no text of its own — "+
-					"a column over a container is an empty cell on every row",
-				path, cur.Element)
-		}
+		return errs.Runtime("UNKNOWN_COLUMN",
+			"%q names attribute %q, which %q does not have", path, attr, s.Element)
+	}
+	if s.Text == nil {
+		return errs.Runtime("UNKNOWN_COLUMN",
+			"%q names element %q, which carries no text of its own; "+
+				"a column over a container is an empty cell on every row",
+			path, s.Element)
 	}
 	return nil
 }

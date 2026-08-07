@@ -532,46 +532,56 @@ func renderInline(nodes []Node, applied []Mark, written, where string) (string, 
 		for j < len(nodes) && carries(nodes[j], mark) {
 			j++
 		}
-		inner, err := renderInline(nodes[i:j], append(applied, mark),
-			written+b.String(), where)
+		span, err := renderSpan(nodes, i, j, mark, applied, written, &b, where)
 		if err != nil {
 			return "", err
 		}
-		// Whitespace at the edge of a span moves outside it. Markdown cannot
-		// emphasise a leading or trailing space — `* x*` is an asterisk and a
-		// word, not a span — and Jira's editor produces one constantly, from
-		// bolding a word and then typing the space after it. The characters
-		// are unchanged and so is what a reader sees; only the extent of the
-		// mark moves, by exactly the whitespace nobody can see it on.
-		lead, core, trail := splitEdgeSpace(inner)
-		if mark.Type == "link" {
-			// A link's brackets are not flanking-sensitive, and its text may
-			// be whitespace and still be a link. Moving it out would drop the
-			// link entirely.
-			lead, core, trail = "", inner, ""
-		}
-		if core == "" {
-			b.WriteString(inner)
-			i = j
-			continue
-		}
-
-		// The trailing whitespace this span moves outside itself sits between
-		// its closing delimiter and whatever comes next, so that is what the
-		// delimiter is up against.
-		next := after(nodes[j:], applied)
-		if trail != "" {
-			next = trail[0]
-		}
-		open, closing, err := delimiters(mark, core,
-			beforeOf(b.String(), lead), endsWithLiveOf(b.String(), lead), next, where)
-		if err != nil {
-			return "", err
-		}
-		b.WriteString(lead + open + core + closing + trail)
+		b.WriteString(span)
 		i = j
 	}
 	return b.String(), nil
+}
+
+// renderSpan writes one run of nodes carrying the same mark, delimiters and all.
+func renderSpan(nodes []Node, i, j int, mark Mark, applied []Mark,
+	written string, b *strings.Builder, where string,
+) (string, error) {
+	inner, err := renderInline(nodes[i:j], append(applied, mark),
+		written+b.String(), where)
+	if err != nil {
+		return "", err
+	}
+
+	// Whitespace at the edge of a span moves outside it. Markdown cannot
+	// emphasise a leading or trailing space: `* x*` is an asterisk and a word,
+	// not a span, and Jira's editor produces one constantly, from bolding a
+	// word and then typing the space after it. The characters are unchanged and
+	// so is what a reader sees; only the extent of the mark moves, by exactly
+	// the whitespace nobody can see it on.
+	lead, core, trail := splitEdgeSpace(inner)
+	if mark.Type == "link" {
+		// A link's brackets are not flanking-sensitive, and its text may be
+		// whitespace and still be a link. Moving it out would drop the link
+		// entirely.
+		lead, core, trail = "", inner, ""
+	}
+	if core == "" {
+		return inner, nil
+	}
+
+	// The trailing whitespace this span moves outside itself sits between its
+	// closing delimiter and whatever comes next, so that is what the delimiter
+	// is up against.
+	next := after(nodes[j:], applied)
+	if trail != "" {
+		next = trail[0]
+	}
+	open, closing, err := delimiters(mark, core,
+		beforeOf(b.String(), lead), endsWithLiveOf(b.String(), lead), next, where)
+	if err != nil {
+		return "", err
+	}
+	return lead + open + core + closing + trail, nil
 }
 
 // nextSpanMark returns the outermost mark on n that is not already open.
@@ -968,45 +978,13 @@ func inline(n Node, lineStart bool, where string) (string, error) {
 		return media(n, where)
 
 	case "mention":
-		id, _ := attrText(n.Attrs, "id")
-		text, _ := attrString(n.Attrs, "text")
-		if text == "" {
-			text = "@" + id
-		}
-		if id == "" {
-			return "", unrepresentable(where, "a mention of nobody")
-		}
-		target, err := linkTarget("jira-user:"+id, where)
-		if err != nil {
-			return "", err
-		}
-		return "[" + escapeText(text, false) + "](" + target + ")", nil
+		return mention(n, where)
 
 	case "emoji":
-		// The text attribute is the emoji itself; the short name is what Jira
-		// shows when it has no character to show. Either is the whole content.
-		if text, ok := attrString(n.Attrs, "text"); ok && text != "" {
-			return escapeText(text, false), nil
-		}
-		if short, ok := attrString(n.Attrs, "shortName"); ok && short != "" {
-			return escapeText(short, false), nil
-		}
-		return "", unrepresentable(where, "an emoji with no character")
+		return emoji(n, where)
 
 	case "status":
-		text, _ := attrString(n.Attrs, "text")
-		if text == "" {
-			return "", unrepresentable(where, "a status lozenge with no text")
-		}
-		colour, ok := attrString(n.Attrs, "color")
-		if !ok || colour == "" {
-			colour = "neutral"
-		}
-		target, err := linkTarget("jira-status:"+colour, where)
-		if err != nil {
-			return "", err
-		}
-		return "[" + escapeText(text, false) + "](" + target + ")", nil
+		return status(n, where)
 
 	case "date":
 		return date(n, where)
@@ -1024,6 +1002,54 @@ func inline(n Node, lineStart bool, where string) (string, error) {
 		return "", unrepresentable(where, "an editor placeholder")
 	}
 	return "", unrepresentable(where, "a %q node", n.Type)
+}
+
+// mention renders a person as a link to their account id, so the identity
+// survives a round trip that the display name alone would not.
+func mention(n Node, where string) (string, error) {
+	id, _ := attrText(n.Attrs, "id")
+	text, _ := attrString(n.Attrs, "text")
+	if text == "" {
+		text = "@" + id
+	}
+	if id == "" {
+		return "", unrepresentable(where, "a mention of nobody")
+	}
+	target, err := linkTarget("jira-user:"+id, where)
+	if err != nil {
+		return "", err
+	}
+	return "[" + escapeText(text, false) + "](" + target + ")", nil
+}
+
+// emoji renders the character itself where there is one. The text attribute is
+// the emoji; the short name is what Jira shows when it has no character to
+// show. Either is the whole content.
+func emoji(n Node, where string) (string, error) {
+	if text, ok := attrString(n.Attrs, "text"); ok && text != "" {
+		return escapeText(text, false), nil
+	}
+	if short, ok := attrString(n.Attrs, "shortName"); ok && short != "" {
+		return escapeText(short, false), nil
+	}
+	return "", unrepresentable(where, "an emoji with no character")
+}
+
+// status renders a lozenge as its text, linked to the colour it carries.
+func status(n Node, where string) (string, error) {
+	text, _ := attrString(n.Attrs, "text")
+	if text == "" {
+		return "", unrepresentable(where, "a status lozenge with no text")
+	}
+	colour, ok := attrString(n.Attrs, "color")
+	if !ok || colour == "" {
+		colour = "neutral"
+	}
+	target, err := linkTarget("jira-status:"+colour, where)
+	if err != nil {
+		return "", err
+	}
+	return "[" + escapeText(text, false) + "](" + target + ")", nil
 }
 
 // date renders a date chip as its day, linked to the instant it holds.

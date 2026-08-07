@@ -129,79 +129,111 @@ type netrcEntry struct {
 // entry, if present, matches any host not named explicitly, and is only used
 // when no explicit entry matched.
 func parseNetrc(content, host string) (netrcEntry, bool) {
-	var (
-		current    netrcEntry
-		fallback   netrcEntry
-		haveMatch  bool
-		haveFall   bool
-		inDefault  bool
-		collecting bool
-	)
-
-	commit := func() {
-		switch {
-		case !collecting:
-		case inDefault:
-			if !haveFall {
-				fallback, haveFall = current, true
-			}
-		case current.machine == host:
-			if !haveMatch {
-				current.machine = host
-				haveMatch = true
-				fallback = current
-			}
-		}
+	s := &netrcScan{host: host}
+	if entry, found, stopped := s.walk(netrcTokens(content)); stopped {
+		return entry, found
 	}
+	s.commit()
 
-	tokens := netrcTokens(content)
+	if s.haveMatch || s.haveFall {
+		return s.result, true
+	}
+	return netrcEntry{}, false
+}
+
+// netrcScan is the state of one walk through a .netrc token stream.
+type netrcScan struct {
+	host string
+	// current is the entry being read; result is the one that will be returned.
+	current   netrcEntry
+	result    netrcEntry
+	haveMatch bool
+	haveFall  bool
+	// inDefault says the current entry came from `default` rather than from a
+	// named machine. collecting says there is a current entry at all, so that
+	// a stray `login` before any entry is ignored rather than inventing one.
+	inDefault  bool
+	collecting bool
+}
+
+// walk reads the token stream, and reports whether it finished early.
+//
+// It stops as soon as an explicit match is complete, because a later entry for
+// the same host does not replace the first one.
+func (s *netrcScan) walk(tokens []string) (entry netrcEntry, found, stopped bool) {
 	for i := 0; i < len(tokens); i++ {
 		switch tokens[i] {
 		case "machine":
-			commit()
-			if haveMatch {
-				return fallback, true
+			s.commit()
+			if s.haveMatch {
+				return s.result, true, true
 			}
 			i++
 			if i >= len(tokens) {
-				return netrcEntry{}, false
+				return netrcEntry{}, false, true
 			}
-			current = netrcEntry{machine: strings.ToLower(tokens[i])}
-			inDefault, collecting = false, true
+			s.startMachine(tokens[i])
 
 		case "default":
-			commit()
-			if haveMatch {
-				return fallback, true
+			s.commit()
+			if s.haveMatch {
+				return s.result, true, true
 			}
-			current = netrcEntry{}
-			inDefault, collecting = true, true
+			s.startDefault()
 
-		case "login", "user":
+		case "login", "user", "password", "account", "macdef":
+			// Each of these consumes the token after it. A macdef body runs to
+			// a blank line, and skipping one token is enough since a macro body
+			// cannot contain a keyword at the start of a token.
 			i++
-			if i < len(tokens) && collecting {
-				current.login = tokens[i]
+			if i < len(tokens) {
+				s.setField(tokens[i-1], tokens[i])
 			}
-
-		case "password", "account":
-			i++
-			if i < len(tokens) && collecting && tokens[i-1] == "password" {
-				current.password = tokens[i]
-			}
-
-		case "macdef":
-			// A macro definition runs to a blank line. Skipping to the next
-			// keyword is enough, since a macro body cannot contain one at the
-			// start of a token.
-			i++
 		}
 	}
-	commit()
+	return netrcEntry{}, false, false
+}
 
-	if haveMatch || haveFall {
-		return fallback, true
+// commit closes the entry just read. The first explicit match for the host
+// wins, and the first default entry is kept in case nothing explicit matches.
+func (s *netrcScan) commit() {
+	switch {
+	case !s.collecting:
+	case s.inDefault:
+		if !s.haveFall {
+			s.result, s.haveFall = s.current, true
+		}
+	case s.current.machine == s.host:
+		if !s.haveMatch {
+			s.current.machine = s.host
+			s.haveMatch = true
+			s.result = s.current
+		}
 	}
-	return netrcEntry{}, false
+}
+
+func (s *netrcScan) startMachine(name string) {
+	s.current = netrcEntry{machine: strings.ToLower(name)}
+	s.inDefault, s.collecting = false, true
+}
+
+func (s *netrcScan) startDefault() {
+	s.current = netrcEntry{}
+	s.inDefault, s.collecting = true, true
+}
+
+// setField records one value. Only password carries a secret: account is
+// consumed and ignored, and a macdef value is a macro body.
+func (s *netrcScan) setField(keyword, value string) {
+	if !s.collecting {
+		return
+	}
+	switch keyword {
+	case "login", "user":
+		s.current.login = value
+	case "password":
+		s.current.password = value
+	}
 }
 
 // netrcTokens splits on whitespace, honoring double-quoted values so a password

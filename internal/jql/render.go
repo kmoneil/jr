@@ -27,31 +27,42 @@ func Render(q *Query) (string, error) {
 	}
 
 	if len(q.Order) > 0 {
+		terms, err := renderOrder(q.Order)
+		if err != nil {
+			return "", err
+		}
 		if b.Len() > 0 {
 			b.WriteByte(' ')
 		}
 		b.WriteString("ORDER BY ")
-		terms := make([]string, 0, len(q.Order))
-		for _, o := range q.Order {
-			dir := o.Direction
-			if dir == "" {
-				dir = Asc
-			}
-			if dir != Asc && dir != Desc {
-				return "", errs.Usage("INVALID_ORDER",
-					"unknown sort direction %q", string(dir)).
-					WithRemedy("use --order asc or --order desc")
-			}
-			field, err := renderField(o.Field)
-			if err != nil {
-				return "", err
-			}
-			terms = append(terms, field+" "+string(dir))
-		}
-		b.WriteString(strings.Join(terms, ", "))
+		b.WriteString(terms)
 	}
 
 	return b.String(), nil
+}
+
+// renderOrder serializes the sort terms. An empty direction means ascending;
+// anything that is neither ascending nor descending is refused rather than
+// passed to the server to reject opaquely.
+func renderOrder(order []Order) (string, error) {
+	terms := make([]string, 0, len(order))
+	for _, o := range order {
+		dir := o.Direction
+		if dir == "" {
+			dir = Asc
+		}
+		if dir != Asc && dir != Desc {
+			return "", errs.Usage("INVALID_ORDER",
+				"unknown sort direction %q", string(dir)).
+				WithRemedy("use --order asc or --order desc")
+		}
+		field, err := renderField(o.Field)
+		if err != nil {
+			return "", err
+		}
+		terms = append(terms, field+" "+string(dir))
+	}
+	return strings.Join(terms, ", "), nil
 }
 
 // renderExpr serializes an expression. nested is true when the result will sit

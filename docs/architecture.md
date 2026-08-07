@@ -289,6 +289,18 @@ name to `customfield_10042` should not cost a round trip on every invocation.
 | Architecture    | Import-graph assertions                                        | Every PR                                            |
 | Build profiles  | Matrix build of all profiles, a size assertion, and a command count per profile | Every PR                           |
 | Fuzzing         | `make fuzz`, every target, built with the full tag set         | Every PR, 60s per target                            |
+| Complexity      | `make complexity`, gocognit over `internal/` and `cmd/`        | Cognitive 15, or an exemption naming its score and its reason |
+
+**The complexity limit is enforced, and its one exception is written down.**
+15 was the number every complexity card in this project had been measured
+against, and nothing read it: not `.golangci.yml`, not a `make` target, not a
+hook. Thirty-four functions had drifted over it. `internal/lint/complexity_test.go`
+now fails on anything above 15 that is not in its `exempt` map, on an exemption
+that has grown past the score it was granted at, and on an exemption for a
+function that is no longer over the limit. An entry there carries the score
+decomposed into what it is made of and a reason the parts cannot go; there is
+one, `adf.scanInline`, and most of its 20 is Go's error propagation written
+where the errors happen.
 
 **A parser guarantees its own output is safe.** An issue key, an epic
 reference, and a board id all end up as URL path segments. Most callers escape

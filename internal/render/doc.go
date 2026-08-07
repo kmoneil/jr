@@ -143,18 +143,26 @@ func (d *Doc) Validate() error {
 		return conformTo(d.Kind, d.Record)
 	}
 
-	c := d.Collection
+	if err := validateCollectionShape(d.Kind, d.Collection); err != nil {
+		return err
+	}
+	return validateCollectionItems(d.Kind, d.Collection)
+}
+
+// validateCollectionShape checks everything about a collection that does not
+// depend on its rows, which is what the header is written from.
+func validateCollectionShape(kind string, c *Collection) error {
 	if c.Name == "" {
-		return errs.Runtime("INVALID_DOC", "result kind %q has no container name", d.Kind)
+		return errs.Runtime("INVALID_DOC", "result kind %q has no container name", kind)
 	}
 	if len(c.Columns) == 0 {
 		return errs.Runtime("INVALID_DOC",
-			"result kind %q declares no columns; TSV would have nothing to emit", d.Kind)
+			"result kind %q declares no columns; TSV would have nothing to emit", kind)
 	}
 	for _, col := range c.Columns {
 		if col.Header == "" {
 			return errs.Runtime("INVALID_DOC",
-				"result kind %q has a column with no header", d.Kind)
+				"result kind %q has a column with no header", kind)
 		}
 		if err := ValidatePath(col.Path); err != nil {
 			return err
@@ -162,24 +170,30 @@ func (d *Doc) Validate() error {
 	}
 	if c.Complete && c.NextPageToken != "" {
 		return errs.Runtime("INVALID_DOC",
-			"result kind %q is complete but carries a next-page token", d.Kind)
+			"result kind %q is complete but carries a next-page token", kind)
 	}
+	return nil
+}
 
+// validateCollectionItems checks the rows, including that they are all the same
+// element: a collection whose items disagree renders as TSV columns that mean
+// different things from one line to the next.
+func validateCollectionItems(kind string, c *Collection) error {
 	var itemName string
 	for i, it := range c.Items {
 		if it == nil {
-			return errs.Runtime("INVALID_DOC", "result kind %q has a nil item at %d", d.Kind, i)
+			return errs.Runtime("INVALID_DOC", "result kind %q has a nil item at %d", kind, i)
 		}
 		if itemName == "" {
 			itemName = it.Name
 		} else if it.Name != itemName {
 			return errs.Runtime("INVALID_DOC",
-				"result kind %q mixes item elements %q and %q", d.Kind, itemName, it.Name)
+				"result kind %q mixes item elements %q and %q", kind, itemName, it.Name)
 		}
-		if err := it.validate(d.Kind + "/" + c.Name); err != nil {
+		if err := it.validate(kind + "/" + c.Name); err != nil {
 			return err
 		}
-		if err := conformTo(d.Kind, it); err != nil {
+		if err := conformTo(kind, it); err != nil {
 			return err
 		}
 	}

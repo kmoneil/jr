@@ -242,42 +242,10 @@ func (c *Client) List(ctx context.Context, opt ListOptions) ([]Board, error) {
 	var out []Board
 	startAt := 0
 	for {
-		query := url.Values{
-			"startAt":    {strconv.Itoa(startAt)},
-			"maxResults": {strconv.Itoa(PageSize)},
-		}
-		if opt.Project != "" {
-			query.Set("projectKeyOrId", opt.Project)
-		}
-		if opt.Type != "" {
-			query.Set("type", strings.ToLower(opt.Type))
-		}
-		if opt.Name != "" {
-			query.Set("name", opt.Name)
-		}
-
-		resp, err := c.Transport.Do(ctx, transport.Request{
-			Method: transport.MethodGet, Path: path, Query: query,
-		})
+		page, err := c.fetchPage(ctx, path, opt, startAt)
 		if err != nil {
 			return nil, err
 		}
-		if err := transport.Err(resp); err != nil {
-			return nil, err
-		}
-
-		var page struct {
-			IsLast     bool       `json:"isLast"`
-			MaxResults int        `json:"maxResults"`
-			Total      int        `json:"total"`
-			Values     []rawBoard `json:"values"`
-		}
-		if err := json.Unmarshal(resp.Body, &page); err != nil {
-			return nil, errs.Remote("MALFORMED_BOARDS",
-				"%s did not return usable boards", path).
-				WithRequestID(resp.RequestID).Wrap(err)
-		}
-
 		for _, raw := range page.Values {
 			out = append(out, raw.convert())
 		}
@@ -290,6 +258,50 @@ func (c *Client) List(ctx context.Context, opt ListOptions) ([]Board, error) {
 		startAt += len(page.Values)
 	}
 	return sorted(out), nil
+}
+
+// boardPage is one response from the agile board endpoint.
+type boardPage struct {
+	IsLast     bool       `json:"isLast"`
+	MaxResults int        `json:"maxResults"`
+	Total      int        `json:"total"`
+	Values     []rawBoard `json:"values"`
+}
+
+func (c *Client) fetchPage(
+	ctx context.Context, path string, opt ListOptions, startAt int,
+) (boardPage, error) {
+	var page boardPage
+
+	query := url.Values{
+		"startAt":    {strconv.Itoa(startAt)},
+		"maxResults": {strconv.Itoa(PageSize)},
+	}
+	if opt.Project != "" {
+		query.Set("projectKeyOrId", opt.Project)
+	}
+	if opt.Type != "" {
+		query.Set("type", strings.ToLower(opt.Type))
+	}
+	if opt.Name != "" {
+		query.Set("name", opt.Name)
+	}
+
+	resp, err := c.Transport.Do(ctx, transport.Request{
+		Method: transport.MethodGet, Path: path, Query: query,
+	})
+	if err != nil {
+		return page, err
+	}
+	if err := transport.Err(resp); err != nil {
+		return page, err
+	}
+	if err := json.Unmarshal(resp.Body, &page); err != nil {
+		return page, errs.Remote("MALFORMED_BOARDS",
+			"%s did not return usable boards", path).
+			WithRequestID(resp.RequestID).Wrap(err)
+	}
+	return page, nil
 }
 
 // sorted orders by id numerically, so two runs against one site produce the

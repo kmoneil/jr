@@ -289,127 +289,244 @@ func (c *Client) Do(ctx context.Context, r Request) (*Response, error) {
 
 	var lastErr error
 	for attempt := 1; ; attempt++ {
-		if err := c.budget.consume(); err != nil {
-			if attempt > 1 && lastErr != nil {
-				return nil, lastErr
-			}
+		if err := c.spend(attempt, lastErr); err != nil {
 			return nil, err
 		}
 
 		resp, err := c.attempt(ctx, r, target, requestID, attempt)
-		if err == nil {
-			retry, reason := shouldRetry(r.Method, resp.Status, r.Replayable)
-			if !retry || attempt > c.retries {
-				resp.Attempts = attempt
-				if retry && reason != "" {
-					// The budget ran out while the status was still
-					// retryable. Report the status, not a retry error.
-					c.tracer.Trace(Event{
-						Kind: EventFailure, Method: r.Method, URL: RedactURL(target),
-						Status: resp.Status, Attempt: attempt, RequestID: requestID,
-						Reason: "retry budget exhausted",
-					})
-				}
-				return resp, nil
-			}
-			// Only a success streams, and a success is never retried — but the
-			// two facts live in different functions, and a leaked connection
-			// is not the way to find out they diverged.
-			resp.Close()
-			wait := backoff(attempt, resp.Header, c.clock.Now(), c.jitter())
-			c.tracer.Trace(Event{
-				Kind: EventRetry, Method: r.Method, URL: RedactURL(target),
-				Status: resp.Status, Attempt: attempt, Wait: wait,
-				RequestID: requestID, Reason: reason,
-			})
-			if err := c.clock.Sleep(ctx, wait); err != nil {
-				return nil, canceled(err)
+		if err != nil {
+			lastErr = err
+			if err := c.retryNetwork(ctx, r, target, requestID, attempt, err); err != nil {
+				return nil, err
 			}
 			continue
 		}
 
-		lastErr = err
-		if !shouldRetryNetworkError(ctx, r.Method, r.Replayable, err) || attempt > c.retries {
+		retry, reason := shouldRetry(r.Method, resp.Status, r.Replayable)
+		if !retry || attempt > c.retries {
+			return c.settle(r, target, requestID, attempt, resp, retry, reason), nil
+		}
+		// Only a success streams, and a success is never retried, but the two
+		// facts live in different functions and a leaked connection is not the
+		// way to find out they diverged.
+		resp.Close()
+		if err := c.waitBeforeRetry(ctx, r, target, requestID, attempt,
+			resp.Header, resp.Status, reason); err != nil {
 			return nil, err
 		}
-		wait := backoff(attempt, nil, c.clock.Now(), c.jitter())
-		c.tracer.Trace(Event{
-			Kind: EventRetry, Method: r.Method, URL: RedactURL(target),
-			Attempt: attempt, Wait: wait, RequestID: requestID,
-			Reason: "network error",
-		})
-		if err := c.clock.Sleep(ctx, wait); err != nil {
-			return nil, canceled(err)
-		}
 	}
+}
+
+// spend takes one request from the budget.
+//
+// A budget exhausted part way through a retry sequence reports what actually
+// went wrong rather than the accounting, because the caller asked about Jira
+// and not about this client's bookkeeping.
+func (c *Client) spend(attempt int, lastErr error) error {
+	err := c.budget.consume()
+	if err == nil {
+		return nil
+	}
+	if attempt > 1 && lastErr != nil {
+		return lastErr
+	}
+	return err
+}
+
+// retryNetwork decides what follows a transport-level failure. A nil return
+// means the caller should try again; anything else is the error to report.
+func (c *Client) retryNetwork(ctx context.Context, r Request, target *url.URL,
+	requestID string, attempt int, cause error,
+) error {
+	if !shouldRetryNetworkError(ctx, r.Method, r.Replayable, cause) || attempt > c.retries {
+		return cause
+	}
+	return c.waitBeforeRetry(ctx, r, target, requestID, attempt, nil, 0, "network error")
+}
+
+// waitBeforeRetry records the retry and sleeps for the backoff it earns.
+func (c *Client) waitBeforeRetry(ctx context.Context, r Request, target *url.URL,
+	requestID string, attempt int, header http.Header, status int, reason string,
+) error {
+	wait := backoff(attempt, header, c.clock.Now(), c.jitter())
+	c.tracer.Trace(Event{
+		Kind: EventRetry, Method: r.Method, URL: RedactURL(target),
+		Status: status, Attempt: attempt, Wait: wait,
+		RequestID: requestID, Reason: reason,
+	})
+	if err := c.clock.Sleep(ctx, wait); err != nil {
+		return canceled(err)
+	}
+	return nil
+}
+
+// settle finishes a response that will not be retried again.
+func (c *Client) settle(r Request, target *url.URL, requestID string, attempt int,
+	resp *Response, retry bool, reason string,
+) *Response {
+	resp.Attempts = attempt
+	if retry && reason != "" {
+		// The budget ran out while the status was still retryable. Report the
+		// status, not a retry error.
+		c.tracer.Trace(Event{
+			Kind: EventFailure, Method: r.Method, URL: RedactURL(target),
+			Status: resp.Status, Attempt: attempt, RequestID: requestID,
+			Reason: "retry budget exhausted",
+		})
+	}
+	return resp
 }
 
 // attempt performs exactly one HTTP call.
 func (c *Client) attempt(ctx context.Context, r Request, target *url.URL,
 	requestID string, attempt int,
 ) (*Response, error) {
-	// The per-attempt timeout bounds getting a response, not reading one.
-	//
-	// For a buffered request those are the same thing, and a deadline over the
-	// whole exchange is right. For a streamed one they are not: the caller
-	// reads the body after this function returns, and a 30-second deadline has
-	// no idea how large the file is or how fast the link is. So a stream is
-	// bounded to first byte and then handed over — the caller's own context
-	// still governs, which is what makes Ctrl-C work on a long download.
-	var (
-		cancel   context.CancelFunc
-		deadline *time.Timer
-		expired  atomic.Bool
-	)
-	if r.Stream {
-		ctx, cancel = context.WithCancel(ctx)
-		deadline = time.AfterFunc(c.timeout, func() {
-			// Recorded as well as acted on, because a cancelled context cannot
-			// say afterwards whether it ran out of time or was interrupted,
-			// and those need different messages.
-			expired.Store(true)
-			cancel()
-		})
-	} else {
-		ctx, cancel = context.WithTimeout(ctx, c.timeout)
-	}
-	// handedOver is set when the response body becomes the caller's, at which
-	// point cancelling here would kill the transfer mid-copy.
-	handedOver := false
-	defer func() {
-		if deadline != nil {
-			deadline.Stop()
-		}
-		if !handedOver {
-			cancel()
-		}
-	}()
+	scope := newAttemptScope(ctx, c.timeout, r.Stream)
+	defer scope.release()
 
-	var body io.Reader
+	body, closer, err := requestBody(r, attempt)
+	if err != nil {
+		return nil, err
+	}
+	if closer != nil {
+		defer func() { _ = closer.Close() }()
+	}
+
+	req, err := http.NewRequestWithContext(scope.ctx, r.Method, target.String(), body)
+	if err != nil {
+		return nil, errs.Runtime("BAD_REQUEST", "cannot build the request").Wrap(err)
+	}
+	if err := c.applyHeaders(scope.ctx, req, r, target, requestID); err != nil {
+		return nil, err
+	}
+
+	c.tracer.Trace(requestEvent(req, attempt, requestID))
+
+	start := c.clock.Now()
+	resp, err := c.http.Do(req)
+	if err != nil {
+		c.tracer.Trace(Event{
+			Kind: EventFailure, Method: r.Method, URL: RedactURL(target),
+			Attempt: attempt, RequestID: requestID, Reason: redactErrorText(err),
+		})
+		if scope.expired.Load() {
+			// The streamed path cancels rather than deadlines, so the context
+			// alone would report this as an interruption.
+			return nil, timedOut(err)
+		}
+		// scope.ctx, not the parent: the buffered path carries the per-attempt
+		// deadline, and that is what tells a timeout from an interruption.
+		return nil, networkError(scope.ctx, err)
+	}
+
+	// A streamed success hands the body to the caller unread, which is the
+	// whole point: a 50MB attachment is copied to a file rather than held in
+	// memory. Anything else is buffered, including a streamed request that
+	// failed, because the error body is small and is the only thing that says
+	// why.
+	//
+	// The close stays in this function, beside the call that opened it, so that
+	// it is visible to the reader and to bodyclose.
+	streaming := r.Stream && resp.StatusCode >= 200 && resp.StatusCode < 300
+	if !streaming {
+		defer func() { _ = resp.Body.Close() }()
+	}
+	return c.receive(r, target, requestID, attempt, start, scope, resp, streaming)
+}
+
+// attemptScope bounds one attempt.
+//
+// The per-attempt timeout bounds getting a response, not reading one. For a
+// buffered request those are the same thing, and a deadline over the whole
+// exchange is right. For a streamed one they are not: the caller reads the body
+// after the attempt returns, and a 30-second deadline has no idea how large the
+// file is or how fast the link is. So a stream is bounded to first byte and
+// then handed over, and the caller's own context still governs. That is what
+// makes Ctrl-C work on a long download.
+type attemptScope struct {
+	ctx      context.Context
+	cancel   context.CancelFunc
+	deadline *time.Timer
+	expired  atomic.Bool
+	// handedOver is set when the response body becomes the caller's, at which
+	// point cancelling would kill the transfer mid-copy.
+	handedOver bool
+}
+
+func newAttemptScope(parent context.Context, timeout time.Duration, stream bool) *attemptScope {
+	s := &attemptScope{}
+	if !stream {
+		s.ctx, s.cancel = context.WithTimeout(parent, timeout)
+		return s
+	}
+	s.ctx, s.cancel = context.WithCancel(parent)
+	s.deadline = time.AfterFunc(timeout, func() {
+		// Recorded as well as acted on, because a cancelled context cannot say
+		// afterwards whether it ran out of time or was interrupted, and those
+		// need different messages.
+		s.expired.Store(true)
+		s.cancel()
+	})
+	return s
+}
+
+// release ends the attempt, unless its body now belongs to the caller.
+func (s *attemptScope) release() {
+	s.stopDeadline()
+	if !s.handedOver {
+		s.cancel()
+	}
+}
+
+// handOver ties the request's cancellation to the lifetime of its body. The
+// connection outlives the attempt, so its cancellation does too: closing the
+// stream is what releases it, which is why Response.Close exists and why a
+// caller that forgets it leaks a connection rather than merely a file handle.
+func (s *attemptScope) handOver(body io.ReadCloser) io.ReadCloser {
+	s.stopDeadline()
+	s.handedOver = true
+	return &cancelOnClose{ReadCloser: body, cancel: s.cancel}
+}
+
+func (s *attemptScope) stopDeadline() {
+	if s.deadline != nil {
+		s.deadline.Stop()
+	}
+}
+
+// requestBody opens the body for one attempt, and returns the closer the caller
+// owns for it.
+//
+// A BodySource is re-opened on every attempt, so a retry sends the same content
+// rather than the remains of the last one. A source that cannot do that says so
+// here, and the request fails instead of going out short.
+func requestBody(r Request, attempt int) (io.Reader, io.Closer, error) {
 	switch {
 	case r.BodySource != nil:
-		// Re-opened on every attempt, so a retry sends the same content rather
-		// than the remains of the last one. A source that cannot do that says
-		// so here, and the request fails instead of going out short.
 		source, err := r.BodySource()
 		if err != nil {
-			return nil, errs.Runtime("BODY_NOT_REPLAYABLE",
+			return nil, nil, errs.Runtime("BODY_NOT_REPLAYABLE",
 				"the request body cannot be sent again for attempt %d", attempt).
 				WithDetail("%s", err.Error()).
 				WithRemedy("a body read from a pipe cannot be retried; write it " +
 					"to a file first, or retry the command yourself").
 				Wrap(err)
 		}
-		defer func() { _ = source.Close() }()
-		body = source
+		return source, source, nil
 	case len(r.Body) > 0:
-		body = bytes.NewReader(r.Body)
+		return bytes.NewReader(r.Body), nil, nil
+	default:
+		return nil, nil, nil
 	}
-	req, err := http.NewRequestWithContext(ctx, r.Method, target.String(), body)
-	if err != nil {
-		return nil, errs.Runtime("BAD_REQUEST", "cannot build the request").Wrap(err)
-	}
+}
 
+// applyHeaders sets everything the client contributes to a request.
+//
+// Credentials are applied last, so nothing above can overwrite them, and
+// nothing below reads them: the trace event is built from a redacted copy.
+func (c *Client) applyHeaders(ctx context.Context, req *http.Request, r Request,
+	target *url.URL, requestID string,
+) error {
 	for name, values := range r.Header {
 		for _, v := range values {
 			req.Header.Add(name, v)
@@ -436,49 +553,30 @@ func (c *Client) attempt(ctx context.Context, r Request, target *url.URL,
 	}
 	req.Header.Set(HeaderRequestID, requestID)
 
-	// Credentials are applied last, so nothing above can overwrite them, and
-	// nothing below reads them: the trace event is built from a redacted copy.
-	if c.auth != nil {
-		creds, err := c.auth.Authorize(ctx, RequestInfo{
-			Method: r.Method,
-			URL:    target.String(),
-		})
-		if err != nil {
-			return nil, err
-		}
-		for name, value := range creds {
-			req.Header.Set(name, value)
-		}
+	if c.auth == nil {
+		return nil
 	}
-
-	c.tracer.Trace(requestEvent(req, attempt, requestID))
-
-	start := c.clock.Now()
-	resp, err := c.http.Do(req)
+	creds, err := c.auth.Authorize(ctx, RequestInfo{
+		Method: r.Method,
+		URL:    target.String(),
+	})
 	if err != nil {
-		c.tracer.Trace(Event{
-			Kind: EventFailure, Method: r.Method, URL: RedactURL(target),
-			Attempt: attempt, RequestID: requestID, Reason: redactErrorText(err),
-		})
-		if expired.Load() {
-			// The streamed path cancels rather than deadlines, so the context
-			// alone would report this as an interruption.
-			return nil, timedOut(err)
-		}
-		return nil, networkError(ctx, err)
+		return err
 	}
-	// A streamed success hands the body to the caller unread, which is the
-	// whole point: a 50MB attachment is copied to a file rather than held in
-	// memory. Anything else is buffered, including a streamed request that
-	// failed — the error body is small and is the only thing that says why.
-	streaming := r.Stream && resp.StatusCode >= 200 && resp.StatusCode < 300
+	for name, value := range creds {
+		req.Header.Set(name, value)
+	}
+	return nil
+}
 
+// receive turns one http.Response into ours. Its body is already owned by the
+// caller: buffered here when streaming is false, handed over when it is true.
+func (c *Client) receive(r Request, target *url.URL, requestID string, attempt int,
+	start time.Time, scope *attemptScope, resp *http.Response, streaming bool,
+) (*Response, error) {
 	var payload []byte
-	if streaming {
-		// Not deferred: ownership passes to the caller with the Response.
-		payload = nil
-	} else {
-		defer func() { _ = resp.Body.Close() }()
+	if !streaming {
+		var err error
 		payload, err = io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 		if err != nil {
 			return nil, errs.Remote("TRUNCATED_RESPONSE", "the response body could not be read").
@@ -514,13 +612,7 @@ func (c *Client) attempt(ctx context.Context, r Request, target *url.URL,
 		Attempts:  attempt,
 	}
 	if streaming {
-		// The connection outlives this function, so its cancellation does too.
-		// Closing the stream is what releases it, which is why Response.Close
-		// exists and why a caller that forgets it leaks a connection rather
-		// than merely a file handle.
-		deadline.Stop()
-		handedOver = true
-		out.Stream = &cancelOnClose{ReadCloser: resp.Body, cancel: cancel}
+		out.Stream = scope.handOver(resp.Body)
 	}
 	return out, nil
 }
@@ -712,27 +804,8 @@ func (c *Client) relative(raw string) (string, error) {
 		ref.Scheme = c.base.Scheme
 	}
 
-	// Scheme and host are checked before anything decides the value is
-	// relative. url.URL.IsAbs is Scheme != "", so `//evil.invalid/steal` is not
-	// absolute by that test while still naming another host — and taking the
-	// relative path out of it rewrites a pointer at somebody else's server into
-	// a path on our own. No credential left the site either way, because
-	// RequestURI drops the host; two spellings of "go elsewhere" getting
-	// opposite treatments is the defect.
-	if ref.Scheme != "" && !strings.EqualFold(ref.Scheme, c.base.Scheme) {
-		return "", offSite("the server pointed at another scheme, and this "+
-			"tool will not follow it",
-			"configured %s, supplied %s", c.base.Scheme, ref.Scheme)
-	}
-	if ref.Host != "" && !sameHost(ref, c.base) {
-		return "", offSite("the server pointed at another host, and this tool "+
-			"will not follow it",
-			"configured %s, supplied %s", c.base.Host, ref.Host)
-	}
-
-	if seg, odd := oddSegment(ref.Path); odd {
-		return "", offSite("the server supplied a URL this tool will not "+
-			"resolve on its behalf", "the segment %q in %s", seg, ref.Path)
+	if err := c.checkOnSite(ref); err != nil {
+		return "", err
 	}
 
 	path := ref.EscapedPath()
@@ -759,6 +832,32 @@ func (c *Client) relative(raw string) (string, error) {
 		path += "?" + ref.RawQuery
 	}
 	return path, nil
+}
+
+// checkOnSite refuses a reference that points anywhere but the configured site.
+//
+// Scheme and host are checked before anything decides the value is relative.
+// url.URL.IsAbs is Scheme != "", so `//evil.invalid/steal` is not absolute by
+// that test while still naming another host, and taking the relative path out
+// of it rewrites a pointer at somebody else's server into a path on our own. No
+// credential left the site either way, because RequestURI drops the host; two
+// spellings of "go elsewhere" getting opposite treatments is the defect.
+func (c *Client) checkOnSite(ref *url.URL) error {
+	if ref.Scheme != "" && !strings.EqualFold(ref.Scheme, c.base.Scheme) {
+		return offSite("the server pointed at another scheme, and this "+
+			"tool will not follow it",
+			"configured %s, supplied %s", c.base.Scheme, ref.Scheme)
+	}
+	if ref.Host != "" && !sameHost(ref, c.base) {
+		return offSite("the server pointed at another host, and this tool "+
+			"will not follow it",
+			"configured %s, supplied %s", c.base.Host, ref.Host)
+	}
+	if seg, odd := oddSegment(ref.Path); odd {
+		return offSite("the server supplied a URL this tool will not "+
+			"resolve on its behalf", "the segment %q in %s", seg, ref.Path)
+	}
+	return nil
 }
 
 // offSite is the refusal for a server-supplied URL that points away from the

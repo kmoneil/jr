@@ -196,6 +196,24 @@ func (n *Node) validate(where string) error {
 		return err
 	}
 
+	if err := n.validateNames(here); err != nil {
+		return err
+	}
+	if err := n.validateCount(here); err != nil {
+		return err
+	}
+
+	for _, c := range n.Children {
+		if err := c.validate(here); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateNames checks that attributes are named, unique, carriable, and do not
+// collide with a child element.
+func (n *Node) validateNames(here string) error {
 	seen := make(map[string]struct{}, len(n.Attrs)+len(n.Children))
 	for _, a := range n.Attrs {
 		if a.Name == "" {
@@ -217,29 +235,29 @@ func (n *Node) validate(where string) error {
 				"node %s uses %q as both an attribute and a child element", here, c.Name)
 		}
 	}
-	if n.ListOf != "" {
-		got := 0
-		for _, c := range n.Children {
-			if c.Name == n.ListOf {
-				got++
-			}
-		}
-		want, ok := n.AttrValue("count")
-		if !ok {
-			return errs.Runtime("INVALID_NODE", "list container %s has no count attribute", here)
-		}
-		if want != strconv.Itoa(got) {
-			// A count that disagrees with the children is exactly the kind of
-			// quiet lie this format exists to prevent.
-			return errs.Runtime("INVALID_NODE",
-				"list container %s claims count=%s but holds %d %q elements", here, want, got, n.ListOf)
+	return nil
+}
+
+// validateCount holds a list container's count attribute to the children it
+// actually has. A count that disagrees is exactly the kind of quiet lie this
+// format exists to prevent.
+func (n *Node) validateCount(here string) error {
+	if n.ListOf == "" {
+		return nil
+	}
+	got := 0
+	for _, c := range n.Children {
+		if c.Name == n.ListOf {
+			got++
 		}
 	}
-
-	for _, c := range n.Children {
-		if err := c.validate(here); err != nil {
-			return err
-		}
+	want, ok := n.AttrValue("count")
+	if !ok {
+		return errs.Runtime("INVALID_NODE", "list container %s has no count attribute", here)
+	}
+	if want != strconv.Itoa(got) {
+		return errs.Runtime("INVALID_NODE",
+			"list container %s claims count=%s but holds %d %q elements", here, want, got, n.ListOf)
 	}
 	return nil
 }

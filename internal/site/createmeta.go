@@ -162,59 +162,11 @@ func FetchIssueTypes(
 	var out []IssueType
 	startAt := 0
 	for {
-		resp, err := client.Do(ctx, transport.Request{
-			Method: transport.MethodGet,
-			Path:   path,
-			Query: map[string][]string{
-				"startAt":    {strconv.Itoa(startAt)},
-				"maxResults": {"100"},
-			},
-		})
+		page, err := fetchIssueTypePage(ctx, client, path, project, startAt)
 		if err != nil {
 			return nil, err
 		}
-		if resp.Status == 400 || resp.Status == 404 {
-			// The project is the only thing this route is addressed by, so
-			// either status means that project — a 10.3 instance answers an
-			// unknown one with 400 and a 404 is equally plausible elsewhere.
-			// Saying which cause it is keeps it apart from "no such type":
-			// they have different fixes, and a bare "Jira rejected the request"
-			// leaves a caller guessing which of three things to check.
-			return nil, errs.NotFound("UNKNOWN_PROJECT",
-				"project %q does not exist, or this credential cannot create in it",
-				project).
-				WithRequestID(resp.RequestID).
-				WithRemedy("check the key with `%s project list`", buildinfo.App)
-		}
-		if err := transport.Err(resp); err != nil {
-			return nil, err
-		}
-
-		// The two deployments name this array differently. Cloud returns
-		// "issueTypes" and no isLast; Data Center returns the paged-collection
-		// envelope with "values". The route and the parameters are identical,
-		// which is what made this easy to miss: the request was right, the
-		// response parsed to nothing, and the command reported that a project
-		// with seven issue types had none by the requested name.
-		var page struct {
-			MaxResults int          `json:"maxResults"`
-			StartAt    int          `json:"startAt"`
-			Total      int          `json:"total"`
-			IsLast     bool         `json:"isLast"`
-			Values     []rawTypeRef `json:"values"`
-			IssueTypes []rawTypeRef `json:"issueTypes"`
-		}
-		if err := json.Unmarshal(resp.Body, &page); err != nil {
-			return nil, errs.Remote("MALFORMED_CREATEMETA",
-				"%s did not return usable issue types", path).
-				WithRequestID(resp.RequestID).
-				Wrap(err)
-		}
-
-		values := page.Values
-		if len(values) == 0 {
-			values = page.IssueTypes
-		}
+		values := page.values()
 		for _, v := range values {
 			out = append(out, IssueType(v))
 		}
@@ -229,6 +181,71 @@ func FetchIssueTypes(
 
 	sort.Slice(out, func(i, j int) bool { return lessID(out[i].ID, out[j].ID) })
 	return out, nil
+}
+
+// issueTypePage is one createmeta response.
+//
+// The two deployments name the array differently. Cloud returns "issueTypes"
+// and no isLast; Data Center returns the paged-collection envelope with
+// "values". The route and the parameters are identical, which is what made this
+// easy to miss: the request was right, the response parsed to nothing, and the
+// command reported that a project with seven issue types had none by the
+// requested name.
+type issueTypePage struct {
+	MaxResults int          `json:"maxResults"`
+	StartAt    int          `json:"startAt"`
+	Total      int          `json:"total"`
+	IsLast     bool         `json:"isLast"`
+	Values     []rawTypeRef `json:"values"`
+	IssueTypes []rawTypeRef `json:"issueTypes"`
+}
+
+func (p issueTypePage) values() []rawTypeRef {
+	if len(p.Values) > 0 {
+		return p.Values
+	}
+	return p.IssueTypes
+}
+
+func fetchIssueTypePage(
+	ctx context.Context, client Doer, path, project string, startAt int,
+) (issueTypePage, error) {
+	var page issueTypePage
+
+	resp, err := client.Do(ctx, transport.Request{
+		Method: transport.MethodGet,
+		Path:   path,
+		Query: map[string][]string{
+			"startAt":    {strconv.Itoa(startAt)},
+			"maxResults": {"100"},
+		},
+	})
+	if err != nil {
+		return page, err
+	}
+	if resp.Status == 400 || resp.Status == 404 {
+		// The project is the only thing this route is addressed by, so either
+		// status means that project: a 10.3 instance answers an unknown one
+		// with 400 and a 404 is equally plausible elsewhere. Saying which cause
+		// it is keeps it apart from "no such type": they have different fixes,
+		// and a bare "Jira rejected the request" leaves a caller guessing which
+		// of three things to check.
+		return page, errs.NotFound("UNKNOWN_PROJECT",
+			"project %q does not exist, or this credential cannot create in it",
+			project).
+			WithRequestID(resp.RequestID).
+			WithRemedy("check the key with `%s project list`", buildinfo.App)
+	}
+	if err := transport.Err(resp); err != nil {
+		return page, err
+	}
+	if err := json.Unmarshal(resp.Body, &page); err != nil {
+		return page, errs.Remote("MALFORMED_CREATEMETA",
+			"%s did not return usable issue types", path).
+			WithRequestID(resp.RequestID).
+			Wrap(err)
+	}
+	return page, nil
 }
 
 // rawTypeRef is one issue type as either deployment describes it.
@@ -319,40 +336,11 @@ func FetchCreateMeta(
 	var fields []MetaField
 	startAt := 0
 	for {
-		resp, err := client.Do(ctx, transport.Request{
-			Method: transport.MethodGet,
-			Path:   path,
-			Query: map[string][]string{
-				"startAt":    {strconv.Itoa(startAt)},
-				"maxResults": {"100"},
-			},
-		})
+		page, err := fetchMetaFieldPage(ctx, client, path, startAt)
 		if err != nil {
 			return nil, err
 		}
-		if err := transport.Err(resp); err != nil {
-			return nil, err
-		}
-
-		// "fields" on Cloud, "values" on Data Center — the same split as the
-		// issue-type list above.
-		var page struct {
-			Total  int            `json:"total"`
-			IsLast bool           `json:"isLast"`
-			Values []rawMetaField `json:"values"`
-			Fields []rawMetaField `json:"fields"`
-		}
-		if err := json.Unmarshal(resp.Body, &page); err != nil {
-			return nil, errs.Remote("MALFORMED_CREATEMETA",
-				"%s did not return usable field metadata", path).
-				WithRequestID(resp.RequestID).
-				Wrap(err)
-		}
-
-		values := page.Values
-		if len(values) == 0 {
-			values = page.Fields
-		}
+		values := page.values()
 		for _, v := range values {
 			fields = append(fields, v.convert(""))
 		}
@@ -366,6 +354,50 @@ func FetchCreateMeta(
 	return &CreateMeta{
 		Project: project, IssueType: resolved.Name, Fields: fields,
 	}, nil
+}
+
+// metaFieldPage is one page of field metadata: "fields" on Cloud, "values" on
+// Data Center, the same split as the issue-type list above.
+type metaFieldPage struct {
+	Total  int            `json:"total"`
+	IsLast bool           `json:"isLast"`
+	Values []rawMetaField `json:"values"`
+	Fields []rawMetaField `json:"fields"`
+}
+
+func (p metaFieldPage) values() []rawMetaField {
+	if len(p.Values) > 0 {
+		return p.Values
+	}
+	return p.Fields
+}
+
+func fetchMetaFieldPage(
+	ctx context.Context, client Doer, path string, startAt int,
+) (metaFieldPage, error) {
+	var page metaFieldPage
+
+	resp, err := client.Do(ctx, transport.Request{
+		Method: transport.MethodGet,
+		Path:   path,
+		Query: map[string][]string{
+			"startAt":    {strconv.Itoa(startAt)},
+			"maxResults": {"100"},
+		},
+	})
+	if err != nil {
+		return page, err
+	}
+	if err := transport.Err(resp); err != nil {
+		return page, err
+	}
+	if err := json.Unmarshal(resp.Body, &page); err != nil {
+		return page, errs.Remote("MALFORMED_CREATEMETA",
+			"%s did not return usable field metadata", path).
+			WithRequestID(resp.RequestID).
+			Wrap(err)
+	}
+	return page, nil
 }
 
 // createMetaEntry is what goes on disk.

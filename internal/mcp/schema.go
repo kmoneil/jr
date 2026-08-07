@@ -166,58 +166,21 @@ func flagSchema(flag registry.Flag) map[string]any {
 func (s *Server) invocation(
 	ctx context.Context, cmd *registry.Command, args map[string]any,
 ) (*registry.Invocation, render.Format, error) {
-	known := map[string]bool{FormatArgument: true, "limit": cmd.Paginated}
-	for _, arg := range cmd.Args {
-		known[arg.Name] = true
-	}
-	for _, flag := range cmd.Flags {
-		known[flag.Name] = true
-	}
-	for name := range args {
-		if !known[name] {
-			return nil, "", errs.Usage("UNKNOWN_ARGUMENT",
-				"%s has no argument %q", commandToTool(cmd.Name()), name).
-				WithRemedy("call tools/list for the arguments this tool accepts")
-		}
+	if err := rejectUnknownArguments(cmd, args); err != nil {
+		return nil, "", err
 	}
 
-	flags := registry.NewFlags()
-	for _, flag := range cmd.Flags {
-		raw, ok := args[flag.Name]
-		if !ok {
-			continue
-		}
-		if err := setFlag(flags, flag, raw); err != nil {
-			return nil, "", err
-		}
+	flags, err := resolveFlags(cmd, args)
+	if err != nil {
+		return nil, "", err
 	}
-
-	positional := make([]string, 0, len(cmd.Args))
-	for _, arg := range cmd.Args {
-		raw, ok := args[arg.Name]
-		if !ok {
-			if arg.Required {
-				return nil, "", errs.Usage("MISSING_ARGUMENT",
-					"%s requires %q", commandToTool(cmd.Name()), arg.Name)
-			}
-			continue
-		}
-		text, err := asString(arg.Name, raw)
-		if err != nil {
-			return nil, "", err
-		}
-		positional = append(positional, text)
+	positional, err := resolvePositional(cmd, args)
+	if err != nil {
+		return nil, "", err
 	}
-
-	limit := registry.Limit{N: registry.DefaultLimit}
-	if raw, ok := args["limit"]; ok {
-		text, err := asString("limit", raw)
-		if err != nil {
-			return nil, "", err
-		}
-		if limit, err = registry.ParseLimit(text); err != nil {
-			return nil, "", err
-		}
+	limit, err := resolveLimit(args)
+	if err != nil {
+		return nil, "", err
 	}
 
 	inv := &registry.Invocation{
@@ -232,15 +195,9 @@ func (s *Server) invocation(
 	}
 
 	if cmd.NeedsJira {
-		if s.opt.Session == nil {
-			return nil, "", errs.Runtime("NO_SESSION",
-				"this server has no way to reach Jira")
-		}
-		session, err := s.opt.Session()
-		if err != nil {
+		if inv.Jira, err = s.session(); err != nil {
 			return nil, "", err
 		}
-		inv.Jira = session
 	}
 
 	if cmd.Validate != nil {
@@ -254,6 +211,79 @@ func (s *Server) invocation(
 		return nil, "", err
 	}
 	return inv, format, nil
+}
+
+// rejectUnknownArguments refuses an argument the tool did not advertise.
+func rejectUnknownArguments(cmd *registry.Command, args map[string]any) error {
+	known := map[string]bool{FormatArgument: true, "limit": cmd.Paginated}
+	for _, arg := range cmd.Args {
+		known[arg.Name] = true
+	}
+	for _, flag := range cmd.Flags {
+		known[flag.Name] = true
+	}
+	for name := range args {
+		if !known[name] {
+			return errs.Usage("UNKNOWN_ARGUMENT",
+				"%s has no argument %q", commandToTool(cmd.Name()), name).
+				WithRemedy("call tools/list for the arguments this tool accepts")
+		}
+	}
+	return nil
+}
+
+func resolveFlags(cmd *registry.Command, args map[string]any) (registry.Flags, error) {
+	flags := registry.NewFlags()
+	for _, flag := range cmd.Flags {
+		raw, ok := args[flag.Name]
+		if !ok {
+			continue
+		}
+		if err := setFlag(flags, flag, raw); err != nil {
+			return registry.Flags{}, err
+		}
+	}
+	return flags, nil
+}
+
+func resolvePositional(cmd *registry.Command, args map[string]any) ([]string, error) {
+	out := make([]string, 0, len(cmd.Args))
+	for _, arg := range cmd.Args {
+		raw, ok := args[arg.Name]
+		if !ok {
+			if arg.Required {
+				return nil, errs.Usage("MISSING_ARGUMENT",
+					"%s requires %q", commandToTool(cmd.Name()), arg.Name)
+			}
+			continue
+		}
+		text, err := asString(arg.Name, raw)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, text)
+	}
+	return out, nil
+}
+
+func resolveLimit(args map[string]any) (registry.Limit, error) {
+	limit := registry.Limit{N: registry.DefaultLimit}
+	raw, ok := args["limit"]
+	if !ok {
+		return limit, nil
+	}
+	text, err := asString("limit", raw)
+	if err != nil {
+		return limit, err
+	}
+	return registry.ParseLimit(text)
+}
+
+func (s *Server) session() (registry.Session, error) {
+	if s.opt.Session == nil {
+		return nil, errs.Runtime("NO_SESSION", "this server has no way to reach Jira")
+	}
+	return s.opt.Session()
 }
 
 // resolveFormat picks the output shape, defaulting the same way the CLI does:
@@ -274,27 +304,29 @@ func resolveFormat(cmd *registry.Command, args map[string]any) (render.Format, e
 
 func setFlag(flags registry.Flags, flag registry.Flag, raw any) error {
 	if flag.Repeatable {
-		values, ok := raw.([]any)
-		if !ok {
-			// A single value where a list was advertised is a common and
-			// harmless mistake; accept it rather than refusing over shape.
-			text, err := asString(flag.Name, raw)
-			if err != nil {
-				return err
-			}
-			flags.SetString(flag.Name, text)
-			return nil
-		}
-		for _, v := range values {
-			text, err := asString(flag.Name, v)
-			if err != nil {
-				return err
-			}
-			flags.SetString(flag.Name, text)
-		}
-		return nil
+		return setRepeatable(flags, flag, raw)
 	}
+	return setScalar(flags, flag, raw)
+}
 
+func setRepeatable(flags registry.Flags, flag registry.Flag, raw any) error {
+	values, ok := raw.([]any)
+	if !ok {
+		// A single value where a list was advertised is a common and harmless
+		// mistake; accept it rather than refusing over shape.
+		values = []any{raw}
+	}
+	for _, v := range values {
+		text, err := asString(flag.Name, v)
+		if err != nil {
+			return err
+		}
+		flags.SetString(flag.Name, text)
+	}
+	return nil
+}
+
+func setScalar(flags registry.Flags, flag registry.Flag, raw any) error {
 	switch flag.Type {
 	case registry.TypeBool:
 		b, ok := raw.(bool)

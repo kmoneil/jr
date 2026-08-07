@@ -304,40 +304,10 @@ func (c *Client) List(ctx context.Context, boardID string, states []string) ([]S
 	var out []Sprint
 	startAt := 0
 	for {
-		query := url.Values{
-			"startAt":    {strconv.Itoa(startAt)},
-			"maxResults": {strconv.Itoa(PageSize)},
-		}
-		if len(states) > 0 {
-			// The agile API takes the set as one comma-separated value, which is
-			// why repeated --state flags are joined rather than repeated here.
-			lower := make([]string, 0, len(states))
-			for _, s := range states {
-				lower = append(lower, strings.ToLower(s))
-			}
-			query.Set("state", strings.Join(lower, ","))
-		}
-
-		resp, err := c.Transport.Do(ctx, transport.Request{
-			Method: transport.MethodGet, Path: path, Query: query,
-		})
+		page, err := c.fetchPage(ctx, path, boardID, startAt, states)
 		if err != nil {
 			return nil, err
 		}
-		if err := c.listErr(resp, boardID); err != nil {
-			return nil, err
-		}
-
-		var page struct {
-			IsLast bool        `json:"isLast"`
-			Values []rawSprint `json:"values"`
-		}
-		if err := json.Unmarshal(resp.Body, &page); err != nil {
-			return nil, errs.Remote("MALFORMED_SPRINTS",
-				"%s did not return usable sprints", path).
-				WithRequestID(resp.RequestID).Wrap(err)
-		}
-
 		for _, raw := range page.Values {
 			converted, err := raw.convert()
 			if err != nil {
@@ -353,6 +323,48 @@ func (c *Client) List(ctx context.Context, boardID string, states []string) ([]S
 		startAt += len(page.Values)
 	}
 	return sorted(out), nil
+}
+
+// sprintPage is one response from the agile sprint endpoint.
+type sprintPage struct {
+	IsLast bool        `json:"isLast"`
+	Values []rawSprint `json:"values"`
+}
+
+func (c *Client) fetchPage(
+	ctx context.Context, path, boardID string, startAt int, states []string,
+) (sprintPage, error) {
+	var page sprintPage
+
+	query := url.Values{
+		"startAt":    {strconv.Itoa(startAt)},
+		"maxResults": {strconv.Itoa(PageSize)},
+	}
+	if len(states) > 0 {
+		// The agile API takes the set as one comma-separated value, which is
+		// why repeated --state flags are joined rather than repeated here.
+		lower := make([]string, 0, len(states))
+		for _, s := range states {
+			lower = append(lower, strings.ToLower(s))
+		}
+		query.Set("state", strings.Join(lower, ","))
+	}
+
+	resp, err := c.Transport.Do(ctx, transport.Request{
+		Method: transport.MethodGet, Path: path, Query: query,
+	})
+	if err != nil {
+		return page, err
+	}
+	if err := c.listErr(resp, boardID); err != nil {
+		return page, err
+	}
+	if err := json.Unmarshal(resp.Body, &page); err != nil {
+		return page, errs.Remote("MALFORMED_SPRINTS",
+			"%s did not return usable sprints", path).
+			WithRequestID(resp.RequestID).Wrap(err)
+	}
+	return page, nil
 }
 
 // listErr names the board in the one refusal this endpoint has that a caller

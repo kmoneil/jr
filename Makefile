@@ -253,6 +253,23 @@ lint: lint-untagged
 lint-untagged:
 	staticcheck -checks=U1000 ./...
 
+# Cognitive complexity. The gate is internal/lint/complexity_test.go, which runs
+# under `make test` like every other invariant; this target is the same check
+# spelled for a human, so the number can be read without waiting for a suite.
+#
+# gocognit reads source without applying build constraints, which is what makes
+# it see tagged code. That is deliberate and asserted, not luck.
+#
+# Test files are excluded, as they are in the gate: a table-driven test scores
+# the length of its table, and holding one to a limit meant for branching code
+# buys a worse test rather than a simpler one.
+## complexity: report every function over the cognitive limit
+.PHONY: complexity
+complexity:
+	@out=$$(gocognit -over 15 ./internal ./cmd | grep -v '_test\.go' || true); \
+	if [ -n "$$out" ]; then echo "$$out"; else echo "    nothing over the limit"; fi
+	@echo "==> limit 15; exemptions live in internal/lint/complexity_test.go"
+
 # Vulnerability scan, over the module and the toolchain it is built with.
 #
 # It fails closed, because govulncheck's own exit status already carries the

@@ -114,38 +114,8 @@ func (a *app) runAuthLogin(ctx context.Context, inv *registry.Invocation) (*rend
 		return nil, err
 	}
 
-	tokenFile := inv.Flags.String("token-file")
-	fromStdin := inv.Flags.Bool("token-stdin")
-	switch {
-	case !fromStdin && tokenFile == "":
-		return nil, errs.Usage("NO_TOKEN_SOURCE", "no token source given").
-			WithRemedy("%s", tokenSourceRemedy)
-	case fromStdin && tokenFile != "" && tokenFile != "-":
-		// Two sources would mean silently picking one, and the caller would
-		// have no way to know which credential was stored.
-		return nil, errs.Usage("AMBIGUOUS_TOKEN_SOURCE",
-			"--token-stdin and --token-file name two different sources").
-			WithRemedy("pass one of them, or --token-file - for stdin")
-	}
-
-	token, err := a.readToken(tokenFile)
+	cred, err := a.credentialFrom(inv)
 	if err != nil {
-		return nil, err
-	}
-	user := firstNonEmpty(inv.Flags.String("email"), inv.Flags.String("user"))
-
-	scheme := auth.Bearer
-	if user != "" {
-		scheme = auth.Basic
-	}
-	if requested := inv.Flags.String("scheme"); requested != "" {
-		if scheme, err = auth.ParseScheme(requested); err != nil {
-			return nil, err
-		}
-	}
-
-	cred := auth.Credential{Scheme: scheme, User: user, Secret: token}
-	if err := cred.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -192,6 +162,45 @@ func (a *app) runAuthLogin(ctx context.Context, inv *registry.Invocation) (*rend
 		doc.Record.Attr("context", created)
 	}
 	return doc, nil
+}
+
+// credentialFrom reads the token and works out the scheme to send it under.
+func (a *app) credentialFrom(inv *registry.Invocation) (auth.Credential, error) {
+	tokenFile := inv.Flags.String("token-file")
+	fromStdin := inv.Flags.Bool("token-stdin")
+	switch {
+	case !fromStdin && tokenFile == "":
+		return auth.Credential{}, errs.Usage("NO_TOKEN_SOURCE", "no token source given").
+			WithRemedy("%s", tokenSourceRemedy)
+	case fromStdin && tokenFile != "" && tokenFile != "-":
+		// Two sources would mean silently picking one, and the caller would
+		// have no way to know which credential was stored.
+		return auth.Credential{}, errs.Usage("AMBIGUOUS_TOKEN_SOURCE",
+			"--token-stdin and --token-file name two different sources").
+			WithRemedy("pass one of them, or --token-file - for stdin")
+	}
+
+	token, err := a.readToken(tokenFile)
+	if err != nil {
+		return auth.Credential{}, err
+	}
+	user := firstNonEmpty(inv.Flags.String("email"), inv.Flags.String("user"))
+
+	scheme := auth.Bearer
+	if user != "" {
+		scheme = auth.Basic
+	}
+	if requested := inv.Flags.String("scheme"); requested != "" {
+		if scheme, err = auth.ParseScheme(requested); err != nil {
+			return auth.Credential{}, err
+		}
+	}
+
+	cred := auth.Credential{Scheme: scheme, User: user, Secret: token}
+	if err := cred.Validate(); err != nil {
+		return auth.Credential{}, err
+	}
+	return cred, nil
 }
 
 // ensureContextFor creates the first context when a credential is stored and

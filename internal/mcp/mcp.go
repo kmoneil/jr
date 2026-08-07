@@ -283,47 +283,59 @@ func (s *Server) run(
 	}
 
 	var out strings.Builder
-	switch {
-	case cmd.Streams():
-		spec := render.StreamSpec{
-			Kind:    cmd.Kind(),
-			Version: cmd.KindVersion(),
-			Name:    cmd.CollectionName,
-			Columns: columnsFor(cmd, inv),
-		}
-		stream, err := render.NewStream(&out, format, spec)
-		if err != nil {
+	if cmd.Streams() {
+		if err := streamInto(ctx, &out, cmd, inv, format); err != nil {
 			return "", err
 		}
-		result, err := cmd.Stream(ctx, inv, stream)
-		if err != nil {
-			return "", err
-		}
-		if err := stream.Close(result.Complete, result.NextPageToken); err != nil {
-			return "", err
-		}
-		if !result.Complete {
-			// There is no exit code here to carry the signal, so the warning
-			// goes in the content. A truncated result that looked complete is
-			// the one failure this whole format exists to prevent.
-			var warning strings.Builder
-			if err := render.WriteStreamTruncation(&warning, cmd.Kind(),
-				stream.Count(), result.NextPageToken, format); err != nil {
-				return "", err
-			}
-			out.WriteString("\n")
-			out.WriteString(warning.String())
-		}
-	default:
-		doc, err := cmd.Run(ctx, inv)
-		if err != nil {
-			return "", err
-		}
-		if err := render.Write(&out, doc, format); err != nil {
-			return "", err
-		}
+		return out.String(), nil
+	}
+
+	doc, err := cmd.Run(ctx, inv)
+	if err != nil {
+		return "", err
+	}
+	if err := render.Write(&out, doc, format); err != nil {
+		return "", err
 	}
 	return out.String(), nil
+}
+
+// streamInto runs a collection command and writes its rows, plus the truncation
+// warning if it was cut short.
+func streamInto(ctx context.Context, out *strings.Builder, cmd *registry.Command,
+	inv *registry.Invocation, format render.Format,
+) error {
+	stream, err := render.NewStream(out, format, render.StreamSpec{
+		Kind:    cmd.Kind(),
+		Version: cmd.KindVersion(),
+		Name:    cmd.CollectionName,
+		Columns: columnsFor(cmd, inv),
+	})
+	if err != nil {
+		return err
+	}
+	result, err := cmd.Stream(ctx, inv, stream)
+	if err != nil {
+		return err
+	}
+	if err := stream.Close(result.Complete, result.NextPageToken); err != nil {
+		return err
+	}
+	if result.Complete {
+		return nil
+	}
+
+	// There is no exit code here to carry the signal, so the warning goes in the
+	// content. A truncated result that looked complete is the one failure this
+	// whole format exists to prevent.
+	var warning strings.Builder
+	if err := render.WriteStreamTruncation(&warning, cmd.Kind(),
+		stream.Count(), result.NextPageToken, format); err != nil {
+		return err
+	}
+	out.WriteString("\n")
+	out.WriteString(warning.String())
+	return nil
 }
 
 func columnsFor(cmd *registry.Command, inv *registry.Invocation) []render.Column {

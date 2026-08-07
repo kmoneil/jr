@@ -105,24 +105,8 @@ func (s *Stream) Write(items ...*Node) error {
 	}
 
 	for _, item := range items {
-		if item == nil {
-			return errs.Runtime("INVALID_DOC", "stream kind %q was given a nil item", s.spec.Kind)
-		}
-		if err := item.validate(s.spec.Kind + "/" + s.spec.Name); err != nil {
+		if err := s.check(item); err != nil {
 			return err
-		}
-		// A streamed row is checked here rather than at Close, because by then
-		// it is already on stdout. This is the only place a collection's shape
-		// can still be refused before a consumer has read it.
-		if err := conformTo(s.spec.Kind, item); err != nil {
-			return err
-		}
-		if s.count > 0 || len(s.items) > 0 {
-			if name := s.itemName(); name != "" && item.Name != name {
-				return errs.Runtime("INVALID_DOC",
-					"stream kind %q mixes item elements %q and %q",
-					s.spec.Kind, name, item.Name)
-			}
 		}
 	}
 
@@ -137,15 +121,46 @@ func (s *Stream) Write(items ...*Node) error {
 		if s.firstName == "" {
 			s.firstName = item.Name
 		}
-		row := make([]string, 0, len(s.spec.Columns))
-		for _, col := range s.spec.Columns {
-			v, _ := item.Lookup(col.Path)
-			row = append(row, v)
-		}
-		s.out.raw(joinTSV(row))
+		s.out.raw(joinTSV(s.row(item)))
 		s.count++
 	}
 	return s.out.err
+}
+
+// check refuses a row before it can reach stdout.
+//
+// A streamed row is checked here rather than at Close, because by then it is
+// already written. This is the only place a collection's shape can still be
+// refused before a consumer has read it.
+func (s *Stream) check(item *Node) error {
+	if item == nil {
+		return errs.Runtime("INVALID_DOC", "stream kind %q was given a nil item", s.spec.Kind)
+	}
+	if err := item.validate(s.spec.Kind + "/" + s.spec.Name); err != nil {
+		return err
+	}
+	if err := conformTo(s.spec.Kind, item); err != nil {
+		return err
+	}
+	if s.count == 0 && len(s.items) == 0 {
+		return nil
+	}
+	if name := s.itemName(); name != "" && item.Name != name {
+		return errs.Runtime("INVALID_DOC",
+			"stream kind %q mixes item elements %q and %q",
+			s.spec.Kind, name, item.Name)
+	}
+	return nil
+}
+
+// row projects one item onto the declared columns.
+func (s *Stream) row(item *Node) []string {
+	out := make([]string, 0, len(s.spec.Columns))
+	for _, col := range s.spec.Columns {
+		v, _ := item.Lookup(col.Path)
+		out = append(out, v)
+	}
+	return out
 }
 
 func (s *Stream) itemName() string {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/kmoneil/jira-cli/internal/errs"
 	"github.com/kmoneil/jira-cli/internal/registry"
+	"github.com/kmoneil/jira-cli/internal/render"
 	"github.com/kmoneil/jira-cli/internal/site"
 	"github.com/kmoneil/jira-cli/internal/transport"
 )
@@ -151,18 +152,12 @@ func (c *Client) ListStream(
 
 	out := &ListResult{Keyset: c.canKeyset(opt)}
 	for {
-		want := pageSize
-		if !opt.Limit.All {
-			remaining := opt.Limit.N - out.Fetched
-			if remaining <= 0 {
-				return truncated(out, token)
-			}
-			// Never ask for more than is wanted: over-fetching costs the
-			// caller's rate limit for rows that are thrown away.
-			want = min(want, remaining)
+		want, satisfied := wantFor(opt.Limit, pageSize, out.Fetched)
+		if satisfied {
+			return truncated(out, token)
 		}
 
-		page, err := c.fetch(ctx, opt, token, want)
+		page, issues, err := c.readPage(ctx, opt, token, want, out, onPage)
 		if err != nil {
 			// A spent request budget is not a failure: it means there is more,
 			// and the caller gets what was fetched plus a way to resume.
@@ -170,31 +165,6 @@ func (c *Client) ListStream(
 				return truncated(out, token)
 			}
 			return nil, err
-		}
-		out.Requests++
-
-		issues, err := decodeIssues(page.Issues, ExtraFieldNames(opt.Fields), c.Body)
-		if err != nil {
-			return nil, err
-		}
-		out.Fetched += len(issues)
-		if page.Total != nil {
-			out.Total = *page.Total
-		}
-		if onPage == nil {
-			out.Issues = append(out.Issues, issues...)
-		} else if err := onPage(issues, out.Total); err != nil {
-			return nil, err
-		}
-
-		if out.Keyset {
-			// Verify the server ordered the way this client assumes. If JQL's
-			// key comparison differs from ours, a keyset cursor would silently
-			// skip or repeat rows; failing here turns that into a loud error
-			// rather than a result that is quietly missing issues.
-			if err := verifyDescendingBelow(issues, token.AfterKey); err != nil {
-				return nil, err
-			}
 		}
 
 		next, last := c.advance(out.Keyset, token, page, issues, want)
@@ -204,15 +174,128 @@ func (c *Client) ListStream(
 		}
 		token = next
 
-		if !opt.Limit.All && out.Fetched >= opt.Limit.N {
-			return truncated(out, token)
-		}
-		if len(issues) == 0 {
-			// A page with no rows that also does not claim to be last would
-			// loop forever. Report what there is and say it is not exhaustive.
+		if stopEarly(opt.Limit, out.Fetched, len(issues)) {
 			return truncated(out, token)
 		}
 	}
+}
+
+// streamOffsetPaged writes an offset-paged sub-resource to a stream.
+//
+// Comments and worklogs both hang off an endpoint that has no cursor, so a
+// result cut short by the caller's limit carries no resume token: an offset
+// shifts when a row is added above it, and resuming from one would skip or
+// repeat. They were two copies of this loop, which is two places for the
+// completeness rule to drift.
+func streamOffsetPaged[T any](
+	inv *registry.Invocation, out *render.Stream, pageSize int,
+	fetch func(startAt, want int) (items []T, total int, err error),
+	node func(T) *render.Node,
+) (registry.StreamResult, error) {
+	startAt := 0
+	for {
+		items, total, err := fetch(startAt, pageSize)
+		if err != nil {
+			return registry.StreamResult{}, err
+		}
+		if len(items) == 0 {
+			// The server ran out, whatever its total claimed. A loop bounded
+			// only by what the server says is a loop the server controls.
+			return registry.StreamResult{Complete: true}, nil
+		}
+
+		bounded, err := writeRows(inv, out, items, node)
+		if err != nil {
+			return registry.StreamResult{}, err
+		}
+		if bounded {
+			// Bounded by the caller, so it is not complete and says so.
+			return registry.StreamResult{Complete: false}, nil
+		}
+		inv.Progress.Update(out.Count(), total)
+
+		startAt += len(items)
+		if startAt >= total {
+			return registry.StreamResult{Complete: true}, nil
+		}
+	}
+}
+
+// writeRows emits one page, stopping at the caller's limit. It reports whether
+// the limit is what stopped it.
+func writeRows[T any](
+	inv *registry.Invocation, out *render.Stream, items []T, node func(T) *render.Node,
+) (bounded bool, err error) {
+	for _, item := range items {
+		if !inv.Limit.All && out.Count() >= inv.Limit.N {
+			return true, nil
+		}
+		if err := out.Write(node(item)); err != nil {
+			return false, err
+		}
+	}
+	return false, nil
+}
+
+// wantFor is how many rows to ask the server for, and whether the caller's
+// limit is already satisfied without asking at all.
+//
+// Never ask for more than is wanted: over-fetching costs the caller's rate
+// limit for rows that are thrown away.
+func wantFor(limit registry.Limit, pageSize, fetched int) (want int, satisfied bool) {
+	if limit.All {
+		return pageSize, false
+	}
+	remaining := limit.N - fetched
+	if remaining <= 0 {
+		return 0, true
+	}
+	return min(pageSize, remaining), false
+}
+
+// stopEarly reports whether to stop before the server has said there is no
+// more: the limit has been reached, or the page came back empty without
+// claiming to be the last, which would otherwise loop forever.
+func stopEarly(limit registry.Limit, fetched, pageLen int) bool {
+	return (!limit.All && fetched >= limit.N) || pageLen == 0
+}
+
+// readPage fetches one page, decodes it, hands it to the caller, and checks the
+// ordering that the cursor depends on.
+func (c *Client) readPage(
+	ctx context.Context, opt ListOptions, token PageToken, want int,
+	out *ListResult, onPage func(page []Issue, total int) error,
+) (*searchResponse, []Issue, error) {
+	page, err := c.fetch(ctx, opt, token, want)
+	if err != nil {
+		return nil, nil, err
+	}
+	out.Requests++
+
+	issues, err := decodeIssues(page.Issues, ExtraFieldNames(opt.Fields), c.Body)
+	if err != nil {
+		return nil, nil, err
+	}
+	out.Fetched += len(issues)
+	if page.Total != nil {
+		out.Total = *page.Total
+	}
+	if onPage == nil {
+		out.Issues = append(out.Issues, issues...)
+	} else if err := onPage(issues, out.Total); err != nil {
+		return nil, nil, err
+	}
+
+	if out.Keyset {
+		// Verify the server ordered the way this client assumes. If JQL's key
+		// comparison differs from ours, a keyset cursor would silently skip or
+		// repeat rows; failing here turns that into a loud error rather than a
+		// result that is quietly missing issues.
+		if err := verifyDescendingBelow(issues, token.AfterKey); err != nil {
+			return nil, nil, err
+		}
+	}
+	return page, issues, nil
 }
 
 // truncated is the one place a result becomes incomplete.

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -259,27 +260,33 @@ func (a *app) runLeaf(
 		if rc.Streams() {
 			return a.stream(cmd.Context(), rc, inv)
 		}
-
-		doc, err := rc.Run(cmd.Context(), inv)
-		if err != nil {
-			return err
-		}
-		// A command that owns stdout has already written everything that
-		// belongs there. Rendering a result on top would put a frame on the
-		// wire its peer cannot parse.
-		if !rc.EmitsDocumentFor(inv) {
-			return nil
-		}
-		if !rc.Emits(doc.Kind, doc.Version) {
-			// A command that emits a kind it did not declare would break every
-			// consumer that dispatches on the declared kind, and would be
-			// invisible to `jr --contract`.
-			return errs.Runtime("UNDECLARED_KIND",
-				"command %s emitted kind %q v%d, which it does not declare",
-				rc.Name(), doc.Kind, doc.Version)
-		}
-		return a.emit(doc)
+		return a.runDocument(cmd.Context(), rc, inv)
 	}
+}
+
+// runDocument runs a command that returns a result document, and writes it.
+func (a *app) runDocument(
+	ctx context.Context, rc *registry.Command, inv *registry.Invocation,
+) error {
+	doc, err := rc.Run(ctx, inv)
+	if err != nil {
+		return err
+	}
+	// A command that owns stdout has already written everything that belongs
+	// there. Rendering a result on top would put a frame on the wire its peer
+	// cannot parse.
+	if !rc.EmitsDocumentFor(inv) {
+		return nil
+	}
+	if !rc.Emits(doc.Kind, doc.Version) {
+		// A command that emits a kind it did not declare would break every
+		// consumer that dispatches on the declared kind, and would be invisible
+		// to `jr --contract`.
+		return errs.Runtime("UNDECLARED_KIND",
+			"command %s emitted kind %q v%d, which it does not declare",
+			rc.Name(), doc.Kind, doc.Version)
+	}
+	return a.emit(doc)
 }
 
 // newInvocation assembles everything a command is handed before it runs.

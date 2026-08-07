@@ -447,21 +447,9 @@ func listMarker(line string) *marker {
 	}
 
 	m := marker{indent: indent}
-	switch rest[0] {
-	case '-', '*', '+':
-		m.bullet = rest[0]
-		rest = rest[1:]
-	default:
-		digits := 0
-		for digits < len(rest) && digits < 9 && rest[digits] >= '0' && rest[digits] <= '9' {
-			digits++
-		}
-		if digits == 0 || digits >= len(rest) || (rest[digits] != '.' && rest[digits] != ')') {
-			return nil
-		}
-		m.number, _ = strconv.Atoi(rest[:digits])
-		m.delim = rest[digits]
-		rest = rest[digits+1:]
+	rest, ok := m.readBullet(rest)
+	if !ok {
+		return nil
 	}
 
 	spaces := len(rest) - len(strings.TrimLeft(rest, " "))
@@ -476,25 +464,50 @@ func listMarker(line string) *marker {
 	}
 	rest = rest[spaces:]
 	m.width = len(line) - len(rest)
-
-	// A checkbox turns the item into a task, which ADF stores as its own kind
-	// of list rather than as a list item that happens to start with a box.
-	if m.bullet != 0 && len(rest) >= 3 && rest[0] == '[' && rest[2] == ']' &&
-		(len(rest) == 3 || rest[3] == ' ') {
-		switch rest[1] {
-		case ' ':
-			m.task = "TODO"
-		case 'x', 'X':
-			m.task = "DONE"
-		}
-		if m.task != "" {
-			m.width += 3
-			if len(rest) > 3 {
-				m.width++
-			}
-		}
-	}
+	m.readCheckbox(rest)
 	return &m
+}
+
+// readBullet consumes the marker itself, either a bullet character or a number
+// and its delimiter, and returns what follows it.
+func (m *marker) readBullet(rest string) (string, bool) {
+	switch rest[0] {
+	case '-', '*', '+':
+		m.bullet = rest[0]
+		return rest[1:], true
+	}
+
+	digits := 0
+	for digits < len(rest) && digits < 9 && rest[digits] >= '0' && rest[digits] <= '9' {
+		digits++
+	}
+	if digits == 0 || digits >= len(rest) || (rest[digits] != '.' && rest[digits] != ')') {
+		return "", false
+	}
+	m.number, _ = strconv.Atoi(rest[:digits])
+	m.delim = rest[digits]
+	return rest[digits+1:], true
+}
+
+// readCheckbox turns the item into a task, which ADF stores as its own kind of
+// list rather than as a list item that happens to start with a box.
+func (m *marker) readCheckbox(rest string) {
+	if m.bullet == 0 || len(rest) < 3 || rest[0] != '[' || rest[2] != ']' ||
+		(len(rest) != 3 && rest[3] != ' ') {
+		return
+	}
+	switch rest[1] {
+	case ' ':
+		m.task = "TODO"
+	case 'x', 'X':
+		m.task = "DONE"
+	default:
+		return
+	}
+	m.width += 3
+	if len(rest) > 3 {
+		m.width++
+	}
 }
 
 // listItem is one item's lines, plus where they came from.
@@ -506,60 +519,16 @@ type listItem struct {
 
 func parseList(lines []string, at int) (Node, int, error) {
 	first := listMarker(lines[0])
-
-	// Gather each item's lines: the marker line's remainder, plus every
-	// following line indented at least to the item's content.
-	var items []listItem
-	used := 0
-	for used < len(lines) {
-		m := listMarker(lines[used])
-		if m == nil || m.indent != first.indent || !m.sameListAs(*first) {
-			break
-		}
-		body := []string{lines[used][min(m.width, len(lines[used])):]}
-		start := used
-		used++
-
-		for used < len(lines) {
-			line := lines[used]
-			if strings.TrimSpace(line) == "" {
-				// A blank line ends the item unless the list continues under
-				// it, which is what makes a list loose rather than what ends
-				// it.
-				if used+1 >= len(lines) || !continuesItem(lines[used+1], *first) {
-					break
-				}
-				body = append(body, "")
-				used++
-				continue
-			}
-			if !continuesItem(line, *first) {
-				break
-			}
-			body = append(body, dedent(line, m.width))
-			used++
-		}
-		items = append(items, listItem{lines: body, at: at + start, state: m.task})
-	}
+	items, used := gatherItems(lines, at, *first)
 
 	if first.task != "" {
 		node, err := taskListNode(items)
 		return node, used, err
 	}
 
-	nodes := make([]Node, 0, len(items))
-	for _, it := range items {
-		content, err := parseBlocks(it.lines, it.at)
-		if err != nil {
-			return Node{}, 0, err
-		}
-		if len(content) == 0 {
-			content = []Node{{Type: "paragraph"}}
-		}
-		if err := checkContent("listItem", content, it.at); err != nil {
-			return Node{}, 0, err
-		}
-		nodes = append(nodes, Node{Type: "listItem", Content: content})
+	nodes, err := listItemNodes(items)
+	if err != nil {
+		return Node{}, 0, err
 	}
 
 	out := Node{Type: "bulletList", Content: nodes}
@@ -570,6 +539,74 @@ func parseList(lines []string, at int) (Node, int, error) {
 		}
 	}
 	return out, used, nil
+}
+
+// gatherItems collects each item's lines: the marker line's remainder, plus
+// every following line indented at least to the item's content. It returns how
+// many of the input lines the list consumed.
+func gatherItems(lines []string, at int, first marker) ([]listItem, int) {
+	var items []listItem
+	used := 0
+	for used < len(lines) {
+		m := listMarker(lines[used])
+		if m == nil || m.indent != first.indent || !m.sameListAs(first) {
+			break
+		}
+		start := used
+		body := []string{lines[used][min(m.width, len(lines[used])):]}
+		used++
+
+		rest, next := gatherItemBody(lines, used, first, m.width)
+		body, used = append(body, rest...), next
+		items = append(items, listItem{lines: body, at: at + start, state: m.task})
+	}
+	return items, used
+}
+
+// gatherItemBody reads the continuation lines of one item, and returns the
+// index the next item starts at.
+func gatherItemBody(lines []string, from int, first marker, width int) ([]string, int) {
+	var body []string
+	i := from
+	for i < len(lines) {
+		line := lines[i]
+		if strings.TrimSpace(line) == "" {
+			// A blank line ends the item unless the list continues under it,
+			// which is what makes a list loose rather than what ends it.
+			if i+1 >= len(lines) || !continuesItem(lines[i+1], first) {
+				break
+			}
+			body = append(body, "")
+			i++
+			continue
+		}
+		if !continuesItem(line, first) {
+			break
+		}
+		body = append(body, dedent(line, width))
+		i++
+	}
+	return body, i
+}
+
+// listItemNodes parses each gathered item into a listItem node. An item with no
+// content still gets an empty paragraph, because ADF's listItem cannot be empty.
+func listItemNodes(items []listItem) ([]Node, error) {
+	nodes := make([]Node, 0, len(items))
+	for _, it := range items {
+		content, err := parseBlocks(it.lines, it.at)
+		if err != nil {
+			return nil, err
+		}
+		if len(content) == 0 {
+			content = []Node{{Type: "paragraph"}}
+		}
+		if err := checkContent("listItem", content, it.at); err != nil {
+			return nil, err
+		}
+		nodes = append(nodes, Node{Type: "listItem", Content: content})
+	}
+	return nodes, nil
 }
 
 // continuesItem reports whether a line belongs to the item above it: indented
@@ -598,38 +635,14 @@ func dedent(line string, width int) string {
 func taskListNode(items []listItem) (Node, error) {
 	tasks := make([]Node, 0, len(items))
 	for _, it := range items {
-		var own []string
-		var nested []listItem
-		for i, line := range it.lines {
-			if m := listMarker(line); m != nil && m.task != "" && i > 0 {
-				// Everything from here down is the sub-list.
-				sub, err := nestedTasks(it.lines[i:], it.at+i)
-				if err != nil {
-					return Node{}, err
-				}
-				nested = sub
-				break
-			}
-			own = append(own, line)
-		}
-
-		text := strings.TrimSpace(strings.Join(own, "\n"))
-		if strings.Contains(text, "\n\n") {
-			return Node{}, unsupported(it.at, "a task holding more than one paragraph")
-		}
-		content, err := parseInline(text, it.at)
+		own, nested, err := splitNestedTasks(it)
 		if err != nil {
 			return Node{}, err
 		}
 
-		state := it.state
-		if state == "" {
-			state = "TODO"
-		}
-		task := Node{
-			Type:    "taskItem",
-			Attrs:   map[string]any{"state": state},
-			Content: content,
+		task, err := taskItemNode(it, own)
+		if err != nil {
+			return Node{}, err
 		}
 		tasks = append(tasks, task)
 
@@ -642,6 +655,45 @@ func taskListNode(items []listItem) (Node, error) {
 		}
 	}
 	return Node{Type: "taskList", Content: tasks}, nil
+}
+
+// splitNestedTasks divides one item's lines into its own content and the
+// sub-list underneath it. Everything from the first nested checkbox down is the
+// sub-list.
+func splitNestedTasks(it listItem) (own []string, nested []listItem, err error) {
+	for i, line := range it.lines {
+		if m := listMarker(line); m != nil && m.task != "" && i > 0 {
+			sub, err := nestedTasks(it.lines[i:], it.at+i)
+			if err != nil {
+				return nil, nil, err
+			}
+			return own, sub, nil
+		}
+		own = append(own, line)
+	}
+	return own, nil, nil
+}
+
+// taskItemNode builds one taskItem from the lines that belong to it.
+func taskItemNode(it listItem, own []string) (Node, error) {
+	text := strings.TrimSpace(strings.Join(own, "\n"))
+	if strings.Contains(text, "\n\n") {
+		return Node{}, unsupported(it.at, "a task holding more than one paragraph")
+	}
+	content, err := parseInline(text, it.at)
+	if err != nil {
+		return Node{}, err
+	}
+
+	state := it.state
+	if state == "" {
+		state = "TODO"
+	}
+	return Node{
+		Type:    "taskItem",
+		Attrs:   map[string]any{"state": state},
+		Content: content,
+	}, nil
 }
 
 // nestedTasks splits an indented run of checkbox lines into items.
@@ -756,22 +808,9 @@ func tableRowNode(cells []string, element string, at int) (Node, error) {
 }
 
 func parseParagraph(lines []string, at int) (Node, int, error) {
-	used := 0
-	for used < len(lines) {
-		line := lines[used]
-		if strings.TrimSpace(line) == "" {
-			break
-		}
-		if used > 0 {
-			if isSetextUnderline(line) {
-				return Node{}, 0, unsupported(at+used, "a setext heading").
-					WithRemedy("write the heading with # instead")
-			}
-			if startsBlock(lines[used:]) {
-				break
-			}
-		}
-		used++
+	used, err := paragraphExtent(lines, at)
+	if err != nil {
+		return Node{}, 0, err
 	}
 
 	// Each line loses its leading and trailing whitespace, which is what
@@ -803,6 +842,30 @@ func parseParagraph(lines []string, at int) (Node, int, error) {
 		}
 	}
 	return Node{Type: "paragraph", Content: content}, used, nil
+}
+
+// paragraphExtent is how many lines the paragraph runs for. A setext underline
+// is refused rather than read as a heading, because the writer has no spelling
+// for one and the two halves have to agree on the same subset.
+func paragraphExtent(lines []string, at int) (int, error) {
+	used := 0
+	for used < len(lines) {
+		line := lines[used]
+		if strings.TrimSpace(line) == "" {
+			return used, nil
+		}
+		if used > 0 {
+			if isSetextUnderline(line) {
+				return 0, unsupported(at+used, "a setext heading").
+					WithRemedy("write the heading with # instead")
+			}
+			if startsBlock(lines[used:]) {
+				return used, nil
+			}
+		}
+		used++
+	}
+	return used, nil
 }
 
 // trimAroundBreaks drops the whitespace on either side of a line break.

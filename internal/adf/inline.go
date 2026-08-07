@@ -284,46 +284,60 @@ func emphasisAt(s string, start, at int) ([]Node, int, error) {
 		return nil, 0, nil
 	}
 
-	delim := strings.Repeat(string(char), run)
 	rest := s[start:]
-
-	// A run with a space before it does not close, so keep looking. `a * b * c`
-	// is three words and two asterisks, not emphasis around " b ".
-	end := -1
-	for from := run; ; {
-		found := findCloser(rest, from, delim)
-		if found < 0 {
-			return nil, 0, nil
-		}
-		closes := found > run && !isSpaceByte(rest[found-1])
-		if closes && char == '_' && found+run < len(rest) && isWordByte(rest[found+run]) {
-			// An underscore between two word characters is inert, so it is not
-			// this span's closer — the next one might be. Giving up here left
-			// `_0_0_` unparsed, and its writer had no other spelling to use.
-			closes = false
-		}
-		if closes {
-			end = found
-			break
-		}
-		from = found + run
+	end, ok := findEmphasisEnd(rest, char, run)
+	if !ok {
+		return nil, 0, nil
 	}
+
 	inner, err := scanInline(rest[run:end], at)
 	if err != nil {
 		return nil, 0, err
 	}
-	// One delimiter is emphasis, two are strong, three are both.
+	if err := applyEmphasis(inner, run, at); err != nil {
+		return nil, 0, err
+	}
+	return inner, end + run, nil
+}
+
+// findEmphasisEnd locates the run that closes the span, or reports that nothing
+// does.
+//
+// A run with a space before it does not close, so the search keeps looking:
+// `a * b * c` is three words and two asterisks, not emphasis around " b ".
+func findEmphasisEnd(rest string, char byte, run int) (int, bool) {
+	delim := strings.Repeat(string(char), run)
+	for from := run; ; {
+		found := findCloser(rest, from, delim)
+		if found < 0 {
+			return 0, false
+		}
+		closes := found > run && !isSpaceByte(rest[found-1])
+		if closes && char == '_' && found+run < len(rest) && isWordByte(rest[found+run]) {
+			// An underscore between two word characters is inert, so it is not
+			// this span's closer, though the next one might be. Giving up here
+			// left `_0_0_` unparsed, and its writer had no other spelling.
+			closes = false
+		}
+		if closes {
+			return found, true
+		}
+		from = found + run
+	}
+}
+
+// applyEmphasis marks the span: one delimiter is emphasis, two are strong,
+// three are both.
+func applyEmphasis(inner []Node, run, at int) error {
 	if run != 2 {
 		if err := addMark(inner, Mark{Type: "em"}, at); err != nil {
-			return nil, 0, err
+			return err
 		}
 	}
 	if run >= 2 {
-		if err := addMark(inner, Mark{Type: "strong"}, at); err != nil {
-			return nil, 0, err
-		}
+		return addMark(inner, Mark{Type: "strong"}, at)
 	}
-	return inner, end + run, nil
+	return nil
 }
 
 // isSpaceByte is CommonMark's whitespace, which a delimiter may not sit
@@ -437,44 +451,72 @@ func linkAt(s string, at int) ([]Node, int, error) {
 		return nil, 0, nil
 	}
 
-	if scheme, value, found := strings.Cut(target, ":"); found {
-		switch scheme {
-		case "jira-user", "jira-status":
-			// These carry a plain string, not marked-up content, so the label
-			// is read as text rather than left with its escapes in it. Storing
-			// the raw slice put a backslash in the name and grew another on
-			// every conversion, which the round-trip fuzzer found.
-			label, err := literalText(text, at)
-			if err != nil {
-				return nil, 0, err
-			}
-			if scheme == "jira-user" {
-				if value == "" {
-					return nil, 0, unsupported(at, "a mention of nobody")
-				}
-				return []Node{{Type: "mention", Attrs: map[string]any{
-					"id": value, "text": label,
-				}}}, width, nil
-			}
-			if label == "" || value == "" {
-				return nil, 0, unsupported(at, "a status lozenge with no text or colour")
-			}
-			return []Node{{Type: "status", Attrs: map[string]any{
-				"text": label, "color": value,
-			}}}, width, nil
-		case "jira-date":
-			if _, err := strconv.ParseInt(value, 10, 64); err != nil {
-				return nil, 0, unsupported(at, "a jira-date link stamped %q", value)
-			}
-			return []Node{{Type: "date", Attrs: map[string]any{
-				"timestamp": value,
-			}}}, width, nil
-		case "jira-media":
-			return nil, 0, unsupported(at, "an attachment written as a link").
-				WithRemedy("an attachment is an image: write it as ![alt](jira-media:...)")
-		}
+	nodes, handled, err := jiraSchemeLink(text, target, at)
+	if err != nil {
+		return nil, 0, err
 	}
+	if handled {
+		return nodes, width, nil
+	}
+	return ordinaryLink(text, target, title, width, at)
+}
 
+// jiraSchemeLink reads the jira- targets this converter writes for the ADF
+// nodes markdown has no spelling of its own for. A false second return means
+// the target names no such scheme, which makes it an ordinary link.
+func jiraSchemeLink(text, target string, at int) ([]Node, bool, error) {
+	scheme, value, found := strings.Cut(target, ":")
+	if !found {
+		return nil, false, nil
+	}
+	switch scheme {
+	case "jira-user", "jira-status":
+		// These carry a plain string, not marked-up content, so the label is
+		// read as text rather than left with its escapes in it. Storing the raw
+		// slice put a backslash in the name and grew another on every
+		// conversion, which the round-trip fuzzer found.
+		label, err := literalText(text, at)
+		if err != nil {
+			return nil, false, err
+		}
+		chip, err := chipNode(scheme, label, value, at)
+		return chip, true, err
+
+	case "jira-date":
+		if _, err := strconv.ParseInt(value, 10, 64); err != nil {
+			return nil, false, unsupported(at, "a jira-date link stamped %q", value)
+		}
+		return []Node{{Type: "date", Attrs: map[string]any{
+			"timestamp": value,
+		}}}, true, nil
+
+	case "jira-media":
+		return nil, false, unsupported(at, "an attachment written as a link").
+			WithRemedy("an attachment is an image: write it as ![alt](jira-media:...)")
+	}
+	return nil, false, nil
+}
+
+// chipNode builds the mention or the status lozenge a jira- scheme names.
+func chipNode(scheme, label, value string, at int) ([]Node, error) {
+	if scheme == "jira-user" {
+		if value == "" {
+			return nil, unsupported(at, "a mention of nobody")
+		}
+		return []Node{{Type: "mention", Attrs: map[string]any{
+			"id": value, "text": label,
+		}}}, nil
+	}
+	if label == "" || value == "" {
+		return nil, unsupported(at, "a status lozenge with no text or colour")
+	}
+	return []Node{{Type: "status", Attrs: map[string]any{
+		"text": label, "color": value,
+	}}}, nil
+}
+
+// ordinaryLink builds a link mark over the bracketed text.
+func ordinaryLink(text, target, title string, width, at int) ([]Node, int, error) {
 	inner, err := scanInline(text, at)
 	if err != nil {
 		return nil, 0, err
@@ -484,9 +526,9 @@ func linkAt(s string, at int) ([]Node, int, error) {
 		return nil, 0, unsupported(at, "a link with no text")
 	}
 	if target == "" {
-		// `[text]()` is a link to nowhere. ADF's link mark requires an
-		// address, and building one without would be a document ToMarkdown
-		// then refuses — the two halves have to agree on the same subset.
+		// `[text]()` is a link to nowhere. ADF's link mark requires an address,
+		// and building one without would be a document ToMarkdown then refuses:
+		// the two halves have to agree on the same subset.
 		return nil, 0, unsupported(at, "a link with no address")
 	}
 	mark := Mark{Type: "link", Attrs: map[string]any{"href": target}}

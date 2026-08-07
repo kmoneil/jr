@@ -149,39 +149,49 @@ func longestFirst(m map[string]string) []string {
 // the thing it guards cannot catch that definition being wrong, so these are
 // looser on purpose and expected to produce the occasional false positive.
 func (c *Cassette) Residue() []string {
-	var out []string
-	seen := map[string]bool{}
-
-	add := func(kind, value string) {
-		if isPlaceholder(value) {
-			return
-		}
-		key := kind + ":" + value
-		if !seen[key] {
-			seen[key] = true
-			out = append(out, kind+" "+value)
-		}
-	}
-
+	found := &residueSet{seen: map[string]bool{}}
 	for _, in := range c.Interactions {
 		for _, text := range []string{
 			in.Request.Path, in.Request.Query, in.Request.Body, in.Response.Body,
 		} {
-			for _, m := range EmailAddress.FindAllString(text, -1) {
-				add("email", m)
-			}
-			// identifierish, deliberately not CloudAccountID — see above.
-			for _, m := range identifierish.FindAllString(text, -1) {
-				add("possible identifier", m)
-			}
-			for _, m := range hostPattern.FindAllString(text, -1) {
-				if !reservedHost(m) {
-					add("host", m)
-				}
-			}
+			found.scan(text)
 		}
 	}
-	return out
+	return found.out
+}
+
+// residueSet collects distinct findings, in the order they were first seen.
+type residueSet struct {
+	out  []string
+	seen map[string]bool
+}
+
+func (r *residueSet) add(kind, value string) {
+	if isPlaceholder(value) {
+		return
+	}
+	key := kind + ":" + value
+	if r.seen[key] {
+		return
+	}
+	r.seen[key] = true
+	r.out = append(r.out, kind+" "+value)
+}
+
+// scan reads one piece of recorded text for anything identity-shaped.
+func (r *residueSet) scan(text string) {
+	for _, m := range EmailAddress.FindAllString(text, -1) {
+		r.add("email", m)
+	}
+	// identifierish, deliberately not CloudAccountID. See Residue.
+	for _, m := range identifierish.FindAllString(text, -1) {
+		r.add("possible identifier", m)
+	}
+	for _, m := range hostPattern.FindAllString(text, -1) {
+		if !reservedHost(m) {
+			r.add("host", m)
+		}
+	}
 }
 
 // EmailAddress matches an address anywhere in a body. Jira attaches one to
@@ -376,25 +386,36 @@ func (c *Cassette) EncodedResidue(suspect []string) []string {
 		for _, text := range []string{
 			in.Request.Path, in.Request.Query, in.Request.Body, in.Response.Body,
 		} {
-			for _, run := range base64Run.FindAllString(text, -1) {
-				if u, err := url.QueryUnescape(run); err == nil {
-					run = u
-				}
-				decoded, ok := decodeBase64(run)
-				if !ok {
-					continue
-				}
-				for _, want := range suspect {
-					if want == "" || !bytes.Contains(decoded, []byte(want)) {
-						continue
-					}
-					if !seen[want] {
-						seen[want] = true
-						out = append(out, "encoded "+want)
-					}
-				}
-			}
+			out = appendEncodedHits(out, seen, text, suspect)
 		}
 	}
 	return out
+}
+
+// appendEncodedHits decodes every base64 run in one piece of text and records
+// which of the suspect strings it was hiding.
+func appendEncodedHits(out []string, seen map[string]bool, text string, suspect []string) []string {
+	for _, run := range base64Run.FindAllString(text, -1) {
+		decoded, ok := decodeMaybeEscaped(run)
+		if !ok {
+			continue
+		}
+		for _, want := range suspect {
+			if want == "" || seen[want] || !bytes.Contains(decoded, []byte(want)) {
+				continue
+			}
+			seen[want] = true
+			out = append(out, "encoded "+want)
+		}
+	}
+	return out
+}
+
+// decodeMaybeEscaped decodes a base64 run that may have been percent-escaped on
+// its way into a URL.
+func decodeMaybeEscaped(run string) ([]byte, bool) {
+	if u, err := url.QueryUnescape(run); err == nil {
+		run = u
+	}
+	return decodeBase64(run)
 }

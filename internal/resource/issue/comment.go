@@ -332,36 +332,15 @@ func runCommentList(
 		return registry.StreamResult{}, err
 	}
 
-	startAt := 0
-	for {
-		page, err := client.ListComments(ctx, inv.Args[0], startAt, pageSize)
-		if err != nil {
-			return registry.StreamResult{}, err
-		}
-		if len(page.Comments) == 0 {
-			// The server ran out, whatever its total claimed. A loop bounded
-			// only by what the server says is a loop the server controls.
-			return registry.StreamResult{Complete: true}, nil
-		}
-
-		for _, comment := range page.Comments {
-			if !inv.Limit.All && out.Count() >= inv.Limit.N {
-				// Bounded by the caller, so it is not complete and says so.
-				// There is no token: this endpoint pages by offset, and an
-				// offset shifts when a comment is added above it.
-				return registry.StreamResult{Complete: false}, nil
+	return streamOffsetPaged(inv, out, pageSize,
+		func(startAt, want int) ([]Comment, int, error) {
+			page, err := client.ListComments(ctx, inv.Args[0], startAt, want)
+			if err != nil {
+				return nil, 0, err
 			}
-			if err := out.Write(comment.Node()); err != nil {
-				return registry.StreamResult{}, err
-			}
-		}
-		inv.Progress.Update(out.Count(), page.Total)
-
-		startAt += len(page.Comments)
-		if startAt >= page.Total {
-			return registry.StreamResult{Complete: true}, nil
-		}
-	}
+			return page.Comments, page.Total, nil
+		},
+		func(c Comment) *render.Node { return c.Node() })
 }
 
 // CommentListDoc renders comments as a document.

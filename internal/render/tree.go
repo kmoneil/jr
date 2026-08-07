@@ -23,26 +23,35 @@ func nodeValue(n *Node) any {
 		out["text"] = n.Text
 	}
 
-	// A list container's array is always present and its count is a number,
-	// matching the result envelope. Everywhere else an attribute stays a
-	// string, because an XML attribute has no type to preserve.
 	if n.ListOf != "" {
-		items := make([]any, 0, len(n.Children))
-		for _, c := range n.Children {
-			if c.Name == n.ListOf {
-				items = append(items, nodeValue(c))
-			}
-		}
-		out[n.ListOf] = items
-		out["count"] = len(items)
+		addListItems(out, n)
 	}
+	addChildren(out, n)
+	return out
+}
 
-	counts := make(map[string]int, len(n.Children))
+// addListItems writes a list container's array, which is always present, and
+// its count, which is a number to match the result envelope. Everywhere else an
+// attribute stays a string, because an XML attribute has no type to preserve.
+func addListItems(out map[string]any, n *Node) {
+	items := make([]any, 0, len(n.Children))
 	for _, c := range n.Children {
 		if c.Name == n.ListOf {
-			continue
+			items = append(items, nodeValue(c))
 		}
-		counts[c.Name]++
+	}
+	out[n.ListOf] = items
+	out["count"] = len(items)
+}
+
+// addChildren writes every child that is not part of the list array, turning a
+// repeated name into an array.
+func addChildren(out map[string]any, n *Node) {
+	counts := make(map[string]int, len(n.Children))
+	for _, c := range n.Children {
+		if c.Name != n.ListOf {
+			counts[c.Name]++
+		}
 	}
 	for _, c := range n.Children {
 		if c.Name == n.ListOf {
@@ -56,7 +65,6 @@ func nodeValue(n *Node) any {
 		list, _ := out[c.Name].([]any)
 		out[c.Name] = append(list, v)
 	}
-	return out
 }
 
 // docValue converts a document into the generic tree, hoisting the envelope to

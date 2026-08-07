@@ -248,33 +248,15 @@ func runWorklogList(
 		return registry.StreamResult{}, err
 	}
 
-	startAt := 0
-	for {
-		page, err := client.ListWorklogs(ctx, inv.Args[0], startAt, pageSize)
-		if err != nil {
-			return registry.StreamResult{}, err
-		}
-		if len(page.Worklogs) == 0 {
-			return registry.StreamResult{Complete: true}, nil
-		}
-
-		for _, w := range page.Worklogs {
-			if !inv.Limit.All && out.Count() >= inv.Limit.N {
-				// No token: this endpoint pages by offset, and an offset shifts
-				// when work is logged above it.
-				return registry.StreamResult{Complete: false}, nil
+	return streamOffsetPaged(inv, out, pageSize,
+		func(startAt, want int) ([]Worklog, int, error) {
+			page, err := client.ListWorklogs(ctx, inv.Args[0], startAt, want)
+			if err != nil {
+				return nil, 0, err
 			}
-			if err := out.Write(w.Node()); err != nil {
-				return registry.StreamResult{}, err
-			}
-		}
-		inv.Progress.Update(out.Count(), page.Total)
-
-		startAt += len(page.Worklogs)
-		if startAt >= page.Total {
-			return registry.StreamResult{Complete: true}, nil
-		}
-	}
+			return page.Worklogs, page.Total, nil
+		},
+		func(w Worklog) *render.Node { return w.Node() })
 }
 
 // WorklogListDoc renders worklogs as a document.
