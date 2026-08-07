@@ -317,11 +317,7 @@ func (a *app) runContextList(_ context.Context, inv *registry.Invocation) (*rend
 		return nil, err
 	}
 
-	names := cfg.Names()
-	complete := true
-	if !inv.Limit.All && len(names) > inv.Limit.N {
-		names, complete = names[:inv.Limit.N], false
-	}
+	names, complete := registry.Bound(inv.Limit, cfg.Names())
 
 	items := make([]*render.Node, 0, len(names))
 	for _, name := range names {

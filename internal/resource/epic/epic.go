@@ -309,11 +309,7 @@ func runList(
 		return registry.StreamResult{}, err
 	}
 
-	complete := true
-	if !inv.Limit.All && len(epics) > inv.Limit.N {
-		epics = epics[:inv.Limit.N]
-		complete = false
-	}
+	epics, complete := registry.Bound(inv.Limit, epics)
 	for _, e := range epics {
 		if err := out.Write(e.Node()); err != nil {
 			return registry.StreamResult{}, err

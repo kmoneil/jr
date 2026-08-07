@@ -246,3 +246,75 @@ func TestFilterByPrefix(t *testing.T) {
 		t.Errorf("Filter(cmds, \"issue\") = %v, want %v", got, want)
 	}
 }
+
+// TestBoundIsExactAtTheBoundary pins the one decision every fetch-all listing
+// used to make for itself.
+//
+// The boundary is the whole point. Exactly N results is a complete answer and
+// N+1 is the first that is not, and getting that off by one in either direction
+// is a lie: too eager and every result whose size happens to equal the limit
+// reports itself truncated forever, too lax and a cut result reports itself
+// whole. Eleven call sites wrote this out longhand; this is the only place it
+// is decided now.
+func TestBoundIsExactAtTheBoundary(t *testing.T) {
+	five := []string{"a", "b", "c", "d", "e"}
+
+	for _, tc := range []struct {
+		name         string
+		limit        registry.Limit
+		items        []string
+		wantKept     int
+		wantComplete bool
+	}{
+		{"under the limit", registry.Limit{N: 10}, five, 5, true},
+		{"exactly the limit", registry.Limit{N: 5}, five, 5, true},
+		{"one over the limit", registry.Limit{N: 4}, five, 4, false},
+		{"far over the limit", registry.Limit{N: 1}, five, 1, false},
+		{"all takes everything", registry.Limit{All: true}, five, 5, true},
+		{"all over an empty set", registry.Limit{All: true}, nil, 0, true},
+		{"empty is complete", registry.Limit{N: 5}, nil, 0, true},
+		{"empty is complete at zero", registry.Limit{N: 0}, nil, 0, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			kept, complete := registry.Bound(tc.limit, tc.items)
+			if len(kept) != tc.wantKept {
+				t.Errorf("kept %d items, want %d", len(kept), tc.wantKept)
+			}
+			if complete != tc.wantComplete {
+				t.Errorf("complete = %v, want %v", complete, tc.wantComplete)
+			}
+			// A bounded result is a prefix of what came in, in the order it
+			// came in. These endpoints are sorted before they get here, so
+			// reordering during the cut would change which rows a caller sees.
+			for i := range kept {
+				if kept[i] != tc.items[i] {
+					t.Fatalf("kept[%d] = %q, want %q — Bound reordered the set",
+						i, kept[i], tc.items[i])
+				}
+			}
+		})
+	}
+}
+
+// TestBoundNeverReportsACutSetComplete is the invariant stated directly, over
+// every combination small enough to enumerate. The table above says what the
+// answer is at the edges; this says the property holds everywhere.
+func TestBoundNeverReportsACutSetComplete(t *testing.T) {
+	for size := range 12 {
+		items := make([]int, size)
+		for i := range items {
+			items[i] = i
+		}
+		for n := range 12 {
+			kept, complete := registry.Bound(registry.Limit{N: n}, items)
+			if complete && len(kept) != size {
+				t.Errorf("limit %d over %d items: reported complete having kept %d",
+					n, size, len(kept))
+			}
+			if !complete && len(kept) == size {
+				t.Errorf("limit %d over %d items: reported truncated having kept all %d",
+					n, size, size)
+			}
+		}
+	}
+}

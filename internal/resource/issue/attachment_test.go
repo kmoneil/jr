@@ -445,3 +445,51 @@ func renderNode(t *testing.T, n *render.Node) string {
 	}
 	return buf.String()
 }
+
+// TestAttachmentListTruncatesAndSaysSo covers the bound on a listing that is
+// not a listing endpoint at all.
+//
+// Attachments are a field on the issue, so the whole set arrives with the one
+// request and is trimmed here. That makes it the same shape as `board list` and
+// the rest, and it was missing the same test they had.
+func TestAttachmentListTruncatesAndSaysSo(t *testing.T) {
+	cmd, ok := registry.Lookup("issue.attachment.list")
+	if !ok {
+		t.Fatal("issue attachment list is not registered")
+	}
+
+	conn, _ := replayConn(t, "attachments.datacenter.json")
+	inv := &registry.Invocation{
+		Jira: &stubSession{conn: conn, kind: site.DataCenter},
+		Args: []string{"ENG-101"}, Flags: registry.NewFlags(),
+		Limit:  registry.Limit{N: 1},
+		Stderr: io.Discard, Progress: registry.NoProgress,
+	}
+
+	var buf strings.Builder
+	stream, err := render.NewStream(&buf, render.TSV, render.StreamSpec{
+		Kind: cmd.Kind(), Version: cmd.KindVersion(),
+		Name: cmd.CollectionName, Columns: cmd.Columns,
+	})
+	if err != nil {
+		t.Fatalf("stream: %v", err)
+	}
+	result, err := cmd.Stream(t.Context(), inv, stream)
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if err := stream.Close(result.Complete, result.NextPageToken); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+
+	// The fixture holds two, or the bound below proves nothing.
+	if rows := strings.Count(strings.TrimRight(buf.String(), "\n"), "\n"); rows != 1 {
+		t.Fatalf("emitted %d rows under --limit 1, want 1:\n%s", rows, buf.String())
+	}
+	if result.Complete {
+		t.Error("a truncated attachment list was reported complete")
+	}
+	if result.NextPageToken != "" {
+		t.Errorf("a page token was invented: %q", result.NextPageToken)
+	}
+}

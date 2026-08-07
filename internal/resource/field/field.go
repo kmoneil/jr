@@ -133,14 +133,10 @@ func runList(
 	}
 
 	fields := catalogue.Fields
-	complete := true
-	if !inv.Limit.All && len(fields) > inv.Limit.N {
-		// A bound the caller set is honored exactly, and the result says it was
-		// cut. Reporting a truncated catalogue as complete is how somebody
-		// concludes their field does not exist.
-		fields = fields[:inv.Limit.N]
-		complete = false
-	}
+	// A bound the caller set is honored exactly, and the result says it was
+	// cut. Reporting a truncated catalogue as complete is how somebody
+	// concludes their field does not exist.
+	fields, complete := registry.Bound(inv.Limit, fields)
 
 	nodes := make([]*render.Node, 0, len(fields))
 	for _, f := range fields {

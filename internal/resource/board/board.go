@@ -329,11 +329,7 @@ func runList(
 		return registry.StreamResult{}, err
 	}
 
-	complete := true
-	if !inv.Limit.All && len(boards) > inv.Limit.N {
-		boards = boards[:inv.Limit.N]
-		complete = false
-	}
+	boards, complete := registry.Bound(inv.Limit, boards)
 	for _, b := range boards {
 		if err := out.Write(b.Node()); err != nil {
 			return registry.StreamResult{}, err

@@ -268,11 +268,7 @@ func runLinkList(
 		return registry.StreamResult{}, err
 	}
 
-	complete := true
-	if !inv.Limit.All && len(links) > inv.Limit.N {
-		links = links[:inv.Limit.N]
-		complete = false
-	}
+	links, complete := registry.Bound(inv.Limit, links)
 	for _, link := range links {
 		if err := out.Write(link.Node()); err != nil {
 			return registry.StreamResult{}, err

@@ -149,11 +149,7 @@ func runComponents(
 		return registry.StreamResult{}, err
 	}
 
-	complete := true
-	if !inv.Limit.All && len(components) > inv.Limit.N {
-		components = components[:inv.Limit.N]
-		complete = false
-	}
+	components, complete := registry.Bound(inv.Limit, components)
 	for _, c := range components {
 		node := render.El("component").
 			Attr("id", c.ID).
@@ -268,11 +264,7 @@ func runVersions(
 		return registry.StreamResult{}, err
 	}
 
-	complete := true
-	if !inv.Limit.All && len(versions) > inv.Limit.N {
-		versions = versions[:inv.Limit.N]
-		complete = false
-	}
+	versions, complete := registry.Bound(inv.Limit, versions)
 	for _, v := range versions {
 		node := render.El("version").
 			Attr("id", v.ID).
@@ -387,11 +379,7 @@ func runStatuses(
 		return registry.StreamResult{}, err
 	}
 
-	complete := true
-	if !inv.Limit.All && len(types) > inv.Limit.N {
-		types = types[:inv.Limit.N]
-		complete = false
-	}
+	types, complete := registry.Bound(inv.Limit, types)
 	for _, t := range types {
 		statuses := make([]*render.Node, 0, len(t.Statuses))
 		names := make([]string, 0, len(t.Statuses))

@@ -97,6 +97,36 @@ func (l Limit) Satisfied(count int) bool {
 	return count >= l.N
 }
 
+// Bound cuts a result set the caller already holds in full down to what was
+// asked for, and reports whether it survived whole.
+//
+// It is for the fetch-everything-then-trim shape, and only that shape: the
+// caller has paged the endpoint to exhaustion, so len(items) is the true size
+// of the result set and comparing it against the limit is a real question.
+// `board list`, `epic list`, `sprint list`, `project list` and the rest fetch
+// the whole set before trimming because their endpoints document no ordering,
+// and this is where they all say so in one voice.
+//
+// **A result the server bounded must not come through here.** If the limit
+// reached the endpoint as maxResults, then len(items) cannot exceed it, the
+// comparison below can never fire, and the set comes back marked complete
+// however much was left behind. That is not hypothetical: `user list` pushed
+// the caller's limit into the request and then ran this comparison against the
+// response, so its truncation branch was unreachable and every bounded search
+// reported itself exhaustive. Such a command asks the server for one row more
+// than it wants and reports whether that row came back — see site.UserPage.
+//
+// It exists because eleven call sites had written these four lines out
+// longhand, and the twelfth wrote them slightly differently and was wrong. The
+// boundary is the part worth having in one place: exactly N results is a
+// complete answer, not a truncated one, and N+1 is the first that is not.
+func Bound[T any](l Limit, items []T) ([]T, bool) {
+	if l.All || len(items) <= l.N {
+		return items, true
+	}
+	return items[:l.N], false
+}
+
 // String renders the limit as the caller wrote it.
 func (l Limit) String() string {
 	if l.All {

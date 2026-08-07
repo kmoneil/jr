@@ -185,14 +185,10 @@ func runTransitions(
 	}
 
 	items := transitions.Items
-	complete := true
-	if !inv.Limit.All && len(items) > inv.Limit.N {
-		// A workflow rarely offers more moves than a limit allows, but a
-		// bounded result is still reported as bounded. Reporting a cut list as
-		// complete is how somebody concludes a transition does not exist.
-		items = items[:inv.Limit.N]
-		complete = false
-	}
+	// A workflow rarely offers more moves than a limit allows, but a
+	// bounded result is still reported as bounded. Reporting a cut list as
+	// complete is how somebody concludes a transition does not exist.
+	items, complete := registry.Bound(inv.Limit, items)
 
 	nodes := make([]*render.Node, 0, len(items))
 	for _, t := range items {
@@ -327,11 +323,7 @@ func runCreateMeta(
 	}
 
 	fields := created.Fields
-	complete := true
-	if !inv.Limit.All && len(fields) > inv.Limit.N {
-		fields = fields[:inv.Limit.N]
-		complete = false
-	}
+	fields, complete := registry.Bound(inv.Limit, fields)
 
 	nodes := make([]*render.Node, 0, len(fields))
 	for _, f := range fields {

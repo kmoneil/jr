@@ -363,11 +363,7 @@ func runList(
 		return registry.StreamResult{}, err
 	}
 
-	complete := true
-	if !inv.Limit.All && len(projects) > inv.Limit.N {
-		projects = projects[:inv.Limit.N]
-		complete = false
-	}
+	projects, complete := registry.Bound(inv.Limit, projects)
 	for _, p := range projects {
 		if err := out.Write(p.Node()); err != nil {
 			return registry.StreamResult{}, err

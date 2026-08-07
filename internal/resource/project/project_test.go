@@ -553,3 +553,67 @@ func TestTheRecordedListingIsEvidence(t *testing.T) {
 		t.Error("projects.cloud.json is no longer a recording")
 	}
 }
+
+// TestProjectPartsTruncateAndSaySo covers the three listings hanging off a
+// project. Each fetches the whole set in one request and trims here, so a limit
+// below what the fixture holds is what exercises the branch.
+//
+// They are together in one table because they are the same shape and were the
+// same omission: `project list` had this test and the three parts beside it did
+// not, which is exactly the gap a per-resource test cannot see and
+// TestEveryCommandDeclaringPartialCanProduceIt does.
+func TestProjectPartsTruncateAndSaySo(t *testing.T) {
+	for _, tc := range []struct {
+		command, fixture string
+		kind             site.Kind
+	}{
+		{"project.components", "components.datacenter.json", site.DataCenter},
+		{"project.versions", "versions.cloud.json", site.Cloud},
+		{"project.statuses", "statuses.cloud.json", site.Cloud},
+	} {
+		t.Run(tc.command, func(t *testing.T) {
+			cmd, ok := registry.Lookup(tc.command)
+			if !ok {
+				t.Fatalf("%s is not registered", tc.command)
+			}
+
+			conn, _ := replayConn(t, tc.fixture)
+			inv := &registry.Invocation{
+				Jira:  &stubSession{conn: conn, kind: tc.kind},
+				Args:  []string{"ENG"},
+				Flags: registry.NewFlags(), Limit: registry.Limit{N: 1},
+				Stderr: io.Discard, Progress: registry.NoProgress,
+			}
+
+			var buf strings.Builder
+			stream, err := render.NewStream(&buf, render.TSV, render.StreamSpec{
+				Kind: cmd.Kind(), Version: cmd.KindVersion(),
+				Name: cmd.CollectionName, Columns: cmd.Columns,
+			})
+			if err != nil {
+				t.Fatalf("stream: %v", err)
+			}
+			result, err := cmd.Stream(t.Context(), inv, stream)
+			if err != nil {
+				t.Fatalf("run: %v", err)
+			}
+			if err := stream.Close(result.Complete, result.NextPageToken); err != nil {
+				t.Fatalf("close: %v", err)
+			}
+
+			// The fixture has to hold more than the limit, or the test proves
+			// nothing: a one-row fixture under --limit 1 is complete, and would
+			// pass a check that only looked at the flag.
+			if rows := strings.Count(strings.TrimRight(buf.String(), "\n"), "\n"); rows != 1 {
+				t.Fatalf("emitted %d rows under --limit 1; the fixture must hold "+
+					"more than one row for this to test anything", rows)
+			}
+			if result.Complete {
+				t.Error("a truncated listing was reported complete")
+			}
+			if result.NextPageToken != "" {
+				t.Errorf("a page token was invented: %q", result.NextPageToken)
+			}
+		})
+	}
+}

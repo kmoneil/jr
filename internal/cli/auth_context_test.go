@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jira-cli/internal/render"
 )
 
 // theToken is what these tests hunt for in any output that is not `auth token`.
@@ -622,5 +623,45 @@ func TestContextNameIsDerivedFromTheHost(t *testing.T) {
 				t.Errorf("context name for %s is not %q:\n%s", host, want, got.stdout)
 			}
 		})
+	}
+}
+
+// TestContextListTruncatesAndSaysSo is the local half of the exit-3 contract.
+//
+// `context list` reads the config file rather than Jira, which is exactly why
+// it was the one paginated command with no truncation test: there is no
+// cassette to write and no deployment to split, so it looks like nothing could
+// go wrong. It declares exit 3 like every other paginated command and has to be
+// able to produce one.
+//
+// End to end through cli.Main rather than through the command, so the exit code
+// is the real exit code and the warning is on the real stderr. That is the pair
+// a script checks, and a test that only inspected the document would pass with
+// either of them missing.
+func TestContextListTruncatesAndSaysSo(t *testing.T) {
+	env := session(t)
+	mustRun(t, env, "context", "create", "work",
+		"--site", "acme.atlassian.invalid", "--project", "ENG")
+	mustRun(t, env, "context", "create", "personal",
+		"--site", "personal.atlassian.invalid", "--project", "HOME")
+
+	// Two contexts, one asked for. Whole first, so the truncation below is the
+	// bound doing it rather than the fixture being short.
+	if whole := mustRun(t, env, "context", "list"); strings.Count(
+		strings.TrimRight(whole.stdout, "\n"), "\n",
+	) != 2 {
+		t.Fatalf("want a header and two rows before bounding:\n%s", whole.stdout)
+	}
+
+	got := run(t, env, "context", "list", "--limit", "1")
+	if got.exit != exitcode.Partial {
+		t.Errorf("exit = %v, want PARTIAL: a cut list reported itself whole\n%s",
+			got.exit, got.stderr)
+	}
+	if !strings.Contains(got.stderr, render.TruncatedCode) {
+		t.Errorf("stderr does not carry %s:\n%s", render.TruncatedCode, got.stderr)
+	}
+	if rows := strings.Count(strings.TrimRight(got.stdout, "\n"), "\n"); rows != 1 {
+		t.Errorf("emitted %d rows under --limit 1, want 1:\n%s", rows, got.stdout)
 	}
 }

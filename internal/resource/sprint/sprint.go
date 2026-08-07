@@ -412,11 +412,7 @@ func runList(
 		return registry.StreamResult{}, err
 	}
 
-	complete := true
-	if !inv.Limit.All && len(sprints) > inv.Limit.N {
-		sprints = sprints[:inv.Limit.N]
-		complete = false
-	}
+	sprints, complete := registry.Bound(inv.Limit, sprints)
 	for _, s := range sprints {
 		if err := out.Write(s.Node()); err != nil {
 			return registry.StreamResult{}, err

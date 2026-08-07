@@ -161,11 +161,7 @@ func (a *app) runSchema(_ context.Context, inv *registry.Invocation) (*render.Do
 
 	// A limit that cuts the list short produces complete="false" and exit 3.
 	// It never produces a truncated list that claims to be exhaustive.
-	complete := true
-	if !inv.Limit.All && len(all) > inv.Limit.N {
-		all = all[:inv.Limit.N]
-		complete = false
-	}
+	all, complete := registry.Bound(inv.Limit, all)
 	return registry.CommandsDoc(all, complete), nil
 }
 
