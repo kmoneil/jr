@@ -35,11 +35,11 @@ either.
 `render`, `errs`.
 
 **Nothing may import `resource/*`** except `cmd`, `tui`, `mcp`, `workflow`, and
-`internal/commands` — which exists only to blank-import resources so their init
+`internal/commands`, which exists only to blank-import resources so their init
 functions run, and is what lets the contract tests see the full command surface.
 
-**Resources never import each other.** A cross-resource operation — adding an
-issue to a sprint — lives in `workflow` or in the calling layer. This is what
+**Resources never import each other.** A cross-resource operation, adding an
+issue to a sprint, lives in `workflow` or in the calling layer. This is what
 keeps each resource independently compilable, which is what makes compile-out
 work and what lets a new resource be added without touching an existing one.
 
@@ -49,7 +49,7 @@ issue resource and the container's, and neither could live in either one. What
 they need from `resource/issue` is `ParseKey`: a local copy would be another
 reimplementation of the one function this project has an invariant about, and
 the first one nobody would think to keep in step. `internal/lint` allows a
-`write`-gated file in `workflow` for exactly this reason and nowhere else — a
+`write`-gated file in `workflow` for exactly this reason and nowhere else; a
 mutation that does not span two resources belongs with the thing it mutates.
 
 That rule is why **Jira metadata lives in `site`, not in the resource that
@@ -64,8 +64,8 @@ over them.
 `resource/user` is the clearest case: `issue assign ENG-1 "Ada Lovelace"` has to
 resolve a display name to an accountId, and `jr user list` reports the same
 value. Two definitions of what a user is would be two answers to that, so the
-type and the deployment split — accountId against username, `query` against
-`username` — live in `site` and the resource renders them.
+type and the deployment split, accountId against username, `query` against
+`username`, live in `site` and the resource renders them.
 
 A resource reaches all of it through one `registry.Session.Metadata` call, so
 the cache is shared: two commands resolving the same field name in the same day
@@ -91,7 +91,7 @@ on the first change to either.
 catalogue and create metadata change when an administrator edits a screen, so a
 day-old answer is still the answer. An issue's available transitions change when
 the issue moves, so they are fetched every time and not memoized within a
-process either — two calls in one run can legitimately differ, and answering the
+process either: two calls in one run can legitimately differ, and answering the
 second from the first would hide it.
 
 Four more rules, all enforced in `internal/lint/importgraph_test.go` against the
@@ -115,11 +115,11 @@ flags, args, output kinds, exit codes, required tags, and the function that runs
 it. From that one declaration come the cobra tree, `jr schema`, and the MCP tool
 list. They cannot drift because there is only one of them.
 
-A command never writes to stdout. It returns a `render.Doc` — a
-format-independent tree — and `internal/cli` decides the format and writes it.
+A command never writes to stdout. It returns a `render.Doc` (a
+format-independent tree) and `internal/cli` decides the format and writes it.
 That is what lets every command support every format without knowing any of them
-exist, and it is why adding the fifth — `markdown`, in a build carrying the
-`render` tag — needed one writer and no change to any command.
+exist, and it is why adding the fifth format needed one writer and no change to
+any command: `markdown`, in a build carrying the `render` tag.
 
 A command that returns a kind it did not declare is rejected before anything is
 written, because a consumer dispatching on the declared kind would silently
@@ -137,26 +137,26 @@ internal/resource/issue/testdata/list.datacenter.json
 
 Both are required. Cloud and Data Center differ in API version, body format,
 and pagination shape, so a fixture recorded against one proves nothing about
-the other — and a resource that ships only the Cloud recording has tested half
+the other, and a resource that ships only the Cloud recording has tested half
 of what it claims to.
 
 **Record them; do not write them.** Every cassette in this repository was
-written by hand, and three encoded an assumption rather than the API — an
+written by hand, and three encoded an assumption rather than the API: an
 endpoint removed in Jira 9.0, a parameter of the wrong type, an expand nobody
 documents as necessary. All three passed their tests. A cassette proves a
 request is *unchanged*; only a recorded one proves it was ever *right*.
 
 `JIRA_RECORD=<path>` writes an invocation's whole conversation to a cassette.
 It is an environment variable rather than a flag because a flag would join the
-command surface, appear in `jr schema`, and need declaring on every command —
+command surface, appear in `jr schema`, and need declaring on every command,
 for something no caller of this tool should reach for.
 
 A recording is scrubbed **as it is written**, never as a later step somebody has
 to remember, on the same reasoning as credential redaction: a file that only
 becomes safe if a second command is run is a file that gets committed before it
-is. The host becomes `recorded.invalid`, account ids, UUIDs, emails, and avatar
+is. The host becomes `recorded.invalid`; account ids, UUIDs, emails, and avatar
 URLs become fixed placeholders, and `JIRA_RECORD_SCRUB="from=to,..."` renames
-whatever else a particular instance carries — a display name, a project key.
+whatever else a particular instance carries, a display name, a project key.
 
 Afterwards the cassette is checked for residue and anything identifier-shaped is
 reported on stderr. **That check deliberately does not reuse the scrubber's own
@@ -212,7 +212,7 @@ sharper version of the same reason: its entries are *named* for the site, so a
 listing publishes the hostname even though every file in it is 0600.
 
 `os.MkdirAll` leaves an existing directory's mode alone, so these apply to a new
-install. An existing 0755 is not repaired on read — changing permissions nobody
+install. An existing 0755 is not repaired on read, changing permissions nobody
 asked this tool to change is its own surprise.
 
 The table covers what `jr` writes, which is not the whole credential chain.
@@ -221,7 +221,7 @@ The table covers what `jr` writes, which is not the whole credential chain.
 is the one place a credential this tool uses may be world-readable.
 
 The store is refused when others can read it, because `jr` creates that file,
-writes it at 0600, and owns it — refusing is holding the tool to its own
+writes it at 0600, and owns it, refusing is holding the tool to its own
 guarantee. `.netrc` is none of those things: it usually predates `jr` on the
 machine, it is shared with curl and git, and curl reads a 0644 file without
 complaint. Refusing would make `jr` the one tool that broke over a mode it did
@@ -229,7 +229,7 @@ not set, and warning on every invocation would leave the credential just as
 exposed while adding noise about the least authoritative source in the chain.
 It is the same principle as the paragraph above: a mode nobody asked this tool
 to police is not this tool's to police. `chmod 600 ~/.netrc` is still worth
-doing — curl reads a 0600 file too — and is the user's call.
+doing, curl reads a 0600 file too, and is the user's call.
 
 That row is absent from the table above rather than added to it, because every
 row there is driven by a real write path in
@@ -252,7 +252,7 @@ Credentials live under **state, not config**, and that placement is the point.
 The config is meant to be hand-edited, shared, and committed to a dotfiles
 repository. A credential in it would be published by the first person who tried.
 `config.toml` holds a credential _reference_; the store holds the secret, at
-mode 0600, and is refused on read if it is readable by anyone else — reading it
+mode 0600, and is refused on read if it is readable by anyone else, reading it
 anyway and warning would mean the credential is used, and stays exposed, every
 time.
 
@@ -281,7 +281,7 @@ name to `customfield_10042` should not cost a round trip on every invocation.
 | Layer           | Method                                                         | Gate                                                |
 | --------------- | -------------------------------------------------------------- | --------------------------------------------------- |
 | `jql/`          | Table-driven, plus a fuzzer asserting no input escapes quoting | 100% of renderer branches                           |
-| `adf/`          | Golden files, round-trip property test, two fuzzers             | Corpus of ≥200 real documents, asserted             |
+| `adf/`          | Golden files, round-trip property test, three fuzzers           | Corpus of ≥200 real documents, asserted             |
 | `resource/*`    | Pure struct-in/struct-out unit tests, plus a fuzzer on anything that parses | 90%                                     |
 | `transport/`    | Recorded fixtures, Cloud + DC                                  | Every endpoint                                      |
 | Output contract | Golden files per kind, per format                              | Any diff requires a version bump in the same commit |
@@ -305,17 +305,17 @@ where the errors happen.
 **A parser guarantees its own output is safe.** An issue key, an epic
 reference, and a board id all end up as URL path segments. Most callers escape
 them and one did not, and the difference between the two was which author
-remembered — so what a parser accepts is safe unescaped, and the escaping is a
+remembered, so what a parser accepts is safe unescaped, and the escaping is a
 second layer rather than the only one. Each of those parsers has a fuzz target
 asserting exactly that, with the inputs that used to get through as seeds.
 
 Recorded HTTP contract tests are mandatory, not optional. Pure-function unit
 tests would not have caught any of the incumbent bugs this project exists to
-avoid — all of them live at the seam between the CLI and a real Jira.
+avoid, all of them live at the seam between the CLI and a real Jira.
 
 ## Bodies that do not fit in memory
 
-`transport` buffers a response by default, capped at 64MB — right for JSON,
+`transport` buffers a response by default, capped at 64MB, right for JSON,
 wrong for an attachment. `Request.Stream` hands the body back unread instead,
 and `Response.Close` releases it.
 
@@ -340,7 +340,7 @@ mistyped `--site` this is not a mistake the caller made or could see.
 **An upload body is a factory, not a reader.** `Request.BodySource` is re-opened
 on every attempt, for the same reason `Body` is bytes: a retry has to send the
 same content again, and a reader is spent by the first one. A source that cannot
-be re-opened fails with `BODY_NOT_REPLAYABLE` rather than sending a short body —
+be re-opened fails with `BODY_NOT_REPLAYABLE` rather than sending a short body,
 the failure mode without it is the worst kind, where the retry succeeds having
 uploaded nothing.
 

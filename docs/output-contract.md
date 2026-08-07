@@ -25,14 +25,14 @@ not a result document and carries no envelope.
 | Collections (`list`, `search`, `schema`)         | `tsv`   | Rectangular data is rectangular, and TSV is the cheapest encoding of it |
 | Records and documents (`get`, `view`, `version`) | `xml`   | Mixed content, no escaping tax, self-describing                         |
 
-`jr version`'s `release` attribute is always a semantic version, in every case —
+`jr version`'s `release` attribute is always a semantic version, in every case,
 a tagged build, an untagged tree, a dirty one, and a source tree with no git at
 all. `scripts/version.sh` produces it and `internal/lint/version_test.go` holds
 it to that shape, because the same string goes out as the `User-Agent` and lands
 in a Jira administrator's access log. It used to be whatever `git describe
 --always` returned, which on an untagged tree is a bare commit hash: it names no
 release, sorts against nothing, and does not announce that it is not a version.
-The User-Agent also carries the build profile — `jr/1.2.0 (reader)` tells an
+The User-Agent also carries the build profile: `jr/1.2.0 (reader)` tells an
 administrator the client that touched an issue could not have written to it.
 
 A tag that is not itself a semantic version fails the build rather than being
@@ -40,12 +40,12 @@ stamped. `git tag nightly` produced `nightly+1.g2acd8a4` and `git tag rel/2024`
 produced a string holding a character semver does not allow at all, both
 straight through `${tag#v}` into the binary and out onto the wire. The script
 now validates its own output and names the offending tag, and the Makefile
-checks it — `$(shell)` keeps a script's output and discards its exit status, so
+checks it: `$(shell)` keeps a script's output and discards its exit status, so
 a refusal alone would have stamped an empty release and built anyway. The four
 cases and the refusals are exercised in repositories the test builds, because
 this repository is only ever in one of them at a time.
 
-All four formats — `tsv`, `xml`, `json`, `yaml` — are available on every
+All four formats (`tsv`, `xml`, `json`, and `yaml`) are available on every
 command. The defaults are a convenience; `--format` is the contract.
 `JIRA_FORMAT` sets the default globally; `--format` overrides it. An
 unrecognized value is exit 2 listing the valid ones, never a silent fallback.
@@ -53,8 +53,8 @@ unrecognized value is exit 2 listing the valid ones, never a silent fallback.
 ### `complete` can appear inside a record, not only on a collection
 
 A collection says whether it is exhaustive in its envelope. A record could not
-say it at all — `Doc.IsComplete` returned true for every record, and said so in
-its own comment — until `issue get --with-comments` had to carry a comment
+say it at all: `Doc.IsComplete` returned true for every record, and said so in
+its own comment, until `issue get --with-comments` had to carry a comment
 thread. A thread is paged, so a bounded one is the normal case rather than an
 edge, and *`complete="false"` or exit 3* is unqualified.
 
@@ -74,14 +74,14 @@ not say which.
 
 **A consumer that learned to look for `complete` on the collection envelope must
 now also look inside a record.** Only containers that can genuinely be bounded
-declare it — `labels` and `components` arrive whole with the issue and do not,
+declare it; `labels` and `components` arrive whole with the issue and do not,
 so a value that is always true is not something to check.
 
 ### `markdown` is presentation, and carries no promise
 
 A build with the `render` tag has a fifth format, `markdown`. **It is not part
-of this contract.** Everything else in this document — the envelope, the kinds,
-the schema versions, the stability policy — describes the four formats above.
+of this contract.** Everything else in this document describes the four formats
+above: the envelope, the kinds, the schema versions, and the stability policy.
 `markdown` exists so a person reading an issue on a terminal does not have to
 read XML, and it may change in any release, with no version bump and no note.
 
@@ -92,7 +92,7 @@ major bump.
 Three things keep the exception contained rather than making it a hole:
 
 - It is **never a default.** `DefaultFor` stays TSV for collections and XML for
-  records, so no existing script can receive markdown by accident — a caller has
+  records, so no existing script can receive markdown by accident; a caller has
   to ask for it by name.
 - It is **absent from a build without the tag.** The agent, reader, and ci
   profiles refuse `--format markdown` with exit 2, do not list it in `--format`,
@@ -105,8 +105,8 @@ Three things keep the exception contained rather than making it a hole:
   other three formats, which is where anything parsing should be looking.
 
 It is still goldened in `internal/render/testdata`, and that is not a
-contradiction. Those files are regression tests — change the writer and the diff
-shows up — and they carry none of the schema-version obligation that
+contradiction. Those files are regression tests: change the writer and the diff
+shows up, and they carry none of the schema-version obligation that
 `internal/cli/testdata/kinds` does, which is the only golden set
 `internal/lint/goldens_test.go` holds to a version bump.
 
@@ -134,20 +134,20 @@ The same document as a single record, `issue get`:
 
 **The token columns are a proxy and are labelled as one.** They were counted
 with `cl100k_base`, which is OpenAI's tokenizer, not the one any Claude model
-uses — it undercounts Claude by roughly 15-20% on prose and by more on
+uses, it undercounts Claude by roughly 15-20% on prose and by more on
 structured text, which is exactly the shape being measured here. The bytes are
 exact, and they put the structured formats at 4.15-5.65x TSV against the
-proxy's 4.35-5.45x — the same band and the same conclusion, reached
+proxy's 4.35-5.45x, the same band and the same conclusion, reached
 independently. They do not agree on the figure, and they disagree on whether
 XML or YAML is the cheaper of the two. So the *decision* stands on the bytes;
 the token columns are corroboration, and neither is a Claude token count. Run
-`make cost` with credentials to replace them with one — it counts through
+`make cost` with credentials to replace them with one, it counts through
 Anthropic's own `count_tokens` endpoint.
 
 A hundred rows is where framing compounds: a structured format spells every
 field name once per row, and TSV spells it once for the whole result. That is
 9,825 tokens saved per hundred issues against XML, or 77%. One record has one
-of everything, so the multiple collapses to 1.21x — and what is left is that a
+of everything, so the multiple collapses to 1.21x, and what is left is that a
 record carries nested and mixed content a rectangular format has nowhere to
 put. The defaults follow the shape because the saving does.
 
@@ -169,8 +169,8 @@ is involved. The same hundred issues, decoded into typed structs:
 | `json` | 325us   | 23.7x  | 139 MB/s   | 58.4 KB   | 853         |
 | `yaml` | 1,602us | 117.0x | 21 MB/s    | 741.5 KB  | 14,831      |
 
-The parse spread is an order of magnitude wider than the token spread — 4.35x
-becomes 56.8x — because a token count scales with the bytes and a parser scales
+The parse spread is an order of magnitude wider than the token spread, 4.35x
+becomes 56.8x, because a token count scales with the bytes and a parser scales
 with the structure. TSV is two splits and an unescape; XML is a state machine
 and an allocation per element.
 
@@ -183,7 +183,7 @@ times, or on a runtime with a small heap.
 Measured 2026-08-06 against a payload built from the summaries Jira Cloud
 actually returned for the sandbox's sample project. `o200k_base` differs from
 `cl100k_base` by under 1% on every token row above, and the byte ratios land in
-the same band again — three counts of the same thing, agreeing on the shape.
+the same band again, three counts of the same thing, agreeing on the shape.
 That is the useful part: the ratio is a property of the framing rather than of
 whose vocabulary is counting, which is also why a proxy tokenizer was enough to
 decide §12.2 and is not enough to publish a number. Parse figures are a Go
@@ -194,7 +194,7 @@ Neither table is the enforced part. `TestFormatCostFavoursTSVForCollections`
 asserts the ratio the default rests on, with no tokenizer and no network, so a
 writer change cannot erode the premise quietly.
 `TestEveryFormatParsesBackToTheSameRows` decodes each format and holds it to the
-values it must recover — the only place in this repository that reads `jr`
+values it must recover, the only place in this repository that reads `jr`
 output back rather than writing it.
 
 ## Envelope
@@ -215,9 +215,9 @@ Every successful XML response:
 </result>
 ```
 
-- `kind` — stable identifier for the payload shape. An agent dispatches on it.
-- `v` — schema version for that kind, incremented on breaking change.
-- `complete` — **`true` only if the result set is exhaustive.** If a limit
+- `kind`, stable identifier for the payload shape. An agent dispatches on it.
+- `v`, schema version for that kind, incremented on breaking change.
+- `complete`, **`true` only if the result set is exhaustive.** If a limit
   truncated it, `complete="false"` and `<next-page-token>` is present. There is
   no third state and no way to get a truncated set that claims to be complete.
   This is the single most important attribute in the format.
@@ -235,7 +235,7 @@ the XML tree:
 }
 ```
 
-TSV emits a header row and nothing else — no envelope, no counts.
+TSV emits a header row and nothing else, no envelope, no counts.
 
 ## Streaming
 
@@ -249,7 +249,7 @@ rows already fetched instead of nothing.
 
 XML, JSON, and YAML cannot stream, because their envelopes carry `count` and
 `complete` and neither is known until the last page lands. Those formats buffer
-and emit once, exactly as before — streamed output for a given result is
+and emit once, exactly as before, streamed output for a given result is
 byte-identical to buffered output, and a test asserts it.
 
 This works because of the arrangement above: TSV's completeness signal lives on
@@ -267,7 +267,7 @@ ordinary Unix behavior and not an error.
 
 A long run reports its progress on stderr **only when stderr is a terminal**.
 On a pipe or a redirect nothing is emitted at all, so the rule that stderr
-carries only structured diagnostics is untouched — there is no structured form
+carries only structured diagnostics is untouched, there is no structured form
 of "42% done" worth defining, and a machine reading stderr sees byte-identical
 output whether or not a human happened to be watching.
 
@@ -332,10 +332,10 @@ consumer can recognise it:
 | `media`            | `![alt](jira-media:<collection>/<id>)`          |
 | `status`           | `[Blocked](jira-status:red)`                    |
 | `date`             | `[2026-08-06](jira-date:1785974400000)`         |
-| `panel`            | `> [!WARNING]` — GitHub alert syntax, with ADF's own panel type |
+| `panel`            | `> [!WARNING]`: GitHub alert syntax, with ADF's own panel type |
 
-A `media` node that carries a URL rather than an id — an external or linked
-image — keeps that URL instead. An `inlineCard`, `blockCard`, or `embedCard`
+A `media` node that carries a URL rather than an id, an external or linked
+image, keeps that URL instead. An `inlineCard`, `blockCard`, or `embedCard`
 becomes the bare URL it points at. An `emoji` becomes the character it stands
 for, or its `:short-name:` where it has no character.
 
@@ -346,10 +346,10 @@ has no page, so there is nowhere for a position on one to go.
 
 Two more things move rather than being dropped or refused. A line break at the
 very start or end of a block is discarded, because markdown cannot write one
-there and Jira does not render one either — it is what pressing shift-enter at
+there and Jira does not render one either, it is what pressing shift-enter at
 the end of a paragraph leaves behind. And whitespace at the edge of an
 emphasised span moves outside it. Markdown cannot emphasise a leading or trailing
-space — `* x*` is an asterisk and a word, not a span — and Jira's editor
+space, `* x*` is an asterisk and a word, not a span, and Jira's editor
 produces one whenever somebody bolds a word and then types the space after it.
 The space is written outside the delimiters instead. Every character is
 unchanged and so is what a reader sees; only the extent of the mark moves, by
@@ -361,13 +361,13 @@ sections; multi-column layouts; decision lists; macros and extensions; custom
 panels, whose colour is content; table cells that span rows or columns, hold
 more than a single paragraph, or sit in a table with no header row; and any
 node type or mark this build does not know. A node-level JSON field the schema
-does not define is refused too, rather than ignored — ignoring one converts a
+does not define is refused too, rather than ignored, ignoring one converts a
 document while silently leaving part of it out.
 
 Link destinations use CommonMark's angle-bracket form
 (`[text](<https://example.invalid/a(b)>)`) where the URL holds a bracket, a
 space, or an angle bracket. Percent-encoding is not used, because a `%28`
-already in the URL and one this tool wrote are the same three characters — so
+already in the URL and one this tool wrote are the same three characters, so
 an address holding a line ending, and an attachment id holding the `/` that
 separates it from its collection, are refused rather than encoded one way.
 
@@ -405,7 +405,7 @@ Every record is one line and every field is one column. Within a field:
 | carriage return | `\r`       |
 
 Split on `\t` and `\n` with no defensive code. A column path that does not
-resolve produces an empty cell — but no shipped column has such a path, and
+resolve produces an empty cell, but no shipped column has such a path, and
 `TestEveryColumnNamesAValue` refuses one that does. A column whose path walks to
 an element with no text of its own can only ever be blank, which is a column
 that cannot show what its header says.
@@ -482,8 +482,8 @@ It is always present, never omitted when false.
 
 ### Resolution failures
 
-A value naming something on the server — a field, and in time a user or a
-transition — is resolved against the site before the request is built, never
+A value naming something on the server, a field, and in time a user or a
+transition, is resolved against the site before the request is built, never
 sent for Jira to reject. The refusal carries the candidates, because an error
 that only says "unknown" leaves the caller to go and read a catalogue to find
 their typo.
@@ -499,7 +499,7 @@ their typo.
 | `AMBIGUOUS_ISSUE_TYPE` | 2      | Several types share that name; pass the id.                                                                                                                         |
 | `UNKNOWN_USER`         | 2      | No user with that display name, email, or id. `detail` lists the plausible near misses with their ids, and is absent where the search returned nothing that shares a word with what was typed. A partial match is a near miss, not a resolution. |
 | `AMBIGUOUS_USER`       | 2      | Several users share that display name. `detail` lists every candidate with its id, whether the account is inactive, and whether it is an app rather than a person.  |
-| `UNKNOWN_PROJECT`      | 5      | The project does not exist, or this credential may not create in it. Reported for either status the createmeta route answers an unaddressable project with — a 10.3 Data Center says 400, and 404 is equally plausible elsewhere. |
+| `UNKNOWN_PROJECT`      | 5      | The project does not exist, or this credential may not create in it. Reported for either status the createmeta route answers an unaddressable project with, a 10.3 Data Center says 400, and 404 is equally plausible elsewhere. |
 
 Field resolution costs one request against a cold cache and none against a warm
 one; a command that names nothing to resolve makes no extra request at all.
@@ -522,12 +522,12 @@ narrow on purpose: a file and a result on the same channel means one corrupts
 the other, and the caller who asked for the file gets it.
 
 Writing to a path is the ordinary case and emits `issue.attachment.download`
-saying what was written, where, and how many bytes — counted while writing, so
+saying what was written, where, and how many bytes, counted while writing, so
 if it disagrees with the size the listing reported, this is the one that
 happened.
 
-A caller with no stdout to spare — `mcp serve`, where bytes would land on the
-JSON-RPC stream as a frame the peer cannot parse — gets `NO_STDOUT` and exit 2
+A caller with no stdout to spare, `mcp serve`, where bytes would land on the
+JSON-RPC stream as a frame the peer cannot parse, gets `NO_STDOUT` and exit 2
 rather than a corrupted session.
 
 ### Verdicts
@@ -538,7 +538,7 @@ exits 0 with `valid="false"` and the reasons attached.
 
 That is deliberate and it is the opposite of the rule everywhere else, so it is
 worth being explicit. An exit code cannot carry a list, and the reasons are what
-the command is for — an agent checking a query before it acts needs to know
+the command is for, an agent checking a query before it acts needs to know
 which field was wrong and where. Exiting non-zero would suppress stdout and
 collapse Jira's own error text, positions included, into a single line of prose.
 
@@ -547,7 +547,7 @@ the question could not be answered at all: no credential, no network, a 500.
 
 The verdict also records who reached it. `method="parse"` is Cloud's parse
 endpoint, `method="search"` is Data Center's zero-row search, and
-`method="local"` means this tool decided without asking — the query did not lex,
+`method="local"` means this tool decided without asking, the query did not lex,
 or its parentheses did not balance. The three are not the same claim, and a
 consumer that treats them as one is trusting a lexer with a question only the
 server can answer.
@@ -560,8 +560,8 @@ their `detail`: `the site came from context "work"`, `from --site`, or
 `from JIRA_SITE`.
 
 Three things can supply a site and which one won is visible nowhere else, so
-"the site is not reachable" used to require a second command — `jr context
-show` — before it could be acted on. It is an addition to the detail and never
+"the site is not reachable" used to require a second command, `jr context
+show`, before it could be acted on. It is an addition to the detail and never
 a replacement: the endpoint that failed is still the first thing there.
 
 Nothing else carries it. An error that explains everything explains nothing, and
@@ -594,7 +594,7 @@ returns the original result rather than making a second one.
 An attempt that claimed a key and then died leaves the claim pending, and a
 retry inside `idem.StaleClaim` is **refused** rather than allowed. The first
 request may have been processed, so "I do not know" has to behave like "it
-happened" — allowing it is the duplicate this exists to prevent. Past that
+happened", allowing it is the duplicate this exists to prevent. Past that
 window the claim is handed over, and the caller is told the earlier attempt's
 outcome is unknown rather than being left to assume nothing happened.
 
@@ -606,7 +606,7 @@ did not ask for idempotency does not silently get it.
 ### Mutations
 
 Every mutating command accepts `--dry-run`, requires the `write` build tag, and
-declares exit 10. A reader binary does not contain them at all — that is the
+declares exit 10. A reader binary does not contain them at all, that is the
 linker's guarantee, not a runtime check.
 
 Read-only mode and the missing-confirmation refusal are enforced in the CLI
@@ -616,19 +616,19 @@ costs nothing and cannot half-happen.
 
 The two are relaxed differently for `--dry-run`, and the asymmetry is
 deliberate. A missing `--yes` is a step the caller has not taken yet, so a
-preview is allowed — you look at the request in order to decide whether to
+preview is allowed, you look at the request in order to decide whether to
 confirm it. A read-only context is a statement about what that context is *for*,
 so the latch stays one-way and a dry run is refused too.
 
 `--dry-run` emits kind `dry-run` v1: the request itself, with its method, path,
 query, and body verbatim. It is built from the same `transport.Request` the
 command was about to send, so the preview and the real thing cannot drift, and
-the body can be pasted into `curl`. It never carries a credential — the document
+the body can be pasted into `curl`. It never carries a credential, the document
 renders the request as the command built it, before the transport attaches one.
 
 | Code                      | Exit | Meaning                                    |
 | ------------------------- | ---- | ------------------------------------------- |
-| `READ_ONLY`               | 10   | A context, `--readonly`, or `JIRA_READONLY` forbids changing Jira. It is a one-way latch within an invocation: nothing a command does turns it off, and `JIRA_READONLY=0` does not clear a context that was created read-only. Changing what a context is for is a separate act — `context edit --unset readonly`. |
+| `READ_ONLY`               | 10   | A context, `--readonly`, or `JIRA_READONLY` forbids changing Jira. It is a one-way latch within an invocation: nothing a command does turns it off, and `JIRA_READONLY=0` does not clear a context that was created read-only. Changing what a context is for is a separate act, `context edit --unset readonly`. |
 | `CONFIRMATION_REQUIRED`   | 10   | A destructive command was run without `--yes`. Not raised for `--dry-run`: a preview is not the thing being confirmed, and you look at it in order to decide. |
 | `IDEMPOTENT_IN_FLIGHT`    | 7    | Another run holds this key and has not finished; it may already have done the work. |
 | `INVALID_ENCODING`        | 2    | Text that is not valid UTF-8. It is refused, never repaired: substituting U+FFFD would put a character in Jira the caller never wrote. |
@@ -638,21 +638,21 @@ renders the request as the command built it, before the transport attaches one.
 | `INVALID_DURATION`        | 2    | Not a Jira duration. The format is a count of `w`, `d`, `h`, or `m`, largest first. Nothing is converted between them: a working week is a site setting. |
 | `SELF_LINK`               | 2    | Both ends of a link are the same issue. |
 | `SELF_EPIC`               | 2    | An epic was named as one of the issues to move into it. |
-| `NOTHING_TO_EDIT`         | 2    | An edit was given nothing to change — `issue edit` with no field, `context edit` with no setting. |
+| `NOTHING_TO_EDIT`         | 2    | An edit was given nothing to change, `issue edit` with no field, `context edit` with no setting. |
 | `CONFLICTING_EDIT`        | 2    | `context edit` was asked to set and clear the same setting. Both at once has no single right answer, and picking one would make the result depend on an implementation detail nobody can see. |
-| `UNCONSTRAINED_QUERY`     | 2    | `issue list --limit all` with no filter would page until the instance is exhausted and return every issue in every project the credential can see. The default bound makes an unfiltered query harmless — one request, fifty rows — so only the pairing is refused. `--all-projects` is how to mean it. |
+| `UNCONSTRAINED_QUERY`     | 2    | `issue list --limit all` with no filter would page until the instance is exhausted and return every issue in every project the credential can see. The default bound makes an unfiltered query harmless, one request, fifty rows, so only the pairing is refused. `--all-projects` is how to mean it. |
 | `INVALID_API_VERSION`     | 2    | `--api-version` accepts 2 or 3. Cloud serves v3; Data Center serves v2. |
 | `TOO_MANY_ISSUES`         | 2    | More issues than the agile API moves at once. It is refused rather than split across requests: two requests can half-succeed, and the outcome would be neither moved nor not moved. |
 | `DESTINATION_EXISTS`      | 7    | A download would replace a file that is already there. It refuses rather than overwriting, because a download that silently replaced a file is indistinguishable from one that worked, and the file it replaced is not recoverable. `--force` allows it. |
-| `OFF_SITE_URL`            | 1    | A URL the server supplied points outside the configured site — another host, another scheme, or outside the context path — and this tool will not follow it. Data Center reports an attachment's content as an absolute URL; following it on trust is how a credential reaches a host nobody chose. The check does not depend on how the URL is spelled: `//host/path` names a host while carrying no scheme, and a path beginning with `/` is resolved against the site's origin, so both are held to the same rule as an absolute URL. The refusal never echoes the URL — one can carry userinfo or a signed parameter — and names only the part that differs. |
-| `UNRENDERABLE_VALUE`      | 1    | A value in the result holds a character no output format can carry — most of C0, `U+FFFE`, `U+FFFF`, or a byte that is not valid UTF-8. XML 1.0 forbids these outright, so escaping is not available: `&#1;` is no more legal than the raw byte. The refusal does not depend on `--format`, even though JSON and YAML could encode one, because the flag chooses an encoding and not what this tool is willing to say. Distinct from `INVALID_ENCODING`, which is exit 2 and is a value the *caller* supplied: this one comes back from Jira, so the caller has done nothing to correct. The message names the field. |
-| `UNSAFE_FILENAME`         | 1    | A download with no `--output` takes its destination from the filename the server reports, and that filename is not one. A name carrying a directory separator, a parent reference, or an absolute path would put the bytes somewhere nobody asked for; Data Center reports the filename on the attachment itself, so the value is the server's rather than the caller's. The name is still reported in full by `issue attachment list` — refusing to *write* it is not refusing to *say* it. Pass `--output <path>` to name the destination yourself. Exit 1 and not 9: the server returns the same filename next time, so retrying cannot help, and 9 publishes a refusal as retryable. |
-| `BODY_NOT_REPLAYABLE`     | 1    | A retry needed the request body again and could not get it — a body read from a pipe cannot be sent twice. The request fails rather than going out short, because a second attempt carrying nothing would be accepted as a successful upload of an empty file. |
+| `OFF_SITE_URL`            | 1    | A URL the server supplied points outside the configured site, another host, another scheme, or outside the context path, and this tool will not follow it. Data Center reports an attachment's content as an absolute URL; following it on trust is how a credential reaches a host nobody chose. The check does not depend on how the URL is spelled: `//host/path` names a host while carrying no scheme, and a path beginning with `/` is resolved against the site's origin, so both are held to the same rule as an absolute URL. The refusal never echoes the URL, one can carry userinfo or a signed parameter, and names only the part that differs. |
+| `UNRENDERABLE_VALUE`      | 1    | A value in the result holds a character no output format can carry, most of C0, `U+FFFE`, `U+FFFF`, or a byte that is not valid UTF-8. XML 1.0 forbids these outright, so escaping is not available: `&#1;` is no more legal than the raw byte. The refusal does not depend on `--format`, even though JSON and YAML could encode one, because the flag chooses an encoding and not what this tool is willing to say. Distinct from `INVALID_ENCODING`, which is exit 2 and is a value the *caller* supplied: this one comes back from Jira, so the caller has done nothing to correct. The message names the field. |
+| `UNSAFE_FILENAME`         | 1    | A download with no `--output` takes its destination from the filename the server reports, and that filename is not one. A name carrying a directory separator, a parent reference, or an absolute path would put the bytes somewhere nobody asked for; Data Center reports the filename on the attachment itself, so the value is the server's rather than the caller's. The name is still reported in full by `issue attachment list`, refusing to *write* it is not refusing to *say* it. Pass `--output <path>` to name the destination yourself. Exit 1 and not 9: the server returns the same filename next time, so retrying cannot help, and 9 publishes a refusal as retryable. |
+| `BODY_NOT_REPLAYABLE`     | 1    | A retry needed the request body again and could not get it, a body read from a pipe cannot be sent twice. The request fails rather than going out short, because a second attempt carrying nothing would be accepted as a successful upload of an empty file. |
 | `SPRINT_NOT_ACTIVE`       | 7    | Only a running sprint can be closed. The sprint is read first, so the wrong state costs one read and no mutation. |
 
 ### Body text on write
 
-Text bound for a description or a comment is **contained, never converted** —
+Text bound for a description or a comment is **contained, never converted**,
 unless `--body-format` says otherwise.
 
 | `--body-format` | What happens                                              |
@@ -664,7 +664,7 @@ unless `--body-format` says otherwise.
 Under `text`, Data Center takes a string of wiki markup and gets the text as
 typed. Cloud will not accept a string where a document belongs, so the text is
 wrapped in the minimal document that holds it: a blank line starts a paragraph,
-a single newline is a line break. Nothing is interpreted — `**bold**` reaches
+a single newline is a line break. Nothing is interpreted, `**bold**` reaches
 Jira as six characters on both deployments, and the server decides what they
 mean. That is the difference between containing text, which is exact, and
 converting it, which is not.
@@ -675,7 +675,7 @@ so both are refused with `BODY_FORMAT_UNSUPPORTED` rather than approximated.
 
 Under `markdown` the subset is CommonMark's block and inline structure minus
 what ADF has no node for, plus GFM tables, task lists, and strikethrough, plus
-the `jira-` link schemes above — so a body read out of Jira goes back in as the
+the `jira-` link schemes above, so a body read out of Jira goes back in as the
 document it came from. A single newline inside a paragraph joins its lines,
 because that is what markdown means by one; a trailing backslash is a hard
 break.
@@ -723,7 +723,7 @@ Each kind reports one element: its attributes with types, optionality, and any
 closed set of values; its child elements with the same, plus whether each may be
 absent or repeated; and its text, when it carries any.
 
-The types are promises about the shape of the text, not JSON types — every
+The types are promises about the shape of the text, not JSON types, every
 format here is textual. `int` parses as a decimal integer. `bool` is exactly
 `true` or `false`, never `yes` or `1`. `timestamp` is RFC 3339 in UTC, which is
 why Jira's own formats are normalized before they are emitted. `date` is
@@ -731,7 +731,7 @@ why Jira's own formats are normalized before they are emitted. `date` is
 inventing midnight in a timezone would be a value nobody set.
 
 **An empty value satisfies every type.** "Present but empty" is a fact this tool
-emits deliberately — an unassigned issue, a context with no default project —
+emits deliberately, an unassigned issue, a context with no default project,
 and it is not the same as absent. A consumer checks for the element, then for
 the value.
 
@@ -751,13 +751,13 @@ alongside the code would describe the output as somebody once believed it to be.
 
 The contract is enforced by golden files, not by review discipline:
 
-- `internal/render/testdata/` — every writer, every payload shape. The envelope,
+- `internal/render/testdata/`, every writer, every payload shape. The envelope,
   the escaping rules, and the truncation signal, which do not vary between
   builds.
-- `internal/cli/testdata/kinds/` — one file per kind and schema version, holding
+- `internal/cli/testdata/kinds/`, one file per kind and schema version, holding
   that kind's element shape as `jr contract` prints it. `issue.get.v2.xml` is
   the shape of `issue.get` at v2.
-- `internal/cli/testdata/<profile>/` — end-to-end output for each built-in
+- `internal/cli/testdata/<profile>/`, end-to-end output for each built-in
   command, recorded once per shipped profile: `full`, `agent`, `reader`, `ci`.
 
 `make golden` rewrites all of them, running the per-profile set under every
@@ -767,7 +767,7 @@ Bump the schema version of the affected kind in the same commit.
 The split is not cosmetic. A kind's *shape* is the same in every build that has
 the kind, so it is pinned once and every profile compares against the same file.
 What differs between builds is which kinds exist and which commands emit them,
-and that is what the per-profile sets carry — `contract.tsv` is the inventory,
+and that is what the per-profile sets carry, `contract.tsv` is the inventory,
 `schema.tsv` the command surface, `version.xml` the tag list.
 
 **The version rule is mechanical, not remembered.** `make golden` refuses to
@@ -790,18 +790,18 @@ Update this document in the same change that alters any of:
   The tables above are asserted against the source by
   `internal/lint/errorcodes_test.go`: a documented code has to exist, produce
   the exit printed beside it, and produce only that one. They are a curated
-  subset — this tree emits some two hundred codes — so a code missing from them
+  subset, this tree emits some two hundred codes, so a code missing from them
   is one the contract does not promise, not one that is undocumented by
   accident.
 - The format of `jr version`'s `release` string, or what `scripts/version.sh`
   accepts and refuses. The guarantee above is one a consumer can parse, and
   nothing used to tell the next person editing that script that a document
-  depended on it. `internal/lint/version_test.go` asserts both — the four cases
+  depended on it. `internal/lint/version_test.go` asserts both, the four cases
   in repositories it builds, and every worked `jr 1.2.0 (…)` example in this
   file and in `docs/build-profiles.md` against the profiles the Makefile ships.
 - The escaping rules of any writer, or the type-promotion table above.
 - Which format is the default for a content shape.
-- What the ADF converter carries, drops, or refuses, in either direction —
+- What the ADF converter carries, drops, or refuses, in either direction,
   including the `jira-` link schemes, which are as much a part of the contract
   as an element name.
 - Where the golden files live, or which builds they are recorded against.

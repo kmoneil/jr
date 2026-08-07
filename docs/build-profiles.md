@@ -5,7 +5,7 @@ contributes zero bytes and zero attack surface.
 
 This is stronger than a runtime check. The incumbent's `edit`, `move`, and
 `delete` segfault on non-TTY stdin because a prompt was reachable in a context
-with no human. Here that is not a bug to fix — it is a state that cannot be
+with no human. Here that is not a bug to fix; it is a state that cannot be
 constructed, because a headless binary has no prompt package linked. Compile-out
 converts a class of runtime bugs into link errors.
 
@@ -17,10 +17,10 @@ converts a class of runtime bugs into link errors.
 | `mcp`       | `jr mcp serve`                                          | `jr mcp serve`                 |
 | `prompt`    | Interactive prompts, the setup wizard, completion       | `jr completion`                |
 | `admin`     | Project, board, and sprint administration               | `jr sprint close`              |
-| `tui`       | `jr ui`, interactive tables                             | **nothing** — no `jr ui` yet   |
+| `tui`       | `jr ui`, interactive tables                             | **nothing**, no `jr ui` yet   |
 | `render`    | Human-readable rendering for a terminal                 | `--format markdown`            |
-| `browser`   | `jr open`, the OAuth browser flow                       | **nothing** — no OAuth yet     |
-| `clipboard` | Copying keys and URLs                                   | **nothing** — nothing copies   |
+| `browser`   | `jr open`, the OAuth browser flow                       | **nothing**, no OAuth yet     |
+| `clipboard` | Copying keys and URLs                                   | **nothing**, nothing copies   |
 
 The right-hand column is not documentation that can drift. Two tests hold it,
 because it makes two different claims.
@@ -29,7 +29,7 @@ because it makes two different claims.
 nothing must be listed in `notYetGating` with a reason, and one that starts
 gating something fails the test until it is taken off that list. A file that
 only records the tag is set, or a package that is nothing but a doc comment,
-does not count as gating — that would report exactly the reassurance the audit
+does not count as gating, because that would report exactly the reassurance the audit
 exists to withhold.
 
 `internal/lint/profiles_test.go` asserts what each cell actually says, by
@@ -44,7 +44,7 @@ claims" are not the same question. A cell may name commands, count them, or say
 
 `jr sprint close` is behind `write && admin`, and it is the only thing so far
 that needs two. Write, because it changes Jira; admin, because of what it
-changes — closing a sprint ends an iteration for a whole board and returns
+changes: closing a sprint ends an iteration for a whole board and returns
 every unfinished issue to the backlog. The agent profile has `write` and not
 `admin`, so it can edit an issue and cannot end an iteration.
 
@@ -78,7 +78,7 @@ make build-all     # all four
 | `ci`     | Query only, smallest possible.                                                         |
 
 `make size` asserts the reader build stays under 12 MB. It guards against a
-terminal, display-server, or `os/exec` dependency creeping in — it is **not** a
+terminal, display-server, or `os/exec` dependency creeping in. It is **not** a
 measure of what a profile excludes, and it should not be read as one.
 
 Binary size is a poor proxy for compile-out. `full` and `agent` are near enough
@@ -90,12 +90,12 @@ The counts below are asserted, not maintained. `internal/lint/profiles_test.go`
 builds each profile, runs `jr schema` against it, and fails if this table
 disagrees; it reads the tag sets from the Makefile so it has no second copy of
 them to go stale. It exists because these numbers were four releases out of date
-— 26, 25, 18, 17 against a real 54, 52, 35, 34 — which is what a number in a
+26, 25, 18, 17 against a real 54, 52, 35, 34, which is what a number in a
 document that nothing checks eventually becomes.
 
 | Profile  | Commands | Not present                                   |
 | -------- | -------- | --------------------------------------------- |
-| `full`   | 60       | —                                             |
+| `full`   | 60       | none                                          |
 | `agent`  | 58       | `completion`, `sprint close`                  |
 | `reader` | 40       | the above, plus the 18 mutating verbs         |
 | `ci`     | 39       | the above, plus `mcp serve`                   |
@@ -126,7 +126,7 @@ display	jr 1.2.0 (reader; tags=mcp)
 **A profile carries no code it cannot reach.** `make lint-untagged` runs
 `staticcheck -checks=U1000 ./...` with no build tags, which is the build a `ci`
 or `reader` user actually gets. `.golangci.yml` turns all eight tags on
-deliberately — code behind a tag is still shipped code — and the cost is that
+deliberately: code behind a tag is still shipped code, and the cost is that
 `unused` then analyses one build in which every file is present, so a symbol
 reachable only from a `//go:build write` file looks used. `echoMode` sat in an
 untagged file and was called from two write-tagged ones, so it compiled into
@@ -137,7 +137,7 @@ could see it: the linter that would have said so was the one configured not to.
 iterates every registered command and asserts:
 
 - Every tag it names is documented in `KnownTags`.
-- Every tag it names is present in this build — a command registered in a build
+- Every tag it names is present in this build; a command registered in a build
   missing its tags means the registration is not gated correctly.
 - Every mutating command requires `write`.
 - In a build without `write`, no registered command is mutating.

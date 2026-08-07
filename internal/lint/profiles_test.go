@@ -204,8 +204,8 @@ var docCount = regexp.MustCompile(`\b(\d+)\b`)
 // readGatesCell decides what one cell claims.
 //
 // "nothing" is tested first and deliberately: three of those four cells name a
-// command as the thing that does not exist yet — "**nothing** — no `jr ui` yet"
-// — and reading them as a command list would assert the opposite of what they
+// command as the thing that does not exist yet, as in "**nothing**, no `jr ui`
+// yet", and reading them as a command list would assert the opposite of what they
 // say.
 func readGatesCell(t *testing.T, cell string) gatesCell {
 	t.Helper()
