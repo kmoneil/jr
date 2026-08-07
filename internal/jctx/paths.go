@@ -118,6 +118,19 @@ func (p Paths) SiteCache(site string) string {
 
 // sanitizeSite turns a site URL into a single safe path element, so a hostname
 // can never escape the cache directory or collide across schemes.
+//
+// The allowlist is not on its own enough to make that true, and the gap is
+// worth naming because it is easy to reintroduce: `.` is a legal hostname
+// character and has to stay on the list, which leaves `.` and `..` as outputs
+// the allowlist is perfectly happy with and Join is not. `..` resolved one
+// level above the cache root, and Cache.Clear does RemoveAll on whatever it is
+// handed — so `--refresh` against a site named `..` deleted every application's
+// cache rather than this tool's. Deeper escapes were already impossible: `/`
+// maps to `_`, so `../..` becomes the literal `.._..`.
+//
+// What holds the invariant is the postcondition, asserted by
+// FuzzSiteCacheStaysUnderTheCacheRoot. An allowlist is a statement about
+// characters; the guarantee is about what they compose into.
 func sanitizeSite(site string) string {
 	s := strings.TrimSpace(strings.ToLower(site))
 	s = strings.TrimPrefix(s, "https://")
@@ -134,7 +147,7 @@ func sanitizeSite(site string) string {
 		}
 	}
 	out := b.String()
-	if out == "" {
+	if out == "" || out == "." || out == ".." {
 		return "unknown"
 	}
 	return out

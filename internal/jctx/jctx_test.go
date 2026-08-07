@@ -1,6 +1,7 @@
 package jctx_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -148,17 +149,78 @@ func TestSiteCacheIsOnePathElement(t *testing.T) {
 		"jira.acme.invalid/jira":         "jira.acme.invalid_jira",
 		"../../../etc/passwd":            ".._.._.._etc_passwd",
 		"":                               "unknown",
+		// The escape that worked, and the one this table missed for as long as
+		// it existed. `../../../etc/passwd` looks like the dangerous input and
+		// is not: `/` maps to `_`, so it flattens to a literal. A bare `..`
+		// passes the allowlist unchanged — `.` has to be on it, hostnames need
+		// it — and Join then resolves it one level up, where Cache.Clear does
+		// RemoveAll. A table of inputs that look hostile is not a table of
+		// inputs that are.
+		"..":         "unknown",
+		"https://..": "unknown",
+		".":          "unknown",
+		"....":       "....",
 	}
 	for site, want := range cases {
 		got := paths.SiteCache(site)
 		if filepath.Base(got) != want {
 			t.Errorf("SiteCache(%q) = %q, want the element %q", site, got, want)
 		}
-		// A hostname must never escape the cache directory.
-		if !strings.HasPrefix(filepath.Clean(got), paths.Cache) {
-			t.Errorf("SiteCache(%q) = %q escapes %q", site, got, paths.Cache)
+		if err := underCacheRoot(paths.Cache, got); err != nil {
+			t.Errorf("SiteCache(%q): %v", site, err)
 		}
 	}
+}
+
+// underCacheRoot reports whether a site cache directory is strictly inside the
+// cache root.
+//
+// filepath.Rel rather than a string prefix: `/home/ada/.cache/jr-evil` has
+// `/home/ada/.cache/jr` as a prefix and is not inside it, so the cheap spelling
+// of this check passes exactly the case worth catching.
+func underCacheRoot(root, dir string) error {
+	rel, err := filepath.Rel(root, filepath.Clean(dir))
+	if err != nil {
+		return fmt.Errorf("%q is not relative to %q: %w", dir, root, err)
+	}
+	if rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("%q escapes %q (relative path %q)", dir, root, rel)
+	}
+	return nil
+}
+
+// FuzzSiteCacheStaysUnderTheCacheRoot asserts the postcondition rather than the
+// allowlist.
+//
+// The allowlist is a statement about characters; the guarantee is about what
+// they compose into, and the two came apart at `..`. A table cannot hold this
+// because the cases that break it are the ones nobody thought to write down —
+// this one shipped with `../../../etc/passwd` in it and without `..`.
+func FuzzSiteCacheStaysUnderTheCacheRoot(f *testing.F) {
+	for _, seed := range []string{
+		"", "..", ".", "....", "https://..", "../..", "/", "//", "\\",
+		"acme.atlassian.invalid", "ACME.INVALID:8080", "..%2f..", "\x00",
+		"é.invalid", strings.Repeat(".", 300),
+	} {
+		f.Add(seed)
+	}
+
+	paths, err := jctx.DefaultPaths(env(map[string]string{"HOME": "/home/ada"}))
+	if err != nil {
+		f.Fatalf("DefaultPaths: %v", err)
+	}
+
+	f.Fuzz(func(t *testing.T, site string) {
+		dir := paths.SiteCache(site)
+		if err := underCacheRoot(paths.Cache, dir); err != nil {
+			t.Fatalf("SiteCache(%q): %v", site, err)
+		}
+		// One element, not a tree: two sites must not be able to nest, and a
+		// separator surviving is how one site's --refresh clears another's.
+		if rel, _ := filepath.Rel(paths.Cache, dir); strings.ContainsRune(rel, filepath.Separator) {
+			t.Fatalf("SiteCache(%q) = %q is more than one element", site, dir)
+		}
+	})
 }
 
 func TestNormalizeSite(t *testing.T) {
