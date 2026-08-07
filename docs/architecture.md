@@ -215,6 +215,29 @@ listing publishes the hostname even though every file in it is 0600.
 install. An existing 0755 is not repaired on read — changing permissions nobody
 asked this tool to change is its own surprise.
 
+The table covers what `jr` writes, which is not the whole credential chain.
+`DefaultChain` has three providers: the environment, the store above, and
+`~/.netrc`. **`.netrc` is read at whatever mode it has, deliberately**, and it
+is the one place a credential this tool uses may be world-readable.
+
+The store is refused when others can read it, because `jr` creates that file,
+writes it at 0600, and owns it — refusing is holding the tool to its own
+guarantee. `.netrc` is none of those things: it usually predates `jr` on the
+machine, it is shared with curl and git, and curl reads a 0644 file without
+complaint. Refusing would make `jr` the one tool that broke over a mode it did
+not set, and warning on every invocation would leave the credential just as
+exposed while adding noise about the least authoritative source in the chain.
+It is the same principle as the paragraph above: a mode nobody asked this tool
+to police is not this tool's to police. `chmod 600 ~/.netrc` is still worth
+doing — curl reads a 0600 file too — and is the user's call.
+
+That row is absent from the table above rather than added to it, because every
+row there is driven by a real write path in
+`TestTheDocumentedModesAreTheOnesOnDisk` and `jr` has no write path for
+`.netrc`. A row it could not drive would be a claim nothing checks, which is
+the failure that test exists to prevent. `TestANetrcIsReadWhateverItsMode` in
+`internal/auth` pins the behaviour instead.
+
 User resolution is deliberately not cached: the field catalogue is one
 immutable snapshot of a whole site, and this is one search per input. A cached
 answer would also outlive somebody leaving, which is exactly the account a

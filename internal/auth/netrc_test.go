@@ -215,3 +215,46 @@ func FuzzNetrcDoesNotPanic(f *testing.F) {
 		}
 	})
 }
+
+// TestANetrcIsReadWhateverItsMode pins the decision recorded on
+// auth.NetrcProvider and in docs/architecture.md.
+//
+// FileStore.load refuses a credential store any other user can read. This does
+// the opposite with the same kind of secret, on purpose: the store is a file
+// jr creates, writes at 0600, and owns, and .netrc is none of those — it is
+// shared with curl and git, it predates jr on most machines that have one, and
+// curl reads a 0644 file without complaint. Refusing would make jr the one
+// tool that broke over a mode it did not set.
+//
+// The test exists because that asymmetry is exactly what a later reader would
+// "fix". Without it, adding a mode check here breaks nothing and looks like
+// tightening security. 0640 is in the table as well as 0644, because a
+// group-readable file is the case somebody reaches for when they want a
+// middle ground, and the answer is the same.
+func TestANetrcIsReadWhateverItsMode(t *testing.T) {
+	const content = "machine jira.acme.invalid login ada password hunter2\n"
+
+	for _, mode := range []os.FileMode{0o600, 0o640, 0o644, 0o666} {
+		t.Run(mode.String(), func(t *testing.T) {
+			path := writeNetrc(t, content)
+			if err := os.Chmod(path, mode); err != nil {
+				t.Fatalf("chmod: %v", err)
+			}
+
+			cred, ok, err := auth.NetrcProvider{Path: path}.Lookup("jira.acme.invalid")
+			if err != nil {
+				t.Fatalf("a .netrc at %04o was refused: %v\n"+
+					"This is a deliberate decision, not an oversight — see the doc "+
+					"comment on auth.NetrcProvider and the permissions section of "+
+					"docs/architecture.md. If it is being reversed, reverse those too.",
+					mode.Perm(), err)
+			}
+			if !ok {
+				t.Fatalf("a .netrc at %04o yielded no credential", mode.Perm())
+			}
+			if cred.User != "ada" || cred.Secret.Reveal() != "hunter2" {
+				t.Errorf("credential = %+v, want the one in the file", cred)
+			}
+		})
+	}
+}
