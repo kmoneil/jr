@@ -18,120 +18,157 @@ func parseInline(s string, at int) ([]Node, error) {
 	return coalesce(nodes), nil
 }
 
-func scanInline(s string, at int) ([]Node, error) {
-	var out []Node
-	var lit strings.Builder
-	flush := func() {
-		if lit.Len() > 0 {
-			out = append(out, Node{Type: "text", Text: lit.String()})
-			lit.Reset()
-		}
+// inlineOut accumulates the nodes scanInline emits and the literal text between
+// them.
+//
+// It exists so the construct arms of that switch can share one shape. Each of
+// them asks a scanner for a construct at the cursor and gets a width back, and
+// every one then answers the same two questions the same way. Six constructs
+// wrote out the same six lines, at three levels of nesting — for, switch, case,
+// if — which is the most expensive place in the function to repeat anything and
+// is where most of its score came from.
+//
+// What is left in the switch is the part that is genuinely CommonMark's: one
+// arm per inline construct markdown has, each naming the bytes that open it.
+type inlineOut struct {
+	nodes []Node
+	lit   strings.Builder
+}
+
+// literal adds one byte to the run of plain text.
+func (o *inlineOut) literal(c byte) { o.lit.WriteByte(c) }
+
+// flush ends the current run of literal text, if there is one.
+func (o *inlineOut) flush() {
+	if o.lit.Len() > 0 {
+		o.nodes = append(o.nodes, Node{Type: "text", Text: o.lit.String()})
+		o.lit.Reset()
 	}
+}
+
+// take accepts what a construct scanner produced and reports how far the cursor
+// advances.
+//
+// A width of zero is the scanner saying "not that construct here" — a backtick
+// that never closes, a bracket with no link after it, an asterisk that opens
+// nothing. That is a literal byte rather than an error, which is the rule this
+// whole scanner runs on: where the text could mean two things it is refused,
+// but where it plainly means one thing it is that thing, and an unmatched
+// delimiter plainly means itself.
+func (o *inlineOut) take(c byte, nodes []Node, width int) int {
+	if width == 0 {
+		o.literal(c)
+		return 1
+	}
+	o.flush()
+	o.nodes = append(o.nodes, nodes...)
+	return width
+}
+
+// takeOne is take for the scanners that produce a single node.
+func (o *inlineOut) takeOne(c byte, node Node, width int) int {
+	if width == 0 {
+		o.literal(c)
+		return 1
+	}
+	o.flush()
+	o.nodes = append(o.nodes, node)
+	return width
+}
+
+// scanInline walks the bytes of one inline run, emitting a node per construct
+// and gathering everything else as literal text.
+//
+// # Why this scores 20 and stops there
+//
+// It was 40 cognitive and 30 cyclomatic, the highest in the module. Six of the
+// nine arms had written out the same six lines — ask a scanner, treat a zero
+// width as a literal byte, otherwise flush and emit — at three levels of
+// nesting. That was structure rather than construct count, and it moved to
+// inlineOut.take.
+//
+// The 20 that remains was measured rather than estimated, by removing each
+// component and reading the difference:
+//
+//	12  four `if err != nil` at nesting two, three points each
+//	 5  five multi-byte guards: \ before a newline, \ before punctuation,
+//	    ! before [, ~ before ~, and * or _
+//	 2  the switch, nested inside the loop
+//	 1  the byte loop
+//
+// Neither of the two that matter can go. The twelve is Go's error propagation
+// written where the errors happen — four constructs can refuse, and folding
+// their checks together would hide which one did. The five is the definition of
+// which bytes open which construct, which is CommonMark's list and not ours; a
+// dispatch table would move the arms somewhere else without removing one of
+// them, and a flat dispatch over N constructs is not improved by hiding N.
+//
+// So this stays over the hot-path bar of 15 on purpose. It is no longer the
+// highest score in the module, and what is left is the shape of the problem.
+func scanInline(s string, at int) ([]Node, error) {
+	var out inlineOut
 
 	for i := 0; i < len(s); {
 		switch c := s[i]; {
 		case c == '\\' && i+1 < len(s) && s[i+1] == '\n':
 			// A backslash at the end of a line is markdown's hard break, and
-			// the one this package writes.
-			flush()
-			out = append(out, Node{Type: "hardBreak"})
-			i += 2
+			// the one this package writes. Width two, so it goes through the
+			// same path as every other construct rather than beside it.
+			i += out.takeOne(c, Node{Type: "hardBreak"}, 2)
 
 		case c == '\\' && i+1 < len(s) && isASCIIPunct(s[i+1]):
-			lit.WriteByte(s[i+1])
+			out.literal(s[i+1])
 			i += 2
 
 		case c == '\n':
 			// A soft break. Markdown joins the lines, and a caller who wanted
 			// them apart writes a backslash or a blank line.
-			lit.WriteByte(' ')
+			out.literal(' ')
 			i++
 
 		case c == '`':
 			node, width := codeSpanAt(s[i:])
-			if width == 0 {
-				lit.WriteByte(c)
-				i++
-				continue
-			}
-			flush()
-			out = append(out, node)
-			i += width
+			i += out.takeOne(c, node, width)
 
 		case c == '!' && i+1 < len(s) && s[i+1] == '[':
 			node, width, err := imageAt(s[i:], at)
 			if err != nil {
 				return nil, err
 			}
-			if width == 0 {
-				lit.WriteByte(c)
-				i++
-				continue
-			}
-			flush()
-			out = append(out, node)
-			i += width
+			i += out.takeOne(c, node, width)
 
 		case c == '[':
 			nodes, width, err := linkAt(s[i:], at)
 			if err != nil {
 				return nil, err
 			}
-			if width == 0 {
-				lit.WriteByte(c)
-				i++
-				continue
-			}
-			flush()
-			out = append(out, nodes...)
-			i += width
+			i += out.take(c, nodes, width)
 
 		case c == '<':
 			node, width := autolinkAt(s[i:])
-			if width == 0 {
-				lit.WriteByte(c)
-				i++
-				continue
-			}
-			flush()
-			out = append(out, node)
-			i += width
+			i += out.takeOne(c, node, width)
 
 		case c == '~' && strings.HasPrefix(s[i:], "~~"):
 			nodes, width, err := delimitedAt(s[i:], "~~", Mark{Type: "strike"}, at)
 			if err != nil {
 				return nil, err
 			}
-			if width == 0 {
-				lit.WriteByte(c)
-				i++
-				continue
-			}
-			flush()
-			out = append(out, nodes...)
-			i += width
+			i += out.take(c, nodes, width)
 
 		case c == '*' || c == '_':
 			nodes, width, err := emphasisAt(s, i, at)
 			if err != nil {
 				return nil, err
 			}
-			if width == 0 {
-				lit.WriteByte(c)
-				i++
-				continue
-			}
-			flush()
-			out = append(out, nodes...)
-			i += width
+			i += out.take(c, nodes, width)
 
 		default:
-			lit.WriteByte(c)
+			out.literal(c)
 			i++
 		}
 	}
-	flush()
-	return out, nil
+	out.flush()
+	return out.nodes, nil
 }
 
 // isASCIIPunct reports the characters a backslash may escape in CommonMark.
