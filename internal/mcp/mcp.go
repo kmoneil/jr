@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime/debug"
 	"strings"
 	"sync"
 
@@ -156,7 +157,46 @@ func (s *Server) handleLine(ctx context.Context, line []byte) {
 	s.send(response{JSONRPC: "2.0", ID: req.ID, Result: result})
 }
 
-func (s *Server) dispatch(ctx context.Context, req request) (any, *rpcError) {
+// dispatch routes one request, and survives a command that panics.
+//
+// The same command code runs from two callers with very different stakes. The
+// CLI runs one and exits, so a panic there loses an invocation that was ending
+// anyway and the traceback is the diagnosis. This server holds a session: a
+// panic in one tool call would end every later one, and the peer would not even
+// get an error — it would see the stdio stream close underneath it, which is
+// indistinguishable from a crash it caused and gives an agent nothing to report.
+//
+// net/http recovers per connection for this reason. Nothing else in this tree
+// recovers from anything, deliberately; this is the one place where the process
+// outliving the failure is the whole point.
+//
+// It cannot cover a goroutine a command started. `multipartSource` in
+// internal/resource/issue/attachment_write.go spawns one per upload attempt, and
+// a panic there ends the process whatever happens here — that is Go's rule, not
+// a gap in this function. Said out loud because "the handler recovers" reads as
+// covering more than it does.
+func (s *Server) dispatch(ctx context.Context, req request) (result any, rpcErr *rpcError) {
+	defer func() {
+		recovered := recover()
+		if recovered == nil {
+			return
+		}
+		// The reply says the call failed and nothing else. A panic value can
+		// carry whatever was in scope — a path, a URL, a field from a response
+		// — and the peer is owed a verdict, not this process's internals. The
+		// detail goes to the log, which is never Out: a traceback on stdout is
+		// a malformed frame, and that has shipped here once already.
+		if s.opt.Log != nil {
+			_, _ = fmt.Fprintf(s.opt.Log, "[mcp] %s panicked: %v\n%s\n",
+				req.Method, recovered, debug.Stack())
+		}
+		result = nil
+		rpcErr = &rpcError{
+			Code:    codeInternal,
+			Message: fmt.Sprintf("%s failed inside the server", req.Method),
+		}
+	}()
+
 	switch req.Method {
 	case "initialize":
 		return s.initialize(req.Params), nil

@@ -480,3 +480,94 @@ func TestNothingButFramesReachOut(t *testing.T) {
 		}
 	}
 }
+
+// TestAPanickingToolDoesNotEndTheSession is why dispatch recovers.
+//
+// The same command code runs from the CLI, which is exiting anyway, and from
+// here, where it holds a session. Without a recover the process dies mid-call:
+// the peer does not get an error, it sees stdio close underneath it, which is
+// indistinguishable from a crash it caused.
+//
+// The second call is the assertion that matters. Returning an error for the
+// call that panicked would also pass against a server that then died, so this
+// asserts the session outlives it.
+func TestAPanickingToolDoesNotEndTheSession(t *testing.T) {
+	reg := testRegistry(t)
+	reg.Register(&registry.Command{
+		Path:    []string{"thing", "explode"},
+		Summary: "Panic, to prove the server survives it",
+		Example: "jr thing explode",
+		Outputs: []registry.Output{{Kind: "thing", Version: 1}},
+		Run: func(context.Context, *registry.Invocation) (*render.Doc, error) {
+			// Explicit, because the realistic sources — a nil map write, an
+			// unchecked type assertion, a slice bound from a response — are
+			// exactly what staticcheck refuses to let past in this repo, which
+			// is the right answer for production code and makes a fixture out
+			// of one awkward. What is under test is that dispatch survives a
+			// panic, not which statement produced it.
+			panic("a command that panics: internals the peer must never see")
+		},
+	})
+
+	var log strings.Builder
+	var out strings.Builder
+	err := mcp.Serve(context.Background(), mcp.Options{
+		Registry: reg,
+		In: strings.NewReader(strings.Join([]string{
+			`{"jsonrpc":"2.0","id":1,"method":"tools/call",` +
+				`"params":{"name":"thing_explode","arguments":{}}}`,
+			`{"jsonrpc":"2.0","id":2,"method":"tools/call",` +
+				`"params":{"name":"thing_get","arguments":{"key":"K-1"}}}`,
+		}, "\n") + "\n"),
+		Out: &out, Log: &log, Name: "jr", Version: "0.0.0-test",
+	})
+	if err != nil {
+		t.Fatalf("serve returned an error rather than surviving: %v", err)
+	}
+
+	var replies []map[string]any
+	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
+		var reply map[string]any
+		if err := json.Unmarshal([]byte(line), &reply); err != nil {
+			t.Fatalf("reply is not JSON: %v\n%s", err, line)
+		}
+		replies = append(replies, reply)
+	}
+	if len(replies) != 2 {
+		t.Fatalf("got %d replies, want 2 — the session ended early:\n%s", len(replies), out.String())
+	}
+
+	// The panicking call is answered, as a protocol error rather than a tool
+	// error: the tool did not refuse, the server broke.
+	rpcErr, ok := replies[0]["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("the panicking call did not return a protocol error: %+v", replies[0])
+	}
+	if code, _ := rpcErr["code"].(float64); int(code) != -32603 {
+		t.Errorf("code = %v, want -32603 (internal error)", rpcErr["code"])
+	}
+
+	// The reply carries a verdict, not the panic value: it can hold whatever
+	// was in scope, and the peer is owed neither the message nor the stack.
+	// Asserted against the whole frame, not just the message field, so moving
+	// the detail into Data would still fail.
+	const secret = "internals the peer must never see"
+	if strings.Contains(out.String(), secret) || strings.Contains(out.String(), "goroutine") {
+		t.Errorf("the panic value reached the peer:\n%s", out.String())
+	}
+	// It does reach the log, which is the only place it belongs — with the
+	// stack, because that is what makes it diagnosable.
+	if !strings.Contains(log.String(), "panicked") ||
+		!strings.Contains(log.String(), secret) ||
+		!strings.Contains(log.String(), "goroutine") {
+		t.Errorf("the panic was not logged with its stack:\n%s", log.String())
+	}
+
+	// And the session still works, which is the whole point.
+	if _, failed := replies[1]["error"]; failed {
+		t.Fatalf("the call after the panic failed: %+v", replies[1])
+	}
+	if replies[1]["result"] == nil {
+		t.Fatalf("the call after the panic returned no result: %+v", replies[1])
+	}
+}
