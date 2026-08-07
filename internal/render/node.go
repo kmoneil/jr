@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/kmoneil/jira-cli/internal/errs"
 )
@@ -178,13 +179,22 @@ func (n *Node) Lookup(path string) (string, bool) {
 }
 
 // validate checks the invariants every writer depends on: a non-empty element
-// name, unique attribute names, and no collision between an attribute name and
-// a child element name.
+// name, unique attribute names, no collision between an attribute name and a
+// child element name, and values every format can actually carry.
 func (n *Node) validate(where string) error {
 	if n.Name == "" {
 		return errs.Runtime("INVALID_NODE", "node at %s has no element name", where)
 	}
 	here := where + "/" + n.Name
+
+	// Checked here because here is the one place both paths meet: Write
+	// validates a buffered document, Stream.Write validates each row before it
+	// reaches stdout, and every writer is downstream of both. Four writers each
+	// deciding what they can carry is what produced two that could and two that
+	// could not.
+	if err := renderable(n.Text, here, "text"); err != nil {
+		return err
+	}
 
 	seen := make(map[string]struct{}, len(n.Attrs)+len(n.Children))
 	for _, a := range n.Attrs {
@@ -193,6 +203,9 @@ func (n *Node) validate(where string) error {
 		}
 		if _, dup := seen[a.Name]; dup {
 			return errs.Runtime("INVALID_NODE", "node %s repeats attribute %q", here, a.Name)
+		}
+		if err := renderable(a.Value, here, "attribute "+strconv.Quote(a.Name)); err != nil {
+			return err
 		}
 		seen[a.Name] = struct{}{}
 	}
@@ -229,4 +242,73 @@ func (n *Node) validate(where string) error {
 		}
 	}
 	return nil
+}
+
+// renderable refuses a value no output format can carry.
+//
+// The narrow definition is XML's, because XML is the strictest of the four and
+// a value has to mean the same thing in all of them: --format chooses an
+// encoding, not what this tool is willing to say. JSON and YAML can encode a
+// control character and were doing so happily while XML emitted the raw byte
+// and TSV passed it through, so the same issue rendered four ways and parsed
+// two — which is the output contract splitting along an axis nobody declared.
+//
+// Refused rather than escaped, because escaping is not available: XML 1.0
+// forbids most of C0 outright, and `&#1;` is no more legal than the byte. And
+// refused rather than dropped, because dropping is this tool quietly changing
+// what Jira holds — the rule the five input-side checks already follow.
+func renderable(s, where, what string) error {
+	for i, r := range s {
+		// A range over a string yields U+FFFD for an invalid byte, and U+FFFD
+		// is itself a legal character — so the two are told apart by how much
+		// was consumed rather than by the rune alone.
+		if r == utf8.RuneError {
+			if _, size := utf8.DecodeRuneInString(s[i:]); size == 1 {
+				return errs.Runtime("UNRENDERABLE_VALUE",
+					"the %s of %s is not valid UTF-8", what, where).
+					WithDetail("at byte %d", i).
+					WithRemedy("this is what Jira returned; the field has to be " +
+						"corrected there")
+			}
+			continue
+		}
+		if !xmlChar(r) {
+			return errs.Runtime("UNRENDERABLE_VALUE",
+				"the %s of %s holds a character no output format can carry",
+				what, where).
+				WithDetail("U+%04X at byte %d", r, i).
+				WithRemedy("this is what Jira returned; the field has to be " +
+					"corrected there")
+		}
+	}
+	return nil
+}
+
+// xmlChar reports whether r is in XML 1.0's Char production.
+//
+// It is narrower than "printable" in one direction and wider in another: tab,
+// newline, and carriage return are in it while the rest of C0 is not, and DEL
+// and the C1 block are perfectly legal despite looking like control characters.
+// Written as the production rather than as a list of things seen in the wild,
+// so it does not drift toward whatever a fixture happened to contain.
+func xmlChar(r rune) bool {
+	switch {
+	case r == '\t' || r == '\n' || r == '\r':
+		return true
+	case r < 0x20:
+		return false
+	case r <= 0xD7FF:
+		return true
+	case r < 0xE000:
+		// Surrogate halves. Unreachable from a valid UTF-8 string, and listed
+		// so the production is complete rather than complete-by-accident.
+		return false
+	case r <= 0xFFFD:
+		return true
+	case r < 0x10000:
+		// U+FFFE and U+FFFF are not characters.
+		return false
+	default:
+		return r <= 0x10FFFF
+	}
 }
