@@ -206,13 +206,24 @@ func selectContext(cfg *Config, over Overrides, getenv Getenv) (string, Context,
 }
 
 // RequireSite returns the site, or a usage error naming what to do about it.
+//
+// The remedy leads with `auth login` because this is the first error a new
+// caller sees, and it is the only one of the three that leaves them able to run
+// the next command. `context create` answers the error — a context now has a
+// site — and not the goal: the credential is still missing, so the very next
+// invocation fails with NO_CREDENTIALS. `auth login --site` stores the
+// credential and creates the first context in one step.
+//
+// The two overrides stay, and stay second. Somebody with JIRA_API_TOKEN already
+// exported needs a site and nothing else, and telling them to log in again
+// would be the same unhelpfulness pointing the other way.
 func (r *Resolved) RequireSite() (string, error) {
 	if r != nil && r.Site != "" {
 		return r.Site, nil
 	}
 	return "", errs.Usage("NO_SITE", "no Jira site configured").
-		WithRemedy("pass --site, set JIRA_SITE, or create a context with " +
-			"`jr context create <name> --site <host>`")
+		WithRemedy("run `jr auth login --site <host>` to store a credential and " +
+			"create your first context, or pass --site, or set JIRA_SITE")
 }
 
 // RequireProject returns the project, or a usage error naming the flag.
