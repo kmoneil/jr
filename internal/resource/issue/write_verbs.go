@@ -20,7 +20,7 @@ import (
 // Kinds the remaining mutating verbs emit.
 const (
 	KindAssign    = "issue.assign"
-	VersionAssign = 1
+	VersionAssign = 2
 	KindDelete    = "issue.delete"
 	VersionDelete = 1
 	KindClone     = "issue.clone"
@@ -73,11 +73,16 @@ after somebody joins is worse than being asked to be specific.
 
 The word unassigned clears the assignee. The word default hands the issue to
 whatever the project's default assignee is, which is not the same thing. The
-word currentUser means whoever holds the credential, as it does on issue list.`),
+word currentUser means whoever holds the credential, as it does on issue list.
+
+--if-unchanged refuses the assignment if the issue changed since you read it,
+exactly as on issue edit. Reassigning work somebody else has just picked up is
+the case it is for.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue assign ENG-101 'Ada Lovelace'",
 			buildinfo.App + " issue assign ENG-101 unassigned",
 			buildinfo.App + " issue assign ENG-101 default --dry-run",
+			buildinfo.App + " issue assign ENG-101 'Ada Lovelace' --if-unchanged eyJkIjo",
 		}, "\n"),
 		Args: []registry.Arg{
 			{Name: "key", Usage: "issue key, e.g. ENG-101", Required: true},
@@ -86,7 +91,7 @@ word currentUser means whoever holds the credential, as it does on issue list.`)
 				Usage: "the user, or the word unassigned or default",
 			},
 		},
-		Flags:        []registry.Flag{dryRunFlag()},
+		Flags:        []registry.Flag{ifUnchangedFlagDecl(), dryRunFlag()},
 		Mutating:     true,
 		NeedsJira:    true,
 		RequiresTags: []string{"write"},
@@ -148,6 +153,9 @@ func validateAssign(ctx context.Context, inv *registry.Invocation) error {
 		return errs.Usage("INVALID_USER", "a user is required").
 			WithRemedy("pass a name, an id, or the word unassigned")
 	}
+	if err := validatePrecondition(inv); err != nil {
+		return err
+	}
 	return validateAssignee(ctx, inv, inv.Args[1])
 }
 
@@ -165,6 +173,10 @@ func runAssign(ctx context.Context, inv *registry.Invocation) (*render.Doc, erro
 	if inv.Flags.Bool("dry-run") {
 		return registry.DryRunDoc("issue.assign", req), nil
 	}
+	checked, err := checkUnchanged(ctx, inv, client, inv.Args[0])
+	if err != nil {
+		return nil, err
+	}
 	if err := client.send(ctx, req); err != nil {
 		return nil, err
 	}
@@ -173,10 +185,10 @@ func runAssign(ctx context.Context, inv *registry.Invocation) (*render.Doc, erro
 	// same command with her accountId produce byte-identical output, which is
 	// the rule --field settled. How a request was spelled is not part of the
 	// contract.
-	return render.Record(KindAssign, VersionAssign, render.El("issue").
+	return stampPrecondition(render.Record(KindAssign, VersionAssign, render.El("issue").
 		Attr("key", inv.Args[0]).
 		Attr("action", "assigned").
-		Leaf("assignee", assignee)), nil
+		Leaf("assignee", assignee)), checked), nil
 }
 
 func deleteCommand() *registry.Command {

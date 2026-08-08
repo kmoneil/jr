@@ -159,8 +159,9 @@ starts gating something, the build fails until this list is corrected.
 
 ```console
 $ jr issue get ENG-101
-<result kind="issue.get" v="4">
-  <issue key="ENG-101" type="Story" priority="High" project="ENG" parent="ENG-1">
+<result kind="issue.get" v="5">
+  <issue key="ENG-101" type="Story" priority="High" project="ENG" parent="ENG-1"
+         precondition="eyJkIjoiY2xvdWQiLCJrIjoiRU5HLTEwMSIsInUiOiIyMDI2LTA4LTA0VDExOjMyOjA3LjQxMloifQ">
     <summary>...</summary>
     <status category="in-progress">In Progress</status>
     <description format="wiki"><![CDATA[ ... ]]></description>
@@ -353,6 +354,44 @@ reaches stdout, rather than a link assembled from a guess.
 
 Jira's own `self` on an issue is not this. It is the REST endpoint, and it
 opens JSON.
+
+### Not overwriting somebody else's edit
+
+Two callers edit one issue. The first sets the summary; the second, holding a
+copy read before that, sets the priority and sends along the summary it read.
+Jira applies both. The first edit is gone, both commands exit 0, and both say
+what they set. Nothing was truncated, nothing errored, nothing lied — the write
+was simply lost. Survivable when the only caller was a person at a terminal;
+`jr mcp serve` ships, and the population of concurrent editors is now however
+many agents somebody points at one board.
+
+`issue get` reports a `precondition`, and `issue edit`, `issue move`, and
+`issue assign` take it back:
+
+```console
+$ jr issue edit ENG-101 --priority High --if-unchanged eyJkIjoiY2xvdWQi...
+STALE_WRITE: ENG-101 changed after the precondition was taken, so this write was not sent
+  detail: the precondition describes 2026-08-04T11:32:07.412Z and the issue now reads 2026-08-04T11:41:55.008Z
+  remedy: re-read it with `jr issue get ENG-101`, decide again against what it says
+          now, and retry with the precondition from that read
+$ echo $?
+7
+```
+
+**It is a check with a window, and it says so.** Neither deployment offers a
+validator on an issue — no `ETag`, no `Last-Modified`, and `PUT /issue/{key}`
+honours no `If-Match` — so this is a read, a comparison, and then the write,
+about one round trip wide. A write that ran one carries
+`<precondition method="read-compare"/>`, because a conditional request the
+server evaluates and a read-then-write are not the same promise, and the
+difference belongs in the output rather than in a caller's assumption.
+
+It is opt-in for a structural reason rather than a cautious one. `jr` is
+one-shot and holds no earlier read: a default-on check would fetch the issue and
+compare it against itself microseconds earlier, detecting nothing and costing a
+request. The baseline has to come from whoever did the reading. Adding it bumped
+`issue.get` to v5 and `issue.edit`, `issue.move`, and `issue.assign` to v2;
+`issue.list` is untouched, because a row nobody read is not a baseline.
 
 ### Pagination
 

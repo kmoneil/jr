@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/kmoneil/jira-cli/internal/buildinfo"
 	"github.com/kmoneil/jira-cli/internal/cli"
 
 	// Every resource, so registry.Default holds them. The blank imports are how
@@ -91,8 +92,17 @@ func checkVersion(
 
 	want, known := current[kind]
 	if !known {
-		t.Errorf("%s:%d documents kind %q, which no command emits",
-			doc, line, kind)
+		// A kind this build has no command for is not a kind nothing emits.
+		// The documents describe the whole product, and `make test` runs
+		// untagged, so `issue.edit` is genuinely absent here and present under
+		// `make test-profiles`. Strict where the whole surface is compiled,
+		// which is the same bargain TestTheCommandReferenceIsCurrent strikes
+		// for the same reason — and the full profile is not a build anybody
+		// skips, it is the one `make ci` runs.
+		if buildinfo.Profile() == "full" {
+			t.Errorf("%s:%d documents kind %q, which no command emits",
+				doc, line, kind)
+		}
 		return
 	}
 	got, err := strconv.Atoi(version)

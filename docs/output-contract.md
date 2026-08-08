@@ -626,11 +626,49 @@ command was about to send, so the preview and the real thing cannot drift, and
 the body can be pasted into `curl`. It never carries a credential, the document
 renders the request as the command built it, before the transport attaches one.
 
+### Preconditions
+
+`issue edit`, `issue move`, and `issue assign` accept `--if-unchanged`, which
+refuses the write if the issue has changed since the caller read it. Without it
+two callers editing one issue both exit 0 and the earlier write is lost, with
+nothing truncated, nothing in error, and nothing to say it happened.
+
+`issue.get` v5 carries a `precondition` attribute, which is what the flag takes.
+It is opaque: what it holds is the millisecond timestamp Jira served, and the
+`updated` element is RFC 3339 to the second, so conditioning on the published
+value would leave a whole second in which another edit is invisible. It also
+names the issue and the deployment, so one from another issue or another site is
+refused rather than compared. `issue.list` does **not** carry one — a baseline
+you did not read is not a baseline, and a caller holding one has by construction
+fetched the issue.
+
+**The check is not atomic, and says so.** Neither deployment offers a validator
+on an issue: there is no `ETag`, no `Last-Modified`, and `PUT /issue/{key}`
+honours no `If-Match`. So the check is a read, a comparison, and then the write,
+and it has a window one round trip wide. A verb that ran one records it:
+
+```xml
+<result kind="issue.edit" v="2">
+  <issue key="ENG-101" action="edited">
+    <precondition method="read-compare"/>
+  </issue>
+</result>
+```
+
+`method` is an enum, and `read-compare` is its only value today. It is published
+rather than assumed because a conditional request the server evaluates and a
+read-then-write are not the same promise, and a caller entitled to know which
+one they got should not have to infer it from the absence of a claim. The
+element is absent when the flag was not passed; it never appears saying a check
+did not happen.
+
 | Code                      | Exit | Meaning                                    |
 | ------------------------- | ---- | ------------------------------------------- |
 | `READ_ONLY`               | 10   | A context, `--readonly`, or `JIRA_READONLY` forbids changing Jira. It is a one-way latch within an invocation: nothing a command does turns it off, and `JIRA_READONLY=0` does not clear a context that was created read-only. Changing what a context is for is a separate act, `context edit --unset readonly`. |
 | `CONFIRMATION_REQUIRED`   | 10   | A destructive command was run without `--yes`. Not raised for `--dry-run`: a preview is not the thing being confirmed, and you look at it in order to decide. |
 | `IDEMPOTENT_IN_FLIGHT`    | 7    | Another run holds this key and has not finished; it may already have done the work. |
+| `STALE_WRITE`             | 7    | `--if-unchanged` was given a precondition and the issue has changed since it was taken, so nothing was sent. `detail` carries both versions. This is the §6.3 stale write: without the flag the later write silently overwrites the earlier one and both callers exit 0. |
+| `INVALID_PRECONDITION`    | 2    | `--if-unchanged` was given something this tool did not issue: not a token at all, one naming no issue, one for another issue, or one minted against the other deployment. Refused rather than compared, because comparing a foreign value would report "the issue changed", which is a claim about this issue that nobody checked. Everything but the deployment is settled locally, so a typo costs no round trip. |
 | `INVALID_ENCODING`        | 2    | Text that is not valid UTF-8. It is refused, never repaired: substituting U+FFFD would put a character in Jira the caller never wrote. |
 | `CONFLICTING_LABEL_FLAGS` | 2    | `--label` replaces the whole set, so it cannot be combined with `--add-label` or `--remove-label`. |
 | `AMBIGUOUS_LINK_DIRECTION`| 2    | A link type's name was given where a direction was needed. `"Blocks"` reads either way; `detail` offers both phrasings. |

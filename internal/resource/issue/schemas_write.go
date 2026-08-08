@@ -14,7 +14,7 @@ import "github.com/kmoneil/jira-cli/internal/render"
 func init() {
 	render.RegisterSchema(KindCreate, CreateSchema())
 	render.RegisterSchema(KindClone, CloneSchema())
-	render.RegisterSchema(KindEdit, ackSchema("issue", "key", "edited"))
+	render.RegisterSchema(KindEdit, withPrecondition(ackSchema("issue", "key", "edited")))
 	render.RegisterSchema(KindDelete, ackSchema("issue", "key", "deleted"))
 	render.RegisterSchema(KindMove, MoveSchema())
 	render.RegisterSchema(KindAssign, AssignSchema())
@@ -69,7 +69,7 @@ func MoveSchema() *render.Schema {
 		},
 		Text: &render.Field{Type: render.TypeString},
 	}})
-	return s
+	return withPrecondition(s)
 }
 
 // AssignSchema echoes the assignee as the caller named it, so the value that
@@ -78,6 +78,17 @@ func AssignSchema() *render.Schema {
 	s := ackSchema("issue", "key", "assigned")
 	s.Children = append(s.Children,
 		render.Child{Schema: render.Leaf("assignee", render.TypeString)})
+	return withPrecondition(s)
+}
+
+// withPrecondition adds the record of an --if-unchanged check.
+//
+// On the three verbs that accept the flag and nowhere else. A shape that
+// declared it everywhere would tell a consumer to look for a check that verb
+// cannot perform, and the point of publishing the method is that a caller can
+// tell which guarantee they got.
+func withPrecondition(s *render.Schema) *render.Schema {
+	s.Children = append(s.Children, preconditionChild())
 	return s
 }
 

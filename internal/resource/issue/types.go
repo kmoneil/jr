@@ -24,7 +24,7 @@ const (
 	KindList    = "issue.list"
 	VersionList = 3
 	KindGet     = "issue.get"
-	VersionGet  = 4
+	VersionGet  = 5
 )
 
 // Body formats a description can arrive in.
@@ -110,6 +110,22 @@ type Issue struct {
 	// deployment's own baseUrl, so it is one string per row that nobody asked
 	// for unless they did.
 	URL string
+
+	// Precondition is the opaque token a caller passes to `--if-unchanged`,
+	// set by `issue get` and empty on a listed row. See precondition.go for
+	// why a row does not carry one.
+	Precondition string
+
+	// updatedRaw is Jira's own `updated`, kept exactly as it arrived.
+	//
+	// Updated above is normalized to the second, which is what this tool
+	// publishes and all a reader needs. A precondition needs the millisecond
+	// the server actually recorded, so the raw value is carried here rather
+	// than the published one being widened — widening it would move every
+	// timestamp in every golden to answer a question only one command asks.
+	// Unexported because it is an input to EncodePrecondition and not a field
+	// of the output contract.
+	updatedRaw string
 }
 
 // ExtraField is one field requested by id and reduced to a scalar.
@@ -289,11 +305,12 @@ func (r rawIssue) convert(mode BodyMode) (Issue, error) {
 				r.Fields.Status.StatusCategory.Name,
 			),
 		},
-		Assignee: r.Fields.Assignee.convert(),
-		Reporter: r.Fields.Reporter.convert(),
-		Created:  created,
-		Updated:  updated,
-		Labels:   r.Fields.Labels,
+		Assignee:   r.Fields.Assignee.convert(),
+		Reporter:   r.Fields.Reporter.convert(),
+		Created:    created,
+		Updated:    updated,
+		updatedRaw: r.Fields.Updated,
+		Labels:     r.Fields.Labels,
 	}
 	if r.Fields.Priority != nil {
 		out.Priority = r.Fields.Priority.Name
@@ -504,6 +521,11 @@ func (i Issue) Node() *render.Node {
 	n.AttrIf("project", i.Project)
 	n.AttrIf("resolution", i.Resolution)
 	n.AttrIf("parent", i.Parent)
+	// Only `issue get` mints one, so this is absent on a listed row and the
+	// shared Schema does not declare it — GetSchema does. AttrIf rather than a
+	// branch on the command, because a row that ever did carry one would then
+	// fail validation loudly instead of quietly widening issue.list's shape.
+	n.AttrIf("precondition", i.Precondition)
 	n.LeafIf("created", i.Created)
 	n.LeafIf("updated", i.Updated)
 	n.LeafIf("url", i.URL)

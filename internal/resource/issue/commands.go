@@ -106,6 +106,19 @@ func Schema() *render.Schema {
 // was actually making.
 func GetSchema() *render.Schema {
 	s := Schema()
+	s.Attrs = append(s.Attrs, render.Field{
+		// The baseline `issue edit --if-unchanged` compares against. It is on
+		// get and not on the shared shape because a baseline you did not read
+		// is not a baseline: a caller holding one has, by construction, fetched
+		// the issue. Putting it on a row as well would also mean sixty-odd
+		// bytes on every row of every listing to serve the one caller in a
+		// hundred who is about to write.
+		//
+		// Optional because an issue Jira reports no `updated` for cannot be
+		// given one, and saying so by absence beats a token that matches
+		// anything.
+		Name: "precondition", Type: render.TypeString, Optional: true,
+	})
 	s.Children = append(s.Children, render.Child{
 		// Present only with --with-comments, which is why it is optional. It
 		// carries `complete` as well as `count`: the thread is paged, so a
@@ -1154,6 +1167,15 @@ func runGet(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) 
 			return nil, err
 		}
 		issue = one[0]
+	}
+
+	// Always, and not behind a flag. A caller cannot ask for a precondition
+	// they do not yet know they need — the decision to write comes after the
+	// read — and a safety value that has to be requested in advance is one
+	// nobody has when it matters. It costs no request: the issue is already here.
+	issue.Precondition, err = EncodePrecondition(info, issue.Key, issue.updatedRaw)
+	if err != nil {
+		return nil, err
 	}
 
 	doc := GetDoc(issue)

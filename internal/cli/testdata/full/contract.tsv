@@ -12,7 +12,7 @@ epic.get	1	epic.get
 epic.list	1	epic.list
 epic.remove	1	epic.remove
 field.list	1	field.list
-issue.assign	1	issue.assign
+issue.assign	2	issue.assign
 issue.attachment.download	1	issue.attachment.download
 issue.attachment.list	1	issue.attachment.list
 issue.attachment.upload	1	issue.attachment.upload
@@ -23,13 +23,13 @@ issue.comment.edit	1	issue.comment.edit
 issue.comment.list	2	issue.comment.list
 issue.create	1	issue.create
 issue.delete	1	issue.delete
-issue.edit	1	issue.edit
-issue.get	4	issue.get
+issue.edit	2	issue.edit
+issue.get	5	issue.get
 issue.link.add	1	issue.link.add
 issue.link.list	1	issue.link.list
 issue.link.remove	1	issue.link.remove
 issue.list	3	issue.list
-issue.move	1	issue.move
+issue.move	2	issue.move
 issue.watch	1	issue.watch
 issue.worklog.add	2	issue.worklog.add
 issue.worklog.delete	1	issue.worklog.delete

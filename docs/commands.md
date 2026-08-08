@@ -870,12 +870,17 @@ The word unassigned clears the assignee. The word default hands the issue to
 whatever the project's default assignee is, which is not the same thing. The
 word currentUser means whoever holds the credential, as it does on issue list.
 
+--if-unchanged refuses the assignment if the issue changed since you read it,
+exactly as on issue edit. Reassigning work somebody else has just picked up is
+the case it is for.
+
 Examples:
 
 ```console
 jr issue assign ENG-101 'Ada Lovelace'
 jr issue assign ENG-101 unassigned
 jr issue assign ENG-101 default --dry-run
+jr issue assign ENG-101 'Ada Lovelace' --if-unchanged eyJkIjo
 ```
 
 | Argument | Required | Description |
@@ -885,11 +890,12 @@ jr issue assign ENG-101 default --dry-run
 
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
+| `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.assign` | v1 | always |
+| `issue.assign` | v2 | always |
 | `dry-run` | v1 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
@@ -1406,6 +1412,16 @@ whichever the implementation happened to apply last.
 --assignee unassigned clears the assignee, by sending an explicit null. Omitting
 the flag leaves it as it was, which is a different thing.
 
+--if-unchanged refuses the write if somebody else edited the issue since you
+read it. Pass the precondition attribute from issue get; a stale one exits 7
+and sends nothing. Without it the last write wins and the earlier one is lost
+silently, which is the ordinary outcome of two callers editing one issue.
+
+Jira offers no conditional request on an issue, so the check is a read, a
+comparison, and then the write, and the window between the read and the write
+is one round trip wide. The result says method="read-compare" rather than
+letting the word precondition imply an atomic one.
+
 --dry-run prints the exact request, body included, and sends nothing.
 
 --description and --body-format work exactly as on issue create.
@@ -1416,6 +1432,7 @@ Examples:
 jr issue edit ENG-101 --summary 'A better summary'
 jr issue edit ENG-101 --add-label retry --remove-label wontfix
 jr issue edit ENG-101 --assignee unassigned --dry-run
+jr issue edit ENG-101 --priority High --if-unchanged eyJkIjo
 ```
 
 | Argument | Required | Description |
@@ -1432,11 +1449,12 @@ jr issue edit ENG-101 --assignee unassigned --dry-run
 | `--remove-label` | `string` | — | remove a label, leaving the others; repeat for several (repeatable) |
 | `--assignee`, `-a` | `string` | — | set the assignee, by display name, email, or id; the word unassigned clears it |
 | `--body-format` | `text\|markdown\|adf` | `text` | how to read the body: text sends it uninterpreted, markdown converts it, adf takes a document as JSON; the last two are Cloud only |
+| `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.edit` | v1 | always |
+| `issue.edit` | v2 | always |
 | `dry-run` | v1 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
@@ -1485,7 +1503,7 @@ jr issue get ENG-101 --url
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.get` | v4 | always |
+| `issue.get` | v5 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
@@ -1730,6 +1748,11 @@ That list is fetched fresh every time and never cached: it depends on where the
 issue is now, and acting on a stale copy sends an id the workflow no longer
 offers.
 
+--if-unchanged refuses the transition if the issue changed since you read it,
+exactly as on issue edit. Resolving the transition already guards against a
+status that moved underneath you; this guards against everything else, which
+matters most when the transition sets a resolution or adds a comment.
+
 --dry-run prints the exact request, body included, and sends nothing.
 
 Examples:
@@ -1738,6 +1761,7 @@ Examples:
 jr issue move ENG-101 'Start Progress'
 jr issue move ENG-101 'Close Issue' --resolution Fixed
 jr issue move ENG-101 11 --dry-run
+jr issue move ENG-101 Done --if-unchanged eyJkIjo
 ```
 
 | Argument | Required | Description |
@@ -1749,11 +1773,12 @@ jr issue move ENG-101 11 --dry-run
 | --- | --- | --- | --- |
 | `--resolution` | `string` | — | resolution to set, for a transition that asks for one |
 | `--comment` | `string` | — | comment to add with the transition |
+| `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.move` | v1 | always |
+| `issue.move` | v2 | always |
 | `dry-run` | v1 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED

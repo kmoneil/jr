@@ -1,0 +1,38 @@
+{
+  "deployment": "datacenter",
+  "source": "constructed",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/issue/ENG-101",
+        "query": "fields=updated"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"id\":\"10001\",\"key\":\"ENG-101\",\"fields\":{\"updated\":\"2026-08-04T11:32:07.412+0000\"}}"
+      }
+    },
+    {
+      "request": {
+        "method": "PUT",
+        "path": "/rest/api/2/issue/ENG-101",
+        "body": "{\"fields\":{\"summary\":\"a better summary\"}}"
+      },
+      "response": {
+        "status": 204,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": ""
+      }
+    }
+  ]
+}

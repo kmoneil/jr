@@ -531,3 +531,51 @@ func TestEveryColumnNamesAValue(t *testing.T) {
 		})
 	}
 }
+
+// TestNoFlagUsageCarriesABackquote stops cobra renaming a flag's argument.
+//
+// cobra's UnquoteUsage reads the first backquoted run in a flag's usage string
+// as the *name of that flag's value*, and strips the quotes from the help text.
+// So `--if-unchanged`, whose usage said "which `jr issue get` reports", rendered
+// in --help as:
+//
+//	--if-unchanged jr issue get   refuse the write if the issue changed ...
+//
+// which reads as a flag taking three words. The usage text is the only place a
+// caller learns what to pass, and there it was describing something else
+// entirely.
+//
+// Args are unaffected — cobra does not unquote those — which is why nine
+// backquoted Arg usages in this tree are correct and the one Flag was not. That
+// asymmetry is exactly the kind nobody remembers, so it is checked rather than
+// written down.
+//
+// Found by running `jr issue edit --help` after the tests were green. Every
+// gate here reads the declaration, and the declaration was fine; what was wrong
+// was what cobra did with it one layer down.
+func TestNoFlagUsageCarriesABackquote(t *testing.T) {
+	for _, cmd := range registry.All() {
+		for _, f := range cmd.Flags {
+			if strings.Contains(f.Usage, "`") {
+				t.Errorf("%s --%s: usage carries a backquote, so cobra will "+
+					"render %q as the flag's argument name: %q",
+					strings.Join(cmd.Path, "."), f.Name,
+					backquoted(f.Usage), f.Usage)
+			}
+		}
+	}
+}
+
+// backquoted is the run cobra would lift out, for the message above.
+func backquoted(usage string) string {
+	open := strings.Index(usage, "`")
+	if open < 0 {
+		return ""
+	}
+	rest := usage[open+1:]
+	close := strings.Index(rest, "`")
+	if close < 0 {
+		return ""
+	}
+	return rest[:close]
+}

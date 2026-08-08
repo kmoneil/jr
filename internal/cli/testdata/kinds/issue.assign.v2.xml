@@ -1,0 +1,19 @@
+      <element name="issue">
+        <attributes count="2">
+          <attribute name="key" type="string" optional="false"/>
+          <attribute name="action" type="string" optional="false" enum="assigned"/>
+        </attributes>
+        <elements count="2">
+          <element name="assignee" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="precondition" optional="true" repeated="false">
+            <attributes count="1">
+              <attribute name="method" type="string" optional="false" enum="read-compare"/>
+            </attributes>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

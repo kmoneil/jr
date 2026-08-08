@@ -28,9 +28,9 @@ const (
 	KindCreate    = "issue.create"
 	VersionCreate = 1
 	KindEdit      = "issue.edit"
-	VersionEdit   = 1
+	VersionEdit   = 2
 	KindMove      = "issue.move"
-	VersionMove   = 1
+	VersionMove   = 2
 )
 
 func init() {
@@ -473,6 +473,16 @@ whichever the implementation happened to apply last.
 --assignee unassigned clears the assignee, by sending an explicit null. Omitting
 the flag leaves it as it was, which is a different thing.
 
+--if-unchanged refuses the write if somebody else edited the issue since you
+read it. Pass the precondition attribute from issue get; a stale one exits 7
+and sends nothing. Without it the last write wins and the earlier one is lost
+silently, which is the ordinary outcome of two callers editing one issue.
+
+Jira offers no conditional request on an issue, so the check is a read, a
+comparison, and then the write, and the window between the read and the write
+is one round trip wide. The result says method="read-compare" rather than
+letting the word precondition imply an atomic one.
+
 --dry-run prints the exact request, body included, and sends nothing.
 
 --description and --body-format work exactly as on issue create.`),
@@ -480,6 +490,7 @@ the flag leaves it as it was, which is a different thing.
 			buildinfo.App + " issue edit ENG-101 --summary 'A better summary'",
 			buildinfo.App + " issue edit ENG-101 --add-label retry --remove-label wontfix",
 			buildinfo.App + " issue edit ENG-101 --assignee unassigned --dry-run",
+			buildinfo.App + " issue edit ENG-101 --priority High --if-unchanged eyJkIjo",
 		}, "\n"),
 		Args: []registry.Arg{{
 			Name: "key", Usage: "issue key, e.g. ENG-101", Required: true,
@@ -509,6 +520,7 @@ the flag leaves it as it was, which is a different thing.
 					"the word unassigned clears it",
 			},
 			bodyFormatFlag(),
+			ifUnchangedFlagDecl(),
 			dryRunFlag(),
 		},
 		Mutating:     true,
@@ -532,6 +544,9 @@ func validateEdit(ctx context.Context, inv *registry.Invocation) error {
 		return errs.Usage("INVALID_KEY", "%q is not an issue key", inv.Args[0]).
 			WithDetail("an issue key looks like ENG-123").
 			WithRemedy("pass a key, not an id or a summary")
+	}
+	if err := validatePrecondition(inv); err != nil {
+		return err
 	}
 
 	replace := len(inv.Flags.StringSlice("label")) > 0
@@ -683,10 +698,18 @@ func runEdit(ctx context.Context, inv *registry.Invocation) (*render.Doc, error)
 	if inv.Flags.Bool("dry-run") {
 		return registry.DryRunDoc("issue.edit", req), nil
 	}
+	// Before the write and after the request is built, so a request this tool
+	// would have refused to build never costs the extra read.
+	checked, err := checkUnchanged(ctx, inv, client, opt.Key)
+	if err != nil {
+		return nil, err
+	}
 	if err := client.send(ctx, req); err != nil {
 		return nil, err
 	}
-	return EditedDoc(KindEdit, VersionEdit, opt.Key, "edited"), nil
+	return stampPrecondition(
+		EditedDoc(KindEdit, VersionEdit, opt.Key, "edited"), checked,
+	), nil
 }
 
 // send performs a request whose success carries no body worth parsing. Jira
@@ -727,11 +750,17 @@ That list is fetched fresh every time and never cached: it depends on where the
 issue is now, and acting on a stale copy sends an id the workflow no longer
 offers.
 
+--if-unchanged refuses the transition if the issue changed since you read it,
+exactly as on issue edit. Resolving the transition already guards against a
+status that moved underneath you; this guards against everything else, which
+matters most when the transition sets a resolution or adds a comment.
+
 --dry-run prints the exact request, body included, and sends nothing.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue move ENG-101 'Start Progress'",
 			buildinfo.App + " issue move ENG-101 'Close Issue' --resolution Fixed",
 			buildinfo.App + " issue move ENG-101 11 --dry-run",
+			buildinfo.App + " issue move ENG-101 Done --if-unchanged eyJkIjo",
 		}, "\n"),
 		Args: []registry.Arg{
 			{Name: "key", Usage: "issue key, e.g. ENG-101", Required: true},
@@ -749,6 +778,7 @@ offers.
 				Name: "comment", Type: registry.TypeString,
 				Usage: "comment to add with the transition",
 			},
+			ifUnchangedFlagDecl(),
 			dryRunFlag(),
 		},
 		Mutating:     true,
@@ -769,6 +799,9 @@ func validateMove(_ context.Context, inv *registry.Invocation) error {
 		return errs.Usage("INVALID_KEY", "%q is not an issue key", inv.Args[0]).
 			WithDetail("an issue key looks like ENG-123").
 			WithRemedy("pass a key, not an id or a summary")
+	}
+	if err := validatePrecondition(inv); err != nil {
+		return err
 	}
 	// The transition itself is resolved in the command body rather than here,
 	// because resolving it needs the issue's current status — and fetching that
@@ -845,18 +878,22 @@ func runMove(ctx context.Context, inv *registry.Invocation) (*render.Doc, error)
 	if inv.Flags.Bool("dry-run") {
 		return registry.DryRunDoc("issue.move", req), nil
 	}
+	checked, err := checkUnchanged(ctx, inv, client, inv.Args[0])
+	if err != nil {
+		return nil, err
+	}
 	if err := client.send(ctx, req); err != nil {
 		return nil, err
 	}
 
-	return render.Record(KindMove, VersionMove, render.El("issue").
+	return stampPrecondition(render.Record(KindMove, VersionMove, render.El("issue").
 		Attr("key", inv.Args[0]).
 		Attr("action", "moved").
 		Attr("transition", transition.ID).
 		Child(render.El("to").
 			Attr("id", transition.To.ID).
 			Attr("category", transition.To.Category).
-			SetText(transition.To.Name))), nil
+			SetText(transition.To.Name))), checked), nil
 }
 
 // encodeCreated and decodeCreated carry a create's result through the ledger.

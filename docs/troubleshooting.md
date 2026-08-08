@@ -326,6 +326,41 @@ preview is what you look at in order to decide.
 The key was already used for a _different_ operation. Answering one with the
 other's result would be worse than refusing. Use a new key.
 
+### `STALE_WRITE` (exit 7)
+
+Somebody else changed the issue between the read your `--if-unchanged`
+precondition came from and this write, so nothing was sent. This is not a
+failure to fix; it is the flag doing its job.
+
+The remedy is a loop, not a retry. Read the issue again, decide again against
+what it says now — the change you were about to make may no longer be the one
+you want — and write with the precondition from the second read:
+
+```console
+$ jr issue get ENG-101 --format json | jq -r '.issue.precondition'
+eyJkIjoiY2xvdWQiLCJrIjoiRU5HLTEwMSIsInUiOiIyMDI2LTA4LTA0VDExOjQxOjU1LjAwOFoifQ
+$ jr issue edit ENG-101 --priority High --if-unchanged eyJkIjoiY2xvdWQi...
+```
+
+Retrying with the *same* precondition will fail the same way every time, which
+is the point: it describes a version of the issue that no longer exists.
+
+`updated` moves for any change, including a comment somebody added, so this can
+refuse a write that would not actually have collided. That is deliberate — the
+alternative is deciding which changes count, and getting that wrong loses an
+edit silently.
+
+### `INVALID_PRECONDITION` (exit 2)
+
+The value passed to `--if-unchanged` is not one this tool issued: not a token at
+all, one describing a different issue, or one minted against your other site.
+It comes from the `precondition` attribute of `jr issue get`, and nowhere else —
+it is deliberately opaque, so there is nothing to assemble by hand.
+
+Refused rather than compared, because comparing a value from somewhere else
+would report "the issue changed", which is a claim about your issue that nobody
+checked.
+
 ### A write failed and you do not know whether it happened
 
 `jr` never replays a non-idempotent request after an upstream error — a POST
