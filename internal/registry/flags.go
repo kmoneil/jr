@@ -12,14 +12,18 @@ type Flags struct {
 	strings map[string][]string
 	ints    map[string]int
 	bools   map[string]bool
+	// defaulted names the flags whose value came from the declaration rather
+	// than from the caller. See WasSet.
+	defaulted map[string]bool
 }
 
 // NewFlags returns an empty flag set.
 func NewFlags() Flags {
 	return Flags{
-		strings: map[string][]string{},
-		ints:    map[string]int{},
-		bools:   map[string]bool{},
+		strings:   map[string][]string{},
+		ints:      map[string]int{},
+		bools:     map[string]bool{},
+		defaulted: map[string]bool{},
 	}
 }
 
@@ -33,6 +37,36 @@ func (f Flags) SetInt(name string, value int) { f.ints[name] = value }
 
 // SetBool records a bool value.
 func (f Flags) SetBool(name string, value bool) { f.bools[name] = value }
+
+// MarkDefault records that a flag's value came from its declaration and not
+// from the caller.
+//
+// The setters above are the caller's voice: harvest writes the effective value
+// for every declared flag, and then says which of them nobody typed. Doing it
+// this way round means a producer that only ever sets what it was given — the
+// MCP binder, and every test — gets the true answer without knowing this method
+// exists. The alternative, marking on the way in, would need the setters to
+// know whether they were carrying an answer or a default, and forgetting to say
+// so would silently report a default as the caller's choice.
+func (f Flags) MarkDefault(name string) { f.defaulted[name] = true }
+
+// WasSet reports whether the caller actually gave this flag.
+//
+// It exists because a flag's zero value and its absence are the same value at
+// this layer, and for some flags they are different requests. `--page-size 0`
+// meant 50: zero is the sentinel for "unset" inside the client, and Int could
+// not tell an explicit one from an absent flag, so a value outside the range
+// the flag's own help publishes was accepted and quietly replaced. Anything
+// whose zero is a legitimate input has to ask this rather than read Int.
+func (f Flags) WasSet(name string) bool {
+	if f.defaulted[name] {
+		return false
+	}
+	_, isString := f.strings[name]
+	_, isInt := f.ints[name]
+	_, isBool := f.bools[name]
+	return isString || isInt || isBool
+}
 
 // String returns the last value of a string flag.
 func (f Flags) String(name string) string {

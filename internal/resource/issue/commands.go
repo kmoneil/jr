@@ -472,14 +472,25 @@ func validateList(ctx context.Context, inv *registry.Invocation) error {
 // Shared by the three commands that declare the flag, because a bound enforced
 // in three places is a bound that will eventually be enforced in two.
 //
-// It does not refuse zero, and that is not this function's choice: zero is
-// resolvePageSize's sentinel for "unset", so a caller who types it gets the
-// default of 50 rather than a refusal. That is a real defect and a separate
-// one — backlog/page-size-zero-is-silently-fifty.md — because fixing it means
-// teaching registry.Flags to tell an explicit zero from an absent flag.
+// Zero is checked here and nowhere below, which is the whole shape of this
+// function. The flag's own help says 1 to 100; `--page-size 101` was refused
+// with the comment three lines above resolvePageSize arguing that a value the
+// server cannot honour is refused rather than clamped, and `--page-size 0` —
+// the same sentence at the other end of the range — was answered by silently
+// doing 50. Nothing caught it because zero is resolvePageSize's sentinel for
+// "unset", and at the layer that reads the flag an explicit zero and an absent
+// flag were the same value. registry.Flags.WasSet is what tells them apart, so
+// the bound is applied to what the caller typed and an omitted flag still pages
+// at the default.
 func requirePageSize(inv *registry.Invocation) error {
-	_, err := resolvePageSize(inv.Flags.Int("page-size"))
-	return err
+	n, given := inv.Flags.Int("page-size"), inv.Flags.WasSet("page-size")
+	if !given {
+		return nil
+	}
+	if n < MinPageSize || n > MaxPageSize {
+		return invalidPageSize(n)
+	}
+	return nil
 }
 
 // requirePageToken refuses a --page-token this tool could not have issued,

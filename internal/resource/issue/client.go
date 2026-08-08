@@ -485,18 +485,29 @@ func (c *Client) fetch(
 // A value above the server's cap is refused rather than clamped. Clamping would
 // mean the tool silently did something other than what was asked, which is the
 // habit this project exists to break.
+// It takes zero to mean unset, which is right here and wrong one layer up:
+// ListOptions.PageSize is a struct field a library caller leaves alone, so its
+// zero carries no intent. A caller who *types* `--page-size 0` has said
+// something, and requirePageSize is where that is refused, because only the
+// flag layer can tell the two apart.
 func resolvePageSize(n int) (int, error) {
 	if n == 0 {
 		return DefaultPageSize, nil
 	}
 	if n < MinPageSize || n > MaxPageSize {
-		return 0, errs.Usage("INVALID_PAGE_SIZE",
-			"--page-size must be between %d and %d", MinPageSize, MaxPageSize).
-			WithDetail("got %d", n).
-			WithRemedy("--page-size tunes the transport; use --limit to say how many " +
-				"results you want")
+		return 0, invalidPageSize(n)
 	}
 	return n, nil
+}
+
+// invalidPageSize is the one refusal, so the bound and its wording cannot
+// differ between the layer that resolves a value and the layer that checks one.
+func invalidPageSize(n int) error {
+	return errs.Usage("INVALID_PAGE_SIZE",
+		"--page-size must be between %d and %d", MinPageSize, MaxPageSize).
+		WithDetail("got %d", n).
+		WithRemedy("--page-size tunes the transport; use --limit to say how many " +
+			"results you want")
 }
 
 // Get fetches one issue.

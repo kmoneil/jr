@@ -81,6 +81,13 @@ func harvest(cmd *cobra.Command, rc *registry.Command) registry.Flags {
 			v, _ := fs.GetString(f.Name)
 			out.SetString(f.Name, v)
 		}
+		if !fs.Changed(f.Name) {
+			// The value above is the declaration's, not the caller's. Said
+			// after the write rather than instead of it: every reader still
+			// gets the effective value, and only a reader that cares whether
+			// the caller typed it — Flags.WasSet — sees the difference.
+			out.MarkDefault(f.Name)
+		}
 	}
 	return out
 }

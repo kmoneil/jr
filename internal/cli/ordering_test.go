@@ -126,54 +126,59 @@ func TestALocalRefusalOutranksTheDeploymentProbe(t *testing.T) {
 //
 // Every command declaring the flag is driven, because the three that declare
 // --page-size resolved it in three places and moving one would have left two.
+//
+// Both ends of --page-size's range are driven, and the low end is the one that
+// was wrong. 101 was refused with an argument about not clamping what the
+// server cannot honour; 0 was answered by silently doing 50, because it is the
+// sentinel for "unset" and nothing at the flag layer could tell an explicit
+// zero from an absent flag. This test used to carry that gap as a comment
+// saying the case would fail for a reason it was not about, which is the shape
+// of an exemption: a value nobody drives is a value nobody checks.
 func TestAPagingFlagIsBoundedBeforeTheProbe(t *testing.T) {
-	bad := map[string]string{
-		// Above the server's cap. Zero is deliberately not tested here: it is
-		// the sentinel for "unset" and is accepted as the default rather than
-		// refused, which is a separate defect —
-		// backlog/page-size-zero-is-silently-fifty.md. Adding the case here
-		// would fail for a reason this test is not about.
-		"page-size":  "101",
-		"page-token": "not-a-token-this-tool-issued",
+	bad := map[string][]string{
+		"page-size":  {"101", "0", "-1"},
+		"page-token": {"not-a-token-this-tool-issued"},
 	}
 
 	var checked int
 	for _, c := range cli.Registry().All() {
 		for _, f := range c.Flags {
-			value, paging := bad[f.Name]
+			values, paging := bad[f.Name]
 			if !paging {
 				continue
 			}
 			checked++
 
-			t.Run(c.Name()+"/"+f.Name, func(t *testing.T) {
-				if c.Validate == nil {
-					t.Fatalf("%s declares --%s and no Validate, so a value it "+
-						"can never honour reaches the network first",
-						c.Name(), f.Name)
-				}
-				inv := invocationWith(c, "ENG-1")
-				switch f.Type {
-				case registry.TypeInt:
-					n, err := strconv.Atoi(value)
-					if err != nil {
-						t.Fatalf("bad test value %q: %v", value, err)
+			for _, value := range values {
+				t.Run(c.Name()+"/"+f.Name+"/"+value, func(t *testing.T) {
+					if c.Validate == nil {
+						t.Fatalf("%s declares --%s and no Validate, so a value it "+
+							"can never honour reaches the network first",
+							c.Name(), f.Name)
 					}
-					inv.Flags.SetInt(f.Name, n)
-				default:
-					inv.Flags.SetString(f.Name, value)
-				}
+					inv := invocationWith(c, "ENG-1")
+					switch f.Type {
+					case registry.TypeInt:
+						n, err := strconv.Atoi(value)
+						if err != nil {
+							t.Fatalf("bad test value %q: %v", value, err)
+						}
+						inv.Flags.SetInt(f.Name, n)
+					default:
+						inv.Flags.SetString(f.Name, value)
+					}
 
-				err := c.Validate(t.Context(), inv)
-				if err == nil {
-					t.Fatalf("%s accepted --%s %s", c.Name(), f.Name, value)
-				}
-				if got := errs.ExitOf(err); got != exitcode.Usage {
-					t.Errorf("%s refused --%s %s with exit %v (%s), want %v",
-						c.Name(), f.Name, value, got, errs.Coerce(err).Code,
-						exitcode.Usage)
-				}
-			})
+					err := c.Validate(t.Context(), inv)
+					if err == nil {
+						t.Fatalf("%s accepted --%s %s", c.Name(), f.Name, value)
+					}
+					if got := errs.ExitOf(err); got != exitcode.Usage {
+						t.Errorf("%s refused --%s %s with exit %v (%s), want %v",
+							c.Name(), f.Name, value, got, errs.Coerce(err).Code,
+							exitcode.Usage)
+					}
+				})
+			}
 		}
 	}
 
@@ -183,6 +188,85 @@ func TestAPagingFlagIsBoundedBeforeTheProbe(t *testing.T) {
 		t.Errorf("checked %d paging flags, want 4; the declarations moved and "+
 			"this test is now asserting something else", checked)
 	}
+
+	requireEveryIntFlagIsDriven(t, bad)
+}
+
+// zeroIsNotAnInput names the int flags whose zero needs no refusal, and why.
+//
+// Empty today, and that is the finding rather than an oversight: --page-size is
+// the only registry.TypeInt flag in the tree. The two int flags on the root —
+// --max-requests and --retries — are bound straight onto the app with IntVar
+// and never reach registry.Flags, and both document zero as a meaning rather
+// than an absence ("0 means no cap").
+var zeroIsNotAnInput = map[string]string{}
+
+// requireEveryIntFlagIsDriven closes the general form of this card.
+//
+// `bad` is a list of flag names somebody remembered to write, and the set of
+// int flags is a list the registry knows: two lists with no reason to agree.
+// That is the shape constrainingFlags and QueryOptions.Constrained had, where
+// the filter missing from the second turned a bounded query into a full-instance
+// sweep. An int flag added later gets the same zero-versus-absent collision
+// --page-size had, and would sit outside this sweep without anything saying so.
+func requireEveryIntFlagIsDriven(t *testing.T, bad map[string][]string) {
+	t.Helper()
+
+	for _, c := range cli.Registry().All() {
+		for _, f := range c.Flags {
+			if f.Type != registry.TypeInt {
+				continue
+			}
+			if _, driven := bad[f.Name]; driven {
+				continue
+			}
+			if why := zeroIsNotAnInput[f.Name]; why != "" {
+				continue
+			}
+			t.Errorf("%s declares --%s as an int and nothing above drives a "+
+				"value it must refuse. At this layer a flag's zero and its "+
+				"absence are the same value, which is how --page-size 0 came "+
+				"to mean 50: either add it to the table, or write down in "+
+				"zeroIsNotAnInput why its zero needs no refusal",
+				c.Name(), f.Name)
+		}
+	}
+}
+
+// TestAnOmittedPageSizeStillPagesAtTheDefault is the other half of the fix, and
+// the half a refusal test cannot cover.
+//
+// Refusing an explicit zero is only correct if an absent flag is still the
+// default: the harvested value is zero either way, so a check that read the
+// number alone would have refused every invocation that did not pass the flag.
+// This drives the same Validate with nothing set at all.
+func TestAnOmittedPageSizeStillPagesAtTheDefault(t *testing.T) {
+	var checked int
+	for _, c := range cli.Registry().All() {
+		if !declaresFlag(c, "page-size") {
+			continue
+		}
+		checked++
+		t.Run(c.Name(), func(t *testing.T) {
+			inv := invocationWith(c, "ENG-1")
+			if err := c.Validate(t.Context(), inv); err != nil {
+				t.Errorf("%s refused an invocation that never mentioned "+
+					"--page-size: %v", c.Name(), err)
+			}
+		})
+	}
+	if checked != 3 {
+		t.Errorf("checked %d commands, want the 3 that declare --page-size", checked)
+	}
+}
+
+func declaresFlag(c *registry.Command, name string) bool {
+	for _, f := range c.Flags {
+		if f.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // invocationWith builds an invocation carrying a malformed first argument and
