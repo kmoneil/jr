@@ -261,7 +261,7 @@ Link wording is customizable per site, so `detail` lists every phrase yours
 offers. `"Blocks"` on its own is ambiguous because it reads in both directions;
 say `blocks` or `is blocked by`.
 
-### `INVALID_KEY`
+### `INVALID_KEY` / `INVALID_PROJECT_KEY`
 
 A malformed issue key is rejected before any request at all, because a 404 for a
 typo reads like a missing issue. Keys look like `ENG-123`.
@@ -269,6 +269,18 @@ typo reads like a missing issue. Keys look like `ENG-123`.
 ```console
 $ jr issue get foo
 # exit 2: "foo" is not an issue key
+```
+
+A project key is checked the same way, on `project get`, `project components`,
+`project versions`, and `project statuses`. A key starts with a letter and
+continues with letters, digits, or underscores — which is wider than Jira's own
+default of two or more uppercase letters, deliberately: a site can widen the
+pattern, and refusing a key some site genuinely uses would be worse than the
+round trip the check saves.
+
+```console
+$ jr project get ../etc
+# exit 2: "../etc" is not a project key
 ```
 
 This holds against an unreachable site and on a cold cache. It did not always:

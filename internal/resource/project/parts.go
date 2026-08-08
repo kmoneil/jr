@@ -81,10 +81,11 @@ before filing one: a component can hand an issue to somebody nobody chose.`),
 		},
 		Outputs: []registry.Output{{Kind: KindComponents, Version: VersionComp}},
 		ExitCodes: []exitcode.Code{
-			exitcode.Partial, exitcode.Auth, exitcode.NotFound,
+			exitcode.Partial, exitcode.Usage, exitcode.Auth, exitcode.NotFound,
 			exitcode.Permission, exitcode.RateLimit, exitcode.Remote,
 		},
-		Stream: runComponents,
+		Validate: validateProject,
+		Stream:   runComponents,
 	}
 }
 
@@ -195,10 +196,11 @@ set.`),
 		},
 		Outputs: []registry.Output{{Kind: KindVersions, Version: VersionVers}},
 		ExitCodes: []exitcode.Code{
-			exitcode.Partial, exitcode.Auth, exitcode.NotFound,
+			exitcode.Partial, exitcode.Usage, exitcode.Auth, exitcode.NotFound,
 			exitcode.Permission, exitcode.RateLimit, exitcode.Remote,
 		},
-		Stream: runVersions,
+		Validate: validateProject,
+		Stream:   runVersions,
 	}
 }
 
@@ -308,10 +310,11 @@ is ` + "`" + buildinfo.App + ` meta transitions` + "`" + `, and it is a shorter 
 		},
 		Outputs: []registry.Output{{Kind: KindStatuses, Version: VersionStat}},
 		ExitCodes: []exitcode.Code{
-			exitcode.Partial, exitcode.Auth, exitcode.NotFound,
+			exitcode.Partial, exitcode.Usage, exitcode.Auth, exitcode.NotFound,
 			exitcode.Permission, exitcode.RateLimit, exitcode.Remote,
 		},
-		Stream: runStatuses,
+		Validate: validateProject,
+		Stream:   runStatuses,
 	}
 }
 

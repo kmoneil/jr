@@ -392,10 +392,11 @@ without repeating themselves.`),
 		NeedsJira: true,
 		Outputs:   []registry.Output{{Kind: KindGet, Version: VersionGet}},
 		ExitCodes: []exitcode.Code{
-			exitcode.Auth, exitcode.NotFound, exitcode.Permission,
+			exitcode.Usage, exitcode.Auth, exitcode.NotFound, exitcode.Permission,
 			exitcode.RateLimit, exitcode.Remote,
 		},
-		Run: runGet,
+		Validate: validateProject,
+		Run:      runGet,
 	}
 }
 
@@ -450,6 +451,38 @@ func projectArg(inv *registry.Invocation) (string, error) {
 		return "", errs.Usage("NO_PROJECT", "a project key is required")
 	}
 	return inv.Jira.RequireProject()
+}
+
+// validateProject refuses a key that cannot name a project, before a session
+// exists.
+//
+// All four commands here take one and none of them checked it, so
+// `project get ../etc` spent the deployment probe and then a request to be told
+// what the string itself already said. url.PathEscape made that a wasted round
+// trip rather than an unsafe one — the invariant about a parser's output being
+// safe in a path did not bind, because there was no parser.
+//
+// In Validate rather than beside the request for the reason every check here
+// is: three of the four stream, so their column headers are on stdout before
+// the body runs, and a refusal raised from inside would arrive after them.
+//
+// It resolves through projectArg, so a key from the context is held to the same
+// grammar as one typed on the command line. That costs nothing — RequireProject
+// reads the resolved context and asks no server — and the alternative is a
+// check that covers the value a caller can see and misses the one they cannot.
+func validateProject(_ context.Context, inv *registry.Invocation) error {
+	key, err := projectArg(inv)
+	if err != nil {
+		return err
+	}
+	if site.ValidProjectKey(key) {
+		return nil
+	}
+	return errs.Usage("INVALID_PROJECT_KEY", "%q is not a project key", key).
+		WithDetail("a project key starts with a letter and continues with " +
+			"letters, digits, or underscores").
+		WithRemedy("see `" + buildinfo.App + " project list` for the keys this " +
+			"credential can reach")
 }
 
 // clientFor is the opening every command here shares.

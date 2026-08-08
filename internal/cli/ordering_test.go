@@ -38,16 +38,6 @@ var argIsNotAnIdentifier = map[string]string{
 		"thing to search for, including one shaped like a path",
 	"user.get": "a user id is an opaque accountId on Cloud and a username on " +
 		"Data Center, and neither has a grammar this tool can check",
-
-	// These four are a gap rather than a decision, and the card says so.
-	// A project key does have a grammar — internal/resource/issue.validProject
-	// already implements it for the project half of an issue key — and nothing
-	// applies it here, so `project get ../etc` is a round trip that comes back
-	// 404. url.PathEscape means it is a wasted request and not an unsafe one.
-	"project.get":        "a project key has no local parser; see backlog/project-key-has-no-parser.md",
-	"project.components": "a project key has no local parser; see backlog/project-key-has-no-parser.md",
-	"project.versions":   "a project key has no local parser; see backlog/project-key-has-no-parser.md",
-	"project.statuses":   "a project key has no local parser; see backlog/project-key-has-no-parser.md",
 }
 
 // TestALocalRefusalOutranksTheDeploymentProbe holds every command that takes an

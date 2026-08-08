@@ -3,6 +3,8 @@ package issue
 import (
 	"strconv"
 	"strings"
+
+	"github.com/kmoneil/jira-cli/internal/site"
 )
 
 // Key is a parsed issue key.
@@ -38,25 +40,12 @@ func ParseKey(s string) (Key, bool) {
 
 // validProject reports whether s can be a Jira project key.
 //
-// Jira's default pattern is two or more uppercase letters. A site can widen it,
-// and what widened patterns actually use is digits and underscores after a
-// leading letter. Nothing outside that set is accepted — not because Jira would
-// refuse it, but because a project key ends up in a URL path and a request that
-// can be steered by its own argument is a different request.
-func validProject(s string) bool {
-	if s == "" {
-		return false
-	}
-	for i, r := range s {
-		switch {
-		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z':
-		case i > 0 && (r == '_' || (r >= '0' && r <= '9')):
-		default:
-			return false
-		}
-	}
-	return true
-}
+// The grammar lives in internal/site because `project get` asks the same
+// question about its own first argument, and a resource may not import another
+// resource. It used to be written out here and nowhere else, so those four
+// commands had no local check at all and `project get ../etc` cost a round trip
+// to be told what the string already said.
+func validProject(s string) bool { return site.ValidProjectKey(s) }
 
 // digits reports whether s is one or more decimal digits and nothing else.
 //
