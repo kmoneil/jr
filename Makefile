@@ -214,6 +214,20 @@ fuzz-jql-tokenize:
 fuzz-jql-date:
 	go test ./internal/jql/ -run=^$$ -fuzz='^FuzzParseDateDoesNotPanic$$' -fuzztime=$(FUZZTIME)
 
+# The command reference is generated from the registry, under the full tag set,
+# because the document describes the full command surface and an untagged run
+# would render the ci profile's subset over it. The gate that keeps it honest is
+# internal/lint/docs_test.go, which runs under `make test` like every other
+# invariant: exact comparison under the full profile, and "everything here is
+# documented" under a reduced one.
+## docs: regenerate docs/commands.md from the registry
+.PHONY: docs
+docs:
+	go test -tags "$(TAGS_FULL)" ./internal/lint/ \
+		-run '^TestTheCommandReferenceIsCurrent$$' -update-docs -count=1
+	@echo
+	@echo "docs/commands.md rewritten from the registry."
+
 ## golden: rewrite the output-contract golden files
 .PHONY: golden
 golden:

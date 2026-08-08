@@ -13,6 +13,33 @@ it looks right.
 > pinning. See [Not yet implemented](#not-yet-implemented) for what is knowingly
 > absent.
 
+## Quickstart
+
+```console
+$ make build                                     # → bin/jr, needs Go 1.26
+
+# Cloud: create an API token at
+# https://id.atlassian.com/manage-profile/security/api-tokens
+$ printf '%s' "$TOKEN" | bin/jr auth login \
+      --site your-company.atlassian.net \
+      --email you@company.com --token-stdin
+
+# Data Center: a personal access token stands alone, no email
+$ printf '%s' "$TOKEN" | bin/jr auth login \
+      --site jira.company.com --token-stdin
+
+$ bin/jr user me                                 # proves the credential works
+$ bin/jr context edit <name> --project ENG       # stop typing --project
+$ bin/jr issue list --assignee currentUser
+```
+
+`auth login` verifies the credential before storing it, and creates your first
+context so the next command has somewhere to point. A token is never taken as a
+flag value, because an argument lands in the shell history and the process list.
+
+Full walkthrough in [docs/getting-started.md](docs/getting-started.md); worked
+examples for common tasks in [docs/recipes.md](docs/recipes.md).
+
 ## Why this exists
 
 Because the guarantee is the product, and a guarantee is not a feature you can
@@ -56,11 +83,16 @@ product, which is the same idea from the other end.
 
 ## Install
 
+There is no release binary yet. Build from source, with Go 1.26:
+
 ```
 git clone <this repo> && cd jira-cli
-make hooks          # install the pre-commit gate, once per clone
 make build          # → bin/jr
+make hooks          # install the pre-commit gate; contributors only, once per clone
 ```
+
+Then see the [quickstart](#quickstart) above, or
+[docs/getting-started.md](docs/getting-started.md) for the walkthrough.
 
 ## What works today
 
@@ -404,7 +436,7 @@ hand-edited and kept in a dotfiles repository, so it holds a _reference_; the
 secret lives under the state directory at mode 0600, and is refused on read if
 it is readable by anyone else.
 
-There are four ways in, and no flag takes a token as its value, because an
+There are five ways in, and no flag takes a token as its value, because an
 argument lands in the shell history and the process list, where anyone on the
 machine can read it.
 
@@ -415,25 +447,38 @@ It reports who you authenticated as. `--no-verify` skips the check, for
 preparing a configuration offline.
 
 ```console
-# 1. Pipe it.
+# 1. Type it. The shell reads it, so nothing echoes and nothing is recorded.
+$ printf 'API token: '; read -rs TOKEN; echo
 $ printf '%s' "$TOKEN" | jr auth login --site acme.atlassian.net \
       --email ada@example.com --token-stdin
+$ unset TOKEN
 
-# 2. From a file, which is what most secret managers write.
+# 2. Pipe it, from a secret manager or anywhere else.
+$ pass show jira/token | jr auth login --site acme.atlassian.net \
+      --email ada@example.com --token-stdin
+
+# 3. From a file, which is what most secret managers write.
 $ jr auth login --site acme.atlassian.net --email ada@example.com \
       --token-file ~/.secrets/jira
 
-# 3. Environment. No login step at all, and every command just works.
+# 4. Environment. No login step at all, and every command just works.
 $ export JIRA_API_TOKEN=... JIRA_EMAIL=ada@example.com   # Cloud
 $ export JIRA_API_TOKEN=...                              # Data Center PAT
 
-# 4. .netrc, shared with curl and git.
+# 5. .netrc, shared with curl and git.
 machine acme.atlassian.net login ada@example.com password ...
 ```
 
 `jr auth login` never prompts. If stdin is a terminal it refuses and lists these
 options rather than waiting for input nobody knew to type. A headless build has
 no human to wait for.
+
+That refusal is why the first form hands the reading to the shell rather than
+asking for it back. `read -s` does not echo, and what is typed at a `read`
+prompt never enters the history — so a human gets the interactive login they
+wanted, and the tool keeps the invariant that nothing ever blocks on input.
+Trailing whitespace is trimmed from a token however it arrives, so a stray
+newline is not a wrong token.
 
 Logging in with `--site` also **creates the first context**, so the next command
 has somewhere to point. If contexts already exist none are touched: you have a
@@ -540,6 +585,17 @@ the ones meant to carry the least. The wire format is asserted by test.
 
 ## Documentation
 
+Start here if you are new:
+
+| Document                                             | Covers                                                                        |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------- |
+| [docs/getting-started.md](docs/getting-started.md)   | Install, get a token, log in, first query, reading the output                 |
+| [docs/recipes.md](docs/recipes.md)                   | Worked examples: searching, bulk edits, exports, sprints, CI, agents          |
+| [docs/troubleshooting.md](docs/troubleshooting.md)   | Every common failure by error code, and what to do about it                   |
+| [docs/commands.md](docs/commands.md)                 | Every command and its flags, generated from the registry and asserted current |
+
+Reference:
+
 | Document                                           | Covers                                                                        |
 | -------------------------------------------------- | ----------------------------------------------------------------------------- |
 | [docs/output-contract.md](docs/output-contract.md) | Formats, envelope, truncation, escaping, exit codes, errors, stability policy |
@@ -570,6 +626,7 @@ make test           # the default build
 make test-profiles  # the suite under every shipped tag set
 make fuzz           # every fuzz target, FUZZTIME each (default 30s)
 make golden         # rewrite the output-contract golden files
+make docs           # regenerate docs/commands.md from the registry
 make cost           # what each format costs, in tokens (needs uv, and network)
 make vuln           # govulncheck over every profile's code (needs network)
 make lint fmt vet

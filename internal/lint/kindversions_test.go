@@ -6,17 +6,23 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/registry"
+	"github.com/kmoneil/jira-cli/internal/cli"
 
-	// Every resource, so registry.Default holds the whole surface. The blank
-	// imports are how the other lint tests reach it too.
+	// Every resource, so registry.Default holds them. The blank imports are how
+	// the other lint tests reach it too; cli.Registry adds the built-ins on top.
 	_ "github.com/kmoneil/jira-cli/internal/commands"
 )
 
 // versionedDocs are the documents that print a worked example of a result
 // envelope, and therefore print a schema version.
+// A document belongs here as soon as it prints an envelope, and not before:
+// the test fails a listed document that matches nothing, because a file it read
+// and asserted nothing about reads like coverage. recipes.md and
+// troubleshooting.md show commands and error envelopes rather than result ones,
+// so they carry no kind version to check.
 var versionedDocs = []string{
 	"../../docs/output-contract.md",
+	"../../docs/getting-started.md",
 	"../../README.md",
 }
 
@@ -101,15 +107,22 @@ func checkVersion(
 
 // currentKindVersions is what the registry says each kind is at.
 //
-// registry.Kinds is the same source `jr contract` prints from, so the document
-// is compared against the machine-readable contract rather than against a
-// second reading of the source. A kind declared at two versions is already a
-// registry-test failure and is not re-checked here.
+// It is the same source `jr contract` prints from, so the document is compared
+// against the machine-readable contract rather than against a second reading of
+// the source. A kind declared at two versions is already a registry-test failure
+// and is not re-checked here.
+//
+// cli.Registry rather than registry.Kinds: the built-ins — version, schema,
+// contract, auth, and context — are added when the app assembles its registry
+// and are absent from the default one. Reading only the default meant every
+// built-in's kind was unknown to this test, so a documented `kind="version"`
+// was reported as a kind no command emits rather than having its number
+// checked. The blind spot was invisible while no document happened to print one.
 func currentKindVersions(t *testing.T) map[string]int {
 	t.Helper()
 
 	out := map[string]int{}
-	for _, k := range registry.Kinds() {
+	for _, k := range cli.Registry().Kinds() {
 		out[k.Name] = k.Version
 	}
 	if len(out) == 0 {

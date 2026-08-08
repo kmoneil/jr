@@ -1,0 +1,575 @@
+# Recipes
+
+Worked examples for the things people actually do. Every one is copy-pasteable
+once you have finished [getting-started.md](getting-started.md).
+
+Commands are shown without `--project`, on the assumption your context has one.
+Add `--project ENG` to any of them to override it for a single run.
+
+- [Finding issues](#finding-issues)
+- [Finding your own work](#finding-your-own-work)
+- [Reading an issue](#reading-an-issue)
+- [Creating and editing](#creating-and-editing)
+- [Moving issues through a workflow](#moving-issues-through-a-workflow)
+- [Comments, worklogs, and links](#comments-worklogs-and-links)
+- [Sprints, epics, and boards](#sprints-epics-and-boards)
+- [Custom fields](#custom-fields)
+- [Exporting and piping](#exporting-and-piping)
+- [Bulk operations](#bulk-operations)
+- [Working safely](#working-safely)
+- [Scripting and CI](#scripting-and-ci)
+- [Agents and MCP](#agents-and-mcp)
+
+## Finding issues
+
+```console
+# Everything open in your default project
+$ jr issue list --status 'To Do' --status 'In Progress'
+
+# By type, by label
+$ jr issue list --type Bug --label regression
+
+# Excluding a label
+$ jr issue list --type Bug --not-label wontfix
+
+# Created or updated in a window; offsets are relative to now
+$ jr issue list --created-after -30d
+$ jr issue list --updated-after 2026-01-01 --updated-before 2026-02-01
+
+# Sorted, with the issue key as a stable tiebreaker you get for free
+$ jr issue list --sort updated --order desc
+```
+
+Repeatable flags OR together, so `--status 'To Do' --status 'In Progress'` means
+either. Different flags AND together.
+
+### When the flags do not cover it
+
+Pass JQL whole. It is combined with the other filters and always parenthesized,
+so an `OR` inside it cannot widen the scope you set:
+
+```console
+$ jr issue list --jql 'priority = Highest AND resolution IS EMPTY'
+
+# Free-text search across summary and description
+$ jr issue list --jql 'text ~ "connection reset"'
+
+# Combine: the JQL narrows, your flags still apply
+$ jr issue list --type Bug --jql 'summary ~ "timeout" OR summary ~ "deadline"'
+```
+
+Check a query without running it:
+
+```console
+$ jr jql validate --jql 'project = ENG AND status = Open'
+$ jr jql explain --jql 'assignee = currentUser() AND sprint IN openSprints()'
+```
+
+A date that does not parse is refused with the reason, rather than silently
+matching nothing:
+
+```console
+$ jr issue list --created-after 2020-13-45
+# exit 2: month 13 is out of range
+```
+
+## Finding your own work
+
+There is a real difference between issues that _belong_ to you and issues you
+_touched_, and mixing them up is how you get a plausible, wrong answer.
+
+```console
+# Assigned to me right now
+$ jr issue list --assignee currentUser
+
+# I filed it (cannot be changed afterwards)
+$ jr issue list --creator currentUser
+
+# It is on me and somebody updated it this week — note: not "I worked on it"
+$ jr issue list --assignee currentUser --updated-after -7d
+```
+
+That last one reads like "what I did this week" and is not. `updated` means
+somebody updated the issue: a bot relabelling your ticket on Tuesday puts it in
+the result, and everything you did to somebody else's ticket stays out.
+
+For the second question:
+
+```console
+# One person across assignee, reporter, creator, and worklogAuthor
+$ jr issue list --involving currentUser --updated-after -7d
+
+# I changed the status of it
+$ jr issue list --changed-by currentUser --changed-after -1w
+
+# I changed some other field
+$ jr issue list --changed-by currentUser --changed-field assignee --changed-after -1w
+
+# I logged time against it
+$ jr issue list --worklog-author currentUser --worklog-after -7d
+
+# It was mine at some point, whoever has it now
+$ jr issue list --was-assignee currentUser
+```
+
+Two limits worth knowing rather than discovering:
+
+- **Comment authorship is not searchable.** JQL has no field for it, so nothing
+  here answers "issues I commented on". `--involving` says so rather than
+  quietly approximating it.
+- **`CHANGED` names one field at a time.** There is no way to ask whether _any_
+  field changed, so `--changed-field` defaults to `status` and anything else has
+  to be named.
+
+Every user-valued flag takes a display name, an email, an account id, or the
+word `currentUser`. A name that resolves to nobody is refused rather than sent —
+because `assignee = "Ada Lovelace"` against Cloud matches nothing and comes back
+complete, empty, and successful, which is indistinguishable from a real answer.
+
+## Reading an issue
+
+```console
+$ jr issue get ENG-101
+
+# With the comment thread
+$ jr issue get ENG-101 --with-comments
+
+# With a link you can click or pipe to a browser
+$ jr issue get ENG-101 --url
+
+# Reading, not parsing (needs the render tag; make build has it)
+$ jr issue get ENG-101 --format markdown
+```
+
+`--url` adds a bare browse URL, on `issue get` and `issue list` alike. It is a
+plain string rather than a terminal escape sequence, so it is both clickable in
+most terminals and usable in a pipe:
+
+```console
+$ jr issue list --assignee currentUser --url | cut -f6 | xargs open
+```
+
+## Creating and editing
+
+```console
+# Preview first — this sends nothing
+$ jr issue create --type Bug --summary 'Retry drops the last error' --dry-run
+
+# Then for real
+$ jr issue create --type Bug --summary 'Retry drops the last error'
+
+# With more of it filled in
+$ jr issue create \
+    --type Story \
+    --summary 'Add keyset pagination' \
+    --description 'Offsets shift when a row is inserted above them.' \
+    --assignee currentUser \
+    --priority High \
+    --label transport
+```
+
+`--description` is sent as **plain text** by default: `**bold**` reaches Jira as
+six characters. To have markup interpreted, ask for it:
+
+```console
+$ jr issue create --type Bug --summary Probe \
+    --description '## Repro
+
+1. Start the server
+2. Kill it mid-request' \
+    --body-format markdown
+```
+
+`--body-format markdown` is Cloud only, and refuses by name anything the
+supported subset cannot hold rather than approximating it.
+
+Editing works the same way:
+
+```console
+$ jr issue edit ENG-101 --summary 'A better summary'
+$ jr issue edit ENG-101 --priority Highest --assignee ada@company.com
+
+# Labels: --label replaces the whole set
+$ jr issue edit ENG-101 --label transport --label retry
+
+# ...or adjust it without knowing what is there
+$ jr issue edit ENG-101 --add-label flaky --remove-label wontfix
+```
+
+Combining `--label` with `--add-label` is refused, because one replaces the set
+and the other adjusts it, and doing both has no single right answer.
+
+### Making a retry safe
+
+A `create` that gets a 503 may or may not have created the issue. `jr` never
+replays a POST after an upstream error for exactly that reason — but if you want
+a retry to be safe, hold an idempotency key:
+
+```console
+$ jr issue create --type Task --summary 'Ship release 42' \
+    --idempotency-key release-42
+```
+
+Run it twice and the second returns the first issue instead of making another.
+
+## Moving issues through a workflow
+
+Ask what an issue can do before telling it to do something:
+
+```console
+$ jr meta transitions ENG-101
+```
+
+Then move it. The transition is named as Jira names it — which is the transition
+name, not the destination status:
+
+```console
+$ jr issue move ENG-101 'Start Progress'
+$ jr issue move ENG-101 'Close Issue' --resolution Fixed
+$ jr issue move ENG-101 'Done' --comment 'Fixed by the retry rework'
+
+# Preview it
+$ jr issue move ENG-101 Done --dry-run
+```
+
+A transition the issue does not offer _right now_ is refused with the list of
+the ones it does, each with its id and destination.
+
+Assigning is its own verb:
+
+```console
+$ jr issue assign ENG-101 ada@company.com
+$ jr issue assign ENG-101 currentUser
+$ jr issue assign ENG-101 unassigned
+```
+
+## Comments, worklogs, and links
+
+```console
+# Comments
+$ jr issue comment list ENG-101
+$ jr issue comment add ENG-101 'Reproduced on 9.4.2'
+$ jr issue comment add ENG-101 '**Fixed**' --body-format markdown
+
+# Worklogs: <key> <time>, in Jira's duration format
+$ jr issue worklog list ENG-101
+$ jr issue worklog add ENG-101 2h --comment 'Pairing on the retry path'
+$ jr issue worklog add ENG-101 '1d 4h' --started 2026-08-01T09:00:00Z
+```
+
+The duration is one argument, so quote it if it has a space in it.
+
+A duration is a count of `w`, `d`, `h`, or `m`, largest first. Nothing is
+converted between them, because how long a working day is is a site setting.
+
+```console
+# Links: <from> <relationship> <to>
+$ jr issue link list ENG-101
+$ jr issue link add ENG-101 blocks ENG-102
+$ jr issue link add ENG-101 'is blocked by' ENG-99
+```
+
+Link wording is customizable per site, so an unknown phrase is refused with
+every phrase your site does offer. `"Blocks"` on its own reads in either
+direction and is refused as ambiguous, with both phrasings offered.
+
+```console
+# Attachments
+$ jr issue attachment list ENG-101
+$ jr issue attachment upload ENG-101 ./trace.log
+$ jr issue attachment download ENG-101 10042
+$ jr issue attachment download ENG-101 10042 --output - > trace.log
+```
+
+## Sprints, epics, and boards
+
+```console
+$ jr board list
+$ jr sprint list --board 42
+$ jr sprint list --state active
+$ jr sprint get 1001
+
+# Move issues into a sprint, or into an epic
+$ jr sprint add 1001 ENG-101 ENG-102 ENG-103
+$ jr epic add ENG-1 ENG-101 ENG-102
+$ jr epic remove ENG-101
+
+# What is in the active sprint
+$ jr issue list --jql 'sprint IN openSprints()' --limit all
+```
+
+Set a default board on your context so you stop passing `--board`:
+
+```console
+$ jr context edit work --board 42
+```
+
+## Custom fields
+
+Find the field first. Names are what you see in the UI; ids are what the API
+wants, and `jr` accepts either:
+
+```console
+$ jr field list
+$ jr field list | grep -i story
+```
+
+Then ask for it. `--field` **adds** to the default columns rather than replacing
+them, and what you ask for reaches the output:
+
+```console
+$ jr issue list --field 'Story Points'
+$ jr issue list --field customfield_10042 --field Sprint
+$ jr issue get ENG-101 --field 'Story Points'
+```
+
+A name that matches nothing is refused locally, with the near misses and their
+ids — rather than sent for Jira to reject opaquely. A field the server did not
+return comes back present and empty, so "no value" stays distinguishable from
+"you asked for something that does not exist".
+
+If your team has fields that belong on every issue, store them on the context:
+
+```console
+$ jr context edit work --field 'Story Points' --field Team
+
+$ jr issue get ENG-250            # both included
+$ jr issue list --field Sprint    # both, plus Sprint
+$ jr issue list --no-context-fields --field Sprint   # just Sprint, this once
+```
+
+Two things to know before storing a set: every read then resolves it, so a field
+renamed in Jira fails `issue get` and `issue list` until the context is
+corrected; and every read consults the field catalogue, which is one request per
+cache TTL rather than per command, but is not free on a cold cache.
+
+## Exporting and piping
+
+TSV is the default for lists precisely so this works:
+
+> **`--limit all` needs a filter.** With no project and no other filter it is
+> refused (`UNCONSTRAINED_QUERY`, exit 2), because it would page until it had
+> every issue in every project your credential can see. A context project counts
+> as a filter, which is why these examples work. To genuinely mean the whole
+> instance, say so: `--all-projects`.
+
+```console
+# Straight to a file
+$ jr issue list --limit all > issues.tsv
+
+# Pick columns
+$ jr issue list --limit all | cut -f1,5
+
+# Skip the header
+$ jr issue list --limit all | tail -n +2
+
+# Line it up for reading
+$ jr issue list | column -t -s $'\t'
+
+# Count by status
+$ jr issue list --limit all | tail -n +2 | cut -f2 | sort | uniq -c | sort -rn
+```
+
+To CSV, if something downstream insists on it:
+
+```console
+$ jr issue list --limit all | tr '\t' ',' > issues.csv
+```
+
+That is only safe because TSV values never contain a raw tab, newline, or
+backslash — they are escaped. It is _not_ safe if a summary contains a comma, so
+prefer a real converter for anything that matters:
+
+```console
+$ jr issue list --limit all --format json | jq -r '.issues[] | [.key, .summary] | @csv'
+```
+
+With `jq`:
+
+```console
+$ jr issue list --format json | jq -r '.issues[].key'
+$ jr issue get ENG-101 --format json | jq -r '.issue.status.text'
+$ jr issue list --format json --limit all |
+      jq '[.issues[] | select(.status.text == "Done")] | length'
+```
+
+Watch the envelope while you are there — it tells you whether you got
+everything:
+
+```console
+$ jr issue list --limit 50 --format json | jq '{count, complete}'
+{
+  "count": 50,
+  "complete": false
+}
+```
+
+## Bulk operations
+
+There is no bulk verb, deliberately: a half-completed bulk edit is worse than a
+loop you can see. Loop in the shell, and let the exit codes stop you.
+
+```console
+# Transition everything matching a query
+$ jr issue list --jql 'status = "In Review" AND updated < -30d' \
+      --limit all | tail -n +2 | cut -f1 |
+  while read -r key; do
+      jr issue move "$key" 'Close Issue' --resolution 'Won'"'"'t Do' || break
+  done
+```
+
+Rehearse it first. Swap the mutating command for `--dry-run`, or just look:
+
+```console
+$ jr issue list --jql 'status = "In Review" AND updated < -30d' --limit all
+```
+
+A safer shape, which stops on the first failure and tells you where it got to:
+
+```console
+$ set -e
+$ jr issue list --label needs-triage --limit all | tail -n +2 | cut -f1 |
+  while read -r key; do
+      echo "labelling $key" >&2
+      jr issue edit "$key" --add-label triaged
+  done
+```
+
+Note `--limit all`. Without it you get the first 50 and **exit 3**, and a bulk
+loop that silently processed the first page would be the exact failure this tool
+exists to prevent.
+
+### Resuming a truncated run
+
+If a run is cut short, the stderr warning carries a token:
+
+```console
+$ jr issue list --limit 50 --project ENG
+# exit 3, and stderr names a next-page-token
+
+$ jr issue list --limit 50 --project ENG --page-token <token>
+```
+
+The token is opaque and carries the deployment it was minted against, so one
+from Cloud is refused against Data Center rather than read as offset zero.
+
+## Working safely
+
+**Preview every write.** Every mutating command takes `--dry-run` and prints the
+exact request it would send, body included:
+
+```console
+$ jr issue delete ENG-101 --dry-run
+```
+
+**Destructive commands require `--yes`.** Deleting is not something you do by
+typo:
+
+```console
+$ jr issue delete ENG-101 --yes
+```
+
+**Use a read-only context for anything exploratory:**
+
+```console
+$ jr context create audit --site your-company.atlassian.net --readonly
+$ jr context use audit
+```
+
+Or for one invocation:
+
+```console
+$ jr issue list --readonly
+$ JIRA_READONLY=1 ./some-script.sh
+```
+
+Read-only is a one-way latch within an invocation: nothing a command does turns
+it off, and `JIRA_READONLY=0` will not clear a context that was created
+read-only. Make the context writable again deliberately:
+
+```console
+$ jr context edit audit --unset readonly
+```
+
+**Or use a binary that cannot write at all.** `make build-reader` produces a
+`jr` with no mutating commands compiled in — not refused at runtime, absent:
+
+```console
+$ bin/jr-reader schema --limit all | grep -c .
+```
+
+**Bound the damage of a runaway query:**
+
+```console
+$ jr issue list --limit all --max-requests 20
+```
+
+Exceeding the budget truncates and exits 3 rather than running forever.
+
+## Scripting and CI
+
+Set everything from the environment; no login step, no config file:
+
+```bash
+export JIRA_SITE=your-company.atlassian.net
+export JIRA_EMAIL=ci@company.com
+export JIRA_API_TOKEN="$JIRA_TOKEN"   # from your secret store
+export JIRA_FORMAT=json
+export JIRA_READONLY=1                # if the job only reads
+```
+
+Then branch on the exit code, not on the output:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! out=$(jr issue list --jql 'labels = release-blocker' --limit all); then
+    status=$?
+    case $status in
+        3) echo "truncated; widen --limit" >&2 ;;
+        4) echo "credentials rejected" >&2 ;;
+        *) echo "jr failed with $status" >&2 ;;
+    esac
+    exit $status
+fi
+
+count=$(printf '%s' "$out" | jq '.count')
+[ "$count" -eq 0 ] || { echo "$count release blockers open" >&2; exit 1; }
+```
+
+`set -e` alone is not enough here: exit 3 means _success, truncated_, and you
+have to decide whether that is acceptable for your job rather than have it
+inherited as a generic failure.
+
+Use the smallest build that does the job. `make build-ci` is query-only and the
+smallest of the four; a token it holds cannot write even if the script is wrong.
+
+## Agents and MCP
+
+Every command in the build is also an MCP tool, generated from the same registry,
+so the tool list cannot drift from the CLI:
+
+```console
+$ jr mcp serve
+```
+
+Point an MCP client at that. Two properties worth knowing:
+
+- **The tool list is the truth about the binary.** A reader build advertises no
+  mutating tools because it does not contain any. An agent introspecting the
+  server sees what is there, not a list of tools that will refuse.
+- **There is no exit code in a tool reply**, so a truncated result carries its
+  warning in the content instead. It is never reported as complete.
+
+Serving a reader or agent build is the straightforward way to give a model Jira
+access it cannot misuse:
+
+```console
+$ make build-reader && bin/jr-reader mcp serve
+```
+
+For feeding results to a model directly, TSV is much the cheapest: a hundred
+issues cost about 2,930 tokens as TSV against 12,755 as XML. The numbers and the
+method are in
+[output-contract.md](output-contract.md#what-the-defaults-cost).
