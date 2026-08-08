@@ -54,7 +54,16 @@ where anyone on the machine can read it.
     ` + buildinfo.App + ` auth login --site <host> --token-file ~/.secrets/jira
 
 This command never prompts. If stdin is a terminal it refuses rather than
-waiting, because a headless build has no human to wait for.
+waiting, because a headless build has no human to wait for. To type a token by
+hand, have the shell read it and pipe the result:
+
+    printf 'API token: '; read -rs TOKEN; echo
+    printf '%s' "$TOKEN" | ` + buildinfo.App + ` auth login --site <host> --token-stdin
+    unset TOKEN
+
+read -s does not echo, and what is typed at a read prompt never reaches the
+shell history — which is the property a flag value cannot have. Trailing
+whitespace is trimmed either way, so a stray newline is not a wrong token.
 
 You do not have to log in at all: set ` + auth.EnvToken + `, plus ` + auth.EnvEmail + ` on
 Cloud, and every command uses it.
