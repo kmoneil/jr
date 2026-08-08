@@ -423,6 +423,12 @@ func contextFieldsFlag() registry.Flag {
 // command, so its header — and its columns — go out before the body runs, and a
 // rejection from inside it would arrive after bytes were already on stdout.
 func validateList(ctx context.Context, inv *registry.Invocation) error {
+	if err := requirePageSize(inv); err != nil {
+		return err
+	}
+	if err := requirePageToken(inv); err != nil {
+		return err
+	}
 	if err := refuseUncontainableJQL(inv); err != nil {
 		return err
 	}
@@ -439,6 +445,39 @@ func validateList(ctx context.Context, inv *registry.Invocation) error {
 		return err
 	}
 	return validateFields(ctx, inv)
+}
+
+// requirePageSize refuses a --page-size that can never work, before a session
+// exists.
+//
+// The bounds are arithmetic on a number the caller typed, and resolvePageSize
+// was reached only from inside the request loop — past Connect, and so past the
+// deployment probe. `--page-size 101` on a cold cache came back NETWORK at
+// exit 9, which publishes a usage error as retryable.
+//
+// The body still resolves the value; this refuses one it would refuse anyway.
+// Shared by the three commands that declare the flag, because a bound enforced
+// in three places is a bound that will eventually be enforced in two.
+//
+// It does not refuse zero, and that is not this function's choice: zero is
+// resolvePageSize's sentinel for "unset", so a caller who types it gets the
+// default of 50 rather than a refusal. That is a real defect and a separate
+// one — backlog/page-size-zero-is-silently-fifty.md — because fixing it means
+// teaching registry.Flags to tell an explicit zero from an absent flag.
+func requirePageSize(inv *registry.Invocation) error {
+	_, err := resolvePageSize(inv.Flags.Int("page-size"))
+	return err
+}
+
+// requirePageToken refuses a --page-token this tool could not have issued,
+// before a session exists.
+//
+// Only the shape is checked here. Which deployment minted it is DecodePageToken's
+// question and stays in the body, because answering it means knowing which site
+// is on the other end.
+func requirePageToken(inv *registry.Invocation) error {
+	_, err := ParsePageToken(inv.Flags.String("page-token"))
+	return err
 }
 
 // validateChangedFilter refuses --changed-field on its own.
@@ -1072,7 +1111,17 @@ parses both identically. It simply has more of it filled in.`),
 // validateGet resolves the field names and settles --url before anything is
 // fetched, so a site that cannot supply a base URL is a refusal rather than a
 // record with the one element the caller asked for missing.
+//
+// The key is parsed first, and that order is the whole point rather than a
+// tidiness. Both of the checks below reach Jira when their flag is set, and the
+// deployment probe behind them is a round trip on a cold cache — so a key that
+// needs no network at all was queueing behind one that does, and `issue get
+// foo` against an unreachable site reported NETWORK at exit 9. That advertises
+// a typo as retryable, which it is not.
 func validateGet(ctx context.Context, inv *registry.Invocation) error {
+	if err := requireIssueKey(inv); err != nil {
+		return err
+	}
 	if err := validateBrowseURL(ctx, inv); err != nil {
 		return err
 	}

@@ -268,6 +268,45 @@ func TestPageTokenIsOpaqueAndDeploymentBound(t *testing.T) {
 	}
 }
 
+// TestParsePageTokenAnswersOnlyWhatNeedsNoSite pins the seam the split was made
+// on.
+//
+// ParsePageToken exists so a command can refuse a garbled token before it
+// builds a session, because the deployment probe behind Connect is a round trip
+// and a token that cannot decode is not worth one. The line has to fall in
+// exactly one place: everything a caller typed wrong is local, and which server
+// minted the token is not knowable without a server. So a wrong-deployment
+// token must *pass* here and still be refused by DecodePageToken — if it were
+// refused here too, the shape check would need the site and could not run
+// early; if the malformed ones passed here, the split would have bought
+// nothing.
+func TestParsePageTokenAnswersOnlyWhatNeedsNoSite(t *testing.T) {
+	cloudToken := issue.EncodePageToken(issue.PageToken{
+		Deployment: site.Cloud, Cursor: "CURSOR-PAGE-2",
+	})
+
+	got, err := issue.ParsePageToken(cloudToken)
+	if err != nil {
+		t.Fatalf("a well-formed token was refused with no site to judge it against: %v", err)
+	}
+	if got.Deployment != site.Cloud || got.Cursor != "CURSOR-PAGE-2" {
+		t.Errorf("parsed %+v, want the Cloud cursor intact", got)
+	}
+	if _, err := issue.DecodePageToken(cloudToken, site.DataCenter); err == nil {
+		t.Error("the deployment check did not survive the split")
+	}
+
+	// Everything that is wrong with the string itself is still answered here.
+	for _, bad := range []string{"garbage", "!!!!", "eyJub3QiOiJ2YWxpZCJ9", "0"} {
+		if _, err := issue.ParsePageToken(bad); err == nil {
+			t.Errorf("--page-token %q parsed", bad)
+		} else if errs.ExitOf(err) != exitcode.Usage {
+			t.Errorf("--page-token %q exits %v, want %v",
+				bad, errs.ExitOf(err), exitcode.Usage)
+		}
+	}
+}
+
 // TestBadPageTokenNeverSilentlyRestarts is the failure this design exists to
 // prevent: a mistyped token that quietly returned page one would page forever
 // and never be noticed.
@@ -1706,7 +1745,11 @@ func TestFieldsAreResolvedOnce(t *testing.T) {
 
 	doer := &stubDoer{body: catalogueJSON}
 	inv := &registry.Invocation{
-		Jira: &stubSession{doer: doer}, Flags: registry.NewFlags(),
+		// The key is what a real invocation carries — cobra enforces the
+		// arity — and issue get now parses it before it resolves a field,
+		// because a parse needs no network and the catalogue does.
+		Jira: &stubSession{doer: doer}, Args: []string{"ENG-101"},
+		Flags: registry.NewFlags(),
 	}
 	inv.Flags.SetString("field", "Story Points")
 	inv.Flags.SetString("field", "customfield_10042")

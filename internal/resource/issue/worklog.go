@@ -176,7 +176,10 @@ Reading takes no write tag, so this is in every build.`),
 			exitcode.Permission, exitcode.RateLimit, exitcode.Remote,
 		},
 		Validate: func(_ context.Context, inv *registry.Invocation) error {
-			return requireIssueKey(inv)
+			if err := requireIssueKey(inv); err != nil {
+				return err
+			}
+			return requirePageSize(inv)
 		},
 		Stream: runWorklogList,
 	}

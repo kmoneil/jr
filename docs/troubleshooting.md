@@ -263,17 +263,22 @@ say `blocks` or `is blocked by`.
 
 ### `INVALID_KEY`
 
-A malformed issue key is rejected before any request for the issue is made,
-because a 404 for a typo reads like a missing issue. Keys look like `ENG-123`.
+A malformed issue key is rejected before any request at all, because a 404 for a
+typo reads like a missing issue. Keys look like `ENG-123`.
 
 ```console
 $ jr issue get foo
 # exit 2: "foo" is not an issue key
 ```
 
-On a cold cache the deployment probe runs before this check, so against a site
-that is unreachable you will see `NETWORK` first and the key complaint only once
-the site answers.
+This holds against an unreachable site and on a cold cache. It did not always:
+the key was parsed inside the client, past the deployment probe, so a typo came
+back as `NETWORK` at exit 9 and advertised itself as retryable. The same is true
+of `--page-size` and `--page-token`, and of a board, sprint, epic, or comment id.
+
+A `--page-token` minted against the other deployment is the one paging refusal
+that still costs a request, because which server issued it is not a question the
+token can answer by itself.
 
 ### `INVALID_ENCODING` / `UNRENDERABLE_VALUE`
 

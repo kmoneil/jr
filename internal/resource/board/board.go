@@ -394,8 +394,33 @@ the same name, and resolving a name would pick one of them without saying so.`),
 			exitcode.Auth, exitcode.NotFound, exitcode.Permission,
 			exitcode.RateLimit, exitcode.Remote,
 		},
-		Run: runGet,
+		Validate: validateGet,
+		Run:      runGet,
 	}
+}
+
+// validateGet checks the board id before a session exists.
+//
+// ValidateID says a typo costs no round trip, and it was called from
+// Client.Get — after Connect, and therefore after the deployment probe. On a
+// cold cache `board get foo` reported NETWORK at exit 9, publishing a typo as
+// retryable. The check is the same one; only its place in the order changed.
+//
+// It resolves the id the way the body does, because a board id in a context is
+// as unvalidated as one on the command line: nothing checks `context create
+// --board abc`, and internal/cli cannot import this package to do so.
+//
+// A missing session is left alone. There is nothing to resolve without one and
+// the body's NO_SESSION is the more useful answer than "no board is set".
+func validateGet(_ context.Context, inv *registry.Invocation) error {
+	if inv.Jira == nil && len(inv.Args) == 0 {
+		return nil
+	}
+	id, err := boardArg(inv)
+	if err != nil {
+		return err
+	}
+	return ValidateID(id)
 }
 
 // Get reads one board.

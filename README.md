@@ -176,7 +176,11 @@ The issue shape is the same one `issue list` emits for a row, so a caller parses
 both identically; `get` simply has more of it filled in.
 
 A malformed key is rejected locally: `jr issue get foo` is exit 2 without a
-round trip, because a 404 for a typo reads like a missing issue.
+round trip, because a 404 for a typo reads like a missing issue. That holds on a
+cold cache, where the deployment probe would otherwise go first and answer a
+typo with `NETWORK` at exit 9 — a refusal published as worth retrying. Every
+command taking an identifier is held to it by
+`TestALocalRefusalOutranksTheDeploymentProbe`.
 
 For reading rather than parsing, a build with the `render` tag has a fifth
 format:

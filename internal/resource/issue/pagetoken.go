@@ -49,15 +49,22 @@ func EncodePageToken(t PageToken) string {
 	return base64.RawURLEncoding.EncodeToString(data)
 }
 
-// DecodePageToken parses a --page-token value.
+// ParsePageToken reads a --page-token value's own shape, and says nothing about
+// which site it belongs to.
+//
+// It is separate from DecodePageToken because everything here is arithmetic on
+// a string the caller typed: no site, no session, no request. That lets a
+// command refuse a garbled token before it builds a session, and the deployment
+// probe inside Connect is a round trip — `--page-token garbage` used to come
+// back as NETWORK at exit 9, which says a typo is worth retrying.
 //
 // Every failure is a usage error rather than a silent restart from the
 // beginning. A mistyped token that quietly returned page one is the failure
 // mode this whole design exists to prevent: the caller would page forever and
 // never notice.
-func DecodePageToken(encoded string, want site.Kind) (PageToken, error) {
+func ParsePageToken(encoded string) (PageToken, error) {
 	if encoded == "" {
-		return PageToken{Deployment: want}, nil
+		return PageToken{}, nil
 	}
 
 	data, err := base64.RawURLEncoding.DecodeString(encoded)
@@ -76,13 +83,19 @@ func DecodePageToken(encoded string, want site.Kind) (PageToken, error) {
 			Wrap(err)
 	}
 
-	if t.Deployment != want {
-		// The two deployments page differently, so replaying one's token
-		// against the other would resume from somewhere unrelated.
+	// Every token this tool mints carries the deployment it was minted against
+	// — the three constructors in client.go all stamp it, and one carrying none
+	// is not ours whatever site is on the other end. That makes this a local
+	// question and not a deployment comparison: `{"not":"valid"}`, which is
+	// legal base64 and legal JSON, decodes to a token of nothing at all. It
+	// used to be caught by the mismatch check below, which reported it as
+	// having been "issued for an unknown site" — true, and less useful than
+	// saying it was never issued here.
+	if t.Deployment == "" {
 		return PageToken{}, errs.Usage("INVALID_PAGE_TOKEN",
-			"--page-token was issued for a %s site and this is %s",
-			deploymentName(t.Deployment), deploymentName(want)).
-			WithRemedy("re-run the query without --page-token against this site")
+			"--page-token is not a token this tool issued").
+			WithDetail("it names no deployment, and every token this tool mints does").
+			WithRemedy("pass a next-page-token from a previous result, or omit it to start over")
 	}
 	if t.Offset < 0 {
 		return PageToken{}, errs.Usage("INVALID_PAGE_TOKEN",
@@ -95,6 +108,33 @@ func DecodePageToken(encoded string, want site.Kind) (PageToken, error) {
 				"--page-token carries something that is not an issue key").
 				WithDetail("%q", t.AfterKey)
 		}
+	}
+	return t, nil
+}
+
+// DecodePageToken parses a --page-token value and checks it against the site it
+// is about to be used on.
+//
+// The deployment half cannot move earlier: it is the one question about a token
+// that needs to know which server answered, so it stays where the connection
+// is. Everything it can be refused for without one is in ParsePageToken.
+func DecodePageToken(encoded string, want site.Kind) (PageToken, error) {
+	if encoded == "" {
+		return PageToken{Deployment: want}, nil
+	}
+
+	t, err := ParsePageToken(encoded)
+	if err != nil {
+		return PageToken{}, err
+	}
+
+	if t.Deployment != want {
+		// The two deployments page differently, so replaying one's token
+		// against the other would resume from somewhere unrelated.
+		return PageToken{}, errs.Usage("INVALID_PAGE_TOKEN",
+			"--page-token was issued for a %s site and this is %s",
+			deploymentName(t.Deployment), deploymentName(want)).
+			WithRemedy("re-run the query without --page-token against this site")
 	}
 	return t, nil
 }
