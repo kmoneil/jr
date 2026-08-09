@@ -426,7 +426,12 @@ not a project scope, and a regular expression cannot tell the difference.`),
 		// anything.
 		NeedsJira: true,
 		Outputs:   []registry.Output{{Kind: KindExplain, Version: VersionExplain}},
-		ExitCodes: []exitcode.Code{},
+		// Asking Jira nothing is not the same as being unable to fail. The
+		// settled context has to be resolved to answer at all, and `--context`
+		// naming one that does not exist is UNKNOWN_CONTEXT at exit 5 before a
+		// byte goes anywhere. The four exits a request can produce are the ones
+		// this command genuinely cannot.
+		ExitCodes: []exitcode.Code{exitcode.NotFound},
 		Validate: func(_ context.Context, inv *registry.Invocation) error {
 			return jql.Validate(inv.Flags.String("jql"))
 		},

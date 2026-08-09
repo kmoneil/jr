@@ -342,8 +342,12 @@ This does not contact Jira. It answers "which credential would be used", not
 			Name: "site", Type: registry.TypeString,
 			Usage: "site to check; defaults to the current context's",
 		}},
-		Outputs:   []registry.Output{{Kind: kindAuthStatus, Version: versionAuthStatus}},
-		ExitCodes: []exitcode.Code{exitcode.Auth},
+		Outputs: []registry.Output{{Kind: kindAuthStatus, Version: versionAuthStatus}},
+		// NotFound because the site defaults to the current context's, so this
+		// resolves one: `--context nope` is UNKNOWN_CONTEXT at exit 5, and a
+		// command whose job is to explain why authentication is not working is
+		// the worst place to answer with an exit it never published.
+		ExitCodes: []exitcode.Code{exitcode.Auth, exitcode.NotFound},
 		Run:       a.runAuthStatus,
 	}
 }
@@ -383,8 +387,10 @@ deliberately, and do not pass it through a command that logs its arguments.`),
 			Name: "site", Type: registry.TypeString,
 			Usage: "site to print the credential for; defaults to the current context's",
 		}},
-		Outputs:   []registry.Output{{Kind: kindAuthToken, Version: versionAuthToken}},
-		ExitCodes: []exitcode.Code{exitcode.Auth},
+		Outputs: []registry.Output{{Kind: kindAuthToken, Version: versionAuthToken}},
+		// NotFound for the reason `auth status` carries it: --site defaults to
+		// the current context's, so an unknown --context is exit 5 here too.
+		ExitCodes: []exitcode.Code{exitcode.Auth, exitcode.NotFound},
 		Run:       a.runAuthToken,
 	}
 }

@@ -188,7 +188,7 @@ jr auth status --site your-site.atlassian.net
 | --- | --- | --- |
 | `auth.status` | v1 | always |
 
-Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND
 
 ### `jr auth token`
 
@@ -224,7 +224,7 @@ jr auth token --site your-site.atlassian.net
 | --- | --- | --- |
 | `auth.token` | v1 | always |
 
-Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND
 
 ## board
 
@@ -2013,7 +2013,7 @@ jr jql explain --jql 'labels = retry' --sort updated --order desc
 | --- | --- | --- |
 | `jql.explain` | v1 | always |
 
-Exit codes: `0` OK, `1` ERROR, `2` USAGE
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND
 
 ### `jr jql validate`
 

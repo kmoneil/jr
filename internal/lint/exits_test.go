@@ -86,24 +86,22 @@ func TestEveryExitACommandCanReachIsDeclared(t *testing.T) {
 	}
 }
 
-// siteExits are the exits any request to a Jira site can produce, whatever it
-// asked for.
+// requestExits are the exits any request to a Jira site can produce, whatever
+// it asked for.
 //
 // Each is a failure of the connection rather than of the endpoint: a rejected
-// or expired credential answers 401 to anything, a site URL missing its context
-// path answers an HTML 404 to anything, an account without the permission
-// answers 403 to anything, a throttled account answers 429 to anything, and a
-// broken instance answers 5xx to anything. A caller can branch on all five
-// without knowing which command produced them, which is why every command that
-// reaches a site declares them.
+// or expired credential answers 401 to anything, an account without the
+// permission answers 403 to anything, a throttled account answers 429 to
+// anything, and a broken instance answers 5xx to anything. A caller can branch
+// on all four without knowing which command produced them, which is why every
+// command that sends a request declares them.
 //
 // Conflict is deliberately not here. transport.Err does map 409 and 412 to it
 // for any request, but a conflict is a statement about a resource's state, so
 // it is declared by the commands whose semantics can produce one rather than by
 // all forty that read.
-var siteExits = []exitcode.Code{
-	exitcode.Auth, exitcode.NotFound, exitcode.Permission,
-	exitcode.RateLimit, exitcode.Remote,
+var requestExits = []exitcode.Code{
+	exitcode.Auth, exitcode.Permission, exitcode.RateLimit, exitcode.Remote,
 }
 
 // sessionWithoutRequests names the commands that are given a session and never
@@ -115,41 +113,54 @@ var siteExits = []exitcode.Code{
 var sessionWithoutRequests = map[string]string{
 	"jql.explain": "it takes a session for the resolved context — the default " +
 		"project its fragment would be scoped by — and asks Jira nothing. " +
-		"Declaring the site exits would publish five codes it cannot produce, " +
-		"which is the defect user list's unreachable Partial was",
+		"Declaring the request exits would publish four codes it cannot " +
+		"produce, which is the defect user list's unreachable Partial was",
 }
 
 // TestEveryCommandThatReachesJiraDeclaresTheSiteExits holds every command that
-// talks to a site to the exits a request can fail with.
+// takes a session to the exits that come with having one.
 //
 // This is the uniform half of the claim above, and the same shape as
 // contract_test.go's "a mutating command declares Blocked" and "a paginated one
 // declares Partial": a capability the command declares implies the exits that
 // capability can produce. Static reachability stops at the first method call,
 // so which commands are seen to reach transport.Err is an accident of how their
-// call chain happens to be written; whether a command sends a request at all is
+// call chain happens to be written; whether a command takes a session at all is
 // not, and NeedsJira already says.
+//
+// NotFound is required of every one of them, including the exempt. Taking a
+// session means resolving a context, and `--context nope` is UNKNOWN_CONTEXT at
+// exit 5 before a byte goes anywhere — which is how `jql explain`, whose whole
+// argument for exemption is that it asks Jira nothing, was found publishing an
+// empty set while exiting 5 on a name it could not find. Sending a request is
+// what adds the other four.
 func TestEveryCommandThatReachesJiraDeclaresTheSiteExits(t *testing.T) {
 	for _, c := range cli.Registry().All() {
 		reason, exempt := sessionWithoutRequests[c.Name()]
 		if !c.NeedsJira {
 			if exempt {
-				t.Errorf("%s is exempt from the site exits as a command that "+
+				t.Errorf("%s is exempt from the request exits as a command that "+
 					"takes a session and sends nothing, and it does not take "+
 					"a session at all: %s", c.Name(), reason)
 			}
 			continue
 		}
 		declared := c.AllExitCodes()
-		for _, code := range siteExits {
+
+		if !slices.Contains(declared, exitcode.NotFound) {
+			t.Errorf("%s takes a session and does not declare exit %d (%s)\n"+
+				"\tresolving the context can fail with UNKNOWN_CONTEXT before "+
+				"anything is sent", c.Name(), exitcode.NotFound, exitcode.NotFound.Name())
+		}
+		for _, code := range requestExits {
 			switch {
 			case exempt && slices.Contains(declared, code):
-				t.Errorf("%s declares exit %d (%s) and is exempt from the site "+
-					"exits because %s; one of the two is wrong",
+				t.Errorf("%s declares exit %d (%s) and is exempt from the "+
+					"request exits because %s; one of the two is wrong",
 					c.Name(), code, code.Name(), reason)
 			case !exempt && !slices.Contains(declared, code):
-				t.Errorf("%s reaches Jira and does not declare exit %d (%s)\n"+
-					"\tany request can fail this way; see siteExits",
+				t.Errorf("%s sends requests and does not declare exit %d (%s)\n"+
+					"\tany request can fail this way; see requestExits",
 					c.Name(), code, code.Name())
 			}
 		}
