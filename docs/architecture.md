@@ -272,6 +272,15 @@ a read-modify-write of a shared file without a lock gives exactly that. A lock
 older than `idem.LockStale` is presumed abandoned and broken; age is the only
 usable signal, since a pid means nothing across containers or after a reboot.
 
+Because a lock can be broken, it carries an id, and a release removes the file
+only when the id is still its own. Releasing by path composed with breaking by
+age into a third writer: a holder that stalled past `LockStale` had its lock
+broken, and then on waking deleted the *new* holder's lock, letting a third
+process in while the second was still mid-write. A run that finds its lock gone
+or replaced reports `LEDGER_LOCK_STOLEN` rather than assuming its write
+survived — it may have been the one another run's rename replaced, and a claim
+that is not in the ledger is a create that runs twice.
+
 Metadata caching is a feature, not an optimization: resolving a custom field
 name to `customfield_10042` should not cost a round trip on every invocation.
 `--refresh` busts it, the TTL defaults to 24h, and `jr field list` warms it.

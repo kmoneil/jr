@@ -169,7 +169,7 @@ const ledgerHeader = "# jr idempotency ledger. Safe to delete; deleting it means
 //
 // The read, the decision, and the write happen under a lock, so two processes
 // racing with one key cannot both be told they claimed it.
-func (l *Ledger) Claim(site, key, operation string) (Outcome, error) {
+func (l *Ledger) Claim(site, key, operation string) (out Outcome, err error) {
 	if l == nil || l.Path == "" {
 		// No ledger means no protection, which is honest: the caller finds out
 		// by the flag having no effect rather than by a silent duplicate.
@@ -183,7 +183,11 @@ func (l *Ledger) Claim(site, key, operation string) (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	defer unlock()
+	// wrote records whether this call reached l.claim, because that is the only
+	// branch with something to lose — see released, which explains why a read
+	// under a stolen lock is sound and a write under one is not.
+	wrote := false
+	defer func() { out, err = releasedOutcome(out, err, wrote, unlock) }()
 
 	file, err := l.read()
 	if err != nil {
@@ -213,10 +217,12 @@ func (l *Ledger) Claim(site, key, operation string) (Outcome, error) {
 			// Past the stale window the first attempt is presumed dead. Its
 			// outcome is still unknown, so the claim is handed over with that
 			// said out loud rather than silently.
+			wrote = true
 			return l.claim(file, id, site, key, operation, now, true)
 		}
 	}
 
+	wrote = true
 	return l.claim(file, id, site, key, operation, now, false)
 }
 
@@ -264,7 +270,7 @@ func (l *Ledger) Release(site, key string) error {
 	return l.finish(site, key, "", false)
 }
 
-func (l *Ledger) finish(site, key, result string, done bool) error {
+func (l *Ledger) finish(site, key, result string, done bool) (err error) {
 	if l == nil || l.Path == "" {
 		return nil
 	}
@@ -273,7 +279,13 @@ func (l *Ledger) finish(site, key, result string, done bool) error {
 	if err != nil {
 		return err
 	}
-	defer unlock()
+	// Reaching the write below is what makes a stolen lock worth reporting: the
+	// outcome this records may have been lost under another run's rename. Both
+	// callers already treat that correctly — Complete's failure is the
+	// LEDGER_NOT_RECORDED warning, and Release's leaves the claim pending,
+	// which is the safe direction when nobody knows whether the request landed.
+	wrote := false
+	defer func() { err = released(err, wrote, unlock) }()
 
 	file, err := l.read()
 	if err != nil {
@@ -294,6 +306,7 @@ func (l *Ledger) finish(site, key, result string, done bool) error {
 		file.Entries[id] = entry
 	}
 	l.prune(file, l.now())
+	wrote = true
 	return l.write(file)
 }
 
@@ -307,7 +320,7 @@ func (l *Ledger) finish(site, key, result string, done bool) error {
 //
 // A failure is returned but callers are expected to ignore it: the request
 // already succeeded, and the only cost is a warning that will not appear.
-func (l *Ledger) Note(site, key, result string) error {
+func (l *Ledger) Note(site, key, result string) (err error) {
 	if l == nil || l.Path == "" {
 		return nil
 	}
@@ -319,7 +332,8 @@ func (l *Ledger) Note(site, key, result string) error {
 	if err != nil {
 		return err
 	}
-	defer unlock()
+	wrote := false
+	defer func() { err = released(err, wrote, unlock) }()
 
 	file, err := l.read()
 	if err != nil {
@@ -332,6 +346,7 @@ func (l *Ledger) Note(site, key, result string) error {
 		At: now, Operation: noteOperation,
 	}
 	l.prune(file, now)
+	wrote = true
 	return l.write(file)
 }
 
