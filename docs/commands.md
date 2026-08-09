@@ -2694,7 +2694,7 @@ jr user me
 | --- | --- | --- |
 | `user.get` | v1 | always |
 
-Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
 ## version
 

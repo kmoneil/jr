@@ -269,7 +269,13 @@ Jira and nothing about whether the token is any good.`),
 		NeedsJira: true,
 		Outputs:   []registry.Output{{Kind: KindGet, Version: VersionGet}},
 		ExitCodes: []exitcode.Code{
-			exitcode.Auth, exitcode.Permission, exitcode.RateLimit, exitcode.Remote,
+			// NotFound looks wrong on a command with nothing to look up, and it
+			// is the likeliest failure there is: a site URL missing its context
+			// path answers /myself with a web page, which is NO_SUCH_ENDPOINT
+			// at exit 5. This command is what a new caller runs first, so it is
+			// the one that reports that misconfiguration.
+			exitcode.Auth, exitcode.NotFound, exitcode.Permission,
+			exitcode.RateLimit, exitcode.Remote,
 		},
 		Run: runMe,
 	}
