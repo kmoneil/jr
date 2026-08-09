@@ -30,7 +30,7 @@ const (
 	KindEdit      = "issue.edit"
 	VersionEdit   = 2
 	KindMove      = "issue.move"
-	VersionMove   = 2
+	VersionMove   = 3
 )
 
 func init() {
@@ -755,12 +755,22 @@ exactly as on issue edit. Resolving the transition already guards against a
 status that moved underneath you; this guards against everything else, which
 matters most when the transition sets a resolution or adds a comment.
 
+--idempotency-key makes a retry safe. A transition is the one mutation here
+that is not idempotent — applying "Start Progress" twice is not applying it
+once — so without a key an ambiguous failure leaves nothing to do but look. A
+second run with the same key returns the recorded result, marked replayed, and
+sends nothing at all: it does not even re-read the transitions, because after a
+transition that did apply the name is no longer on offer. The key must be used
+for the same issue and the same transition; anything else is refused rather
+than answered with another request's result.
+
 --dry-run prints the exact request, body included, and sends nothing.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue move ENG-101 'Start Progress'",
 			buildinfo.App + " issue move ENG-101 'Close Issue' --resolution Fixed",
 			buildinfo.App + " issue move ENG-101 11 --dry-run",
 			buildinfo.App + " issue move ENG-101 Done --if-unchanged eyJkIjo",
+			buildinfo.App + " issue move ENG-101 Done --idempotency-key deploy-42",
 		}, "\n"),
 		Args: []registry.Arg{
 			{Name: "key", Usage: "issue key, e.g. ENG-101", Required: true},
@@ -777,6 +787,10 @@ matters most when the transition sets a resolution or adds a comment.
 			{
 				Name: "comment", Type: registry.TypeString,
 				Usage: "comment to add with the transition",
+			},
+			{
+				Name: "idempotency-key", Type: registry.TypeString,
+				Usage: "make a retry safe: the same key returns the recorded move",
 			},
 			ifUnchangedFlagDecl(),
 			dryRunFlag(),
@@ -802,6 +816,11 @@ func validateMove(_ context.Context, inv *registry.Invocation) error {
 	}
 	if err := validatePrecondition(inv); err != nil {
 		return err
+	}
+	if key := inv.Flags.String("idempotency-key"); key != "" {
+		if err := idem.ValidateKey(key); err != nil {
+			return err
+		}
 	}
 	// The transition itself is resolved in the command body rather than here,
 	// because resolving it needs the issue's current status — and fetching that
@@ -849,51 +868,327 @@ func runMove(ctx context.Context, inv *registry.Invocation) (*render.Doc, error)
 		return nil, errs.Runtime("NO_SESSION", "issue move has no connection to Jira")
 	}
 
-	meta, err := inv.Jira.Metadata(ctx)
-	if err != nil {
-		return nil, err
-	}
-	transitions, err := meta.Transitions(ctx, inv.Args[0])
-	if err != nil {
-		return nil, err
-	}
-	// Resolved before anything is sent, so a name that is not available costs
-	// one read and no write.
-	transition, err := transitions.Resolve(inv.Args[1])
-	if err != nil {
-		return nil, err
-	}
-
+	// Connect first, because the ledger is keyed by site and the replay has to
+	// be answerable before anything else happens. It is the same connection
+	// Metadata uses below and is built once.
 	conn, info, err := inv.Jira.Connect(ctx)
 	if err != nil {
 		return nil, err
 	}
 	client := &Client{Transport: conn, Site: info}
 
-	req, err := client.MoveRequest(inv.Args[0], transition.ID,
-		inv.Flags.String("resolution"), inv.Flags.String("comment"))
+	// The claim comes before the transitions are read, which is the whole
+	// difference between this and create. A retry after an ambiguous failure
+	// runs the same command line, and if the transition did apply, the name is
+	// no longer among what the issue can do — so resolving first would answer a
+	// safe retry with UNKNOWN_TRANSITION and leave the caller exactly as
+	// uncertain as before. A replay costs no requests at all.
+	claim, err := claimMove(inv, client)
 	if err != nil {
 		return nil, err
 	}
+	if claim.replay != nil {
+		return claim.replay, nil
+	}
+
+	// Everything from here to the send is work this claim has to be released
+	// for if it fails: none of it has reached Jira, so holding the key would
+	// lock out a corrected retry for ten minutes.
+	doc, err := sendMove(ctx, inv, client, claim)
+	if err != nil {
+		return nil, err
+	}
+	return doc, nil
+}
+
+// sendMove resolves the transition, sends it, and records the outcome. It is
+// separate from runMove so that every failure between the claim and the send
+// releases the key on one path rather than at six return statements.
+func sendMove(
+	ctx context.Context, inv *registry.Invocation, client *Client, claim moveClaim,
+) (*render.Doc, error) {
+	meta, err := inv.Jira.Metadata(ctx)
+	if err != nil {
+		return nil, claim.releaseUnsent(err)
+	}
+	transitions, err := meta.Transitions(ctx, inv.Args[0])
+	if err != nil {
+		return nil, claim.releaseUnsent(err)
+	}
+	// Resolved before anything is sent, so a name that is not available costs
+	// one read and no write.
+	transition, err := transitions.Resolve(inv.Args[1])
+	if err != nil {
+		return nil, claim.releaseUnsent(err)
+	}
+
+	req, err := client.MoveRequest(inv.Args[0], transition.ID,
+		inv.Flags.String("resolution"), inv.Flags.String("comment"))
+	if err != nil {
+		return nil, claim.releaseUnsent(err)
+	}
 	if inv.Flags.Bool("dry-run") {
+		// Unreachable with a claim held: claimMove does not claim for a dry
+		// run, because a preview that consumed the key would make the real
+		// invocation after it a replay of a request nobody sent.
 		return registry.DryRunDoc("issue.move", req), nil
 	}
 	checked, err := checkUnchanged(ctx, inv, client, inv.Args[0])
 	if err != nil {
-		return nil, err
+		return nil, claim.releaseUnsent(err)
 	}
+
+	// A key means the caller holds an idempotency token, which is what makes
+	// this POST safe for the transport to replay after an upstream error.
+	// Without one it is never retried, because a 503 can arrive after Jira has
+	// applied the transition.
+	req.Replayable = claim.held
 	if err := client.send(ctx, req); err != nil {
+		if transport.NeverSent(err) {
+			claim.release()
+		}
 		return nil, err
 	}
 
-	return stampPrecondition(render.Record(KindMove, VersionMove, render.El("issue").
-		Attr("key", inv.Args[0]).
+	moved := movedResult{
+		Issue:      inv.Args[0],
+		Transition: strings.TrimSpace(inv.Args[1]),
+		ID:         transition.ID,
+		To: movedTo{
+			ID:       transition.To.ID,
+			Category: transition.To.Category,
+			Name:     transition.To.Name,
+		},
+	}
+	claim.complete(inv, moved)
+	return stampPrecondition(MovedDoc(moved, false), checked), nil
+}
+
+// movedResult is what the ledger stores about a transition that happened.
+//
+// A create records the issue it made, and a replay reproduces that record. A
+// move makes nothing, so what it records is where the issue went — the resolved
+// transition id and the destination status — which is what lets a replay echo
+// the same <to> rather than an empty one.
+//
+// It also records the question. The issue key and the transition as the caller
+// typed it are part of what the key was claimed for, so a second run naming a
+// different issue is refused instead of being told that ENG-2 moved when what
+// moved was ENG-1. That check does not exist on create because a create has
+// nothing to name: its key identifies an attempt to bring something into
+// existence, and there is no prior object for the ledger to compare against.
+type movedResult struct {
+	Issue      string  `json:"issue"`
+	Transition string  `json:"transition"`
+	ID         string  `json:"id"`
+	To         movedTo `json:"to"`
+}
+
+type movedTo struct {
+	ID       string `json:"id"`
+	Category string `json:"category"`
+	Name     string `json:"name"`
+}
+
+// MovedDoc renders the acknowledgement of a transition.
+//
+// Both the live path and the replay build the document here, so the two cannot
+// drift: a replay must be identical to the original apart from the marker, or a
+// consumer diffing two runs sees a difference that means nothing.
+func MovedDoc(moved movedResult, replayed bool) *render.Doc {
+	n := render.El("issue").
+		Attr("key", moved.Issue).
 		Attr("action", "moved").
-		Attr("transition", transition.ID).
-		Child(render.El("to").
-			Attr("id", transition.To.ID).
-			Attr("category", transition.To.Category).
-			SetText(transition.To.Name))), checked), nil
+		Attr("transition", moved.ID)
+	if replayed {
+		n.Attr("replayed", "true")
+	}
+	return render.Record(KindMove, VersionMove, n.Child(render.El("to").
+		Attr("id", moved.To.ID).
+		Attr("category", moved.To.Category).
+		SetText(moved.To.Name)))
+}
+
+// moveClaim is the ledger state one invocation of `issue move` holds.
+type moveClaim struct {
+	ledger *idem.Ledger
+	site   string
+	key    string
+	// held is true when this run claimed the key and owes the ledger an
+	// outcome. It is false for an unkeyed move and for a dry run.
+	held bool
+	// derived is the key an unkeyed move is recorded under, so that the §6.3
+	// warning has something to compare the next one against. Nothing is
+	// claimed under it: a caller who did not ask for idempotency does not
+	// silently get it.
+	derived string
+	// replay is the recorded document, when the key had already been used.
+	replay *render.Doc
+}
+
+// movedKey derives the identity of an unkeyed move from what the caller typed.
+//
+// The create path derives from the request body, which is not available here
+// until the transition has been resolved — a read this must happen before. The
+// command line is the same fact one step earlier: the same words against the
+// same site are the same request.
+func movedKey(inv *registry.Invocation, siteURL string) string {
+	return idem.DeriveKey(KindMove, siteURL, inv.Args[0],
+		strings.TrimSpace(inv.Args[1]),
+		inv.Flags.String("resolution"), inv.Flags.String("comment"))
+}
+
+// warnIfMovedRecently reports an identical transition inside idem.RecentWindow.
+func warnIfMovedRecently(
+	inv *registry.Invocation, ledger *idem.Ledger, siteURL, derived string,
+) {
+	entry, found, err := ledger.Recent(siteURL, derived, idem.RecentWindow)
+	if err != nil || !found {
+		return
+	}
+	moved, err := decodeMoved(entry.Result)
+	if err != nil {
+		return
+	}
+	warn(inv, "POSSIBLE_DUPLICATE",
+		"an identical move put "+moved.Issue+" in "+moved.To.Name+" moments ago")
+}
+
+// claimMove reserves the idempotency key, or answers with what it already did.
+func claimMove(inv *registry.Invocation, client *Client) (moveClaim, error) {
+	if inv.Flags.Bool("dry-run") {
+		return moveClaim{}, nil
+	}
+	ledger := inv.Jira.Idempotency()
+	siteURL := client.Site.BaseURL
+
+	key := inv.Flags.String("idempotency-key")
+	if key == "" {
+		// No key means no protection, per §6.3 — but an identical transition
+		// that just succeeded is worth saying out loud, and here more than on
+		// create: a workflow with a loop applies it a second time, and a
+		// transition that posts a comment or sets a resolution does that work
+		// again. It is a warning and not a refusal, because a deliberate
+		// second pass around a loop is a legitimate thing to want.
+		derived := movedKey(inv, siteURL)
+		warnIfMovedRecently(inv, ledger, siteURL, derived)
+		return moveClaim{ledger: ledger, site: siteURL, derived: derived}, nil
+	}
+
+	claim := moveClaim{
+		ledger: ledger,
+		site:   siteURL,
+		key:    key,
+	}
+	out, err := claim.ledger.Claim(claim.site, claim.key, KindMove)
+	if err != nil {
+		return moveClaim{}, err
+	}
+	switch {
+	case out.Replayed:
+		moved, err := decodeMoved(out.Entry.Result)
+		if err != nil {
+			return moveClaim{}, err
+		}
+		if err := moved.answers(inv, key); err != nil {
+			return moveClaim{}, err
+		}
+		// No precondition element: --if-unchanged describes a read this run did
+		// not do, and stamping it would claim a check that never happened.
+		claim.replay = MovedDoc(moved, true)
+		return claim, nil
+	case out.InFlight:
+		return moveClaim{}, errs.New(exitcode.Conflict, "IDEMPOTENT_IN_FLIGHT",
+			"another run holds idempotency key %q and has not finished", key).
+			WithDetail("it may already have transitioned the issue").
+			WithRemedy("wait for it, or read the issue before retrying")
+	}
+	if out.Reclaimed {
+		// The claim was handed over from an attempt that never finished. That
+		// attempt may have applied the transition, and this one is about to
+		// apply it again.
+		warn(inv, "IDEMPOTENT_RECLAIMED",
+			"an earlier run held key "+key+" and never finished; it may have "+
+				"moved the issue already")
+	}
+	claim.held = true
+	return claim, nil
+}
+
+// answers refuses a recorded result that belongs to a different request.
+//
+// The ledger already refuses a key whose *operation* differs, with this code
+// and this exit. This is the same rule one level finer: within `issue move`,
+// the question is which issue and which transition, and answering ENG-102 with
+// ENG-101's result would report a move that did not happen — complete, exit 0,
+// and wrong.
+func (m movedResult) answers(inv *registry.Invocation, key string) error {
+	asked := strings.TrimSpace(inv.Args[1])
+	if m.Issue == inv.Args[0] && m.Transition == asked {
+		return nil
+	}
+	return errs.Conflict("IDEMPOTENCY_KEY_REUSED",
+		"idempotency key %q was already used for a different move", key).
+		WithDetail("it recorded %s %q and this run asks for %s %q",
+			m.Issue, m.Transition, inv.Args[0], asked).
+		WithRemedy("use a different key, one per logical request")
+}
+
+// release frees the key, for a failure that proves nothing was sent.
+func (c moveClaim) release() {
+	if c.held {
+		_ = c.ledger.Release(c.site, c.key)
+	}
+}
+
+// releaseUnsent frees the key and returns the error unchanged, so a failure
+// before the request leaves does not lock the key out of a corrected retry.
+func (c moveClaim) releaseUnsent(err error) error {
+	c.release()
+	return err
+}
+
+// complete records the outcome. A failure to record is a warning rather than an
+// error: the transition happened, and reporting a failure for something that
+// succeeded would be the worse lie. The cost is that a retry with this key
+// would apply it again.
+func (c moveClaim) complete(inv *registry.Invocation, moved movedResult) {
+	if !c.held {
+		if c.derived != "" {
+			// Recorded, not claimed. Without this the warning above could never
+			// fire, because nothing would ever have written the entry it looks
+			// for.
+			_ = c.ledger.Note(c.site, c.derived, encodeMoved(moved))
+		}
+		return
+	}
+	if err := c.ledger.Complete(c.site, c.key, encodeMoved(moved)); err != nil {
+		warn(inv, "LEDGER_NOT_RECORDED",
+			"moved "+moved.Issue+" but could not record the idempotency key; "+
+				"a retry with it would transition the issue again")
+	}
+}
+
+func encodeMoved(moved movedResult) string {
+	// Errors are impossible for a struct of strings, and a ledger entry is not
+	// worth a second error path on the success side of a move that has already
+	// happened.
+	data, _ := json.Marshal(moved)
+	return string(data)
+}
+
+func decodeMoved(stored string) (movedResult, error) {
+	var moved movedResult
+	if err := json.Unmarshal([]byte(stored), &moved); err != nil || moved.Issue == "" {
+		// Unlike a create, there is no older shape to fall back to: this entry
+		// has only ever been written by encodeMoved. An unreadable one means
+		// the ledger was edited or truncated, and guessing would report a
+		// transition nobody can point at.
+		return movedResult{}, errs.Runtime("LEDGER_ENTRY_UNREADABLE",
+			"the ledger recorded no usable result for this key").
+			WithRemedy("read the issue to see whether the transition applied")
+	}
+	return moved, nil
 }
 
 // encodeCreated and decodeCreated carry a create's result through the ledger.

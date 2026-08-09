@@ -60,7 +60,12 @@ func CloneSchema() *render.Schema {
 func MoveSchema() *render.Schema {
 	s := ackSchema("issue", "key", "moved")
 	s.Attrs = append(s.Attrs,
-		render.Field{Name: "transition", Type: render.TypeString})
+		render.Field{Name: "transition", Type: render.TypeString},
+		// Present only when the result came from the idempotency ledger rather
+		// than from Jira. A transition is not idempotent, so "I did this" and
+		// "this had already been done" are different events and a caller has to
+		// be able to tell them apart.
+		render.Field{Name: "replayed", Type: render.TypeBool, Optional: true})
 	s.Children = append(s.Children, render.Child{Schema: &render.Schema{
 		Element: "to",
 		Attrs: []render.Field{

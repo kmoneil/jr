@@ -1753,6 +1753,15 @@ exactly as on issue edit. Resolving the transition already guards against a
 status that moved underneath you; this guards against everything else, which
 matters most when the transition sets a resolution or adds a comment.
 
+--idempotency-key makes a retry safe. A transition is the one mutation here
+that is not idempotent — applying "Start Progress" twice is not applying it
+once — so without a key an ambiguous failure leaves nothing to do but look. A
+second run with the same key returns the recorded result, marked replayed, and
+sends nothing at all: it does not even re-read the transitions, because after a
+transition that did apply the name is no longer on offer. The key must be used
+for the same issue and the same transition; anything else is refused rather
+than answered with another request's result.
+
 --dry-run prints the exact request, body included, and sends nothing.
 
 Examples:
@@ -1762,6 +1771,7 @@ jr issue move ENG-101 'Start Progress'
 jr issue move ENG-101 'Close Issue' --resolution Fixed
 jr issue move ENG-101 11 --dry-run
 jr issue move ENG-101 Done --if-unchanged eyJkIjo
+jr issue move ENG-101 Done --idempotency-key deploy-42
 ```
 
 | Argument | Required | Description |
@@ -1773,12 +1783,13 @@ jr issue move ENG-101 Done --if-unchanged eyJkIjo
 | --- | --- | --- | --- |
 | `--resolution` | `string` | — | resolution to set, for a transition that asks for one |
 | `--comment` | `string` | — | comment to add with the transition |
+| `--idempotency-key` | `string` | — | make a retry safe: the same key returns the recorded move |
 | `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.move` | v2 | always |
+| `issue.move` | v3 | always |
 | `dry-run` | v1 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED

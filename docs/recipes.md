@@ -212,6 +212,19 @@ $ jr issue create --type Task --summary 'Ship release 42' \
 
 Run it twice and the second returns the first issue instead of making another.
 
+The same flag is on `issue move`, where it matters more: a transition is not
+idempotent, so a retry that guesses wrong either fails confusingly or does the
+work again.
+
+```console
+$ jr issue move ENG-101 'Close Issue' --idempotency-key release-42
+```
+
+The second run answers from the ledger without asking Jira anything, and marks
+the result `replayed="true"`. Use a new key for a different issue or a different
+transition — the same one is refused rather than answered with the first move's
+result.
+
 ## Moving issues through a workflow
 
 Ask what an issue can do before telling it to do something:

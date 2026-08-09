@@ -1340,3 +1340,315 @@ var directoryJSON = map[site.Kind]string{
  }
 ]`,
 }
+
+// countedReplayConn is replayConn with a request counter.
+//
+// Counting matters here in a way it does not for a create: the replayer serves
+// an identical request a second time rather than refusing it, so Unplayed
+// cannot tell one call from two, and "the replay sent nothing" is precisely
+// the claim being made. The tracer sees every attempt the transport makes,
+// which is also what makes a silent retry visible.
+func countedReplayConn(
+	t *testing.T, fixture string,
+) (*transport.Client, *transport.Replayer, *int) {
+	t.Helper()
+
+	cassette, err := transport.LoadCassette(filepath.Join("testdata", fixture))
+	if err != nil {
+		t.Fatalf("load %s: %v", fixture, err)
+	}
+	replayer := transport.NewReplayer(cassette)
+	sent := 0
+	conn, err := transport.New(transport.Options{
+		BaseURL: "https://recorded.invalid", HTTPClient: replayer.Client(), Retries: -1,
+		Tracer: transport.TracerFunc(func(e transport.Event) {
+			if e.Kind == transport.EventRequest {
+				sent++
+			}
+		}),
+	})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+	return conn, replayer, &sent
+}
+
+// moveInvocation is one `issue move` against a recorded conversation.
+func moveInvocation(
+	conn *transport.Client, ledger *idem.Ledger, args []string, key string,
+) *registry.Invocation {
+	flags := registry.NewFlags()
+	if key != "" {
+		flags.SetString("idempotency-key", key)
+	}
+	return &registry.Invocation{
+		Jira: &stubSession{
+			doer: &stubDoer{body: catalogueJSON}, conn: conn,
+			kind: site.DataCenter, metaClient: conn, ledger: ledger,
+		},
+		Args: args, Flags: flags,
+		Stderr: io.Discard, Progress: registry.NoProgress,
+	}
+}
+
+// TestMoveReplaysUnderOneKey is the card's headline. A transition is the one
+// mutation in this resource that is not idempotent, so a retry after an
+// ambiguous failure needs the ledger to answer rather than the workflow.
+//
+// The replay costs no requests at all, which is the property that makes it
+// useful: by the time a caller retries, a transition that did apply has left
+// the issue somewhere its name is no longer offered from, so re-reading the
+// transitions would answer a safe retry with UNKNOWN_TRANSITION.
+func TestMoveReplaysUnderOneKey(t *testing.T) {
+	cmd, ok := registry.Lookup("issue.move")
+	if !ok {
+		t.Fatal("issue move is not registered")
+	}
+	conn, replayer, sent := countedReplayConn(t, "move.datacenter.json")
+	ledger := &idem.Ledger{Path: filepath.Join(t.TempDir(), "idempotency.toml")}
+
+	run := func() *render.Doc {
+		t.Helper()
+		inv := moveInvocation(conn, ledger, []string{"ENG-101", "Close Issue"}, "deploy-42")
+		if err := cmd.Validate(t.Context(), inv); err != nil {
+			t.Fatalf("validate: %v", err)
+		}
+		doc, err := cmd.Run(t.Context(), inv)
+		if err != nil {
+			t.Fatalf("run: %v", err)
+		}
+		if err := doc.Validate(); err != nil {
+			t.Errorf("validate doc: %v", err)
+		}
+		return doc
+	}
+
+	first := run()
+	afterFirst := *sent
+	second := run()
+
+	if *sent != afterFirst {
+		t.Errorf("the replay sent %d requests, want none", *sent-afterFirst)
+	}
+	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+		t.Errorf("the transition was never sent: %v", unplayed)
+	}
+	if _, marked := first.Record.AttrValue("replayed"); marked {
+		t.Error("the first move was marked as a replay")
+	}
+	if _, marked := second.Record.AttrValue("replayed"); !marked {
+		t.Error("the replay was not marked")
+	}
+	// Identical apart from the marker, including where it went: a consumer
+	// diffing two runs must not see a difference that means nothing, and a
+	// replay that reported an empty destination would be one.
+	firstID, _ := first.Record.AttrValue("transition")
+	secondID, _ := second.Record.AttrValue("transition")
+	if firstID != secondID || firstID != "2" {
+		t.Errorf("replay transition = %q, want the original %q", secondID, firstID)
+	}
+	firstTo, _ := first.Record.ChildNamed("to")
+	secondTo, ok := second.Record.ChildNamed("to")
+	if !ok {
+		t.Fatal("the replay does not say where the issue went")
+	}
+	if firstTo.Text != secondTo.Text || secondTo.Text != "Closed" {
+		t.Errorf("replay destination = %q, want %q", secondTo.Text, firstTo.Text)
+	}
+	if category, _ := secondTo.AttrValue("category"); category != "done" {
+		t.Errorf("replay category = %q, want done", category)
+	}
+}
+
+// TestAMoveKeyIsRefusedForAnotherRequest is what the recorded question is for.
+//
+// A create's key identifies an attempt to bring something into existence, and
+// there is no prior object to compare against. A move names an issue that
+// already exists, so replaying ENG-101's transition for ENG-102 would report a
+// move that did not happen — complete, exit 0, and wrong.
+func TestAMoveKeyIsRefusedForAnotherRequest(t *testing.T) {
+	cmd, _ := registry.Lookup("issue.move")
+	ledger := &idem.Ledger{Path: filepath.Join(t.TempDir(), "idempotency.toml")}
+
+	for _, tc := range []struct {
+		name string
+		key  string
+		args []string
+	}{
+		{name: "another issue", key: "k-issue", args: []string{"ENG-102", "Close Issue"}},
+		{name: "another transition", key: "k-transition", args: []string{"ENG-101", "Start Progress"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			conn, _, sent := countedReplayConn(t, "move.datacenter.json")
+			if _, err := cmd.Run(
+				t.Context(),
+				moveInvocation(conn, ledger, []string{"ENG-101", "Close Issue"}, tc.key),
+			); err != nil {
+				t.Fatalf("the first move failed: %v", err)
+			}
+			afterFirst := *sent
+
+			_, err := cmd.Run(t.Context(), moveInvocation(conn, ledger, tc.args, tc.key))
+			if err == nil {
+				t.Fatal("a key claimed for one move answered another")
+			}
+			// The same code and the same exit the ledger uses for a key reused
+			// across operations: this is that rule one level finer, and two
+			// spellings of one refusal would be a caller branching on which
+			// layer noticed.
+			if code := errs.Coerce(err).Code; code != "IDEMPOTENCY_KEY_REUSED" {
+				t.Errorf("code = %q, want IDEMPOTENCY_KEY_REUSED", code)
+			}
+			if errs.ExitOf(err) != exitcode.Conflict {
+				t.Errorf("exit = %v, want %v", errs.ExitOf(err), exitcode.Conflict)
+			}
+			// And it costs nothing: the refusal is a comparison against the
+			// ledger, not a question for Jira.
+			if *sent != afterFirst {
+				t.Errorf("the refusal sent %d requests, want none", *sent-afterFirst)
+			}
+		})
+	}
+}
+
+// TestAFailedMoveKeepsItsClaim is the conservative half, as on create. A 503
+// can arrive after Jira applied the transition, so the key stays held and the
+// retry is refused rather than transitioning the issue twice.
+func TestAFailedMoveKeepsItsClaim(t *testing.T) {
+	cmd, _ := registry.Lookup("issue.move")
+	conn, _, _ := countedReplayConn(t, "move-fails.datacenter.json")
+	ledger := &idem.Ledger{Path: filepath.Join(t.TempDir(), "idempotency.toml")}
+
+	if _, err := cmd.Run(
+		t.Context(),
+		moveInvocation(conn, ledger, []string{"ENG-101", "Close Issue"}, "k"),
+	); err == nil {
+		t.Fatal("a 503 was reported as success")
+	}
+
+	_, err := cmd.Run(t.Context(),
+		moveInvocation(conn, ledger, []string{"ENG-101", "Close Issue"}, "k"))
+	if err == nil {
+		t.Fatal("a retry after an ambiguous failure was allowed through")
+	}
+	if code := errs.Coerce(err).Code; code != "IDEMPOTENT_IN_FLIGHT" {
+		t.Errorf("code = %q, want IDEMPOTENT_IN_FLIGHT — the first attempt may "+
+			"have moved the issue", code)
+	}
+	if errs.ExitOf(err) != exitcode.Conflict {
+		t.Errorf("exit = %v, want %v", errs.ExitOf(err), exitcode.Conflict)
+	}
+}
+
+// TestAMoveThatNeverLeftReleasesItsKey is the other direction, and it is the
+// reason the claim is taken before the transitions are read.
+//
+// Claiming early is what lets a replay answer without a request; the cost is a
+// window in which the key is held for work that never reached Jira. A typo in
+// the transition name must not lock the key out of the corrected retry for ten
+// minutes.
+func TestAMoveThatNeverLeftReleasesItsKey(t *testing.T) {
+	cmd, _ := registry.Lookup("issue.move")
+	conn, replayer, _ := countedReplayConn(t, "move.datacenter.json")
+	ledger := &idem.Ledger{Path: filepath.Join(t.TempDir(), "idempotency.toml")}
+
+	_, err := cmd.Run(t.Context(),
+		moveInvocation(conn, ledger, []string{"ENG-101", "Resolve Issue"}, "k"))
+	if err == nil {
+		t.Fatal("an unavailable transition was sent")
+	}
+	if code := errs.Coerce(err).Code; code != "UNKNOWN_TRANSITION" {
+		t.Fatalf("code = %q, want UNKNOWN_TRANSITION", code)
+	}
+
+	doc, err := cmd.Run(t.Context(),
+		moveInvocation(conn, ledger, []string{"ENG-101", "Close Issue"}, "k"))
+	if err != nil {
+		t.Fatalf("the corrected retry was refused: %v", err)
+	}
+	if _, marked := doc.Record.AttrValue("replayed"); marked {
+		t.Error("a move that never happened was replayed")
+	}
+	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+		t.Errorf("the corrected retry never sent the transition: %v", unplayed)
+	}
+}
+
+// TestADryRunDoesNotConsumeTheKey keeps the preview a preview. A dry run that
+// claimed the key would make the invocation it exists to rehearse a replay of a
+// request nobody sent.
+func TestADryRunDoesNotConsumeTheKey(t *testing.T) {
+	cmd, _ := registry.Lookup("issue.move")
+	conn, replayer, _ := countedReplayConn(t, "move.datacenter.json")
+	ledger := &idem.Ledger{Path: filepath.Join(t.TempDir(), "idempotency.toml")}
+
+	preview := moveInvocation(conn, ledger, []string{"ENG-101", "Close Issue"}, "k")
+	preview.Flags.SetBool("dry-run", true)
+	doc, err := cmd.Run(t.Context(), preview)
+	if err != nil {
+		t.Fatalf("dry run: %v", err)
+	}
+	if doc.Kind != registry.KindDryRun {
+		t.Fatalf("kind = %q, want %q", doc.Kind, registry.KindDryRun)
+	}
+
+	doc, err = cmd.Run(t.Context(),
+		moveInvocation(conn, ledger, []string{"ENG-101", "Close Issue"}, "k"))
+	if err != nil {
+		t.Fatalf("the move after a dry run was refused: %v", err)
+	}
+	if _, marked := doc.Record.AttrValue("replayed"); marked {
+		t.Error("the dry run consumed the key, so the real move replayed it")
+	}
+	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+		t.Errorf("the transition was never sent: %v", unplayed)
+	}
+}
+
+// TestAnUnkeyedRepeatedMoveWarnsAndProceeds is §6.3's other half for the verb
+// where it bites hardest.
+//
+// A repeated transition usually fails at the resolver, because the issue has
+// left the status the transition leaves from — but a workflow with a loop
+// applies it again, and one that posts a comment or sets a resolution does that
+// work twice. It is a warning and not a refusal: a deliberate second pass
+// around a loop is a legitimate thing to want, and a caller who did not ask for
+// idempotency does not silently get it.
+func TestAnUnkeyedRepeatedMoveWarnsAndProceeds(t *testing.T) {
+	cmd, _ := registry.Lookup("issue.move")
+	conn, _, sent := countedReplayConn(t, "move.datacenter.json")
+	ledger := &idem.Ledger{Path: filepath.Join(t.TempDir(), "idempotency.toml")}
+
+	var stderr strings.Builder
+	run := func() {
+		t.Helper()
+		inv := moveInvocation(conn, ledger, []string{"ENG-101", "Close Issue"}, "")
+		inv.Stderr = &stderr
+		inv.Format = render.XML
+		if _, err := cmd.Run(t.Context(), inv); err != nil {
+			t.Fatalf("run: %v", err)
+		}
+	}
+
+	run()
+	if stderr.Len() != 0 {
+		t.Errorf("the first move warned about something: %s", stderr.String())
+	}
+	afterFirst := *sent
+	run()
+
+	// Nothing was blocked: the second transition really went out.
+	if *sent <= afterFirst {
+		t.Error("the second move was suppressed; an unkeyed caller does not " +
+			"silently get idempotency")
+	}
+	if !strings.Contains(stderr.String(), "POSSIBLE_DUPLICATE") {
+		t.Errorf("the repeated move did not warn:\n%s", stderr.String())
+	}
+	// The warning names the issue and where it went, so a caller can look
+	// rather than guess.
+	if !strings.Contains(stderr.String(), "ENG-101") ||
+		!strings.Contains(stderr.String(), "Closed") {
+		t.Errorf("the warning does not say what already happened:\n%s", stderr.String())
+	}
+}

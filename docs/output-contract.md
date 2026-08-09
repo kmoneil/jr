@@ -586,7 +586,7 @@ returns the original result rather than making a second one.
 
 | Code                      | Exit | Meaning                                                                                                                                                                                    |
 | ------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `IDEMPOTENCY_KEY_REUSED`  | 7    | The key was already used for a different operation. Answering one with the other's result would be worse than refusing.                                                                    |
+| `IDEMPOTENCY_KEY_REUSED`  | 7    | The key was already used for a different request — another operation, or on `issue move` another issue or another transition. Answering one with the other's result would be worse than refusing. |
 | `INVALID_IDEMPOTENCY_KEY` | 2    | 1 to 128 characters of letters, digits, and `. _ : -`.                                                                                                                                     |
 | `LEDGER_INVALID`          | 1    | The ledger could not be parsed. It is refused rather than ignored: everywhere else an unreadable cache is a miss because the cost is a round trip, and here the cost is a duplicate issue. |
 | `LEDGER_LOCKED`           | 1    | Another run is writing the ledger and did not finish.                                                                                                                                      |
@@ -600,8 +600,23 @@ outcome is unknown rather than being left to assume nothing happened.
 
 Without a key, an identical request that succeeded within 60s produces a
 structured **warning** on stderr and nothing else. It is not blocked: two
-deliberate identical creates are a legitimate thing to want, and a caller who
-did not ask for idempotency does not silently get it.
+deliberate identical creates, or a second pass around a workflow loop, are
+legitimate things to want, and a caller who did not ask for idempotency does not
+silently get it.
+
+`issue create`, `issue clone`, and `issue move` accept `--idempotency-key`.
+`issue edit` and `issue assign` do not need one: both are `PUT`s, so the
+transport already replays them after an upstream error and setting a field twice
+sets it once. A transition is the mutation that is not idempotent, and
+`issue.move` v3 marks a replayed one `replayed="true"` on the `issue` element,
+the way `issue.create` v1 does.
+
+A replayed move sends **nothing at all**, including the read that resolves the
+transition name. By the time a caller retries, a transition that did apply has
+left the issue somewhere that name is no longer offered from, so resolving it
+first would answer a safe retry with `UNKNOWN_TRANSITION`. The key is therefore
+bound to the issue and the transition as typed: a second run naming either
+differently is refused rather than answered with the first one's result.
 
 ### Mutations
 
