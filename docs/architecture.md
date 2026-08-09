@@ -292,7 +292,8 @@ name to `customfield_10042` should not cost a round trip on every invocation.
 | `jql/`          | Table-driven, plus a fuzzer asserting no input escapes quoting | 100% of renderer branches                           |
 | `adf/`          | Golden files, round-trip property test, three fuzzers           | Corpus of ≥200 real documents, asserted             |
 | `resource/*`    | Pure struct-in/struct-out unit tests, plus a fuzzer on anything that parses | 90%                                     |
-| `transport/`    | Recorded fixtures, Cloud + DC                                  | Every endpoint                                      |
+| `transport/`    | Replayed fixtures, Cloud + DC                                  | Every endpoint                                      |
+| Fixture evidence | Cassettes grouped by package and deployment, each group needing a recording behind it | A group with none names itself and its reason, and the list can only shrink |
 | Output contract | Golden files per kind, per format                              | Any diff requires a version bump in the same commit |
 | Documented contract | Every `kind="…" v="…"` in the docs compared to the registry's kinds | The number a reader copies matches the one the binary emits |
 | Command reference | `docs/commands.md` rendered from the registry and compared | Exact under the full profile; every command present is documented under a reduced one |
@@ -323,6 +324,20 @@ asserting exactly that, with the inputs that used to get through as seeds.
 Recorded HTTP contract tests are mandatory, not optional. Pure-function unit
 tests would not have caught any of the incumbent bugs this project exists to
 avoid, all of them live at the seam between the CLI and a real Jira.
+
+**Which is a rule the tree does not yet keep, and the gap is now enumerated
+rather than described.** A cassette that was written and one that was recorded
+replay identically, so nothing in the suite could tell how much of it was
+evidence. Grouping every cassette by package and deployment answered it:
+eleven recordings, all Cloud, covering four groups of eighteen — and **no Data
+Center conversation anywhere rested on a recording**, against 62 cassettes
+asserting what somebody believed Data Center does. `unrecorded` in
+`internal/lint/evidence_test.go` is that inventory. Each entry names a group
+and why there is no recording behind it: five wait on a scrum board in the
+Cloud sandbox, nine on a Data Center instance that is not production. The test
+refuses an entry whose group has since been recorded, so the list can only
+shrink, and refuses a new group that arrives with neither a recording nor a
+reason.
 
 ## Bodies that do not fit in memory
 
