@@ -4,9 +4,13 @@
 //
 // Every command becomes a tool whose schema is derived from the same metadata
 // that builds the command tree and `jr schema`, so adding a command adds a tool
-// for free and the two cannot drift. The tool list of a build is exactly the
-// command list of that build: a reader binary advertises no mutating tools
-// because it contains none.
+// for free and the two cannot drift. The tool list of a build is the command
+// list of that build: a reader binary advertises no mutating tools because it
+// contains none.
+//
+// With one exception, and it is a command rather than a category: a command
+// that declares OwnsStdout writes this server's own byte stream, so it cannot
+// be a tool of it. `mcp serve` is the only one. See servableAsTool.
 //
 // The protocol is spoken directly rather than through an SDK. What is needed is
 // JSON-RPC 2.0 over stdio with three methods, which is small and precisely
@@ -259,6 +263,21 @@ func (s *Server) callTool(ctx context.Context, params json.RawMessage) (any, *rp
 		return nil, &rpcError{
 			Code:    codeInvalidParams,
 			Message: fmt.Sprintf("no tool named %q in this build", call.Name),
+		}
+	}
+	// Checked here as well as in Tools, because a peer can call a name that was
+	// never advertised. Leaving it out of the list is a description of this
+	// server; refusing it here is the control. It says why rather than
+	// pretending the command does not exist, because `mcp serve` plainly does
+	// and a caller reading "no such tool" about a command in `jr --help` learns
+	// nothing.
+	if !servableAsTool(cmd) {
+		return nil, &rpcError{
+			Code: codeInvalidParams,
+			Message: fmt.Sprintf(
+				"%q cannot be called as a tool: it writes the stream this server "+
+					"speaks on", call.Name,
+			),
 		}
 	}
 

@@ -22,13 +22,17 @@ func (a *app) mcpServeCommand() *registry.Command {
 		Path:    []string{"mcp", "serve"},
 		Summary: "Serve this build's commands as MCP tools over stdio",
 		Description: strings.TrimSpace(`
-Speaks the Model Context Protocol on stdin and stdout, exposing every command
-in this build as a tool.
+Speaks the Model Context Protocol on stdin and stdout, exposing this build's
+commands as tools.
 
 The tool list is generated from the same registry that builds the command tree
 and ` + "`" + buildinfo.App + ` schema` + "`" + `, so a tool cannot drift from the command behind it,
 and adding a command adds a tool for free. It is also the truth about this
 binary: a reader build advertises no mutating tools because it contains none.
+
+This command is not among them. It writes the stream the server is speaking on,
+so calling it as a tool would start a second server on the same stdin and
+stdout — and the call that did it would never return.
 
 A tool call returns the same output the command would print, in the same
 formats, with the same defaults — tsv for a collection, xml for a record. A

@@ -24,7 +24,8 @@ type Tool struct {
 	InputSchema map[string]any `json:"inputSchema"`
 }
 
-// Tools converts every registered command into a tool.
+// Tools converts every registered command into a tool, except the ones that
+// cannot be one.
 //
 // The list is the command list of this build. A reader binary advertises no
 // mutating tools because it contains none — an agent introspecting the server
@@ -33,6 +34,9 @@ func Tools(reg *registry.Registry) []Tool {
 	commands := reg.All()
 	out := make([]Tool, 0, len(commands))
 	for _, cmd := range commands {
+		if !servableAsTool(cmd) {
+			continue
+		}
 		out = append(out, Tool{
 			Name:        commandToTool(cmd.Name()),
 			Description: toolDescription(cmd),
@@ -41,6 +45,29 @@ func Tools(reg *registry.Registry) []Tool {
 	}
 	return out
 }
+
+// servableAsTool reports whether a command can be run as a tool call.
+//
+// `OwnsStdout` means the command writes the byte stream itself for the life of
+// the process, and this server is already writing JSON-RPC frames to that
+// stream. `mcp serve` is the only such command, and calling it as a tool
+// started a second server on the same stdin and stdout: the outer request never
+// answered, because the outer server was blocked inside Command.Run, and the
+// nested one consumed and replied to the frames that followed — from a server
+// the client does not know exists. One call, and the session is gone.
+//
+// The predicate is `OwnsStdout` rather than the command's name, so the next
+// command to set the flag inherits the refusal instead of the defect.
+//
+// `OwnsStdoutWhen` deliberately does *not* disqualify a command, and the two
+// fields are not interchangeable here even though they read that way.
+// `issue attachment download` sets it and is a perfectly good tool: with
+// `output` naming a path it writes a file and returns the usual document, and
+// only `output: "-"` would want the stream. That case is already refused, by
+// the command's own Validate, which runs on this path and finds `inv.Stdout`
+// nil — a tool call has no stdout to hand out. Hiding the whole command would
+// remove a working tool to prevent a call that already fails cleanly.
+func servableAsTool(cmd *registry.Command) bool { return !cmd.OwnsStdout }
 
 // commandToTool converts issue.list to issue_list.
 //
