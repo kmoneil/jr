@@ -1,0 +1,38 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB and the response-header filter in transport.KeptHeaders, which drops every header no code reads. `sprint start` against a sprint that already carries both dates, and the reason this file exists: the body is {\"state\":\"active\"} and nothing else. Jira requires a sprint to have a window before it will run, and the window belongs to the sprint rather than to the request \u2014 so a dated sprint starts from an empty body, and requiring --start and --end unconditionally would refuse a request the server accepts. Both halves are here: the precondition read that finds the sprint future, and the POST that starts it.",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/agile/1.0/sprint/4"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"id\":4,\"self\":\"https://recorded.invalid/rest/agile/1.0/sprint/4\",\"state\":\"future\",\"name\":\"AGL Sprint 4\",\"startDate\":\"2026-08-17T09:00:00.000Z\",\"endDate\":\"2026-08-31T09:00:00.000Z\",\"createdDate\":\"2026-08-10T16:16:57.187Z\",\"originBoardId\":3,\"goal\":\"Ship the importer\"}"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/agile/1.0/sprint/4",
+        "body": "{\"state\":\"active\"}"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"id\":4,\"self\":\"https://recorded.invalid/rest/agile/1.0/sprint/4\",\"state\":\"active\",\"name\":\"AGL Sprint 4\",\"startDate\":\"2026-08-17T09:00:00.000Z\",\"endDate\":\"2026-08-31T09:00:00.000Z\",\"createdDate\":\"2026-08-10T16:16:57.187Z\",\"originBoardId\":3,\"goal\":\"Ship the importer\"}"
+      }
+    }
+  ]
+}

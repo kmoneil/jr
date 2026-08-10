@@ -1,0 +1,23 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB and the response-header filter in transport.KeptHeaders, which drops every header no code reads. `sprint create` with nothing but a name, which is the minimum the endpoint takes: name and originBoardId. The sprint it makes has no dates at all, and that is the state start-undated-recorded.cloud.json then refuses to start.",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/agile/1.0/sprint",
+        "body": "{\"name\":\"AGL Sprint 5\",\"originBoardId\":3}"
+      },
+      "response": {
+        "status": 201,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"id\":5,\"self\":\"https://recorded.invalid/rest/agile/1.0/sprint/5\",\"state\":\"future\",\"name\":\"AGL Sprint 5\",\"createdDate\":\"2026-08-10T16:17:21.499Z\",\"originBoardId\":3}"
+      }
+    }
+  ]
+}

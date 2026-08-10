@@ -38,6 +38,10 @@ var argIsNotAnIdentifier = map[string]string{
 		"thing to search for, including one shaped like a path",
 	"user.get": "a user id is an opaque accountId on Cloud and a username on " +
 		"Data Center, and neither has a grammar this tool can check",
+	"sprint.create": "a sprint name is free text and never reaches a URL path; " +
+		"Jira accepts a sprint called ../../not-an-id, and refusing one here " +
+		"would be this tool deciding what a team may call its iteration. The " +
+		"id it hands back is what gets validated, on every verb that takes one",
 }
 
 // TestALocalRefusalOutranksTheDeploymentProbe holds every command that takes an

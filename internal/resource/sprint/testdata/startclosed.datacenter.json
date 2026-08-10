@@ -1,0 +1,22 @@
+{
+  "deployment": "datacenter",
+  "source": "constructed",
+  "note": "Hand-written. The other wrong state, and it needs a different remedy: an active sprint is already running and a closed one cannot be reopened by any API at all.",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/agile/1.0/sprint/101"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"id\":101,\"self\":\"https://jira.acme.invalid/rest/agile/1.0/sprint/101\",\"state\":\"closed\",\"name\":\"ENG Sprint 3\",\"startDate\":\"2026-06-17T09:00:00.000+0000\",\"endDate\":\"2026-07-01T09:00:00.000+0000\",\"completeDate\":\"2026-07-01T10:22:00.000+0000\",\"originBoardId\":99,\"goal\":\"Retry budget\"}"
+      }
+    }
+  ]
+}

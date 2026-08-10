@@ -1,0 +1,23 @@
+{
+  "deployment": "datacenter",
+  "source": "constructed",
+  "note": "Hand-written: the only Data Center available is production. It asserts that a 201 carrying a sprint is handled, and never that the request was accepted \u2014 see backlog/data-center-evidence.md. The dates come back in Data Center's own format, an offset with no colon, which time.RFC3339 refuses and normalizeTime is what converts.",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/agile/1.0/sprint",
+        "body": "{\"endDate\":\"2026-07-29T09:00:00Z\",\"goal\":\"Keyset pagination\",\"name\":\"ENG Sprint 6\",\"originBoardId\":99,\"startDate\":\"2026-07-15T09:00:00Z\"}"
+      },
+      "response": {
+        "status": 201,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"id\":102,\"self\":\"https://jira.acme.invalid/rest/agile/1.0/sprint/102\",\"state\":\"future\",\"name\":\"ENG Sprint 6\",\"startDate\":\"2026-07-15T09:00:00.000+0000\",\"endDate\":\"2026-07-29T09:00:00.000+0000\",\"originBoardId\":99,\"goal\":\"Keyset pagination\"}"
+      }
+    }
+  ]
+}

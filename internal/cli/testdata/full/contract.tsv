@@ -6,7 +6,7 @@ board.list	1	board.list
 context.get	1	context.create,context.delete,context.edit,context.show,context.use
 context.list	1	context.list
 contract	2	contract
-dry-run	2	epic.add,epic.remove,issue.assign,issue.attachment.upload,issue.clone,issue.comment.add,issue.comment.delete,issue.comment.edit,issue.create,issue.delete,issue.edit,issue.link.add,issue.link.remove,issue.move,issue.watch,issue.worklog.add,issue.worklog.delete,sprint.add,sprint.close
+dry-run	2	epic.add,epic.remove,issue.assign,issue.attachment.upload,issue.clone,issue.comment.add,issue.comment.delete,issue.comment.edit,issue.create,issue.delete,issue.edit,issue.link.add,issue.link.remove,issue.move,issue.watch,issue.worklog.add,issue.worklog.delete,sprint.add,sprint.close,sprint.create,sprint.start
 epic.add	2	epic.add
 epic.get	1	epic.get
 epic.list	1	epic.list
@@ -47,8 +47,10 @@ schema.command	1	schema
 schema.commands	1	schema
 sprint.add	1	sprint.add
 sprint.close	1	sprint.close
+sprint.create	1	sprint.create
 sprint.get	1	sprint.get
 sprint.list	1	sprint.list
+sprint.start	1	sprint.start
 user.get	1	user.get,user.me
 user.list	1	user.list
 version	1	version

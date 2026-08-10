@@ -40,7 +40,7 @@ contains what.
 - **[meta](#meta)** — [`meta createmeta`](#jr-meta-createmeta), [`meta transitions`](#jr-meta-transitions)
 - **[project](#project)** — [`project components`](#jr-project-components), [`project get`](#jr-project-get), [`project list`](#jr-project-list), [`project statuses`](#jr-project-statuses), [`project versions`](#jr-project-versions)
 - **[schema](#schema)** — [`schema`](#jr-schema)
-- **[sprint](#sprint)** — [`sprint add`](#jr-sprint-add), [`sprint close`](#jr-sprint-close), [`sprint get`](#jr-sprint-get), [`sprint list`](#jr-sprint-list)
+- **[sprint](#sprint)** — [`sprint add`](#jr-sprint-add), [`sprint close`](#jr-sprint-close), [`sprint create`](#jr-sprint-create), [`sprint get`](#jr-sprint-get), [`sprint list`](#jr-sprint-list), [`sprint start`](#jr-sprint-start)
 - **[user](#user)** — [`user get`](#jr-user-get), [`user list`](#jr-user-list), [`user me`](#jr-user-me)
 - **[version](#version)** — [`version`](#jr-version)
 
@@ -2524,6 +2524,59 @@ jr sprint close 128 --dry-run
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+### `jr sprint create`
+
+Create a future sprint on a board
+
+- **mutating** — changes Jira; accepts `--dry-run`, refused in read-only mode
+- **build tags** — needs `write`
+
+```
+jr sprint create <name> [flags]
+```
+
+Adds an unstarted sprint to a board.
+
+The sprint is created in the future state. Nothing about the board changes for
+anybody working on it until the sprint is started, so this is safe to run: an
+unstarted sprint holds no issues and appears only in the backlog view.
+
+The board comes from --board, JIRA_BOARD, or the context, exactly as for
+`jr sprint list`. Only a scrum board has sprints, and a kanban board is
+refused by the server.
+
+--start and --end are optional here. A sprint can be planned without dates and
+given them when it is started, which is what the Jira UI does; passing them now
+records the intended window up front.
+
+--dry-run prints the exact request, body included, and sends nothing.
+
+Examples:
+
+```console
+jr sprint create "Sprint 14" --board 42
+jr sprint create "Sprint 14" --goal "Ship the importer"
+jr sprint create "Sprint 14" --start 2026-08-11T09:00:00Z --end 2026-08-25T09:00:00Z
+```
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `name` | yes | what the sprint is called, e.g. "Sprint 14" |
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--start` | `string` | — | when the sprint begins, RFC 3339, e.g. 2026-08-11T09:00:00Z |
+| `--end` | `string` | — | when the sprint is due to end, RFC 3339 |
+| `--goal` | `string` | — | what the sprint is for |
+| `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
+
+| Emits | Schema | When |
+| --- | --- | --- |
+| `sprint.create` | v1 | always |
+| `dry-run` | v2 | --dry-run is given |
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
+
 ### `jr sprint get`
 
 Fetch one sprint
@@ -2604,6 +2657,56 @@ jr sprint list --board 42 --limit all --format json
 Default TSV columns: `id`, `name`, `state`, `start`, `end`
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
+
+### `jr sprint start`
+
+Start a future sprint
+
+- **mutating** — changes Jira; accepts `--dry-run`, refused in read-only mode
+- **build tags** — needs `write`
+
+```
+jr sprint start <id> [flags]
+```
+
+Begins a sprint that has been planned but not yet started.
+
+The sprint is read first, so a sprint that cannot be started is refused before
+anything is sent. Only a future sprint can be started: an active one is already
+running and a closed one cannot be reopened by any API, so both are a
+precondition failure rather than a request worth making.
+
+This is not destructive and takes no --yes. Starting a sprint is undone by
+`jr sprint close`, which is the half that needs both the write and admin
+tags, because ending an iteration returns every unfinished issue to the backlog.
+
+--dry-run prints the exact request, body included, and sends nothing. The read
+still happens, so a dry run tells you whether the start would be allowed.
+
+Examples:
+
+```console
+jr sprint start 128
+jr sprint start 128 --end 2026-08-25T09:00:00Z
+jr sprint start 128 --dry-run
+```
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `id` | yes | sprint id, from `jr sprint list` |
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--start` | `string` | — | when the sprint begins, RFC 3339, e.g. 2026-08-11T09:00:00Z |
+| `--end` | `string` | — | when the sprint is due to end, RFC 3339 |
+| `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
+
+| Emits | Schema | When |
+| --- | --- | --- |
+| `sprint.start` | v1 | always |
+| `dry-run` | v2 | --dry-run is given |
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
 ## user
 

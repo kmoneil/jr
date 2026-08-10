@@ -1,0 +1,38 @@
+{
+  "deployment": "datacenter",
+  "source": "constructed",
+  "note": "Hand-written. The sprint has no dates and the flags supply them, which is the other half of start-recorded.cloud.json: there the sprint carried its own window and the body was nothing but the state. Both spellings reach the same endpoint and only one of them can be recorded at a time.",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/agile/1.0/sprint/99"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"id\":99,\"self\":\"https://jira.acme.invalid/rest/agile/1.0/sprint/99\",\"state\":\"future\",\"name\":\"ENG Sprint 5\",\"originBoardId\":99}"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/agile/1.0/sprint/99",
+        "body": "{\"endDate\":\"2026-07-29T09:00:00Z\",\"startDate\":\"2026-07-15T09:00:00Z\",\"state\":\"active\"}"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"id\":99,\"self\":\"https://jira.acme.invalid/rest/agile/1.0/sprint/99\",\"state\":\"active\",\"name\":\"ENG Sprint 5\",\"startDate\":\"2026-07-15T09:00:00.000+0000\",\"endDate\":\"2026-07-29T09:00:00.000+0000\",\"originBoardId\":99}"
+      }
+    }
+  ]
+}

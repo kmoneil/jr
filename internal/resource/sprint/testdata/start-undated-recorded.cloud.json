@@ -1,0 +1,22 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB and the response-header filter in transport.KeptHeaders, which drops every header no code reads. `sprint start` refused. The sprint has no dates and none were passed, so Jira would answer \"startDate: You must specify a start date for the sprint\"; this refuses locally instead, at exit 2. **The file holds one interaction and that is the assertion** \u2014 the read happened and the POST did not, which a passing exit code alone would not have established.",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/agile/1.0/sprint/5"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"id\":5,\"self\":\"https://recorded.invalid/rest/agile/1.0/sprint/5\",\"state\":\"future\",\"name\":\"AGL Sprint 5\",\"createdDate\":\"2026-08-10T16:17:21.499Z\",\"originBoardId\":3}"
+      }
+    }
+  ]
+}

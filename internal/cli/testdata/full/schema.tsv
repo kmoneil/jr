@@ -53,8 +53,10 @@ project.versions	List a project's versions	false	false	project.versions
 schema	Describe every command this build contains	false	false	schema.commands
 sprint.add	Move issues into a sprint	true	false	sprint.add
 sprint.close	Close an active sprint	true	true	sprint.close
+sprint.create	Create a future sprint on a board	true	false	sprint.create
 sprint.get	Fetch one sprint	false	false	sprint.get
 sprint.list	List a board's sprints	false	false	sprint.list
+sprint.start	Start a future sprint	true	false	sprint.start
 user.get	Fetch one user by id	false	false	user.get
 user.list	Search for users	false	false	user.list
 user.me	Show who this credential authenticates as	false	false	user.get

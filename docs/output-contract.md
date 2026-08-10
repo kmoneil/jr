@@ -732,6 +732,49 @@ did not happen.
 | `UNSAFE_FILENAME`         | 1    | A download with no `--output` takes its destination from the filename the server reports, and that filename is not one. A name carrying a directory separator, a parent reference, or an absolute path would put the bytes somewhere nobody asked for; Data Center reports the filename on the attachment itself, so the value is the server's rather than the caller's. The name is still reported in full by `issue attachment list`, refusing to *write* it is not refusing to *say* it. Pass `--output <path>` to name the destination yourself. Exit 1 and not 9: the server returns the same filename next time, so retrying cannot help, and 9 publishes a refusal as retryable. |
 | `BODY_NOT_REPLAYABLE`     | 1    | A retry needed the request body again and could not get it, a body read from a pipe cannot be sent twice. The request fails rather than going out short, because a second attempt carrying nothing would be accepted as a successful upload of an empty file. |
 | `SPRINT_NOT_ACTIVE`       | 7    | Only a running sprint can be closed. The sprint is read first, so the wrong state costs one read and no mutation. |
+| `SPRINT_NOT_FUTURE`       | 7    | Only a planned sprint can be started. The two wrong states get different remedies: an active sprint is already running and can be closed, and a closed one cannot be reopened by any API. |
+| `SPRINT_HAS_NO_DATES`     | 2    | `sprint start` on a sprint that has no window, with none supplied. Jira will not run a sprint that has no dates, so this is the server's rule refused a round trip earlier. It names only the half that is missing: a sprint created with both dates needs neither flag. |
+| `INVALID_SPRINT_DATE`     | 2    | `--start` or `--end` is not an RFC 3339 timestamp. A bare date names no time and no zone, and choosing one would decide when somebody's iteration begins on their behalf. An offset is accepted and normalized to UTC, which is a spelling of an instant rather than a different instant. |
+| `INVALID_SPRINT_WINDOW`   | 2    | The sprint would end before it starts. Jira refuses the same thing — "the start date of a sprint must be before the end date" — so this is that verdict without the round trip. On `sprint start` the pair checked is the effective one, so `--end` alone can be backwards against a start date the sprint already holds. |
+| `INVALID_SPRINT_NAME`     | 2    | `sprint create` was given no name, or one that is entirely whitespace. Anything else is accepted: a sprint name is free text, it never reaches a URL path, and what a team calls its iteration is not this tool's business. |
+
+### The sprint lifecycle
+
+A sprint is created, started, and closed, and the three verbs are gated
+differently because their blast radii differ. `sprint create` and `sprint start`
+need `write`; `sprint close` needs `write` **and** `admin`, because ending an
+iteration returns every unfinished issue to the backlog and no API reopens one.
+So an agent build can plan an iteration and begin one, and cannot end one.
+
+Neither of the first two is destructive and neither takes `--yes`: starting a
+sprint is undone by closing it, and a sprint that was never started holds
+nothing to lose.
+
+`sprint.create` v1 and `sprint.start` v1 report the sprint as the server now
+holds it, plus an `action`, because both endpoints answer with the whole sprint
+rather than a bare acknowledgement. The id in `sprint.create` is the only place a
+caller learns what their new sprint was numbered.
+
+```xml
+<result kind="sprint.start" v="1">
+  <sprint id="4" state="active" board="3" action="started">
+    <name>Sprint 14</name>
+    <goal>Ship the importer</goal>
+    <start>2026-08-17T09:00:00Z</start>
+    <end>2026-08-31T09:00:00Z</end>
+  </sprint>
+</result>
+```
+
+**The window belongs to the sprint, not to the request.** Jira will not run a
+sprint that has no dates, but a sprint created with them starts from a body
+carrying nothing but the state. So `--start` and `--end` are required exactly
+when the sprint has nothing to supply, and `SPRINT_HAS_NO_DATES` names only the
+missing half. Requiring them unconditionally would refuse a request the server
+accepts.
+
+Dates are RFC 3339 in and RFC 3339 out. What goes to Jira is what a read
+reports, so the two can be compared without either being reformatted first.
 
 ### Body text on write
 

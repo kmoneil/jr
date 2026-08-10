@@ -1,7 +1,7 @@
 {
   "deployment": "cloud",
   "source": "recorded",
-  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB and the response-header filter in transport.KeptHeaders, which drops every header no code reads. `sprint close`, the last verb in this tree that had never been run. Both halves are here: the precondition read that finds the sprint active, and the POST that ends it. Jira answers the POST 200 with a body rather than 204, and the body carries completeDate \u2014 which the constructed Data Center fixture beside this one had right, for once. Recording it cost the sandbox's only sprint; there is no way to reopen one and no `sprint start` verb, so a re-recording is a new sprint made by hand in the UI.",
+  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB and the response-header filter in transport.KeptHeaders, which drops every header no code reads. `sprint close`, the last verb in this tree that had never been run. Both halves are here: the precondition read that finds the sprint active, and the POST that ends it. Jira answers the POST 200 with a body rather than 204, and the body carries completeDate \u2014 which the constructed Data Center fixture beside this one had right, for once. Recording it cost the sandbox's only sprint, and at the time that meant a re-recording needed a new sprint made by hand in the UI. It no longer does: `sprint create` and `sprint start` close the loop, so the whole lifecycle is reproducible from the CLI. A closed sprint still cannot be reopened by any API \u2014 re-recording this file makes a new sprint and spends that one instead.",
   "interactions": [
     {
       "request": {

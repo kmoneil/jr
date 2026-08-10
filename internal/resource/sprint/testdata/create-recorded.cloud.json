@@ -1,0 +1,23 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB and the response-header filter in transport.KeptHeaders, which drops every header no code reads. `sprint create` with everything it accepts: a name, a goal, and both dates. Jira answers 201 with the whole sprint, which is why the verb reports the server's account of what it made rather than echoing back the request. Note the dates come back with milliseconds and a Z where they went out as plain RFC 3339 seconds \u2014 normalizeTime is what makes the two ends agree.",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/agile/1.0/sprint",
+        "body": "{\"endDate\":\"2026-08-31T09:00:00Z\",\"goal\":\"Ship the importer\",\"name\":\"AGL Sprint 4\",\"originBoardId\":3,\"startDate\":\"2026-08-17T09:00:00Z\"}"
+      },
+      "response": {
+        "status": 201,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"id\":4,\"self\":\"https://recorded.invalid/rest/agile/1.0/sprint/4\",\"state\":\"future\",\"name\":\"AGL Sprint 4\",\"startDate\":\"2026-08-17T09:00:00.000Z\",\"endDate\":\"2026-08-31T09:00:00.000Z\",\"createdDate\":\"2026-08-10T16:16:57.187Z\",\"originBoardId\":3,\"goal\":\"Ship the importer\"}"
+      }
+    }
+  ]
+}

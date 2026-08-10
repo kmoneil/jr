@@ -1,0 +1,30 @@
+      <element name="sprint">
+        <attributes count="4">
+          <attribute name="id" type="int" optional="false"/>
+          <attribute name="state" type="string" optional="false" enum="future,active,closed"/>
+          <attribute name="board" type="string" optional="true"/>
+          <attribute name="action" type="string" optional="false" enum="started"/>
+        </attributes>
+        <elements count="4">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="goal" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="start" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="end" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

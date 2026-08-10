@@ -1,0 +1,22 @@
+{
+  "deployment": "datacenter",
+  "source": "constructed",
+  "note": "Hand-written. One interaction and no POST: a start that ignored the precondition would find nothing in the cassette to answer it.",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/agile/1.0/sprint/100"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"id\":100,\"self\":\"https://jira.acme.invalid/rest/agile/1.0/sprint/100\",\"state\":\"active\",\"name\":\"ENG Sprint 4\",\"startDate\":\"2026-07-01T09:00:00.000+0000\",\"endDate\":\"2026-07-15T09:00:00.000+0000\",\"originBoardId\":99,\"goal\":\"Keyset pagination\"}"
+      }
+    }
+  ]
+}
