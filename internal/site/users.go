@@ -23,6 +23,9 @@ type User struct {
 	Display string
 	Email   string
 	Active  bool
+	// TimeZone is the IANA zone on the user's profile, where the server
+	// discloses it. A search does not; a lookup by id usually does.
+	TimeZone string
 	// Kind distinguishes a person from an application or a customer account,
 	// where the server says. Assigning an issue to an app account is a mistake
 	// worth being able to see before making.
@@ -38,6 +41,7 @@ type rawUser struct {
 	DisplayName string `json:"displayName"`
 	Email       string `json:"emailAddress"`
 	Active      bool   `json:"active"`
+	TimeZone    string `json:"timeZone"`
 }
 
 func (r rawUser) convert() User {
@@ -50,7 +54,7 @@ func (r rawUser) convert() User {
 	}
 	return User{
 		ID: id, Display: r.DisplayName, Email: r.Email,
-		Active: r.Active, Kind: r.AccountType,
+		Active: r.Active, Kind: r.AccountType, TimeZone: r.TimeZone,
 	}
 }
 

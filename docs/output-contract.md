@@ -400,6 +400,45 @@ natural types because they are the ones a caller branches on:
 a consumer never has to distinguish "none" from "not applicable". A list
 container's `count` is derived from its children and cannot disagree with them.
 
+### Timestamps out are UTC; dates in are not
+
+Every timestamp this tool **emits** is RFC 3339 in UTC. That is a property of
+the output and it is normalized here, so two deployments that serve different
+formats — Data Center writes an offset with no colon — reach a consumer as one
+shape.
+
+Every date a caller **sends** is evaluated by Jira, in the timezone on the
+**Jira account's profile**. Not UTC, and not the clock of the machine running
+`jr`, which has no way to tell the server what it is. This applies to
+`--created-after` and every date flag beside it, to a raw `--jql`, to
+`startOfDay()` and the rest of the `startOf`/`endOf` family, and to a bare
+literal like `2026-08-10 00:00`.
+
+Measured against a Cloud site on 2026-08-10, from a host running UTC, for an
+issue created at `2026-08-10T14:02:37Z`:
+
+```
+--created-after "2026-08-10 09:02"   matches
+--created-after "2026-08-10 09:03"   does not      ⇒ the literal clock is UTC-5
+--created-after 'startOfDay("+9h")'  matches
+--created-after 'startOfDay("+10h")' does not      ⇒ startOfDay() is 05:00:00Z
+```
+
+The account said `America/Chicago`, which in August is UTC−5, and the two agree.
+
+So `--created-after startOfDay()` means "since 05:00Z" for that caller: a
+request for *today* that silently omits the first five hours of it, reported
+`complete="true"` at exit 0. There is nothing wrong with the result — it is the
+answer to the question Jira was asked.
+
+**`jr user me` reports the zone**, as `timezone` on `user.get` v2, and that is
+the whole of the fix. The dates are passed through rather than resolved here on
+purpose: `startOfWeek()` carries Jira's own notion of when a week starts, and a
+client that computed an instant would be substituting its own. Where a caller
+means their own day rather than the account's, the way to say so is an absolute
+literal converted into the account's zone — `docs/recipes.md` has the
+conversion.
+
 ## TSV escaping
 
 Every record is one line and every field is one column. Within a field:

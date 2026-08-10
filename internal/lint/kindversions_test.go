@@ -30,6 +30,15 @@ var versionedDocs = []string{
 // docEnvelope matches an XML envelope in prose: `<result kind="issue.list" v="3">`.
 var docEnvelope = regexp.MustCompile(`kind="([a-z][a-z.]*)" v="(\d+)"`)
 
+// docProseVersion matches a version named in prose rather than in an example:
+// "`issue.get` v5 carries a `precondition` attribute".
+//
+// Eight of these were in the documents before anything read one, and they are
+// the harder half to notice: an example is obviously a thing that can go stale,
+// and a sentence reads as an explanation. It is the same claim either way, and
+// this document's first instruction is to branch on the number.
+var docProseVersion = regexp.MustCompile("`([a-z][a-z.]*\\.[a-z]+)` v(\\d+)")
+
 // docJSONEnvelope matches the JSON spelling of the same thing, which is two
 // lines apart and so is matched a line at a time by the caller.
 var (
@@ -60,6 +69,10 @@ func TestTheDocumentedSchemaVersionsAreCurrent(t *testing.T) {
 		var kind string
 		for i, line := range readLines(t, doc) {
 			for _, m := range docEnvelope.FindAllStringSubmatch(line, -1) {
+				checkVersion(t, doc, i+1, m[1], m[2], current)
+				checked++
+			}
+			for _, m := range docProseVersion.FindAllStringSubmatch(line, -1) {
 				checkVersion(t, doc, i+1, m[1], m[2], current)
 				checked++
 			}

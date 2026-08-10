@@ -50,6 +50,6 @@ sprint.create	1	sprint.create
 sprint.get	1	sprint.get
 sprint.list	1	sprint.list
 sprint.start	1	sprint.start
-user.get	1	user.get,user.me
-user.list	1	user.list
+user.get	2	user.get,user.me
+user.list	2	user.list
 version	1	version

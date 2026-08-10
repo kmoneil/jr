@@ -17,6 +17,14 @@ type Account struct {
 	Display string
 	Email   string
 	Active  bool
+	// TimeZone is the IANA zone on the account's own profile, e.g.
+	// "America/Chicago", and is empty where the server does not say.
+	//
+	// It matters far more than a profile setting sounds like it should: Jira
+	// evaluates every relative date and every startOf/endOf function in this
+	// zone, not in UTC and not in the caller's. Nothing else in this tool can
+	// tell a caller which clock their query was answered on.
+	TimeZone string
 }
 
 // rawAccount covers both deployments.
@@ -27,6 +35,7 @@ type rawAccount struct {
 	DisplayName string `json:"displayName"`
 	Email       string `json:"emailAddress"`
 	Active      bool   `json:"active"`
+	TimeZone    string `json:"timeZone"`
 }
 
 // Whoami asks the site who the caller is.
@@ -62,10 +71,11 @@ func Whoami(ctx context.Context, client Doer, info Info) (Account, error) {
 		id = raw.Key
 	}
 	return Account{
-		ID:      id,
-		Name:    raw.Name,
-		Display: raw.DisplayName,
-		Email:   raw.Email,
-		Active:  raw.Active,
+		ID:       id,
+		Name:     raw.Name,
+		Display:  raw.DisplayName,
+		Email:    raw.Email,
+		Active:   raw.Active,
+		TimeZone: raw.TimeZone,
 	}, nil
 }

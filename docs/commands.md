@@ -1710,7 +1710,7 @@ jr issue list --changed-by currentUser --changed-after -1w
 | `--was-assignee` | `string` | — | who the issue was assigned to at any point, whoever holds it now |
 | `--changed-by` | `string` | — | who changed --changed-field |
 | `--changed-field` | `string` | `status` | the field --changed-by and --changed-after apply to; JQL cannot ask whether any field changed, only a named one |
-| `--created-after` | `string` | — | only issues created on or after this date or offset, e.g. -7d |
+| `--created-after` | `string` | — | only issues created on or after this date or offset, e.g. -7d; every date on this command is evaluated in the Jira account's timezone, which jr user me reports |
 | `--created-before` | `string` | — | only issues created on or before this date or offset |
 | `--updated-after` | `string` | — | only issues updated on or after this date or offset; updated by anyone, which is not the same as updated by you |
 | `--updated-before` | `string` | — | only issues updated on or before this date or offset |
@@ -2738,7 +2738,7 @@ jr user get 712020:8f3a --format json
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `user.get` | v1 | always |
+| `user.get` | v2 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
@@ -2784,7 +2784,7 @@ jr user list ada --format json
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `user.list` | v1 | always |
+| `user.list` | v2 | always |
 
 Default TSV columns: `id`, `display`, `email`, `active`
 
@@ -2816,7 +2816,7 @@ jr user me
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `user.get` | v1 | always |
+| `user.get` | v2 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 

@@ -29,6 +29,6 @@ schema.command	1	schema
 schema.commands	1	schema
 sprint.get	1	sprint.get
 sprint.list	1	sprint.list
-user.get	1	user.get,user.me
-user.list	1	user.list
+user.get	2	user.get,user.me
+user.list	2	user.list
 version	1	version

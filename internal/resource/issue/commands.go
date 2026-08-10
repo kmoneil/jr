@@ -255,7 +255,9 @@ to status and everything else has to be asked for.`),
 			},
 			{
 				Name: "created-after", Type: registry.TypeString,
-				Usage: "only issues created on or after this date or offset, e.g. -7d",
+				Usage: "only issues created on or after this date or offset, e.g. -7d; " +
+					"every date on this command is evaluated in the Jira " +
+					"account's timezone, which " + buildinfo.App + " user me reports",
 			},
 			{
 				Name: "created-before", Type: registry.TypeString,

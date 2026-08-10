@@ -1,0 +1,24 @@
+      <element name="user">
+        <attributes count="3">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="active" type="bool" optional="false"/>
+          <attribute name="kind" type="string" optional="true"/>
+        </attributes>
+        <elements count="3">
+          <element name="display" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="email" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="timezone" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

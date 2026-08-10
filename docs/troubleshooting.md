@@ -214,6 +214,37 @@ $ jr issue list --limit all --project ENG      # scope it
 $ jr issue list --limit all --all-projects     # or mean it
 ```
 
+### "Today" is not my today
+
+Nothing is broken and the result is complete. Jira evaluates every date you send
+in the timezone on **the Jira account's profile** — not UTC, and not your
+machine's clock, which the server never learns.
+
+```console
+$ jr user me
+# <timezone>America/Chicago</timezone>
+```
+
+If that is not your zone, `--created-after startOfDay()` does not mean your
+midnight. For an account on `America/Chicago` in August, `startOfDay()` is
+05:00Z, so "created today" quietly starts five hours late and still reports
+`complete="true"` at exit 0.
+
+The same applies to a bare literal: `--created-after "2026-08-10 00:00"` is
+midnight *there*, not here.
+
+To mean your own day, convert it and send an absolute literal:
+
+```console
+# midnight where you are, expressed in the account's zone
+$ start=$(TZ=Pacific/Auckland date -d "today 00:00" +%s)
+$ jr issue list --created-after "$(TZ=America/Chicago date -d @$start '+%Y-%m-%d %H:%M')"
+```
+
+`startOfWeek()` and friends are passed through rather than computed here on
+purpose — they carry Jira's own notion of when a week begins, which a converted
+instant does not.
+
 ## Refusals that look like bugs
 
 Most of these are the tool declining to guess. The pattern is the same

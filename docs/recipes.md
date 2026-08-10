@@ -43,6 +43,28 @@ $ jr issue list --sort updated --order desc
 Repeatable flags OR together, so `--status 'To Do' --status 'In Progress'` means
 either. Different flags AND together.
 
+**Dates are evaluated in the Jira account's timezone, not yours.** An offset
+like `-30d` is relative to now and unaffected, but anything with a day boundary
+in it — `startOfDay()`, `2026-01-01`, `startOfWeek()` — means that boundary
+*there*. `jr user me` reports the zone:
+
+```console
+$ jr user me | grep timezone
+```
+
+If it is not your zone, `--created-after startOfDay()` is not your midnight. For
+an account on `America/Chicago`, it is 05:00Z, so "created today" starts five
+hours late and still reports itself complete. To mean your own day, convert it:
+
+```console
+$ start=$(TZ=Pacific/Auckland date -d "today 00:00" +%s)
+$ jr issue list --created-after \
+    "$(TZ=America/Chicago date -d @$start '+%Y-%m-%d %H:%M')"
+```
+
+Timestamps coming *back* are always RFC 3339 in UTC, whichever way the query
+went in.
+
 ### When the flags do not cover it
 
 Pass JQL whole. It is combined with the other filters and always parenthesized,

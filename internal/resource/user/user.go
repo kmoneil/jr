@@ -22,10 +22,13 @@ import (
 
 // Kinds and schema versions this resource emits.
 const (
-	KindList    = "user.list"
-	VersionList = 1
+	KindList = "user.list"
+	// v2 added the account's timezone. It is the clock Jira evaluates every
+	// relative date in, and until it was published a caller had no way to find
+	// out which day `startOfDay()` meant.
+	VersionList = 2
 	KindGet     = "user.get"
-	VersionGet  = 1
+	VersionGet  = 2
 )
 
 func init() {
@@ -56,6 +59,16 @@ func Schema() *render.Schema {
 			// It is not the same as having none, and the element is omitted
 			// rather than emitted empty so a consumer can tell.
 			{Schema: render.Leaf("email", render.TypeString), Optional: true},
+			// The IANA zone on the account's profile, e.g. "America/Chicago".
+			//
+			// Jira evaluates every relative date and every startOf/endOf
+			// function against this zone — not UTC, and not the clock of the
+			// machine running this tool, which has no way to tell the server
+			// what it is. Optional for the reason email is: Data Center sends
+			// none, and a Cloud privacy setting can withhold it. It is `user
+			// me` that is guaranteed to have it, being the caller's own
+			// account, and `user me` is where the answer is worth looking for.
+			{Schema: render.Leaf("timezone", render.TypeString), Optional: true},
 		},
 	}
 }
@@ -88,7 +101,8 @@ func Node(u User) *render.Node {
 		Attr("active", strconv.FormatBool(u.Active)).
 		AttrIf("kind", u.Kind).
 		Leaf("display", u.Display).
-		LeafIf("email", u.Email)
+		LeafIf("email", u.Email).
+		LeafIf("timezone", u.TimeZone)
 }
 
 // ListColumns is the default TSV column set for `user list`.
@@ -300,6 +314,7 @@ func runMe(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) {
 	return render.Record(KindGet, VersionGet, Node(User{
 		ID: account.ID, Display: account.Display,
 		Email: account.Email, Active: account.Active,
+		TimeZone: account.TimeZone,
 	})), nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kmoneil/jira-cli/internal/errs"
 	"github.com/kmoneil/jira-cli/internal/exitcode"
@@ -502,5 +503,120 @@ func TestAFullPageIsNeverReportedComplete(t *testing.T) {
 				t.Errorf("emitted %d rows, want %d:\n%s", rows, tc.wantRows, buf.String())
 			}
 		})
+	}
+}
+
+// TestMeReportsTheClockJiraAnswersOn is the whole reason user.get went to v2.
+//
+// Jira evaluates every relative date and every startOf/endOf function in the
+// timezone on the *account's* profile — not UTC, and not the clock of the
+// machine running this tool. Measured against the sandbox on 2026-08-10 from a
+// host running UTC: an issue created at 14:02:37Z is matched by
+// `--created-after "2026-08-10 09:02"` and not by `"09:03"`, and by
+// `startOfDay("+9h")` and not by `startOfDay("+10h")`. Both put the day
+// boundary at 05:00Z, five hours after the caller's midnight, and the account
+// says America/Chicago, which in August is UTC-5.
+//
+// So `--created-after startOfDay()` means "since 05:00Z" and reports itself
+// complete at exit 0, and until this field was published there was nothing in
+// the tool that could tell a caller which day they had asked for.
+//
+// The evidence needed no new recording. me.cloud.json has carried the field
+// since it was recorded and nothing parsed it, which is its own lesson about
+// what a fixture is worth: the answer was committed before the question.
+func TestMeReportsTheClockJiraAnswersOn(t *testing.T) {
+	cmd, ok := registry.Lookup("user.me")
+	if !ok {
+		t.Fatal("user me is not registered")
+	}
+	conn, _ := replayConn(t, "me.cloud.json")
+
+	doc, err := cmd.Run(t.Context(), &registry.Invocation{
+		Jira: &stubSession{conn: conn, kind: site.Cloud}, Flags: registry.NewFlags(),
+		Stderr: io.Discard, Progress: registry.NoProgress,
+	})
+	if err != nil {
+		t.Fatalf("user me: %v", err)
+	}
+	zone, ok := doc.Record.ChildNamed("timezone")
+	if !ok {
+		t.Fatal("user me reports no timezone, so nothing in this tool says " +
+			"which clock a relative date is evaluated on")
+	}
+	if zone.Text != "America/Chicago" {
+		t.Errorf("timezone = %q, want the zone the recording carries", zone.Text)
+	}
+	// A zone that names no zone is worse than none: a caller would compute
+	// against it. It has to be loadable.
+	if _, err := time.LoadLocation(zone.Text); err != nil {
+		t.Errorf("timezone %q does not name an IANA zone: %v", zone.Text, err)
+	}
+}
+
+// TestTheTimezoneIsReportedWhereverTheServerSendsIt is the other half, and it
+// corrected the belief that produced it.
+//
+// The element was made optional on the reasoning that a search does not
+// disclose a timezone and only /myself does. The recordings say otherwise: both
+// search.cloud.json and user.cloud.json carry timeZone, so a search on this
+// deployment discloses it too. Optional is still right, for the reason email is
+// optional — Data Center's fixtures carry none and a Cloud privacy setting can
+// withhold it — but "absent because the endpoint never sends it" was wrong, and
+// a comment saying so would have outlived the check.
+//
+// It renders XML rather than TSV, and the first version of it did not. TSV
+// emits the declared column set, which has never contained a timezone, so the
+// assertion held whatever the code did: fabricating a zone in rawUser.convert
+// left it green. A test whose subject is an element the default projection
+// drops has to read a format that carries every element.
+func TestTheTimezoneIsReportedWhereverTheServerSendsIt(t *testing.T) {
+	for _, tc := range []struct {
+		fixture string
+		kind    site.Kind
+		want    bool
+	}{
+		// Recorded: this Cloud site discloses the zone on a search.
+		{"search.cloud.json", site.Cloud, true},
+		// Constructed, and the shape a privacy setting produces: no email and
+		// no zone. Absent is absent, never an empty element.
+		{"search-private.cloud.json", site.Cloud, false},
+		// Data Center, hand-written, and it sends neither.
+		{"search.datacenter.json", site.DataCenter, false},
+	} {
+		cmd, ok := registry.Lookup("user.list")
+		if !ok {
+			t.Fatal("user list is not registered")
+		}
+		conn, _ := replayConn(t, tc.fixture)
+
+		var buf strings.Builder
+		stream, err := render.NewStream(&buf, render.XML, render.StreamSpec{
+			Kind: cmd.Kind(), Version: cmd.KindVersion(),
+			Name: cmd.CollectionName, Columns: cmd.Columns,
+		})
+		if err != nil {
+			t.Fatalf("%s: stream: %v", tc.fixture, err)
+		}
+		result, err := cmd.Stream(t.Context(), &registry.Invocation{
+			Jira: &stubSession{conn: conn, kind: tc.kind}, Args: []string{"ada"},
+			Flags: registry.NewFlags(), Limit: registry.Limit{N: registry.DefaultLimit},
+			Stderr: io.Discard, Progress: registry.NoProgress,
+		}, stream)
+		if err != nil {
+			t.Fatalf("%s: user list: %v", tc.fixture, err)
+		}
+		if err := stream.Close(result.Complete, result.NextPageToken); err != nil {
+			t.Fatalf("%s: close: %v", tc.fixture, err)
+		}
+
+		// The display name proves the rows reached the buffer, so a missing
+		// timezone is a fact about the output and not about an empty document.
+		if !strings.Contains(buf.String(), "<display>") {
+			t.Fatalf("%s: rendered no users: %s", tc.fixture, buf.String())
+		}
+		if got := strings.Contains(buf.String(), "<timezone>"); got != tc.want {
+			t.Errorf("%s: timezone present = %v, want %v:\n%s",
+				tc.fixture, got, tc.want, buf.String())
+		}
 	}
 }
