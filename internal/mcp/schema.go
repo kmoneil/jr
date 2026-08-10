@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"strconv"
 	"strings"
 
@@ -378,7 +379,11 @@ func setScalar(flags registry.Flags, flag registry.Flag, raw any) error {
 			return errs.Usage("INVALID_ARGUMENT", "%q expects a number", flag.Name).
 				WithDetail("got %T", raw)
 		}
-		flags.SetInt(flag.Name, int(f))
+		n, err := wholeNumber(flag.Name, f)
+		if err != nil {
+			return err
+		}
+		flags.SetInt(flag.Name, n)
 	default:
 		text, err := asString(flag.Name, raw)
 		if err != nil {
@@ -392,6 +397,61 @@ func setScalar(flags registry.Flags, flag registry.Flag, raw any) error {
 		flags.SetString(flag.Name, text)
 	}
 	return nil
+}
+
+// wholeNumber converts a JSON number to an int, refusing what the conversion
+// cannot represent.
+//
+// JSON has one numeric type and Go decodes it as float64, so `int(f)` was
+// doing three things silently. An out-of-range value is implementation-defined
+// by the Go spec — on amd64 `int(1e30)` is the most negative int64 — and NaN is
+// too. A fraction was truncated, so `page-size: 2.7` meant 2 and said nothing.
+//
+// Nothing reachable today turns that into a defect: `--page-size` is the only
+// registry int flag in the tree, and resolvePageSize range-checks it, so an
+// overflowed value is refused one layer down with a message about page size.
+// That is the reason to fix it rather than the reason not to — the check that
+// currently saves it belongs to a different flag's validation, and the next int
+// flag inherits the narrowing without inheriting the rescue.
+//
+// The bound is float64's exact-integer range rather than math.MaxInt. Beyond
+// 2^53 a float64 cannot distinguish adjacent integers, so a value that
+// converted "successfully" would be a number the peer did not send. Refusing is
+// the honest answer, and no flag this tool has is anywhere near it.
+//
+// # What this cannot catch, and why that is not fixed here
+//
+// 2^53+1 arrives as 2^53. json.Unmarshal decoded it into a float64 before this
+// function existed, so the rounding happened at a layer above and the value
+// here is one the peer could legitimately have sent. There is no check that
+// distinguishes them.
+//
+// Catching it means decoding with json.Number and parsing each argument from
+// its literal text — which changes every numeric path in this file, including
+// asString's float64 case, for a magnitude no flag in this tool approaches:
+// --page-size is the only registry int flag and its ceiling is three digits.
+// Written down rather than done, so the gap is a decision instead of a
+// discovery, and so the argument is here when a flag ever does need that range.
+func wholeNumber(name string, f float64) (int, error) {
+	const exactIntegerRange = 1 << 53
+
+	refuse := func(why string) error {
+		return errs.Usage("INVALID_ARGUMENT", "%q expects a whole number", name).
+			WithDetail("%s", why).
+			WithRemedy("pass an integer within ±%d", exactIntegerRange)
+	}
+
+	switch {
+	case math.IsNaN(f):
+		return 0, refuse("got NaN")
+	case math.IsInf(f, 0):
+		return 0, refuse("got infinity")
+	case f != math.Trunc(f):
+		return 0, refuse(fmt.Sprintf("got %v, which is not whole", f))
+	case f > exactIntegerRange || f < -exactIntegerRange:
+		return 0, refuse(fmt.Sprintf("got %v, which is out of range", f))
+	}
+	return int(f), nil
 }
 
 // asString accepts the JSON scalars a model is likely to produce for something

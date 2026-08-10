@@ -102,6 +102,24 @@ type Server struct {
 	enc *json.Encoder
 }
 
+// MaxFrameBytes is the largest single JSON-RPC frame this server will read.
+//
+// A tool call can carry a sizable argument — an issue description, a JQL
+// string, a comment body — so the cap is generous rather than tight. It is
+// exported and named because a refusal quotes it: a peer told only "too large"
+// has to guess how much to cut, and the number is the whole of the answer.
+//
+// Beyond it the frame is refused and the session continues. That is the part
+// worth stating, because it used to be the opposite: a bufio.Scanner sets
+// ErrTooLong, Scan returns false, and the loop exits — so one oversized
+// argument ended the session, and the peer saw the stream close underneath it
+// rather than an error. The comment here said "refused" while the code hung up.
+const MaxFrameBytes = 8 << 20
+
+// errFrameTooLong marks a frame past MaxFrameBytes, which is refused rather
+// than read.
+var errFrameTooLong = errors.New("frame exceeds the size limit")
+
 // Serve runs the stdio loop until the input ends or the context is cancelled.
 func Serve(ctx context.Context, opt Options) error {
 	if opt.Registry == nil {
@@ -109,30 +127,115 @@ func Serve(ctx context.Context, opt Options) error {
 	}
 	s := &Server{opt: opt, enc: json.NewEncoder(opt.Out)}
 
-	scanner := bufio.NewScanner(opt.In)
-	// A tool call can carry a sizable argument, so the default 64KiB line cap
-	// is raised. Beyond this a frame is refused rather than silently truncated.
-	scanner.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
+	// A Reader rather than a Scanner, because a Scanner cannot resume: once a
+	// line is too long it is finished for good, and this loop has to answer the
+	// oversized frame and carry on to the next one.
+	reader := bufio.NewReaderSize(opt.In, 64*1024)
 
-	for scanner.Scan() {
+	for {
 		// A cancelled context ends the session cleanly: the client asked for
 		// nothing more, so there is nothing to report as a failure.
 		if ctx.Err() != nil {
 			return nil //nolint:nilerr // cancellation is a clean stop, not an error.
 		}
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
+
+		line, err := readFrame(reader)
+		switch {
+		case errors.Is(err, errFrameTooLong):
+			// No id: the frame was never parsed, so there is nothing to answer
+			// it with. The peer still learns its request was rejected and the
+			// session is still usable, which is the whole difference.
+			s.fail(nil, codeInvalidRequest,
+				fmt.Sprintf("a frame may not exceed %d bytes", MaxFrameBytes), nil)
+			continue
+		case errors.Is(err, io.EOF):
+			// The stream ending is how a stdio server stops. A partial line
+			// before it is still worth handling: a peer that wrote a frame and
+			// closed without a newline asked a complete question.
+			if trimmed := strings.TrimSpace(line); trimmed != "" {
+				s.handleLine(ctx, []byte(trimmed))
+			}
+			return nil
+		case err != nil:
+			return errs.Runtime("MCP_READ", "cannot read the MCP stream").Wrap(err)
+		}
+
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			s.handleLine(ctx, []byte(trimmed))
+		}
+	}
+}
+
+// readFrame reads one newline-terminated frame, bounded by MaxFrameBytes.
+//
+// ReadSlice rather than ReadString, and the difference is the whole point.
+// ReadString reads a line of any length, growing internally until it finds the
+// delimiter — so a size check after it has already returned is a check that
+// buffered the thing it was rejecting. A peer sending one enormous line would
+// exhaust memory before the cap was consulted, which is the cap not being one.
+// ReadSlice returns at most the reader's buffer and reports ErrBufferFull, so
+// the accumulation is what is bounded rather than the verdict.
+//
+// The returned slice points into that buffer and is invalidated by the next
+// read, which is why it is copied into the builder rather than retained.
+//
+// An oversized frame is drained to its newline, so the next read starts at the
+// next frame rather than part-way through the one just refused — otherwise one
+// bad frame becomes a run of parse errors as its tail is read as fresh input.
+func readFrame(r *bufio.Reader) (string, error) {
+	var b strings.Builder
+
+	for {
+		chunk, err := r.ReadSlice('\n')
+		if b.Len()+len(chunk) > MaxFrameBytes {
+			return "", refuseOversizedFrame(r, err)
+		}
+		b.Write(chunk)
+
+		if errors.Is(err, bufio.ErrBufferFull) {
 			continue
 		}
-		s.handleLine(ctx, []byte(line))
+		return b.String(), err
 	}
-	if err := scanner.Err(); err != nil {
-		if errors.Is(err, io.EOF) {
-			return nil
+}
+
+// refuseOversizedFrame discards whatever is left of a frame past the cap and
+// returns the error to report for it.
+//
+// Whether anything is left is the part worth getting right. ErrBufferFull means
+// the frame continues past the chunk that tripped the cap, so the rest has to
+// go. A nil error means ReadSlice found the newline, so the frame is *already*
+// consumed and draining would swallow the next one — which it did, and the test
+// that caught it reported ids 1, refusal, 4, 5, with 3 missing.
+//
+// A read error wins over the refusal: the stream is finished, and reporting the
+// size of a frame nobody can send another of answers the wrong question.
+func refuseOversizedFrame(r *bufio.Reader, err error) error {
+	switch {
+	case errors.Is(err, bufio.ErrBufferFull):
+		if derr := drainFrame(r); derr != nil {
+			return derr
 		}
-		return errs.Runtime("MCP_READ", "cannot read the MCP stream").Wrap(err)
+	case err != nil:
+		return err
 	}
-	return nil
+	return errFrameTooLong
+}
+
+// drainFrame discards input up to and including the next newline.
+//
+// It is bounded only by the stream, deliberately. The alternative is to stop
+// reading and leave the remainder to be parsed as frames, which is the failure
+// readFrame exists to prevent — and a peer sending an endless line with no
+// newline is sending one infinite frame, which no framing can answer.
+func drainFrame(r *bufio.Reader) error {
+	for {
+		_, err := r.ReadSlice('\n')
+		if errors.Is(err, bufio.ErrBufferFull) {
+			continue
+		}
+		return err
+	}
 }
 
 func (s *Server) handleLine(ctx context.Context, line []byte) {

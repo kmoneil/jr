@@ -41,7 +41,11 @@ whichever way it called: a machine-stable code, a remedy, and whether retrying
 can help.
 
 There is no exit code in a tool reply, so a truncated result carries its
-warning in the content instead. It is never reported as complete.`),
+warning in the content instead. It is never reported as complete.
+
+A single frame may not exceed 8 MiB. One larger is refused, naming the limit,
+and the session carries on — a request that is too big is one call failing, not
+the end of the conversation.`),
 		Example:      buildinfo.App + " mcp serve",
 		RequiresTags: []string{"mcp"},
 		// The output is the JSON-RPC stream, not a result document. Nothing
