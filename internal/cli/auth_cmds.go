@@ -296,10 +296,6 @@ func (a *app) runAuthLogout(_ context.Context, inv *registry.Invocation) (*rende
 	if err != nil {
 		return nil, err
 	}
-	if err := requireYes(inv, "removing the credential for "+site); err != nil {
-		return nil, err
-	}
-
 	store, err := a.credentialStore()
 	if err != nil {
 		return nil, err

@@ -173,6 +173,49 @@ func TestReadOnlyOutranksAMissingConfirmation(t *testing.T) {
 	}
 }
 
+// TestTheRealDestructiveBuiltinsRefuseWithoutYes drives the two shipped
+// destructive built-ins rather than a fake, because they were the two commands
+// that behaved differently from every sibling.
+//
+// `context delete` and `auth logout` each carried a private requireYes in their
+// own body. It was unreachable — the gate refuses first, and neither declares
+// --dry-run, so there is no path that reaches the body without --yes — but
+// while the gate was missing from `mcp serve`, those two refused there and
+// their four resource siblings did not. Two commands protected twice, four not
+// at all, and the difference was an accident of which package the body lived
+// in.
+//
+// The duplicate is gone and this is what makes removing it safe: nothing else
+// in the suite asserted that these two refuse at all.
+func TestTheRealDestructiveBuiltinsRefuseWithoutYes(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+	}{
+		{name: "context delete", args: []string{"context", "delete", "gone"}},
+		{
+			name: "auth logout",
+			args: []string{"auth", "logout", "--site", "acme.atlassian.invalid"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			env := session(t)
+			got := run(t, env, tc.args...)
+
+			if got.exit != exitcode.Blocked {
+				t.Errorf("exit = %v, want %v\nstderr: %s",
+					got.exit, exitcode.Blocked, got.stderr)
+			}
+			if !strings.Contains(got.stderr, "CONFIRMATION_REQUIRED") {
+				t.Errorf("stderr does not carry the code: %s", got.stderr)
+			}
+			if got.stdout != "" {
+				t.Errorf("stdout = %q, want nothing", got.stdout)
+			}
+		})
+	}
+}
+
 // runGated runs a command with an isolated environment plus whatever the test
 // adds, and returns what reached each stream.
 func runGated(

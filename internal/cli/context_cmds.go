@@ -456,9 +456,6 @@ func (a *app) runContextDelete(_ context.Context, inv *registry.Invocation) (*re
 	if !ok {
 		return nil, unknownContext(cfg, name)
 	}
-	if err := requireYes(inv, "deleting context "+name); err != nil {
-		return nil, err
-	}
 	if err := cfg.Delete(name); err != nil {
 		return nil, err
 	}
@@ -471,17 +468,18 @@ func (a *app) runContextDelete(_ context.Context, inv *registry.Invocation) (*re
 	return doc, nil
 }
 
-// requireYes enforces the confirmation gate.
+// The confirmation gate used to be enforced a second time here, by a requireYes
+// these two built-ins called and no other destructive command did.
 //
-// A headless build never blocks on input: there is no prompt to fall back to,
-// so the absence of --yes is exit 10 rather than a question nobody can answer.
-func requireYes(inv *registry.Invocation, what string) error {
-	if inv.Flags.Bool("yes") {
-		return nil
-	}
-	return errs.Blocked("CONFIRMATION_REQUIRED", "%s needs confirmation", what).
-		WithRemedy("pass --yes")
-}
+// It was unreachable. registry.Gate refuses a Destructive command before Run,
+// and neither of these declares --dry-run, so no path reached a body without
+// --yes. What it did do was make two commands look protected by a mechanism
+// their four resource siblings did not share — which is how a missing gate
+// stayed hidden: driven over `mcp serve`, where the gate was not running at
+// all, these two refused correctly and `issue delete` sent the DELETE.
+//
+// TestTheRealDestructiveBuiltinsRefuseWithoutYes drives both of them and is
+// what makes this removal safe rather than merely plausible.
 
 func unknownContext(cfg *jctx.Config, name string) error {
 	e := errs.NotFound("UNKNOWN_CONTEXT", "no context named %q", name)

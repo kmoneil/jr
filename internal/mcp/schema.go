@@ -200,6 +200,16 @@ func (s *Server) invocation(
 		}
 	}
 
+	// Read-only and confirmation, from the declaration, in the same place and
+	// the same order the CLI applies them: before Validate and before any
+	// network call. A tool call is the one path where nobody is watching, so
+	// this is where §6's guarantees are worth the most and where they were
+	// missing — the gate lived in the CLI wrapper and this layer calls
+	// Command.Run directly.
+	if err := registry.Gate(cmd, inv); err != nil {
+		return nil, "", err
+	}
+
 	if cmd.Validate != nil {
 		if err := cmd.Validate(ctx, inv); err != nil {
 			return nil, "", err

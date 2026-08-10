@@ -121,6 +121,15 @@ flags, args, output kinds, exit codes, required tags, and the function that runs
 it. From that one declaration come the cobra tree, `jr schema`, and the MCP tool
 list. They cannot drift because there is only one of them.
 
+It also holds `registry.Gate`, which turns two of those declarations into
+refusals: `Destructive` needs `--yes`, and `Mutating` is refused outright in
+read-only mode, both before validation and before any network call. It lives
+here rather than in a caller because there are two callers — `internal/cli` and
+`internal/mcp` — and a guarantee enforced by a caller is a guarantee each caller
+has to remember. It was in the CLI for exactly as long as the CLI was the only
+one, and `mcp serve` ran every mutating and destructive command ungated in the
+meantime.
+
 A command never writes to stdout. It returns a `render.Doc` (a
 format-independent tree) and `internal/cli` decides the format and writes it.
 That is what lets every command support every format without knowing any of them
