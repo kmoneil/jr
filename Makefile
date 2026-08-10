@@ -180,23 +180,51 @@ FUZZTIME ?= 60s
 #
 # Output is captured rather than piped, because a pipe would discard the exit
 # status and the sweep would report success while a target was failing.
+#
+# A failing target is classified rather than believed, because Go 1.26 fails a
+# target that found nothing: the fuzzing coordinator races its own deadline
+# against the context it uses to suppress that deadline, and reports the
+# leftover `context deadline exceeded` as the target's result. The whole value
+# of this sweep is that both of its verdicts mean something, and a red that the
+# tool produced by itself is spent on the next real crasher, which gets re-run
+# "to see if it's the flake again". scripts/fuzz-verdict.sh holds the rule and
+# the upstream references; a flaked run is still printed in full and still
+# counted out loud, it just does not blame the target.
+#
+# Not a retry. The race happens at the end of a run that consumed its whole
+# budget and wrote every input it found, so there is nothing to re-run for —
+# and a sweep that retries a red until it goes green is how an intermittent
+# crasher becomes a passing build.
 ## fuzz: run every fuzz target for FUZZTIME each (default 60s)
 .PHONY: fuzz
 fuzz:
 	@echo "==> Fuzz sweep (FUZZTIME=$(FUZZTIME) per target, tags=$(TAGS_FULL))"
-	@failed=0; start=$$(date +%s); ran=0; \
+	@failed=0; start=$$(date +%s); ran=0; flaked=0; \
 	for pkg in $$(go list -tags "$(TAGS_FULL)" ./...); do \
 		for target in $$(go test -tags "$(TAGS_FULL)" $$pkg -list 'Fuzz.*' 2>/dev/null | grep '^Fuzz' || true); do \
 			ran=$$((ran + 1)); \
 			printf "    %-52s " "$${pkg#$(MODULE)/} $$target"; \
 			if out=$$(go test -tags "$(TAGS_FULL)" $$pkg -run=^$$ -fuzz="^$$target$$" -fuzztime=$(FUZZTIME) 2>&1); then \
-				echo "$$out" | tail -1; \
+				status=0; \
 			else \
-				failed=1; echo "FAIL"; echo "$$out" | sed 's/^/        /'; \
+				status=$$?; \
 			fi; \
+			case $$(printf '%s\n' "$$out" | sh scripts/fuzz-verdict.sh $$status) in \
+			pass) \
+				echo "$$out" | tail -1; \
+				;; \
+			flake) \
+				flaked=$$((flaked + 1)); \
+				echo "FLAKE (golang/go#75804, not this target)"; \
+				echo "$$out" | sed 's/^/        /'; \
+				;; \
+			*) \
+				failed=1; echo "FAIL"; echo "$$out" | sed 's/^/        /'; \
+				;; \
+			esac; \
 		done; \
 	done; \
-	echo "==> $$ran target(s) in $$(($$(date +%s) - start))s"; \
+	echo "==> $$ran target(s) in $$(($$(date +%s) - start))s, $$flaked flaked in the toolchain"; \
 	exit $$failed
 
 ## fuzz-jql-values: hammer the JQL value round-trip fuzzer
