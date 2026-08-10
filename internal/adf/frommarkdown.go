@@ -348,7 +348,50 @@ func isSetextUnderline(line string) bool {
 	return strings.Trim(trimmed, "=") == "" || strings.Trim(trimmed, "-") == ""
 }
 
-func parseQuote(lines []string, at int) (Node, int, error) {
+// leadingQuoteType reports whether the first block of these lines is a
+// blockquote or a panel, and which, or "" for anything else.
+//
+// It mirrors the arm of parseBlocks' dispatch that reaches parseQuote, and the
+// two have to agree in one direction only. A miss is harmless — the existing
+// checkContent after parseBlocks still refuses, just slowly, which is what
+// every case did before this existed. A false positive is not: it would refuse
+// markdown that parses. So every condition here is one that stops this
+// returning a type, and the ordering matters for exactly one input: `    > x`
+// is CommonMark's indented code block, and TrimLeft would otherwise read it as
+// a quote.
+func leadingQuoteType(lines []string) string {
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if isIndentedCode(line) || fenceOf(line) != "" ||
+			headingLevel(line) > 0 || isThematicBreak(line) {
+			return ""
+		}
+		trimmed := strings.TrimLeft(line, " ")
+		if !strings.HasPrefix(trimmed, ">") {
+			return ""
+		}
+		// `> [!WARNING]` opens a panel and everything else a quotation, which
+		// is the same split parseQuote makes on its own first line. Neither is
+		// storable inside anything, so this only decides which word the
+		// refusal uses.
+		if _, ok := alertName(strings.TrimPrefix(strings.TrimPrefix(trimmed, ">"), " ")); ok {
+			return "panel"
+		}
+		return "blockquote"
+	}
+	return ""
+}
+
+// quoteBody strips one `>` marker from each line of the quotation, and reports
+// how many lines it consumed.
+//
+// A line with no marker ends the quote if it is blank and refuses it otherwise.
+// CommonMark would read the second as a lazy continuation, and whether a line
+// belongs to the quotation or to the text after it should not depend on knowing
+// that rule.
+func quoteBody(lines []string, at int) ([]string, int, error) {
 	var inner []string
 	used := 0
 	for used < len(lines) {
@@ -357,15 +400,20 @@ func parseQuote(lines []string, at int) (Node, int, error) {
 			if strings.TrimSpace(line) == "" {
 				break
 			}
-			// CommonMark would read this as a lazy continuation of the quote.
-			// Whether a line belongs to the quotation or to the text after it
-			// should not depend on knowing that rule.
-			return Node{}, 0, unsupported(at+used,
+			return nil, 0, unsupported(at+used,
 				"a quoted line with no > in front of it").
 				WithRemedy("put > on every line of the quote")
 		}
 		inner = append(inner, strings.TrimPrefix(strings.TrimPrefix(line, ">"), " "))
 		used++
+	}
+	return inner, used, nil
+}
+
+func parseQuote(lines []string, at int) (Node, int, error) {
+	inner, used, err := quoteBody(lines, at)
+	if err != nil {
+		return Node{}, 0, err
 	}
 
 	// `> [!WARNING]` on the first line is a panel rather than a quotation.
@@ -376,12 +424,35 @@ func parseQuote(lines []string, at int) (Node, int, error) {
 		}
 	}
 
+	container := "blockquote"
+	if kind != "" {
+		container = "panel"
+	}
+	// Refused before the recursion rather than after it. Nothing this parser
+	// builds accepts a nested quote — no entry in blocksAllowedIn lists
+	// blockquote or panel — so checkContent below was always going to refuse
+	// this, having first parsed the whole nest to find out. `> > > …` strips one
+	// marker per level and copies the rest, so the cost of reaching that verdict
+	// was quadratic: 32KB of `> ` took 2.26s to say no, at a clean 4x per
+	// doubling.
+	//
+	// checkContent produces the refusal rather than a message written here, so
+	// the error is the same one by construction rather than by two strings
+	// agreeing today. TestNestedQuotesAreRefusedInLinearTime pins the shape of
+	// the curve; a message assertion would not have noticed the quadratic and
+	// the ten-second ceiling in perf_test.go did not.
+	if leading := leadingQuoteType(inner); leading != "" {
+		if err := checkContent(container, []Node{{Type: leading}}, at); err != nil {
+			return Node{}, 0, err
+		}
+	}
+
 	content, err := parseBlocks(inner, at)
 	if err != nil {
 		return Node{}, 0, err
 	}
 	if kind == "" {
-		if err := checkContent("blockquote", content, at); err != nil {
+		if err := checkContent(container, content, at); err != nil {
 			return Node{}, 0, err
 		}
 		return Node{Type: "blockquote", Content: content}, used, nil
@@ -390,7 +461,7 @@ func parseQuote(lines []string, at int) (Node, int, error) {
 		// A panel with no content is not a shape Jira stores.
 		content = []Node{{Type: "paragraph"}}
 	}
-	if err := checkContent("panel", content, at); err != nil {
+	if err := checkContent(container, content, at); err != nil {
 		return Node{}, 0, err
 	}
 	return Node{

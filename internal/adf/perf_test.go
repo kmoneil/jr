@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/kmoneil/jira-cli/internal/adf"
+	"github.com/kmoneil/jira-cli/internal/errs"
 )
 
 // TestPathologicalInputFinishes guards against a conversion that is quadratic
@@ -138,5 +139,74 @@ func TestConversionIsLinearInSpanCount(t *testing.T) {
 	if ratio > 3 {
 		t.Errorf("doubling the inline nodes multiplied allocation by %.2f, "+
 			"want about 2 — conversion is superlinear in the number of spans", ratio)
+	}
+}
+
+// bytesToParse reports how much FromMarkdown allocates for one input.
+//
+// The error is ignored on purpose. What this measures is refused input, and the
+// cost of *reaching* the refusal is the thing being guarded — a parser that
+// says no in quadratic time has already done the work before deciding not to.
+func bytesToParse(t *testing.T, markdown string) uint64 {
+	t.Helper()
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	_, _ = adf.FromMarkdown(markdown)
+	runtime.ReadMemStats(&after)
+	return after.TotalAlloc - before.TotalAlloc
+}
+
+// nestedQuote is `> > > … x`: one blockquote marker per level, on one line.
+func nestedQuote(depth int) string { return strings.Repeat("> ", depth) + "x" }
+
+// TestNestedQuotesAreStillRefused is the other half of the guard below.
+//
+// A parser that stopped refusing nested quotes would be linear and wrong, and
+// the ratio assertion on its own would call that a pass. Jira stores no
+// blockquote inside any container — no entry in blocksAllowedIn lists one — so
+// the refusal is the correct answer and the speed of reaching it is the bug.
+func TestNestedQuotesAreStillRefused(t *testing.T) {
+	for _, depth := range []int{2, 3, 50} {
+		_, err := adf.FromMarkdown(nestedQuote(depth))
+		if err == nil {
+			t.Fatalf("depth %d was accepted; Jira stores no nested blockquote", depth)
+		}
+		if code := errs.Coerce(err).Code; code != "MARKDOWN_UNSUPPORTED" {
+			t.Errorf("depth %d refused with %q, want MARKDOWN_UNSUPPORTED", depth, code)
+		}
+	}
+}
+
+// TestNestedQuotesAreRefusedInLinearTime is TestPathologicalInputFinishes'
+// "deep quotes" case asked as a question a ceiling cannot answer.
+//
+// That case has run `strings.Repeat("> ", 5000)` since it was written and
+// passed throughout, because 5000 levels of a quadratic is about a fifth of a
+// second against a ten-second bar. The same lesson as the inline renderer: a
+// ceiling generous enough never to flake is generous enough never to fire, and
+// only the shape of the curve distinguishes the two.
+//
+// Doubling the depth: linear is 2, quadratic is 4, the bar sits at 3. The
+// version this replaced measured 4.0 at these sizes, and 32KB of `> ` took
+// 2.26 seconds to produce a refusal.
+func TestNestedQuotesAreRefusedInLinearTime(t *testing.T) {
+	const n = 2000
+
+	// Warm the paths once, so first-call costs land outside both measurements.
+	_, _ = adf.FromMarkdown(nestedQuote(n))
+
+	small := bytesToParse(t, nestedQuote(n))
+	large := bytesToParse(t, nestedQuote(2*n))
+	if small == 0 {
+		t.Fatal("measured no allocation; the parse did not run")
+	}
+
+	ratio := float64(large) / float64(small)
+	t.Logf("depth %d: %d bytes; depth %d: %d bytes; ratio %.2f",
+		n, small, 2*n, large, ratio)
+	if ratio > 3 {
+		t.Errorf("doubling the nesting depth multiplied allocation by %.2f, "+
+			"want about 2 — refusing a nested quote is superlinear in its depth",
+			ratio)
 	}
 }
