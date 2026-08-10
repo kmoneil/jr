@@ -139,7 +139,8 @@ Cloud only: Data Center stores wiki markup, and there is no converter to it.`),
 			},
 			{
 				Name: "parent", Type: registry.TypeString,
-				Usage: "parent issue key, for a subtask",
+				Usage: "parent issue key: the epic on Cloud, or the issue a " +
+					"subtask belongs to",
 			},
 			{
 				Name: "idempotency-key", Type: registry.TypeString,
@@ -225,7 +226,24 @@ func (c *Client) CreateRequest(opt CreateOptions) (transport.Request, error) {
 		fields["labels"] = opt.Labels
 	}
 	if opt.Parent != "" {
-		fields["parent"] = map[string]any{"key": opt.Parent}
+		// The sentinel has no meaning here: there is nothing to clear on an
+		// issue that does not exist yet, and letting it through would send
+		// "parent": null — a field the caller never asked for. Refused rather
+		// than dropped, because dropping it would create the issue anyway and
+		// report success for a request nobody made.
+		if strings.EqualFold(opt.Parent, ParentSentinel) {
+			return transport.Request{}, errs.Usage("INVALID_KEY",
+				"%q is not an issue key", opt.Parent).
+				WithDetail("an issue being created has no parent to clear").
+				WithRemedy("omit --parent to create an issue with no parent")
+		}
+		// Canonicalized, not passed through: a create and an edit that name the
+		// same parent should send the same bytes, and only one of them did.
+		value, err := parentValue(opt.Parent)
+		if err != nil {
+			return transport.Request{}, err
+		}
+		fields["parent"] = value
 	}
 	if opt.Assignee != "" {
 		fields["assignee"] = c.assigneeValue(opt.Assignee)
@@ -242,6 +260,59 @@ func (c *Client) CreateRequest(opt CreateOptions) (transport.Request, error) {
 		Header: jsonHeader(),
 		Body:   body,
 	}, nil
+}
+
+// ParentSentinel is the word that clears an issue's parent.
+//
+// It cannot be mistaken for a key, because ParseKey requires a project and a
+// number: a site with a project named NONE still spells its issues NONE-1, so
+// nothing a caller could legitimately mean collides with the bare word.
+const ParentSentinel = "none"
+
+// validateParent refuses a parent that is neither a key nor the sentinel, and
+// refuses an issue named as its own parent.
+//
+// Both are settled locally, so a typo costs no round trip. The self check is
+// SELF_EPIC's argument at the other end of the same relationship: Jira would
+// reject the cycle anyway, and the caller learns sooner and without a request.
+func validateParent(key, parent string) error {
+	if parent == "" || strings.EqualFold(parent, ParentSentinel) {
+		return nil
+	}
+	parsed, ok := ParseKey(parent)
+	if !ok {
+		return errs.Usage("INVALID_KEY", "%q is not an issue key", parent).
+			WithDetail("an issue key looks like ENG-123").
+			WithRemedy("--parent takes the key of the issue this belongs under, " +
+				"or the word none to clear it")
+	}
+	if own, ok := ParseKey(key); ok && own.String() == parsed.String() {
+		return errs.Usage("SELF_PARENT", "an issue cannot be its own parent").
+			WithDetail("%s", parsed.String()).
+			WithRemedy("name a different issue, or none to clear the parent")
+	}
+	return nil
+}
+
+// parentValue names the parent the way Jira expects, or nil to clear it.
+//
+// The key is canonicalized rather than passed through, so `--parent eng-42`
+// reaches Jira as ENG-42. That is the same rule the agile verbs keep, and the
+// reason both use ParseKey rather than a local copy of what a key looks like.
+func parentValue(parent string) (map[string]any, error) {
+	if strings.EqualFold(parent, ParentSentinel) {
+		// An explicit null is how Jira is told to clear the field, exactly as
+		// --assignee unassigned clears an assignee. Omitting it would leave the
+		// issue under whatever it is under now, which is the opposite of what
+		// was asked.
+		return nil, nil
+	}
+	parsed, ok := ParseKey(parent)
+	if !ok {
+		return nil, errs.Usage("INVALID_KEY", "%q is not an issue key", parent).
+			WithDetail("an issue key looks like ENG-123")
+	}
+	return map[string]any{"key": parsed.String()}, nil
 }
 
 // assigneeValue names a user the way this deployment expects.
@@ -473,6 +544,13 @@ whichever the implementation happened to apply last.
 --assignee unassigned clears the assignee, by sending an explicit null. Omitting
 the flag leaves it as it was, which is a different thing.
 
+--parent sets what this issue sits under, and the word none clears it. On Cloud
+that is how an issue joins or leaves an epic: the parent field carries epic
+membership on both company-managed and team-managed projects, where the agile
+endpoint behind jr epic add serves company-managed ones only. It is also how a
+subtask names the issue it belongs to, because Jira spells both with the one
+field.
+
 --if-unchanged refuses the write if somebody else edited the issue since you
 read it. Pass the precondition attribute from issue get; a stale one exits 7
 and sends nothing. Without it the last write wins and the earlier one is lost
@@ -490,6 +568,8 @@ letting the word precondition imply an atomic one.
 			buildinfo.App + " issue edit ENG-101 --summary 'A better summary'",
 			buildinfo.App + " issue edit ENG-101 --add-label retry --remove-label wontfix",
 			buildinfo.App + " issue edit ENG-101 --assignee unassigned --dry-run",
+			buildinfo.App + " issue edit ENG-101 --parent ENG-42",
+			buildinfo.App + " issue edit ENG-101 --parent none",
 			buildinfo.App + " issue edit ENG-101 --priority High --if-unchanged eyJkIjo",
 		}, "\n"),
 		Args: []registry.Arg{{
@@ -519,6 +599,11 @@ letting the word precondition imply an atomic one.
 				Usage: "set the assignee, by display name, email, or id; " +
 					"the word unassigned clears it",
 			},
+			{
+				Name: "parent", Type: registry.TypeString,
+				Usage: "set the parent issue, which on Cloud is the epic; " +
+					"the word none clears it",
+			},
 			bodyFormatFlag(),
 			ifUnchangedFlagDecl(),
 			dryRunFlag(),
@@ -544,6 +629,9 @@ func validateEdit(ctx context.Context, inv *registry.Invocation) error {
 		return errs.Usage("INVALID_KEY", "%q is not an issue key", inv.Args[0]).
 			WithDetail("an issue key looks like ENG-123").
 			WithRemedy("pass a key, not an id or a summary")
+	}
+	if err := validateParent(inv.Args[0], inv.Flags.String("parent")); err != nil {
+		return err
 	}
 	if err := validatePrecondition(inv); err != nil {
 		return err
@@ -571,7 +659,11 @@ func validateEdit(ctx context.Context, inv *registry.Invocation) error {
 }
 
 func editTouchesAnything(inv *registry.Invocation) bool {
-	for _, name := range []string{"summary", "description", "priority", "assignee"} {
+	// parent belongs here for the same reason the others do, and it is the one
+	// most easily left out: `issue edit ENG-1 --parent ENG-42` names exactly one
+	// field, and omitting it from this list would refuse the only spelling of
+	// "move this into that epic" with "nothing to change".
+	for _, name := range []string{"summary", "description", "priority", "assignee", "parent"} {
 		if inv.Flags.String(name) != "" {
 			return true
 		}
@@ -598,6 +690,10 @@ type EditOptions struct {
 	// SetAssignee distinguishes "leave it alone" from "clear it", which an
 	// empty string cannot.
 	SetAssignee bool
+	Parent      string
+	// SetParent is SetAssignee's reason again: "" is what an omitted flag reads
+	// as, and clearing the parent has to be sayable.
+	SetParent bool
 }
 
 // EditRequest builds the request without sending it.
@@ -608,48 +704,16 @@ func (c *Client) EditRequest(opt EditOptions) (transport.Request, error) {
 			"%q is not an issue key", opt.Key)
 	}
 
-	fields := map[string]any{}
-	update := map[string]any{}
-
-	if opt.Summary != "" {
-		fields["summary"] = opt.Summary
-	}
-	if opt.Description != "" {
-		value, err := bodyValue(c.Site.Kind, opt.Description, c.BodyFormat)
-		if err != nil {
-			return transport.Request{}, err
-		}
-		fields["description"] = value
-	}
-	if opt.Priority != "" {
-		fields["priority"] = map[string]any{"name": opt.Priority}
-	}
-	if opt.Labels != nil {
-		fields["labels"] = opt.Labels
-	}
-	if opt.SetAssignee {
-		fields["assignee"] = c.assigneeValue(opt.Assignee)
-	}
-
-	// add and remove go through `update` rather than `fields`, because that is
-	// the only shape Jira applies incrementally — setting `fields.labels` would
-	// replace the set, which is what --label means and not what these do.
-	var ops []any
-	for _, l := range opt.AddLabels {
-		ops = append(ops, map[string]any{"add": l})
-	}
-	for _, l := range opt.RemoveLabels {
-		ops = append(ops, map[string]any{"remove": l})
-	}
-	if len(ops) > 0 {
-		update["labels"] = ops
+	fields, err := c.editFields(opt)
+	if err != nil {
+		return transport.Request{}, err
 	}
 
 	payload := map[string]any{}
 	if len(fields) > 0 {
 		payload["fields"] = fields
 	}
-	if len(update) > 0 {
+	if update := editUpdate(opt); len(update) > 0 {
 		payload["update"] = update
 	}
 
@@ -664,6 +728,62 @@ func (c *Client) EditRequest(opt EditOptions) (transport.Request, error) {
 		Header: jsonHeader(),
 		Body:   body,
 	}, nil
+}
+
+// editFields is the half of an edit that replaces a value outright.
+//
+// Every entry is conditional on the caller having named it, which is what "only
+// what you name is sent" means: a field missing from this map is a field the
+// issue keeps. The two Set* booleans are here because "" cannot say the
+// difference between "leave it" and "clear it".
+func (c *Client) editFields(opt EditOptions) (map[string]any, error) {
+	fields := map[string]any{}
+
+	if opt.Summary != "" {
+		fields["summary"] = opt.Summary
+	}
+	if opt.Description != "" {
+		value, err := bodyValue(c.Site.Kind, opt.Description, c.BodyFormat)
+		if err != nil {
+			return nil, err
+		}
+		fields["description"] = value
+	}
+	if opt.Priority != "" {
+		fields["priority"] = map[string]any{"name": opt.Priority}
+	}
+	if opt.Labels != nil {
+		fields["labels"] = opt.Labels
+	}
+	if opt.SetAssignee {
+		fields["assignee"] = c.assigneeValue(opt.Assignee)
+	}
+	if opt.SetParent {
+		value, err := parentValue(opt.Parent)
+		if err != nil {
+			return nil, err
+		}
+		fields["parent"] = value
+	}
+	return fields, nil
+}
+
+// editUpdate is the half Jira applies incrementally.
+//
+// add and remove cannot go through `fields`, because setting `fields.labels`
+// replaces the whole set — which is what --label means and not what these do.
+func editUpdate(opt EditOptions) map[string]any {
+	var ops []any
+	for _, l := range opt.AddLabels {
+		ops = append(ops, map[string]any{"add": l})
+	}
+	for _, l := range opt.RemoveLabels {
+		ops = append(ops, map[string]any{"remove": l})
+	}
+	if len(ops) == 0 {
+		return nil
+	}
+	return map[string]any{"labels": ops}
 }
 
 func runEdit(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) {
@@ -689,6 +809,9 @@ func runEdit(ctx context.Context, inv *registry.Invocation) (*render.Doc, error)
 	}
 	if assignee := inv.Flags.String("assignee"); assignee != "" {
 		opt.Assignee, opt.SetAssignee = resolvedAssignee(inv, assignee), true
+	}
+	if parent := inv.Flags.String("parent"); parent != "" {
+		opt.Parent, opt.SetParent = parent, true
 	}
 
 	req, err := client.EditRequest(opt)

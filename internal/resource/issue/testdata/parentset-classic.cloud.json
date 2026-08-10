@@ -1,0 +1,91 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB. `issue edit --parent` against a company-managed (classic) project. Paired with parentset-nextgen.cloud.json, which is the identical request against a team-managed one: the two together are why the epic verbs do not need to branch on project style, where the agile endpoint they used to call serves company-managed projects only.",
+  "interactions": [
+    {
+      "request": {
+        "method": "PUT",
+        "path": "/rest/api/3/issue/AGL-3",
+        "body": "{\"fields\":{\"parent\":{\"key\":\"AGL-1\"}}}"
+      },
+      "response": {
+        "status": 204,
+        "header": {
+          "Atl-Request-Id": [
+            "00000000-0000-0000-0000-000000000000"
+          ],
+          "Atl-Traceid": [
+            "f5dcf9158397450d9f66bc8a05a2b0d1"
+          ],
+          "Cache-Control": [
+            "no-cache, no-store, no-transform"
+          ],
+          "Date": [
+            "Mon, 10 Aug 2026 14:25:30 GMT"
+          ],
+          "Nel": [
+            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=299;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=50;w=1"
+          ],
+          "Report-To": [
+            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
+          ],
+          "Server": [
+            "AtlassianEdge"
+          ],
+          "Server-Timing": [
+            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=91,cdn-upstream-fbl;dur=625,atl-edge;dur=501,atl-edge-internal;dur=21,atl-edge-upstream;dur=477,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW57-P7\",cdn-rid;desc=\"ubv_QOFgcPx_IuX6bMAdc9DEumCHTWTXMS9svH3th96bwBZuEt8WnQ==\",cdn-downstream-fbl;dur=631"
+          ],
+          "Set-Cookie": [
+            "REDACTED"
+          ],
+          "Strict-Transport-Security": [
+            "max-age=63072000; includeSubDomains; preload"
+          ],
+          "Timing-Allow-Origin": [
+            "*"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "Via": [
+            "1.1 adc96cbe9a6cb4823c94ff3c8a007bba.cloudfront.net (CloudFront)"
+          ],
+          "X-Aaccountid": [
+            "000000%3A00000000-0000-0000-0000-000000000000"
+          ],
+          "X-Amz-Cf-Id": [
+            "ubv_QOFgcPx_IuX6bMAdc9DEumCHTWTXMS9svH3th96bwBZuEt8WnQ=="
+          ],
+          "X-Amz-Cf-Pop": [
+            "DFW57-P7"
+          ],
+          "X-Arequestid": [
+            "8459a85c53370226092a54ef13b59474"
+          ],
+          "X-Cache": [
+            "Miss from cloudfront"
+          ],
+          "X-Content-Type-Options": [
+            "nosniff"
+          ],
+          "X-Ratelimit-Limit": [
+            "300"
+          ],
+          "X-Ratelimit-Remaining": [
+            "299"
+          ],
+          "X-Xss-Protection": [
+            "1; mode=block"
+          ]
+        }
+      }
+    }
+  ]
+}

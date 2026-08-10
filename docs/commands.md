@@ -1334,7 +1334,7 @@ jr issue create --type Bug --summary Probe --dry-run
 | `--priority` | `string` | — | priority name, e.g. High |
 | `--label` | `string` | — | label to set; repeat for several (repeatable) |
 | `--assignee`, `-a` | `string` | — | assignee, by display name, email, or id; the word unassigned leaves it unset |
-| `--parent` | `string` | — | parent issue key, for a subtask |
+| `--parent` | `string` | — | parent issue key: the epic on Cloud, or the issue a subtask belongs to |
 | `--idempotency-key` | `string` | — | make a retry safe: the same key returns the original issue |
 | `--body-format` | `text\|markdown\|adf` | `text` | how to read the body: text sends it uninterpreted, markdown converts it, adf takes a document as JSON; the last two are Cloud only |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
@@ -1412,6 +1412,13 @@ whichever the implementation happened to apply last.
 --assignee unassigned clears the assignee, by sending an explicit null. Omitting
 the flag leaves it as it was, which is a different thing.
 
+--parent sets what this issue sits under, and the word none clears it. On Cloud
+that is how an issue joins or leaves an epic: the parent field carries epic
+membership on both company-managed and team-managed projects, where the agile
+endpoint behind jr epic add serves company-managed ones only. It is also how a
+subtask names the issue it belongs to, because Jira spells both with the one
+field.
+
 --if-unchanged refuses the write if somebody else edited the issue since you
 read it. Pass the precondition attribute from issue get; a stale one exits 7
 and sends nothing. Without it the last write wins and the earlier one is lost
@@ -1432,6 +1439,8 @@ Examples:
 jr issue edit ENG-101 --summary 'A better summary'
 jr issue edit ENG-101 --add-label retry --remove-label wontfix
 jr issue edit ENG-101 --assignee unassigned --dry-run
+jr issue edit ENG-101 --parent ENG-42
+jr issue edit ENG-101 --parent none
 jr issue edit ENG-101 --priority High --if-unchanged eyJkIjo
 ```
 
@@ -1448,6 +1457,7 @@ jr issue edit ENG-101 --priority High --if-unchanged eyJkIjo
 | `--add-label` | `string` | — | add a label, leaving the others; repeat for several (repeatable) |
 | `--remove-label` | `string` | — | remove a label, leaving the others; repeat for several (repeatable) |
 | `--assignee`, `-a` | `string` | — | set the assignee, by display name, email, or id; the word unassigned clears it |
+| `--parent` | `string` | — | set the parent issue, which on Cloud is the epic; the word none clears it |
 | `--body-format` | `text\|markdown\|adf` | `text` | how to read the body: text sends it uninterpreted, markdown converts it, adf takes a document as JSON; the last two are Cloud only |
 | `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |

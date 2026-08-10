@@ -692,6 +692,7 @@ did not happen.
 | `INVALID_DURATION`        | 2    | Not a Jira duration. The format is a count of `w`, `d`, `h`, or `m`, largest first. Nothing is converted between them: a working week is a site setting. |
 | `SELF_LINK`               | 2    | Both ends of a link are the same issue. |
 | `SELF_EPIC`               | 2    | An epic was named as one of the issues to move into it. |
+| `SELF_PARENT`             | 2    | An issue was named as its own parent. Settled locally, so the cycle costs no round trip. |
 | `NOTHING_TO_EDIT`         | 2    | An edit was given nothing to change, `issue edit` with no field, `context edit` with no setting. |
 | `CONFLICTING_EDIT`        | 2    | `context edit` was asked to set and clear the same setting. Both at once has no single right answer, and picking one would make the result depend on an implementation detail nobody can see. |
 | `UNCONSTRAINED_QUERY`     | 2    | `issue list --limit all` with no filter would page until the instance is exhausted and return every issue in every project the credential can see. The default bound makes an unfiltered query harmless, one request, fifty rows, so only the pairing is refused. `--all-projects` is how to mean it. |

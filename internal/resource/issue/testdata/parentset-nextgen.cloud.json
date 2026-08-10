@@ -1,0 +1,91 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB. `issue edit --parent` against a team-managed (next-gen) project \u2014 the operation `epic add` is refused for, accepted here. See internal/workflow/testdata/epicadd-nextgen.cloud.json for that refusal.",
+  "interactions": [
+    {
+      "request": {
+        "method": "PUT",
+        "path": "/rest/api/3/issue/OPS-10",
+        "body": "{\"fields\":{\"parent\":{\"key\":\"OPS-5\"}}}"
+      },
+      "response": {
+        "status": 204,
+        "header": {
+          "Atl-Request-Id": [
+            "00000000-0000-0000-0000-000000000000"
+          ],
+          "Atl-Traceid": [
+            "953007202f3b47f885e1c3f0fb91e659"
+          ],
+          "Cache-Control": [
+            "no-cache, no-store, no-transform"
+          ],
+          "Date": [
+            "Mon, 10 Aug 2026 14:25:32 GMT"
+          ],
+          "Nel": [
+            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=298;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=50;w=1"
+          ],
+          "Report-To": [
+            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
+          ],
+          "Server": [
+            "AtlassianEdge"
+          ],
+          "Server-Timing": [
+            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=518,atl-edge;dur=486,atl-edge-internal;dur=15,atl-edge-upstream;dur=471,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW59-P8\",cdn-rid;desc=\"IUA8T3peikSZpIbj0ixQ9bXoVCM3bXGYuE5JWycHR0EZ4o_RYW3oWg==\",cdn-downstream-fbl;dur=524"
+          ],
+          "Set-Cookie": [
+            "REDACTED"
+          ],
+          "Strict-Transport-Security": [
+            "max-age=63072000; includeSubDomains; preload"
+          ],
+          "Timing-Allow-Origin": [
+            "*"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "Via": [
+            "1.1 f680a9012904fc51461bd1151bb8cf94.cloudfront.net (CloudFront)"
+          ],
+          "X-Aaccountid": [
+            "000000%3A00000000-0000-0000-0000-000000000000"
+          ],
+          "X-Amz-Cf-Id": [
+            "IUA8T3peikSZpIbj0ixQ9bXoVCM3bXGYuE5JWycHR0EZ4o_RYW3oWg=="
+          ],
+          "X-Amz-Cf-Pop": [
+            "DFW59-P8"
+          ],
+          "X-Arequestid": [
+            "c8355004fabfb74e83ba99e577282bc6"
+          ],
+          "X-Cache": [
+            "Miss from cloudfront"
+          ],
+          "X-Content-Type-Options": [
+            "nosniff"
+          ],
+          "X-Ratelimit-Limit": [
+            "300"
+          ],
+          "X-Ratelimit-Remaining": [
+            "298"
+          ],
+          "X-Xss-Protection": [
+            "1; mode=block"
+          ]
+        }
+      }
+    }
+  ]
+}

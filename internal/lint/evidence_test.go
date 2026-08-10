@@ -37,9 +37,17 @@ var recordedFixtures = map[string][]string{
 		"projects.cloud.json", "project.cloud.json", "statuses.cloud.json",
 		"versions-empty.cloud.json", "components-empty.cloud.json",
 	},
-	"internal/resource/user":   {"search.cloud.json", "me.cloud.json", "user.cloud.json"},
-	"internal/resource/jql":    {"parse.cloud.json", "invalid.cloud.json"},
-	"internal/resource/issue":  {"list-recorded.cloud.json"},
+	"internal/resource/user": {"search.cloud.json", "me.cloud.json", "user.cloud.json"},
+	"internal/resource/jql":  {"parse.cloud.json", "invalid.cloud.json"},
+	"internal/resource/issue": {
+		"list-recorded.cloud.json",
+		// The same two requests against both project styles. The symmetry is
+		// the claim — that the parent field needs no branch on style — so one
+		// of these quietly becoming hand-written would leave the claim
+		// half-evidenced and still green.
+		"parentset-classic.cloud.json", "parentclear-classic.cloud.json",
+		"parentset-nextgen.cloud.json", "parentclear-nextgen.cloud.json",
+	},
 	"internal/resource/board":  {"boards-recorded.cloud.json", "board-recorded.cloud.json"},
 	"internal/resource/epic":   {"epics-recorded.cloud.json", "epic-recorded.cloud.json"},
 	"internal/resource/sprint": {"sprints-recorded.cloud.json", "sprint-recorded.cloud.json"},
