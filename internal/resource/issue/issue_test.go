@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -3051,4 +3052,36 @@ func headersOf(cols []render.Column) []string {
 		out = append(out, c.Header)
 	}
 	return out
+}
+
+// TestANamedFieldIsAlsoFetched covers the half of --field that decides what
+// goes to Jira, as opposed to what comes out.
+//
+// ExtraFieldNames answers "which ids need an element of their own", so it drops
+// the natives — and five of those are modelled by this package and are *not* in
+// DefaultFields, because a listing does not fetch them. Building the request
+// from it meant `--field parent` produced a column over a field nobody had
+// asked for, and every cell in it was empty. Which ids need an element and
+// which need fetching are two questions, and one answer was being used for
+// both.
+func TestANamedFieldIsAlsoFetched(t *testing.T) {
+	for _, field := range []string{
+		// Native, modelled, and absent from a listing's request.
+		"description", "resolution", "parent", "components", "fixVersions",
+		// Custom, which always worked.
+		"customfield_10042",
+	} {
+		got := issue.RequestedFields([]string{field})
+		if !slices.Contains(got, field) {
+			t.Errorf("--field %s is not in the request: %v", field, got)
+		}
+	}
+
+	// A field already in the default set is asked for once. Jira accepts a
+	// repeat, and a request that names the same field twice is a request this
+	// tool did not mean to build.
+	got := issue.RequestedFields([]string{"summary", "summary", "created"})
+	if len(got) != len(issue.DefaultFields()) {
+		t.Errorf("RequestedFields = %v, want no duplicate of a default", got)
+	}
 }

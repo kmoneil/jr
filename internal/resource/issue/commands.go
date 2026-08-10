@@ -373,7 +373,7 @@ func runList(
 		Limit:     inv.Limit,
 		PageSize:  inv.Flags.Int("page-size"),
 		PageToken: inv.Flags.String("page-token"),
-		Fields:    requestedFields(resolvedFields(inv)),
+		Fields:    RequestedFields(resolvedFields(inv)),
 	}, func(page []Issue, total int) error {
 		if inv.Flags.Bool(urlFlagName) {
 			if err := stampURLs(page, info); err != nil {
@@ -402,14 +402,37 @@ func runList(
 	}, nil
 }
 
-// requestedFields returns what to ask Jira for.
+// RequestedFields returns what to ask Jira for.
 //
 // --field is additive. Replacing the default set instead would mean
 // `--field customfield_10042` silently blanked the status and assignee columns,
 // which looks like every issue is unassigned rather than like a flag that
 // narrowed the request.
-func requestedFields(resolved []string) []string {
-	return append(DefaultFields(), ExtraFieldNames(resolved)...)
+func RequestedFields(resolved []string) []string {
+	out := DefaultFields()
+	have := map[string]bool{}
+	for _, id := range out {
+		have[id] = true
+	}
+	// Every resolved id that is not already being asked for, native or not.
+	//
+	// ExtraFieldNames is the wrong question here and was being used for it:
+	// that answers "which ids need an element of their own", so it drops the
+	// natives — and five of them, description, resolution, parent, components
+	// and fixVersions, are modelled by this package and *not* in DefaultFields,
+	// because a listing does not fetch them. Naming one produced a column over
+	// a field nobody had asked Jira for, and an always-empty cell. Which ids
+	// need an element and which need fetching are two questions with two
+	// answers, which is the same conflation that made --field a no-op one layer
+	// along.
+	for _, id := range resolved {
+		if have[id] {
+			continue
+		}
+		have[id] = true
+		out = append(out, id)
+	}
+	return out
 }
 
 // resolvedFieldsKey is where the ids resolved during validation are left for
