@@ -8,7 +8,7 @@ can pin it, verify it, and act on it without reading the output to check whether
 it looks right.
 
 > **Status: pre-release, and deliberately untagged.** The command surface is
-> complete and tested: 60 commands in the full build, 40 in the reader. Every
+> complete and tested: 62 commands in the full build, 40 in the reader. Every
 > build reports itself as `0.0.0-untagged+<sha>` until there is a release worth
 > pinning. See [Not yet implemented](#not-yet-implemented) for what is knowingly
 > absent.
@@ -96,7 +96,7 @@ Then see the [quickstart](#quickstart) above, or
 
 ## What works today
 
-60 commands in the full build, 40 in the reader.
+62 commands in the full build, 40 in the reader.
 
 ```
 jr auth      login logout status token
@@ -108,7 +108,7 @@ jr issue     attachment list download upload
 jr project   list get components versions statuses
 jr user      list get me
 jr board     list get
-jr sprint    list get add close
+jr sprint    list get create add start close
 jr epic      list get add remove
 jr jql       validate explain
 jr field     list
@@ -150,9 +150,9 @@ not shipped at all.
 - `--no-color`, and the `clipboard` tag. Nothing emits ANSI and nothing copies,
   so both flags would be flags that do nothing.
 
-Everything else described in this README is built. 60 commands in the full
-build, and `internal/lint` asserts the tag table above against the binaries
-rather than against this sentence. If a tag here is said to gate nothing and
+Everything else described in this README is built. 62 commands in the full
+build, and `internal/lint` asserts both that number and the tag table above
+against the binaries rather than against this sentence. If a tag here is said to gate nothing and
 starts gating something, the build fails until this list is corrected.
 
 ### Reading one issue

@@ -306,6 +306,31 @@ Jira refused a sprint listing for that board. Usually the board is a kanban
 board, and only scrum boards have sprints. `detail` keeps the server's own
 message.
 
+### `SPRINT_HAS_NO_DATES` / `INVALID_SPRINT_DATE`
+
+`jr sprint start` refused because the sprint has no window and you did not pass
+one. Jira will not run a sprint that has no dates; this says so without spending
+the round trip.
+
+```console
+$ jr sprint start 5
+# SPRINT_HAS_NO_DATES: sprint 5 has no dates, and Jira will not run a sprint
+# without them
+
+$ jr sprint start 5 --start 2026-08-17T09:00:00Z --end 2026-08-31T09:00:00Z
+```
+
+**A sprint that already has both dates needs neither flag**, because the window
+belongs to the sprint and not to the request. If you passed dates to
+`jr sprint create`, `jr sprint start <id>` on its own is enough. The refusal
+names only the half that is missing, so being asked for `--end` alone means the
+start date is already set.
+
+`INVALID_SPRINT_DATE` means the value is not RFC 3339. A bare `2026-08-17` names
+no time and no zone, and `jr` will not pick one for you — that would decide when
+your iteration begins. An offset is fine and is normalized to UTC:
+`2026-08-17T11:00:00+02:00` is sent, and reported, as `2026-08-17T09:00:00Z`.
+
 ## Writes
 
 ### `READ_ONLY` (exit 10)

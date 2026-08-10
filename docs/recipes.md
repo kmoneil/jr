@@ -311,6 +311,58 @@ $ jr epic remove ENG-101
 $ jr issue list --jql 'sprint IN openSprints()' --limit all
 ```
 
+### Running a sprint end to end
+
+Plan it, fill it, start it, close it. The id you need at every step after the
+first is the one `sprint create` reports.
+
+```console
+$ jr sprint create "Sprint 14" --board 42 \
+    --start 2026-08-17T09:00:00Z --end 2026-08-31T09:00:00Z \
+    --goal "Ship the importer"
+# → <sprint id="1002" state="future" …>
+
+$ jr sprint add 1002 ENG-101 ENG-102
+$ jr sprint start 1002
+$ jr sprint close 1002 --yes
+```
+
+Dates are RFC 3339, and a bare `2026-08-17` is refused: it names no time and no
+zone, and `jr` will not choose one for you.
+
+**The window belongs to the sprint, not to the command.** Because the sprint
+above was created with both dates, `sprint start` needs neither flag. A sprint
+planned without them wants them at the point it starts:
+
+```console
+$ jr sprint create "Sprint 15" --board 42
+$ jr sprint start 1003 --start 2026-08-31T09:00:00Z --end 2026-09-14T09:00:00Z
+```
+
+Scripting it, where the id is the only thing you need out of the create. A
+record in TSV is a field/value table rather than a row, so the id is a lookup by
+name and not a column:
+
+```console
+$ id=$(jr sprint create "Sprint 14" --board 42 --format tsv |
+       awk -F'\t' '$1 == "@id" { print $2 }')
+$ jr sprint start "$id" --start 2026-08-17T09:00:00Z --end 2026-08-31T09:00:00Z
+```
+
+`sprint close` is the one to be careful with: every unfinished issue returns to
+the backlog, no API reopens a closed sprint, and it needs `--yes` and a build
+carrying the `admin` tag. Creating and starting need only `write`, so an agent
+build can plan an iteration and begin one and cannot end one.
+
+**`sprint = <id>` is not a test of current membership.** Jira's Sprint field
+records every sprint an issue has ever been in, so a finished iteration still
+answers with its whole contents:
+
+```console
+# Everything that was ever in it, including what was carried out at close
+$ jr issue list --jql 'sprint = 1002' --limit all
+```
+
 Set a default board on your context so you stop passing `--board`:
 
 ```console

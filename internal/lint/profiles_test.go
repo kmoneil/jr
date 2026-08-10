@@ -463,3 +463,77 @@ func slicesContainsProfile(profiles []profile, name string) bool {
 	}
 	return false
 }
+
+// readmePath is the fourth document carrying a number about the command
+// surface, and it was the only one nothing read.
+const readmePath = "../../README.md"
+
+// readmeCount matches the sentence the README states its surface in, wherever
+// it says it:
+//
+//	62 commands in the full build, 40 in the reader.
+//	complete and tested: 62 commands in the full build, 40 in the reader.
+//	Everything else described in this README is built. 62 commands in the full
+//
+// The "in the reader" half is optional, because the third occurrence does not
+// carry it.
+var readmeCount = regexp.MustCompile(
+	`(\d+) commands? in the full\s+build(?:, (\d+) in the reader)?`,
+)
+
+// TestTheReadmeSurfaceCountMatchesTheBinaries holds the README to the same
+// binaries docs/build-profiles.md is held to.
+//
+// It says the number three times and every one of them was 60 against a real
+// 62 the moment `sprint create` and `sprint start` landed. The sentence beside
+// the third even said the lint asserts the tag table "rather than against this
+// sentence", which was an accurate description of a gap: the profile table was
+// gated and the README was not, so the document a new reader meets first was
+// the one free to drift.
+//
+// Every occurrence is checked rather than the first, because three copies of a
+// number are three chances to update two of them.
+func TestTheReadmeSurfaceCountMatchesTheBinaries(t *testing.T) {
+	profiles := profilesFromMakefile(t)
+	bin := t.TempDir()
+
+	counts := map[string]int{}
+	for _, p := range profiles {
+		if p.name == "full" || p.name == "reader" {
+			counts[p.name] = commandCount(t, bin, p)
+		}
+	}
+	if len(counts) != 2 {
+		t.Fatalf("the Makefile ships %v; this test needs a full and a reader "+
+			"profile to compare the README against", profiles)
+	}
+
+	body := strings.Join(readLines(t, readmePath), "\n")
+	found := readmeCount.FindAllStringSubmatch(body, -1)
+	if len(found) == 0 {
+		t.Fatalf("%s: no surface count found; this test reads it by shape, so a "+
+			"reworded sentence silently asserts nothing", readmePath)
+	}
+
+	for _, m := range found {
+		full, err := strconv.Atoi(m[1])
+		if err != nil {
+			t.Fatalf("%s: %q has an unreadable count", readmePath, m[0])
+		}
+		if full != counts["full"] {
+			t.Errorf("%s says %q and the full build has %d commands",
+				readmePath, strings.Join(strings.Fields(m[0]), " "), counts["full"])
+		}
+		if m[2] == "" {
+			continue
+		}
+		reader, err := strconv.Atoi(m[2])
+		if err != nil {
+			t.Fatalf("%s: %q has an unreadable reader count", readmePath, m[0])
+		}
+		if reader != counts["reader"] {
+			t.Errorf("%s says %q and the reader build has %d commands",
+				readmePath, strings.Join(strings.Fields(m[0]), " "), counts["reader"])
+		}
+	}
+}

@@ -52,6 +52,12 @@ the first one nobody would think to keep in step. `internal/lint` allows a
 `write`-gated file in `workflow` for exactly this reason and nowhere else; a
 mutation that does not span two resources belongs with the thing it mutates.
 
+`sprint create`, `sprint start`, and `sprint close` are the near miss that shows
+where the line is. All three change a sprint, none of them touches an issue, so
+all three live in `resource/sprint` beside the reads — while `sprint add`, which
+differs from them only in moving issues, cannot. The test is what a verb has to
+import, not which noun it is spelled with.
+
 That rule is why **Jira metadata lives in `site`, not in the resource that
 lists it.** `issue list --field "Story Points"` has to resolve a name to
 `customfield_10042`, and it cannot ask the field resource to do it; `issue move`
