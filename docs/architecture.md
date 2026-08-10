@@ -346,6 +346,30 @@ name to `customfield_10042` should not cost a round trip on every invocation.
 | Fuzzing         | `make fuzz`, all 20 targets, built with the full tag set       | Every PR, 60s per target                            |
 | Complexity      | `make complexity`, gocognit over `internal/` and `cmd/`        | Cognitive 15, or an exemption naming its score and its reason |
 
+**A red from the fuzz sweep means the target, and the toolchain does not get a
+vote.** Go 1.26 fails a fuzz target that found nothing. When the time budget
+elapses, the fuzzing coordinator wakes on its parent context and suppresses the
+deadline error by comparing it against a child context that has not been
+cancelled yet, so `context deadline exceeded` leaks out as the target's result —
+after a run that spent its whole budget and wrote every input it found.
+`scripts/fuzz-verdict.sh` classifies each run as pass, flake, or fail; a flaked
+run is printed in full and counted in the summary line, and only the blame is
+withheld, because silence would be the worse half of the same defect. It is not
+a retry: the race happens at the end of a completed run, and a sweep that re-ran
+a red until it went green would turn an intermittent crasher into a passing
+build.
+
+What classification risks is calling a real crasher a flake, so that is what
+`internal/lint/fuzzverdict_test.go` holds it to, driving the script with the
+shapes `go test -fuzz` actually produces — including the two that most resemble
+the flake and are not: a seed-corpus entry, which fails before any input is
+written and so shares the flake's only negative marker, and a target whose own
+failure message contains the phrase. Upstream is
+[golang/go#75804](https://github.com/golang/go/issues/75804), fixed in go1.27.0
+and in no 1.26.x, so `TestTheFuzzFlakeWorkaroundIsStillNeeded` fails on a
+released 1.27 and names what to delete. Scaffolding for somebody else's bug
+outlives the bug otherwise.
+
 **The complexity limit is enforced, and its one exception is written down.**
 15 was the number every complexity card in this project had been measured
 against, and nothing read it: not `.golangci.yml`, not a `make` target, not a
