@@ -1,12 +1,12 @@
 {
   "deployment": "cloud",
   "source": "recorded",
-  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB. The first time this verb reached a real Jira and was accepted. It replaces a constructed cassette that asserted this same request unchanged for two releases while nothing established it was ever right. The project is company-managed (classic), which is the endpoint's actual limit \u2014 see epicadd-nextgen.cloud.json for the same request refused.",
+  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB. Leaving an epic is spelled as joining the absence of one: the caller never names the epic they are in, and the server takes `none` as the epic reference and answers 204.",
   "interactions": [
     {
       "request": {
         "method": "POST",
-        "path": "/rest/agile/1.0/epic/AGL-1/issue",
+        "path": "/rest/agile/1.0/epic/none/issue",
         "body": "{\"issues\":[\"AGL-2\"]}"
       },
       "response": {
@@ -16,7 +16,7 @@
             "00000000-0000-0000-0000-000000000000"
           ],
           "Atl-Traceid": [
-            "4345e7195cbe47faa69ca92a5e320b9d"
+            "4d3efacba5ba4dfeac882d10278062d2"
           ],
           "Cache-Control": [
             "no-cache, no-store, no-transform"
@@ -40,7 +40,7 @@
             "AtlassianEdge"
           ],
           "Server-Timing": [
-            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=91,cdn-upstream-fbl;dur=681,atl-edge;dur=558,atl-edge-internal;dur=19,atl-edge-upstream;dur=539,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW59-P7\",cdn-rid;desc=\"N321QlgSaeqC6Kry3ie4pgnK0lYet47EHNDmappNWplWsYrRydT8nA==\",cdn-downstream-fbl;dur=687"
+            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=458,atl-edge;dur=428,atl-edge-internal;dur=16,atl-edge-upstream;dur=412,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW56-P1\",cdn-rid;desc=\"4tsD41NBj19iNfZDmbxs2VA6H1Ni0ugF78U8cbwFD8IBL5YcqKeBqQ==\",cdn-downstream-fbl;dur=463"
           ],
           "Set-Cookie": [
             "REDACTED"
@@ -55,19 +55,19 @@
             "Accept-Encoding"
           ],
           "Via": [
-            "1.1 9485615792f5f5ecef76608e38635192.cloudfront.net (CloudFront)"
+            "1.1 dc90f3ff330d4e8627c954320a1a07cc.cloudfront.net (CloudFront)"
           ],
           "X-Aaccountid": [
             "000000%3A00000000-0000-0000-0000-000000000000"
           ],
           "X-Amz-Cf-Id": [
-            "N321QlgSaeqC6Kry3ie4pgnK0lYet47EHNDmappNWplWsYrRydT8nA=="
+            "4tsD41NBj19iNfZDmbxs2VA6H1Ni0ugF78U8cbwFD8IBL5YcqKeBqQ=="
           ],
           "X-Amz-Cf-Pop": [
-            "DFW59-P7"
+            "DFW56-P1"
           ],
           "X-Arequestid": [
-            "3148647c0607a4e271947712fe01d115"
+            "624063693f6ecb19c82098422b5a65f0"
           ],
           "X-Cache": [
             "Miss from cloudfront"

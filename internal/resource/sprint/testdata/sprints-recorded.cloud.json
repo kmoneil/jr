@@ -1,34 +1,37 @@
 {
   "deployment": "cloud",
   "source": "recorded",
-  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB. The first time this verb reached a real Jira and was accepted. It replaces a constructed cassette that asserted this same request unchanged for two releases while nothing established it was ever right. The project is company-managed (classic), which is the endpoint's actual limit \u2014 see epicadd-nextgen.cloud.json for the same request refused.",
+  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB. A scrum board's sprint listing. The sprint is in state future and so carries neither a start nor an end date, which is the case the renderer has to leave empty rather than invent.",
   "interactions": [
     {
       "request": {
-        "method": "POST",
-        "path": "/rest/agile/1.0/epic/AGL-1/issue",
-        "body": "{\"issues\":[\"AGL-2\"]}"
+        "method": "GET",
+        "path": "/rest/agile/1.0/board/3/sprint",
+        "query": "maxResults=50&startAt=0"
       },
       "response": {
-        "status": 204,
+        "status": 200,
         "header": {
           "Atl-Request-Id": [
             "00000000-0000-0000-0000-000000000000"
           ],
           "Atl-Traceid": [
-            "4345e7195cbe47faa69ca92a5e320b9d"
+            "4856b0105f8e4939a38c799d5b1fc277"
           ],
           "Cache-Control": [
             "no-cache, no-store, no-transform"
           ],
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
           "Date": [
-            "Mon, 10 Aug 2026 13:52:56 GMT"
+            "Mon, 10 Aug 2026 13:52:22 GMT"
           ],
           "Nel": [
             "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
           ],
           "Ratelimit": [
-            "\"jira-burst-based\";r=199;t=1"
+            "\"jira-burst-based\";r=349;t=1"
           ],
           "Ratelimit-Policy": [
             "\"jira-burst-based\";q=100;w=1"
@@ -40,7 +43,7 @@
             "AtlassianEdge"
           ],
           "Server-Timing": [
-            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=91,cdn-upstream-fbl;dur=681,atl-edge;dur=558,atl-edge-internal;dur=19,atl-edge-upstream;dur=539,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW59-P7\",cdn-rid;desc=\"N321QlgSaeqC6Kry3ie4pgnK0lYet47EHNDmappNWplWsYrRydT8nA==\",cdn-downstream-fbl;dur=687"
+            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=238,atl-edge;dur=207,atl-edge-internal;dur=16,atl-edge-upstream;dur=191,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW57-P2\",cdn-rid;desc=\"-KZQGOnwxKelf--jd2x8lroIkDeNDKkoBQzZy5b78cP329Y72BPk7A==\",cdn-downstream-fbl;dur=243"
           ],
           "Set-Cookie": [
             "REDACTED"
@@ -55,19 +58,19 @@
             "Accept-Encoding"
           ],
           "Via": [
-            "1.1 9485615792f5f5ecef76608e38635192.cloudfront.net (CloudFront)"
+            "1.1 89f2505f9f8dbcdacd6d4a40d558810c.cloudfront.net (CloudFront)"
           ],
           "X-Aaccountid": [
             "000000%3A00000000-0000-0000-0000-000000000000"
           ],
           "X-Amz-Cf-Id": [
-            "N321QlgSaeqC6Kry3ie4pgnK0lYet47EHNDmappNWplWsYrRydT8nA=="
+            "-KZQGOnwxKelf--jd2x8lroIkDeNDKkoBQzZy5b78cP329Y72BPk7A=="
           ],
           "X-Amz-Cf-Pop": [
-            "DFW59-P7"
+            "DFW57-P2"
           ],
           "X-Arequestid": [
-            "3148647c0607a4e271947712fe01d115"
+            "f6a1b1b9d7c44890c018acdc8068561f"
           ],
           "X-Cache": [
             "Miss from cloudfront"
@@ -76,15 +79,16 @@
             "nosniff"
           ],
           "X-Ratelimit-Limit": [
-            "200"
+            "350"
           ],
           "X-Ratelimit-Remaining": [
-            "199"
+            "349"
           ],
           "X-Xss-Protection": [
             "1; mode=block"
           ]
-        }
+        },
+        "body": "{\"maxResults\":50,\"startAt\":0,\"total\":1,\"isLast\":true,\"values\":[{\"id\":1,\"self\":\"https://recorded.invalid/rest/agile/1.0/sprint/1\",\"state\":\"future\",\"name\":\"AGL Sprint 1\",\"createdDate\":\"2026-08-10T13:35:48.975Z\",\"originBoardId\":3}]}"
       }
     }
   ]

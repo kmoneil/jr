@@ -10,12 +10,13 @@ import (
 	"testing"
 )
 
-// recordedResources are the resources whose Cloud conversation has been
-// recorded against a real instance, and must stay recorded.
+// recordedFixtures are the cassettes whose Cloud conversation has been recorded
+// against a real instance, keyed by the package they live in, and which must
+// stay recorded.
 //
 // The list is short because recording is manual: it needs a live sandbox, a
 // scrub map, and somebody to read the residue report. It is not a target to
-// grow for its own sake — a resource earns a place here when its request shape
+// grow for its own sake — a cassette earns a place here when its request shape
 // is load-bearing enough that being wrong about it would be expensive.
 //
 // What this guards is regression, not coverage. Replacing a recording with a
@@ -25,14 +26,27 @@ import (
 // replay identically. That is precisely how three fixtures came to encode
 // requests Jira rejects — a removed createmeta route, validateQuery as a string
 // where a boolean is required, a missing expand — with green tests throughout.
-var recordedResources = map[string][]string{
-	"project": {
+//
+// The key is a package path rather than a resource name because
+// internal/workflow is not under internal/resource, and it holds the fixture
+// with the best claim to a place here: epicadd.cloud.json asserted a request
+// Jira refuses on most Cloud projects for two releases, and the recording that
+// replaced it is the only thing that makes the refusal beside it legible.
+var recordedFixtures = map[string][]string{
+	"internal/resource/project": {
 		"projects.cloud.json", "project.cloud.json", "statuses.cloud.json",
 		"versions-empty.cloud.json", "components-empty.cloud.json",
 	},
-	"user":  {"search.cloud.json", "me.cloud.json", "user.cloud.json"},
-	"jql":   {"parse.cloud.json", "invalid.cloud.json"},
-	"issue": {"list-recorded.cloud.json"},
+	"internal/resource/user":   {"search.cloud.json", "me.cloud.json", "user.cloud.json"},
+	"internal/resource/jql":    {"parse.cloud.json", "invalid.cloud.json"},
+	"internal/resource/issue":  {"list-recorded.cloud.json"},
+	"internal/resource/board":  {"boards-recorded.cloud.json", "board-recorded.cloud.json"},
+	"internal/resource/epic":   {"epics-recorded.cloud.json", "epic-recorded.cloud.json"},
+	"internal/resource/sprint": {"sprints-recorded.cloud.json", "sprint-recorded.cloud.json"},
+	"internal/workflow": {
+		"epicadd.cloud.json", "epicremove.cloud.json", "sprintadd.cloud.json",
+		"epicadd-nextgen.cloud.json",
+	},
 }
 
 // repoRoot is where the lint package sits relative to the module, matching the
@@ -43,27 +57,27 @@ const repoRoot = "../.."
 func TestRecordedFixturesStayRecorded(t *testing.T) {
 	root := repoRoot
 
-	for resource, fixtures := range recordedResources {
+	for pkg, fixtures := range recordedFixtures {
 		for _, name := range fixtures {
-			path := filepath.Join(root, "internal", "resource", resource, "testdata", name)
+			path := filepath.Join(root, filepath.FromSlash(pkg), "testdata", name)
 
 			data, err := os.ReadFile(path) //nolint:gosec // a path from the test tree.
 			if err != nil {
 				t.Errorf("%s/%s: %v — a recording was deleted or renamed",
-					resource, name, err)
+					pkg, name, err)
 				continue
 			}
 			var c struct {
 				Source string `json:"source"`
 			}
 			if err := json.Unmarshal(data, &c); err != nil {
-				t.Errorf("%s/%s: %v", resource, name, err)
+				t.Errorf("%s/%s: %v", pkg, name, err)
 				continue
 			}
 			if c.Source != "recorded" {
 				t.Errorf("%s/%s is source=%q, want \"recorded\" — a hand-written "+
 					"cassette replays exactly like a recorded one and asserts "+
-					"nothing about the API", resource, name, c.Source)
+					"nothing about the API", pkg, name, c.Source)
 			}
 		}
 	}
@@ -92,16 +106,13 @@ func TestRecordedFixturesStayRecorded(t *testing.T) {
 // nobody has evidence for and why, and the test below refuses a stale one: the
 // moment a recording lands, its entry has to go, so this list can only shrink.
 var unrecorded = map[string]string{
-	"internal/resource/board cloud": "the Cloud sandbox has no scrum board, so " +
-		"there is no board to read; blocked on creating one, which is UI work " +
-		"and not code",
-	"internal/resource/epic cloud": "same board that internal/resource/board " +
-		"needs — an epic is read through the agile API and the sandbox has no " +
-		"agile content",
-	"internal/resource/sprint cloud": "same board again; without a sprint there " +
-		"is nothing for `sprint list` or `sprint get` to answer with",
-	"internal/workflow cloud": "the agile write verbs need a board with issues " +
-		"to move between containers, and `sprint close` ends a real iteration",
+	// The four Cloud agile rows were paid off on 2026-08-10, when a
+	// company-managed project with a scrum board and a sprint was added to the
+	// sandbox. `sprint close` is still the one verb in the tree with no
+	// recording of its own — it needs a *started* sprint, and starting one is
+	// UI work this tool has no verb for — but the package it lives in has
+	// recordings now, so it is a card and not a row here. This list is grouped
+	// by package and deployment and cannot express "one verb of four".
 
 	// Every Data Center row has one cause, written out once per row rather than
 	// once for the group, because a row is what somebody deletes and the reason

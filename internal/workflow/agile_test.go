@@ -22,6 +22,12 @@ import (
 // TestTheThreeVerbsSendWhatTheySay pins the endpoint and the body of each move.
 // The cassettes match on both, so a wrong path or a reordered body fails here
 // rather than against a real instance.
+//
+// Every Cloud row here is a recording. That matters more than the coverage: the
+// three Data Center rows are constructed, and a constructed cassette proves a
+// request is unchanged and never that it was right — which is exactly how the
+// Cloud `epic.add` row spent two releases asserting a request Jira refuses for
+// the majority of Cloud projects. See TestTheAgileEpicEndpointIsCompanyManagedOnly.
 func TestTheThreeVerbsSendWhatTheySay(t *testing.T) {
 	for _, tc := range []struct {
 		command, fixture string
@@ -37,9 +43,14 @@ func TestTheThreeVerbsSendWhatTheySay(t *testing.T) {
 			container: "sprint", id: "128", action: "added",
 		},
 		{
+			command: "sprint.add", fixture: "sprintadd", kind: site.Cloud,
+			args:      []string{"1", "AGL-4", "AGL-5"},
+			container: "sprint", id: "1", action: "added",
+		},
+		{
 			command: "epic.add", fixture: "epicadd", kind: site.Cloud,
-			args:      []string{"ENG-42", "ENG-101"},
-			container: "epic", id: "ENG-42", action: "added",
+			args:      []string{"AGL-1", "AGL-2"},
+			container: "epic", id: "AGL-1", action: "added",
 		},
 		{
 			// Leaving an epic is spelled as joining the absence of one. There
@@ -48,8 +59,13 @@ func TestTheThreeVerbsSendWhatTheySay(t *testing.T) {
 			args:      []string{"ENG-101", "ENG-102"},
 			container: "epic", id: "none", action: "removed",
 		},
+		{
+			command: "epic.remove", fixture: "epicremove", kind: site.Cloud,
+			args:      []string{"AGL-2"},
+			container: "epic", id: "none", action: "removed",
+		},
 	} {
-		t.Run(tc.command, func(t *testing.T) {
+		t.Run(tc.command+"/"+string(tc.kind), func(t *testing.T) {
 			doc, replayer := runVerb(t, tc.command, tc.fixture, tc.kind, tc.args, false)
 
 			if doc.Record.Name != tc.container {
@@ -69,6 +85,50 @@ func TestTheThreeVerbsSendWhatTheySay(t *testing.T) {
 					unmatched)
 			}
 		})
+	}
+}
+
+// TestTheAgileEpicEndpointIsCompanyManagedOnly pins the limit that no
+// constructed cassette contained, because whoever wrote one did not know it was
+// there.
+//
+// Cloud refuses `POST /rest/agile/1.0/epic/{ref}/issue` when the issue belongs
+// to a team-managed (next-gen) project, which is the default for every project
+// created on a Cloud site. This tool sends it anyway — nothing in
+// internal/workflow branches on project style — so `epic add` and `epic remove`
+// fail for most Cloud callers while epicadd.cloud.json reported the request
+// well-formed.
+//
+// The refusal is a fixture rather than a sentence in a comment so that
+// reinstating the endpoint for every project fails a test. Jira's own message
+// names the route that does work, and this tool cannot take it: `issue edit`
+// has no --parent.
+func TestTheAgileEpicEndpointIsCompanyManagedOnly(t *testing.T) {
+	cmd, ok := registry.Lookup("epic.add")
+	if !ok {
+		t.Fatal("epic add is not registered")
+	}
+	conn, replayer := replayConn(t, "epicadd-nextgen.cloud.json")
+
+	_, err := cmd.Run(t.Context(), &registry.Invocation{
+		Jira: &stubSession{conn: conn, kind: site.Cloud},
+		Args: []string{"OPS-5", "OPS-10"}, Flags: registry.NewFlags(),
+		Stderr: io.Discard, Progress: registry.NoProgress,
+	})
+	if err == nil {
+		t.Fatal("a next-gen issue was reported as added to an epic")
+	}
+	if code := errs.Coerce(err).Code; code != "BAD_REQUEST" {
+		t.Errorf("code = %q, want BAD_REQUEST", code)
+	}
+	// Jira names the way out in the body. Asserting it keeps the remedy in the
+	// test rather than only in a backlog card.
+	if detail := errs.Coerce(err).Detail; !strings.Contains(detail, "parent") {
+		t.Errorf("detail = %q, want Jira's own remedy naming the parent property",
+			detail)
+	}
+	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+		t.Errorf("the request was never sent: %v", unplayed)
 	}
 }
 

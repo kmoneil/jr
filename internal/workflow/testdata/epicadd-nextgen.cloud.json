@@ -1,28 +1,31 @@
 {
   "deployment": "cloud",
   "source": "recorded",
-  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB. The first time this verb reached a real Jira and was accepted. It replaces a constructed cassette that asserted this same request unchanged for two releases while nothing established it was ever right. The project is company-managed (classic), which is the endpoint's actual limit \u2014 see epicadd-nextgen.cloud.json for the same request refused.",
+  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB. The request in epicadd.cloud.json, sent to a team-managed (next-gen) project and refused with 400. It is kept because a fix that stops sending it needs the reason to survive: team-managed is the default for every new Cloud project, and without this the endpoint reads as simply correct. The response body carries a developer.atlassian.com link, which the residue check reports as an undeclared host; it is Jira's own documentation URL and not a leak.",
   "interactions": [
     {
       "request": {
         "method": "POST",
-        "path": "/rest/agile/1.0/epic/AGL-1/issue",
-        "body": "{\"issues\":[\"AGL-2\"]}"
+        "path": "/rest/agile/1.0/epic/OPS-5/issue",
+        "body": "{\"issues\":[\"OPS-10\"]}"
       },
       "response": {
-        "status": 204,
+        "status": 400,
         "header": {
           "Atl-Request-Id": [
             "00000000-0000-0000-0000-000000000000"
           ],
           "Atl-Traceid": [
-            "4345e7195cbe47faa69ca92a5e320b9d"
+            "2475ddf3ab5e4f73aa935afdae9d116b"
           ],
           "Cache-Control": [
             "no-cache, no-store, no-transform"
           ],
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
           "Date": [
-            "Mon, 10 Aug 2026 13:52:56 GMT"
+            "Mon, 10 Aug 2026 13:52:59 GMT"
           ],
           "Nel": [
             "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
@@ -40,7 +43,7 @@
             "AtlassianEdge"
           ],
           "Server-Timing": [
-            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=91,cdn-upstream-fbl;dur=681,atl-edge;dur=558,atl-edge-internal;dur=19,atl-edge-upstream;dur=539,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW59-P7\",cdn-rid;desc=\"N321QlgSaeqC6Kry3ie4pgnK0lYet47EHNDmappNWplWsYrRydT8nA==\",cdn-downstream-fbl;dur=687"
+            "atl-edge;dur=110,atl-edge-internal;dur=17,atl-edge-upstream;dur=91,atl-edge-pop;desc=\"aws-us-east-1\""
           ],
           "Set-Cookie": [
             "REDACTED"
@@ -51,26 +54,23 @@
           "Timing-Allow-Origin": [
             "*"
           ],
-          "Vary": [
-            "Accept-Encoding"
-          ],
           "Via": [
-            "1.1 9485615792f5f5ecef76608e38635192.cloudfront.net (CloudFront)"
+            "1.1 b572f6c1b5efbd2fea3247497fa7717a.cloudfront.net (CloudFront)"
           ],
           "X-Aaccountid": [
             "000000%3A00000000-0000-0000-0000-000000000000"
           ],
           "X-Amz-Cf-Id": [
-            "N321QlgSaeqC6Kry3ie4pgnK0lYet47EHNDmappNWplWsYrRydT8nA=="
+            "uUEbR9a52RVMcp49wWByuNiKDLZNbdI6s2EhrUrZpZ_2FgAMLjGoFA=="
           ],
           "X-Amz-Cf-Pop": [
-            "DFW59-P7"
+            "DFW56-P11"
           ],
           "X-Arequestid": [
-            "3148647c0607a4e271947712fe01d115"
+            "79ef41eca6cc4d5b02ef895634c8acca"
           ],
           "X-Cache": [
-            "Miss from cloudfront"
+            "Error from cloudfront"
           ],
           "X-Content-Type-Options": [
             "nosniff"
@@ -84,7 +84,8 @@
           "X-Xss-Protection": [
             "1; mode=block"
           ]
-        }
+        },
+        "body": "{\"errorMessages\":[\"The request contains a next-gen issue. This operation can't add next-gen issues to epics. To add a next-gen issue to an epic, use the Edit issue operation and set the parent property (i.e., '\\\"parent\\\":{\\\"key\\\":\\\"PROJ-123\\\"}' where \\\"PROJ-123\\\" has an issue type at level one of the issue type hierarchy). See <a href=\\\"https://developer.atlassian.com/cloud/jira/platform/rest/v2/\\\"> developer.atlassian.com </a> for more details.\"],\"errors\":{}}"
       }
     }
   ]
