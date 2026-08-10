@@ -667,7 +667,7 @@ Commits follow Conventional Commits (`feat(issue):`, `fix(transport):`); the
 ```
 make test           # the default build
 make test-profiles  # the suite under every shipped tag set
-make fuzz           # every fuzz target, FUZZTIME each (default 30s)
+make fuzz           # every fuzz target, FUZZTIME each (default 60s)
 make golden         # rewrite the output-contract golden files
 make docs           # regenerate docs/commands.md from the registry
 make cost           # what each format costs, in tokens (needs uv, and network)

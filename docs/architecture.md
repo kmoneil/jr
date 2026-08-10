@@ -300,7 +300,7 @@ name to `customfield_10042` should not cost a round trip on every invocation.
 | CLI surface     | Snapshot tests of `--help`, `schema`, exit codes               | Any diff is reviewed                                |
 | Architecture    | Import-graph assertions                                        | Every PR                                            |
 | Build profiles  | Matrix build of all profiles, a size assertion, and a command count per profile | Every PR                           |
-| Fuzzing         | `make fuzz`, every target, built with the full tag set         | Every PR, 60s per target                            |
+| Fuzzing         | `make fuzz`, all 20 targets, built with the full tag set       | Every PR, 60s per target                            |
 | Complexity      | `make complexity`, gocognit over `internal/` and `cmd/`        | Cognitive 15, or an exemption naming its score and its reason |
 
 **The complexity limit is enforced, and its one exception is written down.**
