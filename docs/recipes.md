@@ -163,6 +163,19 @@ $ jr issue get ENG-101 --url
 $ jr issue get ENG-101 --format markdown
 ```
 
+`--age` adds a column saying how long since each issue was updated, in words,
+without touching the timestamp it is derived from:
+
+```console
+$ jr issue list --age
+key      status       assignee       updated               summary          age
+ENG-101  In Progress  Ada Lovelace   2026-08-10T14:30:31Z  Retry drops...   3 hours
+```
+
+Both forms are in the row, so a script keeps parsing `updated` while you read
+`age`. It is coarse — one unit, no "ago" — and it stops at days, because a month
+has no fixed length and this tool will not pick one for you.
+
 `--url` adds a bare browse URL, on `issue get` and `issue list` alike. It is a
 plain string rather than a terminal escape sequence, so it is both clickable in
 most terminals and usable in a pipe:

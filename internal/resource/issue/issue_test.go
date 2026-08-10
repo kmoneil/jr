@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kmoneil/jira-cli/internal/errs"
 	"github.com/kmoneil/jira-cli/internal/exitcode"
@@ -2480,6 +2481,7 @@ var notAFilter = map[string]string{
 	"page-token":        "a resume point, which the guard has already run for",
 	"changed-field":     "it selects what --changed-by asks about and filters nothing",
 	"url":               "it adds a column, not a condition",
+	"age":               "same: it renders a timestamp the row already carries",
 }
 
 // TestAnyFilterSatisfiesTheGuard covers what counts as constraining, one flag
@@ -3083,5 +3085,107 @@ func TestANamedFieldIsAlsoFetched(t *testing.T) {
 	got := issue.RequestedFields([]string{"summary", "summary", "created"})
 	if len(got) != len(issue.DefaultFields()) {
 		t.Errorf("RequestedFields = %v, want no duplicate of a default", got)
+	}
+}
+
+// TestAgeIsCoarseAndInOneUnit covers where the units change, which is the only
+// interesting thing about this function and the only part a clock would make
+// hard to test. It is pure for that reason.
+func TestAgeIsCoarseAndInOneUnit(t *testing.T) {
+	now := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
+	at := func(d time.Duration) string {
+		return now.Add(-d).UTC().Format(time.RFC3339)
+	}
+
+	for _, tc := range []struct {
+		d    time.Duration
+		want string
+	}{
+		{0, "0 seconds"},
+		{time.Second, "1 second"},
+		{59 * time.Second, "59 seconds"},
+		// Every boundary from both sides. A unit that changes one tick early
+		// reports an hour-old issue as 60 minutes.
+		{time.Minute, "1 minute"},
+		{89 * time.Second, "1 minute"},
+		{59*time.Minute + 59*time.Second, "59 minutes"},
+		{time.Hour, "1 hour"},
+		{23*time.Hour + 59*time.Minute, "23 hours"},
+		{24 * time.Hour, "1 day"},
+		{47 * time.Hour, "1 day"},
+		{48 * time.Hour, "2 days"},
+		// It stops at days on purpose: a month has no fixed length and a year
+		// has two, so a coarser unit would mean whichever divisor this file
+		// happened to pick and the caller could not tell which.
+		{400 * 24 * time.Hour, "400 days"},
+	} {
+		if got := issue.Age(at(tc.d), now); got != tc.want {
+			t.Errorf("Age(%v) = %q, want %q", tc.d, got, tc.want)
+		}
+	}
+}
+
+// TestAgeSaysNothingRatherThanGuessing covers the inputs there is no honest
+// answer for.
+func TestAgeSaysNothingRatherThanGuessing(t *testing.T) {
+	now := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
+
+	// Absent stays absent. "0 seconds" would claim the issue was updated just
+	// now, which is a different thing from not knowing when it was.
+	if got := issue.Age("", now); got != "" {
+		t.Errorf("Age(\"\") = %q, want nothing", got)
+	}
+	if got := issue.Age("not a timestamp", now); got != "" {
+		t.Errorf("Age of an unparseable stamp = %q, want nothing", got)
+	}
+	// A server clock ahead of this machine's. Reporting a negative age would
+	// report the skew, which is not what the column is about.
+	future := now.Add(2 * time.Hour).UTC().Format(time.RFC3339)
+	if got := issue.Age(future, now); got != "0 seconds" {
+		t.Errorf("Age of a future stamp = %q, want the floor", got)
+	}
+}
+
+// TestAgeNeverReplacesTheTimestamp is the contract half, and the reason --age
+// adds a column instead of changing one.
+//
+// Every timestamp this tool emits is RFC 3339 in UTC and consumers parse it.
+// Rendering `updated` as "3 hours" would break them silently, months after
+// somebody put the flag in a shell alias.
+func TestAgeNeverReplacesTheTimestamp(t *testing.T) {
+	stamp := "2026-08-10T09:00:00Z"
+	node := issue.Issue{
+		Key: "ENG-1", ID: "1", Updated: stamp,
+		Age: issue.Age(stamp, time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)),
+	}.Node()
+
+	updated, ok := node.ChildNamed("updated")
+	if !ok || updated.Text != stamp {
+		t.Errorf("updated = %+v, want the RFC 3339 instant untouched", updated)
+	}
+	age, ok := node.ChildNamed("age")
+	if !ok || age.Text != "3 hours" {
+		t.Errorf("age = %+v, want the rendering beside it", age)
+	}
+	// And absent entirely when nobody asked, so a row costs nothing extra.
+	plain := issue.Issue{Key: "ENG-1", ID: "1", Updated: stamp}.Node()
+	if _, ok := plain.ChildNamed("age"); ok {
+		t.Error("an age appeared without --age")
+	}
+}
+
+// TestBothCommandsDeclareTheAgeFlag keeps the pair from drifting: --age exists
+// on the listing and on the record, or a caller learns which by trying.
+func TestBothCommandsDeclareTheAgeFlag(t *testing.T) {
+	for _, name := range []string{"issue.list", "issue.get"} {
+		cmd, ok := registry.Lookup(name)
+		if !ok {
+			t.Fatalf("%s is not registered", name)
+		}
+		if !slices.ContainsFunc(cmd.Flags, func(f registry.Flag) bool {
+			return f.Name == "age"
+		}) {
+			t.Errorf("%s declares no --age", name)
+		}
 	}
 }

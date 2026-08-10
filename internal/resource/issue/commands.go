@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/kmoneil/jira-cli/internal/buildinfo"
 	"github.com/kmoneil/jira-cli/internal/errs"
@@ -79,6 +80,11 @@ func Schema() *render.Schema {
 			// built here from the deployment's baseUrl, because Jira's own
 			// `self` is the REST endpoint and opens JSON rather than an issue.
 			{Schema: render.Leaf("url", render.TypeString), Optional: true},
+			// Present only with --age, and never instead of `updated`. It is a
+			// rendering of how long ago that timestamp was — "3 hours",
+			// "14 days" — so it is a string and not a duration: it is for
+			// reading, and the instant it derives from is right beside it.
+			{Schema: render.Leaf("age", render.TypeString), Optional: true},
 			{Schema: &render.Schema{
 				// Mixed content in CDATA, with the markup named rather than
 				// guessed at: wiki on Data Center, adf on Cloud.
@@ -317,6 +323,7 @@ to status and everything else has to be asked for.`),
 			},
 			contextFieldsFlag(),
 			urlFlag(),
+			ageFlag(),
 			{
 				Name: "all-projects", Type: registry.TypeBool,
 				Usage: "search every project the credential can see, ignoring " +
@@ -379,6 +386,11 @@ func runList(
 			if err := stampURLs(page, info); err != nil {
 				return err
 			}
+		}
+		if inv.Flags.Bool(ageFlagName) {
+			// One instant for the whole page, so two rows a slow page apart
+			// are not reported as different ages for that reason alone.
+			stampAges(page, time.Now())
 		}
 		nodes := make([]*render.Node, 0, len(page))
 		for _, i := range page {
@@ -735,6 +747,9 @@ func listColumnsFor(inv *registry.Invocation) []render.Column {
 	cols := append(ListColumns(), ExtraColumns(resolvedFields(inv))...)
 	if inv.Flags.Bool(urlFlagName) {
 		cols = append(cols, urlColumn())
+	}
+	if inv.Flags.Bool(ageFlagName) {
+		cols = append(cols, ageColumn())
 	}
 	return cols
 }
@@ -1151,7 +1166,7 @@ parses both identically. It simply has more of it filled in.`),
 				"customfield_10042 or 'Story Points'; " +
 				"added to the default set and to the context's, " +
 				"repeat for several",
-		}, contextFieldsFlag(), rawBodyFlag(), urlFlag(), {
+		}, contextFieldsFlag(), rawBodyFlag(), urlFlag(), ageFlag(), {
 			Name: withCommentsFlag, Type: registry.TypeBool,
 			Usage: "include the comment thread, oldest first; costs a second " +
 				"request, and a thread longer than " +
@@ -1213,6 +1228,11 @@ func runGet(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) 
 		if err := stampURLs(one, info); err != nil {
 			return nil, err
 		}
+		issue = one[0]
+	}
+	if inv.Flags.Bool(ageFlagName) {
+		one := []Issue{issue}
+		stampAges(one, time.Now())
 		issue = one[0]
 	}
 

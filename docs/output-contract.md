@@ -210,7 +210,7 @@ Every successful XML response:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<result kind="issue.list" v="4">
+<result kind="issue.list" v="5">
   <issues count="3" complete="true">
     <issue key="ENG-101">
       <summary>Retry logic drops the last error</summary>
@@ -236,7 +236,7 @@ the XML tree:
 ```json
 {
   "kind": "issue.list",
-  "v": 4,
+  "v": 5,
   "count": 3,
   "complete": true,
   "issues": [ … ]
@@ -403,13 +403,41 @@ container's `count` is derived from its children and cannot disagree with them.
 
 ### The reporter is reported
 
-`issue.list` v4 and `issue.get` v6 carry a `reporter` element, on the same terms
+`issue.list` v5 and `issue.get` v7 carry a `reporter` element, on the same terms
 as `assignee`: always present, and empty when the server discloses nobody.
 
 It was asked for on every request from the first version of this tool — it is in
 the default field set — parsed, and then rendered in no format at all, so
 `--reporter ada` filtered on a value nothing could show. Found by asking why
 `--field reporter` did nothing, which it also did.
+
+### `--age` adds a column, and never changes one
+
+`jr issue list --age` and `jr issue get --age` append an `age` element rendering
+how long ago the issue was last updated — `3 hours`, `14 days` — beside an
+`updated` that is untouched and still RFC 3339 in UTC.
+
+That shape is the point. Rendering the timestamp itself as "3 hours" would break
+every consumer that parses it, silently, and for the caller who put the flag in
+a shell alias months earlier. Appending instead costs a consumer nothing and
+leaves both forms available in one row, which is the same bargain `--url` makes.
+
+```console
+$ jr issue list --age | cut -f4,6
+updated                 age
+2026-08-10T14:30:31Z    3 hours
+```
+
+It is coarse and in one unit, with no "ago" — the column says that already — and
+**it stops at days**. A month has no fixed length and a year has two, so a
+coarser unit would mean whichever divisor this tool happened to pick, and a
+reader could not tell which. `412 days` is longer to read and is the number this
+tool actually knows.
+
+An issue with no `updated` gets no age rather than `0 seconds`, which would
+claim it had just been touched. A timestamp ahead of the local clock reports the
+floor rather than a negative age: that would be reporting clock skew, which is
+not what the column is about.
 
 ### Timestamps out are UTC; dates in are not
 
@@ -727,7 +755,7 @@ refuses the write if the issue has changed since the caller read it. Without it
 two callers editing one issue both exit 0 and the earlier write is lost, with
 nothing truncated, nothing in error, and nothing to say it happened.
 
-`issue.get` v6 carries a `precondition` attribute, which is what the flag takes.
+`issue.get` v7 carries a `precondition` attribute, which is what the flag takes.
 It is opaque: what it holds is the millisecond timestamp Jira served, and the
 `updated` element is RFC 3339 to the second, so conditioning on the published
 value would leave a whole second in which another edit is invisible. It also

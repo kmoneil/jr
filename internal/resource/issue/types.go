@@ -22,9 +22,9 @@ import (
 // commit that changes the corresponding golden file.
 const (
 	KindList    = "issue.list"
-	VersionList = 4
+	VersionList = 5
 	KindGet     = "issue.get"
-	VersionGet  = 6
+	VersionGet  = 7
 )
 
 // Body formats a description can arrive in.
@@ -110,6 +110,11 @@ type Issue struct {
 	// deployment's own baseUrl, so it is one string per row that nobody asked
 	// for unless they did.
 	URL string
+	// Age is how long ago the issue was last updated, in words, and is set
+	// only when --age asked for it. Like URL it is not a field Jira sends: it
+	// is derived here, from `updated` and the clock, and it never replaces the
+	// timestamp it is derived from.
+	Age string
 
 	// Precondition is the opaque token a caller passes to `--if-unchanged`,
 	// set by `issue get` and empty on a listed row. See precondition.go for
@@ -538,6 +543,7 @@ func (i Issue) Node() *render.Node {
 	n.LeafIf("created", i.Created)
 	n.LeafIf("updated", i.Updated)
 	n.LeafIf("url", i.URL)
+	n.LeafIf("age", i.Age)
 
 	// Long text is a child element with its markup named, and mixed content
 	// goes in a CDATA section so newlines and fenced code survive untouched.
