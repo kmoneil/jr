@@ -181,6 +181,16 @@ type stubSession struct {
 	meta   *site.Metadata
 }
 
+// Connect answers as Cloud, and the deployment is arbitrary here rather than
+// load-bearing: this package builds no request and reads no Info.Kind, so it
+// behaves identically either way. The split it depends on — `/rest/api/3/field`
+// against `/rest/api/2/field` — lives in site.FetchFields and is asserted by
+// TestFetchFieldsUsesTheDeploymentsAPIVersion.
+//
+// Running this package's tables under both would add rows that cannot fail for
+// a reason this package controls. Said here because "the stub hardcodes a
+// deployment" reads like an oversight, and the answer is one grep away in a
+// package somebody would have to think to look in.
 func (s *stubSession) Connect(context.Context) (*transport.Client, site.Info, error) {
 	return nil, site.Info{Kind: site.Cloud}, nil
 }

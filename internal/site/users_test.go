@@ -99,6 +99,67 @@ func TestSearchUsersSendsTheParameterTheDeploymentTakes(t *testing.T) {
 	}
 }
 
+// TestFetchUserSendsTheParameterTheDeploymentTakes is the same split as
+// SearchUsers above, on the endpoint that had no test for it.
+//
+// It branches twice — `/rest/api/3` against `/rest/api/2`, and `accountId`
+// against `username` — and a mutation of Info.APIBase's Data Center arm was
+// caught by createmeta, fields, the probe, and the user *search*, and by
+// nothing here. Which is the failure mode the search test's own comment names:
+// the wrong parameter is not an error, it is an empty answer that reads as "no
+// such user", and `user get` would report it against a real account.
+//
+// Two fixtures rather than one, for the reason the directory constants give:
+// a body carrying both an accountId and a name would resolve whichever
+// parameter the code sent, and hide which one that was.
+func TestFetchUserSendsTheParameterTheDeploymentTakes(t *testing.T) {
+	const cloudUser = `{"accountId":"712020:8f3a","displayName":"Ada Lovelace",
+		"emailAddress":"ada@example.invalid","active":true}`
+	const dcUser = `{"name":"ada","key":"ada","displayName":"Ada Lovelace",
+		"emailAddress":"ada@example.invalid","active":true}`
+
+	for _, tc := range []struct {
+		kind  site.Kind
+		param string
+		id    string
+		body  string
+		path  string
+	}{
+		{site.Cloud, "accountId", "712020:8f3a", cloudUser, "/rest/api/3/user"},
+		{site.DataCenter, "username", "ada", dcUser, "/rest/api/2/user"},
+	} {
+		t.Run(string(tc.kind), func(t *testing.T) {
+			doer := &queryRecordingDoer{bodies: map[string]string{"/user": tc.body}}
+			got, err := site.FetchUser(
+				context.Background(), doer, site.Info{Kind: tc.kind}, tc.id,
+			)
+			if err != nil {
+				t.Fatalf("fetch: %v", err)
+			}
+
+			req := doer.requests[0]
+			if req.Path != tc.path {
+				t.Errorf("path = %q, want %q", req.Path, tc.path)
+			}
+			if v := req.Query.Get(tc.param); v != tc.id {
+				t.Errorf("%s = %q, want %q", tc.param, v, tc.id)
+			}
+			// The other deployment's parameter must be absent rather than
+			// merely unused: sending both would pass this test and leave the
+			// endpoint to choose.
+			for _, other := range []string{"accountId", "username"} {
+				if other != tc.param && req.Query.Has(other) {
+					t.Errorf("%s was also sent, so this asserts nothing about "+
+						"which one the deployment gets", other)
+				}
+			}
+			if got.ID != tc.id {
+				t.Errorf("ID = %q, want %q", got.ID, tc.id)
+			}
+		})
+	}
+}
+
 // TestResolveUserFindsTheIdThisDeploymentWants is the whole point: a caller
 // types a name, and each deployment gets the identifier it recognises.
 func TestResolveUserFindsTheIdThisDeploymentWants(t *testing.T) {

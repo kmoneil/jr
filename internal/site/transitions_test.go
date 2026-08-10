@@ -28,6 +28,34 @@ const transitionsJSON = `{"expand":"transitions","transitions":[
 	 "to":{"id":"1","name":"Open","statusCategory":{"key":"new","name":"To Do"}}}
 ]}`
 
+// TestFetchTransitionsUsesTheDeploymentsAPIVersion covers the one branch this
+// function has between the two deployments.
+//
+// Every other test here drives it as Cloud, so a mutation of Info.APIBase's
+// Data Center arm went unnoticed in this file while createmeta, fields, the
+// probe, and user search all caught it. The response shape is genuinely shared
+// — rawTransitions says so — which is exactly why the path is the only thing
+// left to get wrong, and why nothing else would notice if it were.
+func TestFetchTransitionsUsesTheDeploymentsAPIVersion(t *testing.T) {
+	for _, tc := range []struct {
+		kind site.Kind
+		want string
+	}{
+		{site.Cloud, "/rest/api/3/issue/ENG-101/transitions"},
+		{site.DataCenter, "/rest/api/2/issue/ENG-101/transitions"},
+	} {
+		doer := &pathRecordingDoer{stubDoer: stubDoer{body: transitionsJSON}}
+		if _, err := site.FetchTransitions(
+			t.Context(), doer, site.Info{Kind: tc.kind}, "ENG-101",
+		); err != nil {
+			t.Fatalf("%s: fetch: %v", tc.kind, err)
+		}
+		if doer.path != tc.want {
+			t.Errorf("%s asked for %q, want %q", tc.kind, doer.path, tc.want)
+		}
+	}
+}
+
 func TestFetchTransitionsNormalizes(t *testing.T) {
 	doer := &stubDoer{body: transitionsJSON}
 	got, err := site.FetchTransitions(t.Context(), doer, site.Info{Kind: site.Cloud}, "ENG-101")

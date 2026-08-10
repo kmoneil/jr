@@ -307,6 +307,14 @@ type stubSession struct {
 	meta   *site.Metadata
 }
 
+// Connect answers as Data Center, which is the deployment whose createmeta
+// response this package's fixtures carry — Cloud pages that endpoint and names
+// the array differently, and site.CreateMeta is where the two converge.
+//
+// Like internal/resource/field, this package reads no Info.Kind of its own, so
+// the choice bounds which fixture shape the tables use and nothing else. Both
+// deployments are asserted a layer down, in TestCreateMetaConvergesAcrossDeployments
+// and TestFetchTransitionsUsesTheDeploymentsAPIVersion.
 func (s *stubSession) Connect(context.Context) (*transport.Client, site.Info, error) {
 	return nil, site.Info{Kind: site.DataCenter}, nil
 }
