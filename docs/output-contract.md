@@ -318,6 +318,32 @@ client.Do(req)  // returns err == nil on 5xx
 A literal `]]>` inside the text is split across two CDATA sections
 (`]]]]><![CDATA[>`), which is the only way to carry that sequence.
 
+### Carriage returns in XML
+
+A carriage return is written as `&#13;`, in element text and in attributes
+alike. Inside CDATA, where a numeric reference would be five literal
+characters, the section is closed and reopened around it:
+`before]]>&#13;<![CDATA[after`.
+
+This is not cosmetic. XML 1.0 §2.11 requires a processor to translate `\r\n`
+and any lone `\r` to `\n` *before parsing*, so a raw carriage return on the wire
+reaches a consumer as a newline — the value it reads is not the value Jira
+holds. Escaping is the only spelling that survives, and it applies inside CDATA
+too, because the normalization runs on the raw input rather than on parsed
+content.
+
+Newline and tab are **not** escaped in element text. Neither is altered by
+§2.11 there, and escaping them would make every multi-line description
+unreadable for no fidelity gained. Both *are* escaped in an attribute value,
+where a separate rule — attribute-value normalization — turns each into a
+space.
+
+The other three formats were never affected: TSV escapes `\r` as `\r` because a
+record is one line, and JSON and YAML carry it through their own escaping. A
+value that means one thing in `--format json` and another in `--format xml` is
+the contract splitting along an axis nobody declared, which is what this rule
+prevents.
+
 ### ADF converted to markdown
 
 Cloud stores a body as an Atlassian Document Format document. It is reported as
