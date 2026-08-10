@@ -1,7 +1,7 @@
 {
   "deployment": "cloud",
   "source": "recorded",
-  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB. `epic add` against a **team-managed** project \u2014 the exact operation epicadd-nextgen.cloud.json records being refused with a 400, working. The two files are the before and after of this fix and are worth reading together. The issue already had this parent, so the recording is also a second application answering 204.",
+  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB and the response-header filter in transport.KeptHeaders, which drops every header no code reads. `epic add` against a **team-managed** project \u2014 the exact operation epicadd-nextgen.cloud.json records being refused with a 400, working. The two files are the before and after of this fix and are worth reading together. The issue already had this parent, so the recording is also a second application answering 204.",
   "interactions": [
     {
       "request": {
@@ -10,81 +10,7 @@
         "body": "{\"fields\":{\"parent\":{\"key\":\"OPS-5\"}}}"
       },
       "response": {
-        "status": 204,
-        "header": {
-          "Atl-Request-Id": [
-            "00000000-0000-0000-0000-000000000000"
-          ],
-          "Atl-Traceid": [
-            "053984a2e93f42a1a667934ced1e8804"
-          ],
-          "Cache-Control": [
-            "no-cache, no-store, no-transform"
-          ],
-          "Date": [
-            "Mon, 10 Aug 2026 14:47:31 GMT"
-          ],
-          "Nel": [
-            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
-          ],
-          "Ratelimit": [
-            "\"jira-burst-based\";r=299;t=1"
-          ],
-          "Ratelimit-Policy": [
-            "\"jira-burst-based\";q=50;w=1"
-          ],
-          "Report-To": [
-            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
-          ],
-          "Server": [
-            "AtlassianEdge"
-          ],
-          "Server-Timing": [
-            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=89,cdn-upstream-fbl;dur=469,atl-edge;dur=349,atl-edge-internal;dur=17,atl-edge-upstream;dur=332,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW56-P4\",cdn-rid;desc=\"oksjVnvR8QxJRN1UJXWpWmID3hrXned1l0GL85le0XE47GCoMVQT_Q==\",cdn-downstream-fbl;dur=475"
-          ],
-          "Set-Cookie": [
-            "REDACTED"
-          ],
-          "Strict-Transport-Security": [
-            "max-age=63072000; includeSubDomains; preload"
-          ],
-          "Timing-Allow-Origin": [
-            "*"
-          ],
-          "Vary": [
-            "Accept-Encoding"
-          ],
-          "Via": [
-            "1.1 3f41657604edf791367cb3169b8e4494.cloudfront.net (CloudFront)"
-          ],
-          "X-Aaccountid": [
-            "000000%3A00000000-0000-0000-0000-000000000000"
-          ],
-          "X-Amz-Cf-Id": [
-            "oksjVnvR8QxJRN1UJXWpWmID3hrXned1l0GL85le0XE47GCoMVQT_Q=="
-          ],
-          "X-Amz-Cf-Pop": [
-            "DFW56-P4"
-          ],
-          "X-Arequestid": [
-            "8ac91c9ac65fae19fb7ad7bc4643a52e"
-          ],
-          "X-Cache": [
-            "Miss from cloudfront"
-          ],
-          "X-Content-Type-Options": [
-            "nosniff"
-          ],
-          "X-Ratelimit-Limit": [
-            "300"
-          ],
-          "X-Ratelimit-Remaining": [
-            "299"
-          ],
-          "X-Xss-Protection": [
-            "1; mode=block"
-          ]
-        }
+        "status": 204
       }
     }
   ]

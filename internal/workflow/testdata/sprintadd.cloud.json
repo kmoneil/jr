@@ -1,7 +1,7 @@
 {
   "deployment": "cloud",
   "source": "recorded",
-  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB. Two issues moved into a future sprint from the backlog. Repeating the request for an issue already in that sprint answered 204 as well, which is the observation agile-writes-unverified asked for and nothing but a real server could give.",
+  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB and the response-header filter in transport.KeptHeaders, which drops every header no code reads. Two issues moved into a future sprint from the backlog. Repeating the request for an issue already in that sprint answered 204 as well, which is the observation agile-writes-unverified asked for and nothing but a real server could give.",
   "interactions": [
     {
       "request": {
@@ -10,81 +10,7 @@
         "body": "{\"issues\":[\"AGL-4\",\"AGL-5\"]}"
       },
       "response": {
-        "status": 204,
-        "header": {
-          "Atl-Request-Id": [
-            "00000000-0000-0000-0000-000000000000"
-          ],
-          "Atl-Traceid": [
-            "d12d836a3efc4048ae39e6da7bfd6b48"
-          ],
-          "Cache-Control": [
-            "no-cache, no-store, no-transform"
-          ],
-          "Date": [
-            "Mon, 10 Aug 2026 13:52:59 GMT"
-          ],
-          "Nel": [
-            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
-          ],
-          "Ratelimit": [
-            "\"jira-burst-based\";r=199;t=1"
-          ],
-          "Ratelimit-Policy": [
-            "\"jira-burst-based\";q=100;w=1"
-          ],
-          "Report-To": [
-            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
-          ],
-          "Server": [
-            "AtlassianEdge"
-          ],
-          "Server-Timing": [
-            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=91,cdn-upstream-fbl;dur=800,atl-edge;dur=677,atl-edge-internal;dur=16,atl-edge-upstream;dur=661,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW59-P7\",cdn-rid;desc=\"_l0gjP1pL5cS5E0-Sutc-eflpPfhyVMBG7Kdm-EFi9LXcqU8noA6Bg==\",cdn-downstream-fbl;dur=806"
-          ],
-          "Set-Cookie": [
-            "REDACTED"
-          ],
-          "Strict-Transport-Security": [
-            "max-age=63072000; includeSubDomains; preload"
-          ],
-          "Timing-Allow-Origin": [
-            "*"
-          ],
-          "Vary": [
-            "Accept-Encoding"
-          ],
-          "Via": [
-            "1.1 4505f33097628f9f9cce04760d4386a8.cloudfront.net (CloudFront)"
-          ],
-          "X-Aaccountid": [
-            "000000%3A00000000-0000-0000-0000-000000000000"
-          ],
-          "X-Amz-Cf-Id": [
-            "_l0gjP1pL5cS5E0-Sutc-eflpPfhyVMBG7Kdm-EFi9LXcqU8noA6Bg=="
-          ],
-          "X-Amz-Cf-Pop": [
-            "DFW59-P7"
-          ],
-          "X-Arequestid": [
-            "58c6a84828d52a6e09bbaef7c109f2ee"
-          ],
-          "X-Cache": [
-            "Miss from cloudfront"
-          ],
-          "X-Content-Type-Options": [
-            "nosniff"
-          ],
-          "X-Ratelimit-Limit": [
-            "200"
-          ],
-          "X-Ratelimit-Remaining": [
-            "199"
-          ],
-          "X-Xss-Protection": [
-            "1; mode=block"
-          ]
-        }
+        "status": 204
       }
     }
   ]

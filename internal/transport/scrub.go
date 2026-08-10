@@ -156,8 +156,108 @@ func (c *Cassette) Residue() []string {
 		} {
 			found.scan(text)
 		}
+		// Headers, which this read for a long time and did not.
+		//
+		// The scrubber has always rewritten header values — that is why
+		// Set-Cookie came out REDACTED — but it does so with tight patterns
+		// tuned to shapes somebody knew about, and this is the loose second
+		// opinion that exists for the shapes nobody did. It looked everywhere
+		// except where the scrubber works, which is the wrong half of the file
+		// to be complementary on. Measured when it was found: 30 of 30
+		// recordings carried header content no guard had ever read.
+		//
+		// The name is carried into the report because it is most of the
+		// judgement. `Atl-Traceid` and `Set-Cookie` read very differently.
+		for name, values := range in.Response.Header {
+			for _, v := range values {
+				found.scanNamed("header "+name+": ", v)
+			}
+		}
 	}
 	return found.out
+}
+
+// StemResidue reports a declared identifier surviving in a form the caller did
+// not declare.
+//
+// Both halves of the recording guard see only what they were told to look for.
+// Replace is strings.ReplaceAll over literals, and EncodedResidue hunts for
+// those same literals; neither knows what an identifier *is*. That is fine for
+// a long key and dangerous for a short one, because a short key cannot be
+// listed bare — `ET=AGL` would rewrite `GET` and `Set-Cookie` — so the caller
+// is forced to enumerate `ET-`, `"ET"`, `(ET)`, and whichever form they forget
+// is neither replaced nor reported.
+//
+// It happened: `"ET"` cleaned `"projectKey":"ET"` and left
+// `"displayName":"Agile fixtures (ET)"` untouched, and the residue report was
+// silent because nothing in it looks for a project key — that is not a shape
+// this package can know.
+//
+// The stem is the target with its leading and trailing punctuation removed and
+// its interior left alone, so `"ET"`, `ET-` and `(ET)` all stem to `ET` while
+// `Software Team` stays `Software Team`. Matching is whole-word, which is what
+// separates `(ET)` from `GET`.
+//
+// It reports and never replaces. A stem match is a hint: a summary may
+// legitimately contain the word, and rewriting on a guess is how a fixture
+// stops being a recording.
+func (c *Cassette) StemResidue(targets []string) []string {
+	found := &residueSet{seen: map[string]bool{}}
+
+	for _, target := range targets {
+		stem := identifierStem(target)
+		if len(stem) < 2 {
+			// One character matches half of everything, and a report that
+			// always fires is one nobody reads.
+			continue
+		}
+		re, err := regexp.Compile(`\b` + regexp.QuoteMeta(stem) + `\b`)
+		if err != nil {
+			continue
+		}
+		for _, in := range c.Interactions {
+			c.reportStem(found, re, stem, in)
+		}
+	}
+	return found.out
+}
+
+// reportStem records where one stem survived in one interaction.
+func (c *Cassette) reportStem(
+	found *residueSet, re *regexp.Regexp, stem string, in Interaction,
+) {
+	for _, text := range []string{
+		in.Request.Path, in.Request.Query, in.Request.Body, in.Response.Body,
+	} {
+		if re.MatchString(text) {
+			found.add("undeclared form of", stem)
+		}
+	}
+	for name, values := range in.Response.Header {
+		for _, v := range values {
+			if re.MatchString(v) {
+				found.add("undeclared form of", stem+" (header "+name+")")
+			}
+		}
+	}
+}
+
+// identifierStem strips the punctuation a caller wraps an identifier in to make
+// it safe for a literal replacement, leaving the identifier itself.
+func identifierStem(target string) string {
+	isWord := func(r rune) bool {
+		return r >= '0' && r <= '9' || r >= 'A' && r <= 'Z' ||
+			r >= 'a' && r <= 'z' || r == '_'
+	}
+	runes := []rune(target)
+	start, end := 0, len(runes)
+	for start < end && !isWord(runes[start]) {
+		start++
+	}
+	for end > start && !isWord(runes[end-1]) {
+		end--
+	}
+	return string(runes[start:end])
 }
 
 // residueSet collects distinct findings, in the order they were first seen.
@@ -179,17 +279,21 @@ func (r *residueSet) add(kind, value string) {
 }
 
 // scan reads one piece of recorded text for anything identity-shaped.
-func (r *residueSet) scan(text string) {
+func (r *residueSet) scan(text string) { r.scanNamed("", text) }
+
+// scanNamed is scan with a prefix naming where the text came from, so a hit in
+// a header says which one.
+func (r *residueSet) scanNamed(where, text string) {
 	for _, m := range EmailAddress.FindAllString(text, -1) {
-		r.add("email", m)
+		r.add("email", where+m)
 	}
 	// identifierish, deliberately not CloudAccountID. See Residue.
 	for _, m := range identifierish.FindAllString(text, -1) {
-		r.add("possible identifier", m)
+		r.add("possible identifier", where+m)
 	}
 	for _, m := range hostPattern.FindAllString(text, -1) {
 		if !reservedHost(m) {
-			r.add("host", m)
+			r.add("host", where+m)
 		}
 	}
 }

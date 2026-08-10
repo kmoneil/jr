@@ -1,7 +1,7 @@
 {
   "deployment": "cloud",
   "source": "recorded",
-  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB. A board's epic listing. The epic's name is empty because an epic created through the REST API on a company-managed Cloud project has no Epic Name set, and this tool has no way to set one; that is the server's answer and not a scrub.",
+  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB and the response-header filter in transport.KeptHeaders, which drops every header no code reads. A board's epic listing. The epic's name is empty because an epic created through the REST API on a company-managed Cloud project has no Epic Name set, and this tool has no way to set one; that is the server's answer and not a scrub.",
   "interactions": [
     {
       "request": {
@@ -12,80 +12,8 @@
       "response": {
         "status": 200,
         "header": {
-          "Atl-Request-Id": [
-            "00000000-0000-0000-0000-000000000000"
-          ],
-          "Atl-Traceid": [
-            "2ec60090ff3240c5a20c822da46c14a0"
-          ],
-          "Cache-Control": [
-            "no-cache, no-store, no-transform"
-          ],
           "Content-Type": [
             "application/json;charset=UTF-8"
-          ],
-          "Date": [
-            "Mon, 10 Aug 2026 13:52:22 GMT"
-          ],
-          "Nel": [
-            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
-          ],
-          "Ratelimit": [
-            "\"jira-burst-based\";r=349;t=1"
-          ],
-          "Ratelimit-Policy": [
-            "\"jira-burst-based\";q=100;w=1"
-          ],
-          "Report-To": [
-            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
-          ],
-          "Server": [
-            "AtlassianEdge"
-          ],
-          "Server-Timing": [
-            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=1,cdn-upstream-connect;dur=90,cdn-upstream-fbl;dur=359,atl-edge;dur=238,atl-edge-internal;dur=18,atl-edge-upstream;dur=219,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW57-P2\",cdn-rid;desc=\"2wXIW_CBKNbN11l7i_9BDmzf36aH_4k9TiEx1T5F6HPWLjKqEOUFpg==\",cdn-downstream-fbl;dur=364"
-          ],
-          "Set-Cookie": [
-            "REDACTED"
-          ],
-          "Strict-Transport-Security": [
-            "max-age=63072000; includeSubDomains; preload"
-          ],
-          "Timing-Allow-Origin": [
-            "*"
-          ],
-          "Vary": [
-            "Accept-Encoding"
-          ],
-          "Via": [
-            "1.1 c73c454a7c881cf4337ab88377497bfc.cloudfront.net (CloudFront)"
-          ],
-          "X-Aaccountid": [
-            "000000%3A00000000-0000-0000-0000-000000000000"
-          ],
-          "X-Amz-Cf-Id": [
-            "2wXIW_CBKNbN11l7i_9BDmzf36aH_4k9TiEx1T5F6HPWLjKqEOUFpg=="
-          ],
-          "X-Amz-Cf-Pop": [
-            "DFW57-P2"
-          ],
-          "X-Arequestid": [
-            "10010a1c1bea4ae8fdc632dcefd92bed"
-          ],
-          "X-Cache": [
-            "Miss from cloudfront"
-          ],
-          "X-Content-Type-Options": [
-            "nosniff"
-          ],
-          "X-Ratelimit-Limit": [
-            "350"
-          ],
-          "X-Ratelimit-Remaining": [
-            "349"
-          ],
-          "X-Xss-Protection": [
-            "1; mode=block"
           ]
         },
         "body": "{\"maxResults\":50,\"startAt\":0,\"isLast\":true,\"values\":[{\"id\":10018,\"key\":\"AGL-1\",\"self\":\"https://recorded.invalid/rest/agile/1.0/epic/10018\",\"name\":\"\",\"summary\":\"Agile fixture epic\",\"color\":{\"key\":\"color_12\"},\"issueColor\":{\"key\":\"grey\"},\"done\":false}]}"

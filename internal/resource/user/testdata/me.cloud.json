@@ -10,80 +10,8 @@
       "response": {
         "status": 200,
         "header": {
-          "Atl-Request-Id": [
-            "00000000-0000-0000-0000-000000000000"
-          ],
-          "Atl-Traceid": [
-            "2ef1b1a6404341718844cae00b0bdaf8"
-          ],
-          "Cache-Control": [
-            "no-store"
-          ],
           "Content-Type": [
             "application/json;charset=UTF-8"
-          ],
-          "Date": [
-            "Thu, 06 Aug 2026 17:47:15 GMT"
-          ],
-          "Nel": [
-            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
-          ],
-          "Ratelimit": [
-            "\"jira-burst-based\";r=348;t=1"
-          ],
-          "Ratelimit-Policy": [
-            "\"jira-burst-based\";q=100;w=1"
-          ],
-          "Report-To": [
-            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
-          ],
-          "Server": [
-            "AtlassianEdge"
-          ],
-          "Server-Timing": [
-            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=101,cdn-upstream-fbl;dur=199,atl-edge;dur=62,atl-edge-internal;dur=17,atl-edge-upstream;dur=46,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW56-P4\",cdn-rid;desc=\"MCKsPSvGpuQNqYy4lwHHoJJuB3J9nEKK2lqAVIBdlclERfSXxthEMg==\",cdn-downstream-fbl;dur=203"
-          ],
-          "Set-Cookie": [
-            "REDACTED"
-          ],
-          "Strict-Transport-Security": [
-            "max-age=63072000; includeSubDomains; preload"
-          ],
-          "Timing-Allow-Origin": [
-            "*"
-          ],
-          "Vary": [
-            "Accept-Encoding"
-          ],
-          "Via": [
-            "1.1 f3d6f8a1b1b387389f178398cc80002e.cloudfront.net (CloudFront)"
-          ],
-          "X-Aaccountid": [
-            "000000%3A00000000-0000-0000-0000-000000000000"
-          ],
-          "X-Amz-Cf-Id": [
-            "MCKsPSvGpuQNqYy4lwHHoJJuB3J9nEKK2lqAVIBdlclERfSXxthEMg=="
-          ],
-          "X-Amz-Cf-Pop": [
-            "DFW56-P4"
-          ],
-          "X-Arequestid": [
-            "2555f13cf24bc6276b9e93224e2d93cd"
-          ],
-          "X-Cache": [
-            "Miss from cloudfront"
-          ],
-          "X-Content-Type-Options": [
-            "nosniff"
-          ],
-          "X-Ratelimit-Limit": [
-            "350"
-          ],
-          "X-Ratelimit-Remaining": [
-            "348"
-          ],
-          "X-Xss-Protection": [
-            "1; mode=block"
           ]
         },
         "body": "{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000:00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"accountType\":\"atlassian\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"locale\":\"en_US\",\"groups\":{\"size\":6,\"items\":[]},\"applicationRoles\":{\"size\":1,\"items\":[]},\"expand\":\"groups,applicationRoles\"}"

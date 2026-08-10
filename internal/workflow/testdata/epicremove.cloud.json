@@ -1,7 +1,7 @@
 {
   "deployment": "cloud",
   "source": "recorded",
-  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB. `epic remove` on Cloud, two issues. Leaving an epic is the parent field set to null, and the caller still never names the epic they are in.",
+  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB and the response-header filter in transport.KeptHeaders, which drops every header no code reads. `epic remove` on Cloud, two issues. Leaving an epic is the parent field set to null, and the caller still never names the epic they are in.",
   "interactions": [
     {
       "request": {
@@ -10,81 +10,7 @@
         "body": "{\"fields\":{\"parent\":null}}"
       },
       "response": {
-        "status": 204,
-        "header": {
-          "Atl-Request-Id": [
-            "00000000-0000-0000-0000-000000000000"
-          ],
-          "Atl-Traceid": [
-            "82eec03bc30e4bef9ddecc2637f5373a"
-          ],
-          "Cache-Control": [
-            "no-cache, no-store, no-transform"
-          ],
-          "Date": [
-            "Mon, 10 Aug 2026 14:47:30 GMT"
-          ],
-          "Nel": [
-            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
-          ],
-          "Ratelimit": [
-            "\"jira-burst-based\";r=299;t=1"
-          ],
-          "Ratelimit-Policy": [
-            "\"jira-burst-based\";q=50;w=1"
-          ],
-          "Report-To": [
-            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
-          ],
-          "Server": [
-            "AtlassianEdge"
-          ],
-          "Server-Timing": [
-            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=91,cdn-upstream-fbl;dur=653,atl-edge;dur=529,atl-edge-internal;dur=24,atl-edge-upstream;dur=505,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW57-P9\",cdn-rid;desc=\"VsbryCuRU1kagV8ksKXi6W6uoInVfKih3R_UM2eYvyJLYkYYrK0-_g==\",cdn-downstream-fbl;dur=656"
-          ],
-          "Set-Cookie": [
-            "REDACTED"
-          ],
-          "Strict-Transport-Security": [
-            "max-age=63072000; includeSubDomains; preload"
-          ],
-          "Timing-Allow-Origin": [
-            "*"
-          ],
-          "Vary": [
-            "Accept-Encoding"
-          ],
-          "Via": [
-            "1.1 2037eed3b1034efe14e3d0cfa72d01c6.cloudfront.net (CloudFront)"
-          ],
-          "X-Aaccountid": [
-            "000000%3A00000000-0000-0000-0000-000000000000"
-          ],
-          "X-Amz-Cf-Id": [
-            "VsbryCuRU1kagV8ksKXi6W6uoInVfKih3R_UM2eYvyJLYkYYrK0-_g=="
-          ],
-          "X-Amz-Cf-Pop": [
-            "DFW57-P9"
-          ],
-          "X-Arequestid": [
-            "997928a9a063153f461470ff2202128f"
-          ],
-          "X-Cache": [
-            "Miss from cloudfront"
-          ],
-          "X-Content-Type-Options": [
-            "nosniff"
-          ],
-          "X-Ratelimit-Limit": [
-            "300"
-          ],
-          "X-Ratelimit-Remaining": [
-            "299"
-          ],
-          "X-Xss-Protection": [
-            "1; mode=block"
-          ]
-        }
+        "status": 204
       }
     },
     {
@@ -94,81 +20,7 @@
         "body": "{\"fields\":{\"parent\":null}}"
       },
       "response": {
-        "status": 204,
-        "header": {
-          "Atl-Request-Id": [
-            "00000000-0000-0000-0000-000000000000"
-          ],
-          "Atl-Traceid": [
-            "c8c37efa0b81421a9bbfb4c8bb161d45"
-          ],
-          "Cache-Control": [
-            "no-cache, no-store, no-transform"
-          ],
-          "Date": [
-            "Mon, 10 Aug 2026 14:47:31 GMT"
-          ],
-          "Nel": [
-            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
-          ],
-          "Ratelimit": [
-            "\"jira-burst-based\";r=298;t=1"
-          ],
-          "Ratelimit-Policy": [
-            "\"jira-burst-based\";q=50;w=1"
-          ],
-          "Report-To": [
-            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
-          ],
-          "Server": [
-            "AtlassianEdge"
-          ],
-          "Server-Timing": [
-            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=91,cdn-upstream-fbl;dur=616,atl-edge;dur=493,atl-edge-internal;dur=17,atl-edge-upstream;dur=474,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW57-P9\",cdn-rid;desc=\"0s4qlRsvC3ZtpKIPGMxnIpmDNljqS6UqwNMf-NaARic5zYAdD0aIKA==\",cdn-downstream-fbl;dur=621"
-          ],
-          "Set-Cookie": [
-            "REDACTED"
-          ],
-          "Strict-Transport-Security": [
-            "max-age=63072000; includeSubDomains; preload"
-          ],
-          "Timing-Allow-Origin": [
-            "*"
-          ],
-          "Vary": [
-            "Accept-Encoding"
-          ],
-          "Via": [
-            "1.1 2037eed3b1034efe14e3d0cfa72d01c6.cloudfront.net (CloudFront)"
-          ],
-          "X-Aaccountid": [
-            "000000%3A00000000-0000-0000-0000-000000000000"
-          ],
-          "X-Amz-Cf-Id": [
-            "0s4qlRsvC3ZtpKIPGMxnIpmDNljqS6UqwNMf-NaARic5zYAdD0aIKA=="
-          ],
-          "X-Amz-Cf-Pop": [
-            "DFW57-P9"
-          ],
-          "X-Arequestid": [
-            "75421070f2e6f49b1094572aec7d3ab0"
-          ],
-          "X-Cache": [
-            "Miss from cloudfront"
-          ],
-          "X-Content-Type-Options": [
-            "nosniff"
-          ],
-          "X-Ratelimit-Limit": [
-            "300"
-          ],
-          "X-Ratelimit-Remaining": [
-            "298"
-          ],
-          "X-Xss-Protection": [
-            "1; mode=block"
-          ]
-        }
+        "status": 204
       }
     }
   ]

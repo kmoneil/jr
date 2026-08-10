@@ -254,7 +254,10 @@ func (r *Recorder) RoundTrip(req *http.Request) (*http.Response, error) {
 		},
 		Response: RecordedResponse{
 			Status: resp.StatusCode,
-			Header: RedactHeader(resp.Header),
+			// Redacted and then trimmed to what something reads. A header that
+			// is never captured cannot leak, which is the only defence that
+			// works against a header shape nobody thought to look for.
+			Header: recordableHeader(resp.Header),
 			Body:   string(respBody),
 		},
 	})

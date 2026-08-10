@@ -1,7 +1,7 @@
 {
   "deployment": "cloud",
   "source": "recorded",
-  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB. One page of a real board listing, which is what the constructed cassette beside it cannot be: that one is built to return three boards out of numeric order and to page, shapes a sandbox will not produce on request. This one establishes only that the endpoint, the query, and the paging parameters this code builds are the ones a server answered.",
+  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB and the response-header filter in transport.KeptHeaders, which drops every header no code reads. One page of a real board listing, which is what the constructed cassette beside it cannot be: that one is built to return three boards out of numeric order and to page, shapes a sandbox will not produce on request. This one establishes only that the endpoint, the query, and the paging parameters this code builds are the ones a server answered.",
   "interactions": [
     {
       "request": {
@@ -12,80 +12,8 @@
       "response": {
         "status": 200,
         "header": {
-          "Atl-Request-Id": [
-            "00000000-0000-0000-0000-000000000000"
-          ],
-          "Atl-Traceid": [
-            "cc1ab311861f4cd089bfce4c9fff29a8"
-          ],
-          "Cache-Control": [
-            "no-cache, no-store, no-transform"
-          ],
           "Content-Type": [
             "application/json;charset=UTF-8"
-          ],
-          "Date": [
-            "Mon, 10 Aug 2026 13:55:30 GMT"
-          ],
-          "Nel": [
-            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
-          ],
-          "Ratelimit": [
-            "\"jira-burst-based\";r=349;t=1"
-          ],
-          "Ratelimit-Policy": [
-            "\"jira-burst-based\";q=100;w=1"
-          ],
-          "Report-To": [
-            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
-          ],
-          "Server": [
-            "AtlassianEdge"
-          ],
-          "Server-Timing": [
-            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=90,cdn-upstream-fbl;dur=301,atl-edge;dur=180,atl-edge-internal;dur=29,atl-edge-upstream;dur=151,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW57-P1\",cdn-rid;desc=\"-SM0iyzMyRDmPuMUTBOcj32ojo5IiHSVF8h1wRDLiteb066nYUS7aw==\",cdn-downstream-fbl;dur=306"
-          ],
-          "Set-Cookie": [
-            "REDACTED"
-          ],
-          "Strict-Transport-Security": [
-            "max-age=63072000; includeSubDomains; preload"
-          ],
-          "Timing-Allow-Origin": [
-            "*"
-          ],
-          "Vary": [
-            "Accept-Encoding"
-          ],
-          "Via": [
-            "1.1 b5141080f2dac9506b5156fa7721b41c.cloudfront.net (CloudFront)"
-          ],
-          "X-Aaccountid": [
-            "000000%3A00000000-0000-0000-0000-000000000000"
-          ],
-          "X-Amz-Cf-Id": [
-            "-SM0iyzMyRDmPuMUTBOcj32ojo5IiHSVF8h1wRDLiteb066nYUS7aw=="
-          ],
-          "X-Amz-Cf-Pop": [
-            "DFW57-P1"
-          ],
-          "X-Arequestid": [
-            "a28fc82d9af4165dbcb6d3efb1d3ab40"
-          ],
-          "X-Cache": [
-            "Miss from cloudfront"
-          ],
-          "X-Content-Type-Options": [
-            "nosniff"
-          ],
-          "X-Ratelimit-Limit": [
-            "350"
-          ],
-          "X-Ratelimit-Remaining": [
-            "349"
-          ],
-          "X-Xss-Protection": [
-            "1; mode=block"
           ]
         },
         "body": "{\"maxResults\":50,\"startAt\":0,\"total\":3,\"isLast\":true,\"values\":[{\"id\":1,\"self\":\"https://recorded.invalid/rest/agile/1.0/board/1\",\"name\":\"OPS board\",\"type\":\"simple\",\"location\":{\"projectId\":10000,\"displayName\":\"(Example) Billing System Dev (OPS)\",\"projectName\":\"(Example) Billing System Dev\",\"projectKey\":\"OPS\",\"projectTypeKey\":\"software\",\"avatarURI\":\"https://recorded.invalid/avatar\",\"name\":\"(Example) Billing System Dev (OPS)\"},\"isPrivate\":false},{\"id\":2,\"self\":\"https://recorded.invalid/rest/agile/1.0/board/2\",\"name\":\"ENG board\",\"type\":\"simple\",\"location\":{\"projectId\":10001,\"displayName\":\"Engineering (ENG)\",\"projectName\":\"Engineering\",\"projectKey\":\"ENG\",\"projectTypeKey\":\"software\",\"avatarURI\":\"https://recorded.invalid/avatar\",\"name\":\"Engineering (ENG)\"},\"isPrivate\":false},{\"id\":3,\"self\":\"https://recorded.invalid/rest/agile/1.0/board/3\",\"name\":\"AGL board\",\"type\":\"scrum\",\"location\":{\"projectId\":10002,\"displayName\":\"Agile fixtures (AGL)\",\"projectName\":\"Agile fixtures\",\"projectKey\":\"AGL\",\"projectTypeKey\":\"software\",\"avatarURI\":\"https://recorded.invalid/avatar\",\"name\":\"Agile fixtures (AGL)\"},\"isPrivate\":false}]}"

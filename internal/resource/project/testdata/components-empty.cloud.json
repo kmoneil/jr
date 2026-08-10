@@ -10,80 +10,8 @@
       "response": {
         "status": 200,
         "header": {
-          "Atl-Request-Id": [
-            "00000000-0000-0000-0000-000000000000"
-          ],
-          "Atl-Traceid": [
-            "c3ea6adf7dae41578325b3f1399f6be0"
-          ],
-          "Cache-Control": [
-            "no-cache, no-store, no-transform"
-          ],
           "Content-Type": [
             "application/json;charset=UTF-8"
-          ],
-          "Date": [
-            "Thu, 06 Aug 2026 17:34:04 GMT"
-          ],
-          "Nel": [
-            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
-          ],
-          "Ratelimit": [
-            "\"jira-burst-based\";r=349;t=1"
-          ],
-          "Ratelimit-Policy": [
-            "\"jira-burst-based\";q=100;w=1"
-          ],
-          "Report-To": [
-            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
-          ],
-          "Server": [
-            "AtlassianEdge"
-          ],
-          "Server-Timing": [
-            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=109,cdn-upstream-fbl;dur=239,atl-edge;dur=92,atl-edge-internal;dur=18,atl-edge-upstream;dur=74,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW56-P8\",cdn-rid;desc=\"EGUAb8ryu5mPc2XJcmL2SP5Vgu-I9WxFMLtlYWsNmgauvcV9C3rgHw==\",cdn-downstream-fbl;dur=243"
-          ],
-          "Set-Cookie": [
-            "REDACTED"
-          ],
-          "Strict-Transport-Security": [
-            "max-age=63072000; includeSubDomains; preload"
-          ],
-          "Timing-Allow-Origin": [
-            "*"
-          ],
-          "Vary": [
-            "Accept-Encoding"
-          ],
-          "Via": [
-            "1.1 4ca0e48ba9ab96e636a6139f463cddb4.cloudfront.net (CloudFront)"
-          ],
-          "X-Aaccountid": [
-            "000000:00000000-0000-0000-0000-000000000000"
-          ],
-          "X-Amz-Cf-Id": [
-            "EGUAb8ryu5mPc2XJcmL2SP5Vgu-I9WxFMLtlYWsNmgauvcV9C3rgHw=="
-          ],
-          "X-Amz-Cf-Pop": [
-            "DFW56-P8"
-          ],
-          "X-Arequestid": [
-            "9c9d8a56e30834f4cdde59e8cfb24f18"
-          ],
-          "X-Cache": [
-            "Miss from cloudfront"
-          ],
-          "X-Content-Type-Options": [
-            "nosniff"
-          ],
-          "X-Ratelimit-Limit": [
-            "350"
-          ],
-          "X-Ratelimit-Remaining": [
-            "349"
-          ],
-          "X-Xss-Protection": [
-            "1; mode=block"
           ]
         },
         "body": "[]"

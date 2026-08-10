@@ -67,8 +67,14 @@ func (a *app) recorder(siteURL string) (*transport.Recorder, func()) {
 		// value, where neither the replacement nor the text scan can reach. A
 		// Cloud page token is a base64 protobuf holding the JQL that produced
 		// it, and a project key rode out inside one before this existed.
+		targets := a.scrubTargets()
 		residue := cassette.Residue()
-		residue = append(residue, cassette.EncodedResidue(a.scrubTargets())...)
+		residue = append(residue, cassette.EncodedResidue(targets)...)
+		// The forms of a declared identifier the caller did not declare. A
+		// short project key cannot be listed bare without rewriting GET and
+		// Set-Cookie, so the caller lists `ET-` and `"ET"` and whichever one
+		// they miss is invisible to both of the checks above.
+		residue = append(residue, cassette.StemResidue(targets)...)
 
 		// Reported rather than refused. These are shapes that *carry* identity,
 		// not proof of a leak — a summary can legitimately contain an address —

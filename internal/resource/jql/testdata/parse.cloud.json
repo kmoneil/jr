@@ -12,80 +12,8 @@
       "response": {
         "status": 200,
         "header": {
-          "Atl-Request-Id": [
-            "00000000-0000-0000-0000-000000000000"
-          ],
-          "Atl-Traceid": [
-            "bd68481936cf477fb41b11b1edf35e29"
-          ],
-          "Cache-Control": [
-            "no-cache, no-store, no-transform"
-          ],
           "Content-Type": [
             "application/json;charset=UTF-8"
-          ],
-          "Date": [
-            "Thu, 06 Aug 2026 17:50:10 GMT"
-          ],
-          "Nel": [
-            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
-          ],
-          "Ratelimit": [
-            "\"jira-burst-based\";r=199;t=1"
-          ],
-          "Ratelimit-Policy": [
-            "\"jira-burst-based\";q=100;w=1"
-          ],
-          "Report-To": [
-            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
-          ],
-          "Server": [
-            "AtlassianEdge"
-          ],
-          "Server-Timing": [
-            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=109,cdn-upstream-fbl;dur=396,atl-edge;dur=249,atl-edge-internal;dur=18,atl-edge-upstream;dur=231,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW59-P7\",cdn-rid;desc=\"rEU-xbSypRLsVdvmDNvvMBaHn9sqfn53MaKj50Onmi5vchDaPORd_A==\",cdn-downstream-fbl;dur=402"
-          ],
-          "Set-Cookie": [
-            "REDACTED"
-          ],
-          "Strict-Transport-Security": [
-            "max-age=63072000; includeSubDomains; preload"
-          ],
-          "Timing-Allow-Origin": [
-            "*"
-          ],
-          "Vary": [
-            "Accept-Encoding"
-          ],
-          "Via": [
-            "1.1 4505f33097628f9f9cce04760d4386a8.cloudfront.net (CloudFront)"
-          ],
-          "X-Aaccountid": [
-            "000000%3A00000000-0000-0000-0000-000000000000"
-          ],
-          "X-Amz-Cf-Id": [
-            "rEU-xbSypRLsVdvmDNvvMBaHn9sqfn53MaKj50Onmi5vchDaPORd_A=="
-          ],
-          "X-Amz-Cf-Pop": [
-            "DFW59-P7"
-          ],
-          "X-Arequestid": [
-            "ad8ae3164c273ab00997c6692eb97d8c"
-          ],
-          "X-Cache": [
-            "Miss from cloudfront"
-          ],
-          "X-Content-Type-Options": [
-            "nosniff"
-          ],
-          "X-Ratelimit-Limit": [
-            "200"
-          ],
-          "X-Ratelimit-Remaining": [
-            "199"
-          ],
-          "X-Xss-Protection": [
-            "1; mode=block"
           ]
         },
         "body": "{\"queries\":[{\"query\":\"project = ENG AND status = Open\",\"structure\":{\"where\":{\"clauses\":[{\"field\":{\"name\":\"project\",\"encodedName\":\"project\"},\"operator\":\"=\",\"operand\":{\"value\":\"ENG\",\"encodedValue\":\"ENG\"}},{\"field\":{\"name\":\"status\",\"encodedName\":\"status\"},\"operator\":\"=\",\"operand\":{\"value\":\"Open\",\"encodedValue\":\"Open\"}}],\"operator\":\"and\"}}}]}"

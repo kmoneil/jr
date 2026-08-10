@@ -1,7 +1,7 @@
 {
   "deployment": "cloud",
   "source": "recorded",
-  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB. A scrum board's sprint listing. The sprint is in state future and so carries neither a start nor an end date, which is the case the renderer has to leave empty rather than invent.",
+  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB and the response-header filter in transport.KeptHeaders, which drops every header no code reads. A scrum board's sprint listing. The sprint is in state future and so carries neither a start nor an end date, which is the case the renderer has to leave empty rather than invent.",
   "interactions": [
     {
       "request": {
@@ -12,80 +12,8 @@
       "response": {
         "status": 200,
         "header": {
-          "Atl-Request-Id": [
-            "00000000-0000-0000-0000-000000000000"
-          ],
-          "Atl-Traceid": [
-            "4856b0105f8e4939a38c799d5b1fc277"
-          ],
-          "Cache-Control": [
-            "no-cache, no-store, no-transform"
-          ],
           "Content-Type": [
             "application/json;charset=UTF-8"
-          ],
-          "Date": [
-            "Mon, 10 Aug 2026 13:52:22 GMT"
-          ],
-          "Nel": [
-            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
-          ],
-          "Ratelimit": [
-            "\"jira-burst-based\";r=349;t=1"
-          ],
-          "Ratelimit-Policy": [
-            "\"jira-burst-based\";q=100;w=1"
-          ],
-          "Report-To": [
-            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
-          ],
-          "Server": [
-            "AtlassianEdge"
-          ],
-          "Server-Timing": [
-            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=0,cdn-upstream-fbl;dur=238,atl-edge;dur=207,atl-edge-internal;dur=16,atl-edge-upstream;dur=191,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW57-P2\",cdn-rid;desc=\"-KZQGOnwxKelf--jd2x8lroIkDeNDKkoBQzZy5b78cP329Y72BPk7A==\",cdn-downstream-fbl;dur=243"
-          ],
-          "Set-Cookie": [
-            "REDACTED"
-          ],
-          "Strict-Transport-Security": [
-            "max-age=63072000; includeSubDomains; preload"
-          ],
-          "Timing-Allow-Origin": [
-            "*"
-          ],
-          "Vary": [
-            "Accept-Encoding"
-          ],
-          "Via": [
-            "1.1 89f2505f9f8dbcdacd6d4a40d558810c.cloudfront.net (CloudFront)"
-          ],
-          "X-Aaccountid": [
-            "000000%3A00000000-0000-0000-0000-000000000000"
-          ],
-          "X-Amz-Cf-Id": [
-            "-KZQGOnwxKelf--jd2x8lroIkDeNDKkoBQzZy5b78cP329Y72BPk7A=="
-          ],
-          "X-Amz-Cf-Pop": [
-            "DFW57-P2"
-          ],
-          "X-Arequestid": [
-            "f6a1b1b9d7c44890c018acdc8068561f"
-          ],
-          "X-Cache": [
-            "Miss from cloudfront"
-          ],
-          "X-Content-Type-Options": [
-            "nosniff"
-          ],
-          "X-Ratelimit-Limit": [
-            "350"
-          ],
-          "X-Ratelimit-Remaining": [
-            "349"
-          ],
-          "X-Xss-Protection": [
-            "1; mode=block"
           ]
         },
         "body": "{\"maxResults\":50,\"startAt\":0,\"total\":1,\"isLast\":true,\"values\":[{\"id\":1,\"self\":\"https://recorded.invalid/rest/agile/1.0/sprint/1\",\"state\":\"future\",\"name\":\"AGL Sprint 1\",\"createdDate\":\"2026-08-10T13:35:48.975Z\",\"originBoardId\":3}]}"

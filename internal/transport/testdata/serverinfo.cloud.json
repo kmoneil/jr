@@ -1,7 +1,7 @@
 {
   "deployment": "cloud",
   "source": "recorded",
-  "note": "Assembled from three recordings against the Cloud sandbox on 2026-08-10, because TestContractAgainstBothDeployments drives four endpoints and JIRA_RECORD captures one invocation per file. Every interaction below is a real request and the response the server gave it, unmodified beyond JIRA_RECORD_SCRUB: `user me --refresh` produced the probe and /myself, an `issue get` on a key that does not exist produced the 404, and an `issue create` with a 300-character summary produced the 400. Assembly was selection and concatenation only \u2014 nothing here was written by hand, which is what source=recorded is claiming. Interactions the test does not play were dropped, because it asserts Replayer.Unplayed is empty. Site and project names are scrubbed here as they are in the bodies below; naming them in prose would undo the scrubbing one line above the data.",
+  "note": "Assembled from three recordings against the Cloud sandbox on 2026-08-10, because TestContractAgainstBothDeployments drives four endpoints and JIRA_RECORD captures one invocation per file. Every interaction below is a real request and the response the server gave it, unmodified beyond JIRA_RECORD_SCRUB and the response-header filter in transport.KeptHeaders, which drops every header no code reads: `user me --refresh` produced the probe and /myself, an `issue get` on a key that does not exist produced the 404, and an `issue create` with a 300-character summary produced the 400. Assembly was selection and concatenation only \u2014 nothing here was written by hand, which is what source=recorded is claiming. Interactions the test does not play were dropped, because it asserts Replayer.Unplayed is empty. Site and project names are scrubbed here as they are in the bodies below; naming them in prose would undo the scrubbing one line above the data.",
   "interactions": [
     {
       "request": {
@@ -11,80 +11,8 @@
       "response": {
         "status": 200,
         "header": {
-          "Atl-Request-Id": [
-            "00000000-0000-0000-0000-000000000000"
-          ],
-          "Atl-Traceid": [
-            "16abc156eac44d05b4bf840962c9ecf3"
-          ],
-          "Cache-Control": [
-            "no-cache, no-store, no-transform"
-          ],
           "Content-Type": [
             "application/json;charset=UTF-8"
-          ],
-          "Date": [
-            "Mon, 10 Aug 2026 13:32:43 GMT"
-          ],
-          "Nel": [
-            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
-          ],
-          "Ratelimit": [
-            "\"jira-burst-based\";r=349;t=1"
-          ],
-          "Ratelimit-Policy": [
-            "\"jira-burst-based\";q=100;w=1"
-          ],
-          "Report-To": [
-            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
-          ],
-          "Server": [
-            "AtlassianEdge"
-          ],
-          "Server-Timing": [
-            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=88,cdn-upstream-fbl;dur=184,atl-edge;dur=65,atl-edge-internal;dur=16,atl-edge-upstream;dur=48,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW56-P11\",cdn-rid;desc=\"KP_aXY4BGljTUQS4CNfuhNsV6_s0kbDnaVMi42caoXamsLfzQYVx3g==\",cdn-downstream-fbl;dur=189"
-          ],
-          "Set-Cookie": [
-            "REDACTED"
-          ],
-          "Strict-Transport-Security": [
-            "max-age=63072000; includeSubDomains; preload"
-          ],
-          "Timing-Allow-Origin": [
-            "*"
-          ],
-          "Vary": [
-            "Accept-Encoding"
-          ],
-          "Via": [
-            "1.1 00395918a6f5b0e169ae23f187b067c0.cloudfront.net (CloudFront)"
-          ],
-          "X-Aaccountid": [
-            "000000%3A00000000-0000-0000-0000-000000000000"
-          ],
-          "X-Amz-Cf-Id": [
-            "KP_aXY4BGljTUQS4CNfuhNsV6_s0kbDnaVMi42caoXamsLfzQYVx3g=="
-          ],
-          "X-Amz-Cf-Pop": [
-            "DFW56-P11"
-          ],
-          "X-Arequestid": [
-            "825f9fad2855a894d9be17f0c0e523ac"
-          ],
-          "X-Cache": [
-            "Miss from cloudfront"
-          ],
-          "X-Content-Type-Options": [
-            "nosniff"
-          ],
-          "X-Ratelimit-Limit": [
-            "350"
-          ],
-          "X-Ratelimit-Remaining": [
-            "349"
-          ],
-          "X-Xss-Protection": [
-            "1; mode=block"
           ]
         },
         "body": "{\"baseUrl\":\"https://recorded.invalid\",\"displayUrl\":\"https://recorded.invalid\",\"displayUrlServicedeskHelpCenter\":\"https://recorded.invalid\",\"displayUrlCSMHelpSeeker\":\"https://recorded.invalid\",\"displayUrlConfluence\":\"https://recorded.invalid\",\"version\":\"1001.0.0-SNAPSHOT\",\"versionNumbers\":[1001,0,0],\"deploymentType\":\"Cloud\",\"buildNumber\":100293,\"buildDate\":\"2026-08-09T00:49:35.000-0500\",\"serverTime\":\"2026-08-10T08:32:43.762-0500\",\"scmInfo\":\"scrubbed\",\"serverTitle\":\"Jira\",\"defaultLocale\":{\"locale\":\"en_US\"},\"serverTimeZone\":\"Etc/UTC\"}"
@@ -98,80 +26,8 @@
       "response": {
         "status": 200,
         "header": {
-          "Atl-Request-Id": [
-            "00000000-0000-0000-0000-000000000000"
-          ],
-          "Atl-Traceid": [
-            "e5a3f38bfe3044a68ec879956257cb1a"
-          ],
-          "Cache-Control": [
-            "no-store"
-          ],
           "Content-Type": [
             "application/json;charset=UTF-8"
-          ],
-          "Date": [
-            "Mon, 10 Aug 2026 13:32:43 GMT"
-          ],
-          "Nel": [
-            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
-          ],
-          "Ratelimit": [
-            "\"jira-burst-based\";r=349;t=1"
-          ],
-          "Ratelimit-Policy": [
-            "\"jira-burst-based\";q=100;w=1"
-          ],
-          "Report-To": [
-            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
-          ],
-          "Server": [
-            "AtlassianEdge"
-          ],
-          "Server-Timing": [
-            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=88,cdn-upstream-fbl;dur=190,atl-edge;dur=71,atl-edge-internal;dur=15,atl-edge-upstream;dur=56,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW56-P11\",cdn-rid;desc=\"Ff1iGLIuKdMZjzWeieTrqEDistLc7XFUkE6SSKfzkCe4pLAM5kbI3w==\",cdn-downstream-fbl;dur=196"
-          ],
-          "Set-Cookie": [
-            "REDACTED"
-          ],
-          "Strict-Transport-Security": [
-            "max-age=63072000; includeSubDomains; preload"
-          ],
-          "Timing-Allow-Origin": [
-            "*"
-          ],
-          "Vary": [
-            "Accept-Encoding"
-          ],
-          "Via": [
-            "1.1 00395918a6f5b0e169ae23f187b067c0.cloudfront.net (CloudFront)"
-          ],
-          "X-Aaccountid": [
-            "000000%3A00000000-0000-0000-0000-000000000000"
-          ],
-          "X-Amz-Cf-Id": [
-            "Ff1iGLIuKdMZjzWeieTrqEDistLc7XFUkE6SSKfzkCe4pLAM5kbI3w=="
-          ],
-          "X-Amz-Cf-Pop": [
-            "DFW56-P11"
-          ],
-          "X-Arequestid": [
-            "cf206860e55fb22d1a89e0495c4e749b"
-          ],
-          "X-Cache": [
-            "Miss from cloudfront"
-          ],
-          "X-Content-Type-Options": [
-            "nosniff"
-          ],
-          "X-Ratelimit-Limit": [
-            "350"
-          ],
-          "X-Ratelimit-Remaining": [
-            "349"
-          ],
-          "X-Xss-Protection": [
-            "1; mode=block"
           ]
         },
         "body": "{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000:00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"accountType\":\"atlassian\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"locale\":\"en_US\",\"groups\":{\"size\":6,\"items\":[]},\"applicationRoles\":{\"size\":1,\"items\":[]},\"expand\":\"groups,applicationRoles\"}"
@@ -186,77 +42,8 @@
       "response": {
         "status": 404,
         "header": {
-          "Atl-Request-Id": [
-            "00000000-0000-0000-0000-000000000000"
-          ],
-          "Atl-Traceid": [
-            "65fa68e42f454eef958e1cfbe62566e2"
-          ],
-          "Cache-Control": [
-            "no-cache, no-store, no-transform"
-          ],
           "Content-Type": [
             "application/json;charset=UTF-8"
-          ],
-          "Date": [
-            "Mon, 10 Aug 2026 13:31:36 GMT"
-          ],
-          "Nel": [
-            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
-          ],
-          "Ratelimit": [
-            "\"jira-burst-based\";r=399;t=1"
-          ],
-          "Ratelimit-Policy": [
-            "\"jira-burst-based\";q=150;w=1"
-          ],
-          "Report-To": [
-            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
-          ],
-          "Server": [
-            "AtlassianEdge"
-          ],
-          "Server-Timing": [
-            "atl-edge;dur=96,atl-edge-internal;dur=18,atl-edge-upstream;dur=78,atl-edge-pop;desc=\"aws-us-east-1\""
-          ],
-          "Set-Cookie": [
-            "REDACTED"
-          ],
-          "Strict-Transport-Security": [
-            "max-age=63072000; includeSubDomains; preload"
-          ],
-          "Timing-Allow-Origin": [
-            "*"
-          ],
-          "Via": [
-            "1.1 372deb5f83b842f053e1134e15f5a6cc.cloudfront.net (CloudFront)"
-          ],
-          "X-Aaccountid": [
-            "000000%3A00000000-0000-0000-0000-000000000000"
-          ],
-          "X-Amz-Cf-Id": [
-            "d7QHlorIZNyX8uxjliL8_muKGs2SMq1nqhGb9xLfqHwTVbNRjaSN9Q=="
-          ],
-          "X-Amz-Cf-Pop": [
-            "DFW57-P2"
-          ],
-          "X-Arequestid": [
-            "4da19660ce36bee4dcd5e9b17c19bd55"
-          ],
-          "X-Cache": [
-            "Error from cloudfront"
-          ],
-          "X-Content-Type-Options": [
-            "nosniff"
-          ],
-          "X-Ratelimit-Limit": [
-            "400"
-          ],
-          "X-Ratelimit-Remaining": [
-            "399"
-          ],
-          "X-Xss-Protection": [
-            "1; mode=block"
           ]
         },
         "body": "{\"errorMessages\":[\"Issue does not exist or you do not have permission to see it.\"],\"errors\":{}}"
@@ -271,77 +58,8 @@
       "response": {
         "status": 400,
         "header": {
-          "Atl-Request-Id": [
-            "00000000-0000-0000-0000-000000000000"
-          ],
-          "Atl-Traceid": [
-            "b48a5c8e6e7a40bc9f6e57970f930caa"
-          ],
-          "Cache-Control": [
-            "no-cache, no-store, no-transform"
-          ],
           "Content-Type": [
             "application/json;charset=UTF-8"
-          ],
-          "Date": [
-            "Mon, 10 Aug 2026 13:31:37 GMT"
-          ],
-          "Nel": [
-            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
-          ],
-          "Ratelimit": [
-            "\"jira-burst-based\";r=199;t=1"
-          ],
-          "Ratelimit-Policy": [
-            "\"jira-burst-based\";q=100;w=1"
-          ],
-          "Report-To": [
-            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
-          ],
-          "Server": [
-            "AtlassianEdge"
-          ],
-          "Server-Timing": [
-            "atl-edge;dur=265,atl-edge-internal;dur=16,atl-edge-upstream;dur=250,atl-edge-pop;desc=\"aws-us-east-1\""
-          ],
-          "Set-Cookie": [
-            "REDACTED"
-          ],
-          "Strict-Transport-Security": [
-            "max-age=63072000; includeSubDomains; preload"
-          ],
-          "Timing-Allow-Origin": [
-            "*"
-          ],
-          "Via": [
-            "1.1 a3a49ec071baa704c41662645e7c9b74.cloudfront.net (CloudFront)"
-          ],
-          "X-Aaccountid": [
-            "000000%3A00000000-0000-0000-0000-000000000000"
-          ],
-          "X-Amz-Cf-Id": [
-            "S0t4CSLzPybGkl_InHJbUbJvKUBYZ41CddqgJ7v9GlFogs53lDd70A=="
-          ],
-          "X-Amz-Cf-Pop": [
-            "DFW57-P5"
-          ],
-          "X-Arequestid": [
-            "16b56b5b6eeb07ff10a14915c3be6a16"
-          ],
-          "X-Cache": [
-            "Error from cloudfront"
-          ],
-          "X-Content-Type-Options": [
-            "nosniff"
-          ],
-          "X-Ratelimit-Limit": [
-            "200"
-          ],
-          "X-Ratelimit-Remaining": [
-            "199"
-          ],
-          "X-Xss-Protection": [
-            "1; mode=block"
           ]
         },
         "body": "{\"errorMessages\":[],\"errors\":{\"summary\":\"Summary can't exceed 255 characters.\"}}"

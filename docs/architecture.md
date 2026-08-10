@@ -158,13 +158,41 @@ is. The host becomes `recorded.invalid`; account ids, UUIDs, emails, and avatar
 URLs become fixed placeholders, and `JIRA_RECORD_SCRUB="from=to,..."` renames
 whatever else a particular instance carries, a display name, a project key.
 
+**A recording keeps only the response headers something reads.** `transport.KeptHeaders`
+lists them and names the reader of each; everything else is dropped as the
+interaction is recorded, so it never reaches memory as part of the tape and
+never reaches a file. That is a stronger guarantee than reporting it afterwards,
+and it exists for the case a report cannot cover: a header carrying identity in
+a shape nobody anticipated. Data Center answers with `X-AUSERNAME`, whose value
+is the authenticated account name and which matches no pattern here — not an
+email, not a UUID, not a host, not a long hex run. Trimming is not free, and the
+list is the price: a header dropped here cannot answer a question later, so the
+rule is keep what something reads, name the reader, and record fresh when the
+question changes.
+
 Afterwards the cassette is checked for residue and anything identifier-shaped is
-reported on stderr. **That check deliberately does not reuse the scrubber's own
+reported on stderr, **including in the headers that survived** — the scrubber
+has always rewritten header values with tight patterns, and for a long time the
+loose second opinion read the bodies and not the headers, which is the wrong
+half of the file to be complementary on.
+
+**That check deliberately does not reuse the scrubber's own
 patterns.** The first version did, and missed a real account id for exactly that
 reason: the pattern was too narrow, so the scrubber left the value and the check
 meant to catch the miss was blind in the same place. A guard that shares a
 definition with the thing it guards cannot catch that definition being wrong, so
 the residue patterns are looser and expected to produce false positives.
+
+The third check is for **a declared identifier surviving in a form the caller did
+not declare**. `Replace` is a literal `strings.ReplaceAll`, so a short project
+key cannot be listed bare — `ET=AGL` would rewrite `GET` and `Set-Cookie` — and
+the caller enumerates `ET-`, `"ET"`, `(ET)` instead. Whichever form they forget
+is invisible to both checks above, because a project key is not a shape this
+package can know. `Cassette.StemResidue` strips the wrapping punctuation off
+each declared target and reports any surviving whole-word occurrence of what is
+left, which finds `(ET)` and does not fire on `GET`. It reports and never
+replaces: a stem match is a hint, and rewriting on a guess is how a fixture
+stops being a recording.
 
 Three properties make a fixture-backed test trustworthy:
 
