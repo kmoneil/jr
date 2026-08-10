@@ -24,9 +24,32 @@ const (
 	// fail; it silently returns fewer, which is exactly the kind of quiet
 	// disagreement this tool refuses to build on.
 	MaxPageSize = 100
-	// DefaultPageSize balances round trips against wasted rows when --limit is
-	// small.
-	DefaultPageSize = 50
+	// DefaultPageSize is the largest page the search accepts, because a round
+	// trip is the unit of cost in this tool and nothing is paid for the size.
+	//
+	// It used to be 50, said to balance round trips against wasted rows when
+	// --limit is small, and that reason described a problem the arithmetic
+	// already solves: wantFor asks for min(pageSize, remaining), so a small
+	// --limit never over-fetches at any page size. `--limit 10` is one request
+	// for ten rows here and was one request for ten rows at 50. Nor does the
+	// default invocation change, because registry.DefaultLimit is 50 and
+	// min(100, 50) is 50 — one request, the same bytes, either way.
+	//
+	// What moves is every run above the default limit, and it halves:
+	// `--limit all` over five thousand issues is fifty sequential requests
+	// rather than a hundred. A search sends a narrow `fields` list and never
+	// asks for a description, so a page is bounded by ten small fields per row
+	// and the per-request cost is dominated by the query rather than by the
+	// rows. Halving the count also halves the exposure to an attempt timeout,
+	// which discards the whole run: ListStream returns a resumable truncation
+	// for a spent request budget and a bare error for anything else.
+	//
+	// Following MaxPageSize is the intent and not an accident — the default is
+	// "the biggest page the server honours". If that cap ever moves far, price
+	// the buffering before letting this follow it: this is one page held in
+	// memory at a time, and a thousand-row page is a different question from a
+	// hundred-row one.
+	DefaultPageSize = MaxPageSize
 )
 
 // Doer is the part of the transport this resource needs.
