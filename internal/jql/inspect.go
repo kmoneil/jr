@@ -93,16 +93,30 @@ func isWordOperator(s string) bool { return wordOperators[strings.ToUpper(s)] }
 // Jira's parse endpoint, which is the only authority on whether a query is
 // valid; this catches the errors worth catching before spending a round trip.
 func Validate(query string) error {
-	if strings.TrimSpace(query) == "" {
-		return errs.Usage("EMPTY_JQL", "JQL query is empty").
-			WithRemedy("supply a query, or omit --jql entirely")
-	}
-
-	tokens, err := Tokenize(query)
+	tokens, err := lexToValidate(query)
 	if err != nil {
 		return err
 	}
+	return balanced(query, tokens)
+}
 
+// lexToValidate is the opening both validators share: a query is not empty, and
+// it lexes. Shared rather than repeated because ValidateFragment used to call
+// Validate and then tokenize again, which left the second error path
+// unreachable — and this package is gated at 100% statement coverage, so an
+// unreachable branch is not a small untidiness, it is a failing build.
+func lexToValidate(query string) ([]Token, error) {
+	if strings.TrimSpace(query) == "" {
+		return nil, errs.Usage("EMPTY_JQL", "JQL query is empty").
+			WithRemedy("supply a query, or omit --jql entirely")
+	}
+	return Tokenize(query)
+}
+
+// balanced reports whether every parenthesis has its partner, which is the one
+// syntax error worth catching here: an unbalanced fragment escapes the wrapper
+// the builder puts around it.
+func balanced(query string, tokens []Token) error {
 	depth := 0
 	var openPositions []int
 	for _, t := range tokens {
@@ -128,4 +142,51 @@ func Validate(query string) error {
 			WithRemedy("close it, or remove it")
 	}
 	return nil
+}
+
+// ValidateFragment is Validate plus the rules that apply only to a query this
+// tool is going to embed in a larger one.
+//
+// The distinction is the whole of this function. `Validate` answers "is this a
+// query", which is what `jr jql validate` reports on and what a caller means
+// when they ask whether their JQL is right. This answers "may this be a
+// *fragment*", which is a narrower question with a different answer, and the
+// two are not interchangeable: a query carrying its own ORDER BY is valid JQL
+// and cannot be embedded.
+func ValidateFragment(query string) error {
+	tokens, err := lexToValidate(query)
+	if err != nil {
+		return err
+	}
+	if err := balanced(query, tokens); err != nil {
+		return err
+	}
+	if pos, found := orderByAt(tokens); found {
+		return errs.Usage("JQL_HAS_ORDER_BY",
+			"the --jql fragment orders its own results, at position %d", pos).
+			WithDetail("%s", query).
+			WithRemedy("use --sort <field> with --order asc|desc; every query " +
+				"this tool sends carries its own ORDER BY, and JQL does not " +
+				"allow one inside the parentheses the fragment is wrapped in")
+	}
+	return nil
+}
+
+// orderByAt finds an ORDER BY clause and reports where it starts.
+//
+// Tokens, never a regular expression, for the reason the rest of this file
+// works that way: `summary ~ "ORDER BY created"` lexes as one string and is a
+// value, not a clause. A field genuinely called order is safe too — it is
+// followed by an operator, and only the clause is followed by the word BY.
+func orderByAt(tokens []Token) (int, bool) {
+	for i := 0; i+1 < len(tokens); i++ {
+		if tokens[i].Kind != TokIdent || tokens[i+1].Kind != TokIdent {
+			continue
+		}
+		if strings.EqualFold(tokens[i].Text, "ORDER") &&
+			strings.EqualFold(tokens[i+1].Text, "BY") {
+			return tokens[i].Pos, true
+		}
+	}
+	return 0, false
 }

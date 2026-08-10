@@ -62,6 +62,17 @@ func Schema() *render.Schema {
 					{Name: "display", Type: render.TypeString},
 				},
 			}},
+			{Schema: &render.Schema{
+				// Fetched on every request since the beginning and rendered
+				// nowhere until v4, so `--reporter` could filter on a value no
+				// output could show. Same shape as the assignee, and always
+				// present for the same reason.
+				Element: "reporter",
+				Attrs: []render.Field{
+					{Name: "id", Type: render.TypeString},
+					{Name: "display", Type: render.TypeString},
+				},
+			}},
 			{Schema: render.Leaf("created", render.TypeTimestamp), Optional: true},
 			{Schema: render.Leaf("updated", render.TypeTimestamp), Optional: true},
 			// Present only with --url. It is not a field Jira sends: it is
@@ -560,7 +571,7 @@ func refuseUncontainableJQL(inv *registry.Invocation) error {
 	if fragment == "" {
 		return nil
 	}
-	return jql.Validate(fragment)
+	return jql.ValidateFragment(fragment)
 }
 
 // refuseUnconstrainedSweep stops `issue list --limit all` with nothing set.

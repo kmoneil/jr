@@ -173,9 +173,38 @@ func (n *Node) Lookup(path string) (string, bool) {
 		if hasAttr {
 			return cur.AttrValue(attr)
 		}
+		if values, isList := listValues(cur); isList {
+			return JoinList(values), true
+		}
 		return cur.Text, true
 	}
 	return "", false
+}
+
+// listValues flattens a list container into the values a single cell carries.
+//
+// The output contract has always said "a column over a list flattens: values
+// are joined with `,`", and until `--field labels` needed one, no column in the
+// tree had ever addressed a list — so the rule was documented, JoinList existed
+// for it, and the only caller was a resource pre-joining an attribute by hand.
+// A path naming a list container resolved to the container's own text, which is
+// empty, and the cell came out blank.
+//
+// A node is a list when ListEl built it, which is what ListOf records — not
+// when its children happen to look like one. The first version of this asked
+// whether every child was a bare text leaf, and an `<issue>` carrying a single
+// `<summary>` satisfied that, so a column path naming a whole record resolved
+// to the summary. Asking the constructor is exact; inferring from the contents
+// is a guess that is right until a record has one child.
+func listValues(n *Node) ([]string, bool) {
+	if n.ListOf == "" {
+		return nil, false
+	}
+	out := make([]string, 0, len(n.Children))
+	for _, c := range n.Children {
+		out = append(out, c.Text)
+	}
+	return out, true
 }
 
 // validate checks the invariants every writer depends on: a non-empty element

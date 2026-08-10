@@ -210,12 +210,13 @@ Every successful XML response:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<result kind="issue.list" v="3">
+<result kind="issue.list" v="4">
   <issues count="3" complete="true">
     <issue key="ENG-101">
       <summary>Retry logic drops the last error</summary>
       <status category="in-progress">In Progress</status>
       <assignee id="712020:8f3a" display="Ada Lovelace"/>
+      <reporter id="712020:4c11" display="Grace Hopper"/>
       <updated>2026-08-04T11:32:07Z</updated>
     </issue>
   </issues>
@@ -235,7 +236,7 @@ the XML tree:
 ```json
 {
   "kind": "issue.list",
-  "v": 3,
+  "v": 4,
   "count": 3,
   "complete": true,
   "issues": [ … ]
@@ -399,6 +400,16 @@ natural types because they are the ones a caller branches on:
 **A list is always an array.** An empty list is `[]`, never an absent field, so
 a consumer never has to distinguish "none" from "not applicable". A list
 container's `count` is derived from its children and cannot disagree with them.
+
+### The reporter is reported
+
+`issue.list` v4 and `issue.get` v6 carry a `reporter` element, on the same terms
+as `assignee`: always present, and empty when the server discloses nobody.
+
+It was asked for on every request from the first version of this tool — it is in
+the default field set — parsed, and then rendered in no format at all, so
+`--reporter ada` filtered on a value nothing could show. Found by asking why
+`--field reporter` did nothing, which it also did.
 
 ### Timestamps out are UTC; dates in are not
 
@@ -716,7 +727,7 @@ refuses the write if the issue has changed since the caller read it. Without it
 two callers editing one issue both exit 0 and the earlier write is lost, with
 nothing truncated, nothing in error, and nothing to say it happened.
 
-`issue.get` v5 carries a `precondition` attribute, which is what the flag takes.
+`issue.get` v6 carries a `precondition` attribute, which is what the flag takes.
 It is opaque: what it holds is the millisecond timestamp Jira served, and the
 `updated` element is RFC 3339 to the second, so conditioning on the published
 value would leave a whole second in which another edit is invisible. It also

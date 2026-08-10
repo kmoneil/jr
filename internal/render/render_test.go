@@ -358,3 +358,64 @@ func TestDefaultFormatFollowsContentShape(t *testing.T) {
 		t.Errorf("diagnostics default to %q, want xml", got)
 	}
 }
+
+// TestAColumnOverAListFlattens covers a rule the output contract has always
+// stated and nothing implemented.
+//
+// "TSV has one cell per column, so a column over a list flattens: values are
+// joined with `,`" has been in docs/output-contract.md since it was written,
+// and JoinList was written for it — with exactly one caller, a resource
+// pre-joining an *attribute* by hand. No column in the tree had ever addressed
+// a list, so a path naming a list container resolved to the container's own
+// text, which is empty, and the cell came out blank. `--field labels` is what
+// finally needed one.
+func TestAColumnOverAListFlattens(t *testing.T) {
+	n := render.El("issue").
+		Child(render.ListEl(
+			"labels", "label",
+			render.El("label").SetText("transport"),
+			render.El("label").SetText("retry"),
+		))
+
+	got, ok := n.Lookup("labels")
+	if !ok {
+		t.Fatal("a path naming a list container resolved to nothing")
+	}
+	if got != "transport,retry" {
+		t.Errorf("labels = %q, want the values joined", got)
+	}
+	// The separator is meaningful, so a value containing one is escaped before
+	// it is joined — otherwise a consumer splitting the cell gets three labels.
+	comma := render.El("issue").
+		Child(render.ListEl(
+			"labels", "label",
+			render.El("label").SetText("a,b"),
+			render.El("label").SetText(`c\d`),
+		))
+	if got, _ := comma.Lookup("labels"); got != `a\,b,c\\d` {
+		t.Errorf("labels = %q, want the separator and the escape escaped", got)
+	}
+}
+
+// TestAContainerThatIsNotAListDoesNotFlatten keeps the rule narrow.
+//
+// An issue has children too. A column path naming one has to keep resolving to
+// nothing rather than to a joined blob of the whole record, or a mistyped path
+// starts returning something that looks like data.
+func TestAContainerThatIsNotAListDoesNotFlatten(t *testing.T) {
+	n := render.El("result").
+		Child(render.El("issue").
+			Attr("key", "ENG-1").
+			Leaf("summary", "s"))
+
+	if got, _ := n.Lookup("issue"); got != "" {
+		t.Errorf("issue = %q, want nothing: its children are not a list", got)
+	}
+	// An empty list is empty, not absent: the path resolves and the cell is
+	// blank, which is what "no labels" looks like.
+	empty := render.El("issue").Child(render.ListEl("labels", "label"))
+	got, ok := empty.Lookup("labels")
+	if !ok || got != "" {
+		t.Errorf("empty labels = %q, %v; want an empty cell that resolved", got, ok)
+	}
+}

@@ -2277,18 +2277,25 @@ func TestAFieldWhoseIdCollidesIsRefused(t *testing.T) {
 		}
 	}
 
-	// A field this package *does* model is accepted and then dropped, because
-	// asking for it changes nothing — it is already in the output, and adding
-	// it again would mean a duplicate column and a duplicate element.
+	// A field this package *does* model is accepted and dropped from the
+	// requested set, because the node already renders it and a second element
+	// named for it would be a duplicate.
+	//
+	// The column is a different question, and conflating the two is what made
+	// `--field components` a no-op: it was already an *element* and had never
+	// been a *column*, so on TSV — the default format — the flag did nothing.
+	// The element stays single and the column appears.
 	resolved, err := issue.ResolveFields(catalogue, []string{"components"})
 	if err != nil {
 		t.Fatalf("a natively-reported field was refused: %v", err)
 	}
 	if got := issue.ExtraFieldNames(resolved); len(got) != 0 {
-		t.Errorf("ExtraFieldNames = %v, want the native field dropped", got)
+		t.Errorf("ExtraFieldNames = %v, want the native field dropped so the "+
+			"node does not carry it twice", got)
 	}
-	if got := issue.ExtraColumns(resolved); len(got) != 0 {
-		t.Errorf("ExtraColumns = %v, want no duplicate column", got)
+	if got := issue.ExtraColumns(resolved); len(got) != 1 {
+		t.Errorf("ExtraColumns = %v, want one column addressing the element "+
+			"the node already renders", got)
 	}
 }
 
@@ -2898,4 +2905,150 @@ func TestATruncatedThreadIsNeverReportedAsComplete(t *testing.T) {
 			t.Errorf("the warning does not mention %q:\n%s", want, warning.String())
 		}
 	}
+}
+
+// TestEveryDefaultFetchedFieldGetsAColumn is the fix for a flag that resolved
+// its argument, fetched it, and produced nothing.
+//
+// `--field created` was accepted, `created` was already in DefaultFields so it
+// was fetched, the node already rendered it — and TSV, the default format,
+// looked exactly as it had before. `--field Team` worked, so the flag looked
+// fine wherever anybody tested it. The reasoning that produced the bug is in a
+// comment on nativeFields: "a caller naming one of these changes nothing,
+// because it is already in the output", which was true of the XML and false of
+// the projection almost everybody reads.
+//
+// It drives every field in DefaultFields by name rather than a representative,
+// because the defect is precisely that one subset behaved differently from
+// another. Four of them are already columns and must stay one column; the rest
+// have to appear.
+func TestEveryDefaultFetchedFieldGetsAColumn(t *testing.T) {
+	already := map[string]bool{
+		"summary": true, "status": true, "assignee": true, "updated": true,
+	}
+
+	defaults := issue.ListColumns()
+	for _, field := range issue.DefaultFields() {
+		cols := append(issue.ListColumns(), issue.ExtraColumns([]string{field})...)
+
+		if already[field] {
+			if len(cols) != len(defaults) {
+				t.Errorf("--field %s added a column to a field already projected: %v",
+					field, headersOf(cols))
+			}
+			continue
+		}
+		if len(cols) != len(defaults)+1 {
+			t.Errorf("--field %s produced %d columns, want one more than the "+
+				"default set: %v", field, len(cols), headersOf(cols))
+			continue
+		}
+		// The column has to point at something. A path naming an element the
+		// node never emits is the same defect one layer along.
+		added := cols[len(cols)-1]
+		if added.Path == "" {
+			t.Errorf("--field %s added a column with no path", field)
+		}
+	}
+}
+
+// TestAColumnForANativeFieldPointsAtTheNode holds each mapped path to the shape
+// Issue.Node actually produces, because a path is a claim about the document.
+//
+// The names differ on purpose: `issuetype` is rendered as the `type` attribute
+// and `fixVersions` as the `fix-versions` list, so a column named for the field
+// would address nothing.
+func TestAColumnForANativeFieldPointsAtTheNode(t *testing.T) {
+	full := issue.Issue{
+		Key: "ENG-1", ID: "1", Summary: "s", Type: "Story", Priority: "High",
+		Project: "ENG", Resolution: "Done", Parent: "ENG-9",
+		Created: "2026-08-10T00:00:00Z", Updated: "2026-08-10T00:00:00Z",
+		Reporter:    issue.User{ID: "ada", Display: "Ada Lovelace"},
+		Description: "why", BodyFormat: issue.BodyWiki,
+		Labels:     []string{"transport"},
+		Components: []string{"api"}, FixVersions: []string{"1.2.0"},
+	}
+	node := full.Node()
+
+	for field, want := range map[string]string{
+		"reporter":    "Ada Lovelace",
+		"priority":    "High",
+		"issuetype":   "Story",
+		"project":     "ENG",
+		"created":     "2026-08-10T00:00:00Z",
+		"resolution":  "Done",
+		"parent":      "ENG-9",
+		"description": "why",
+		"labels":      "transport",
+		"components":  "api",
+		"fixversions": "1.2.0",
+	} {
+		cols := issue.ExtraColumns([]string{field})
+		if len(cols) != 1 {
+			t.Errorf("--field %s produced %d columns", field, len(cols))
+			continue
+		}
+		got, ok := node.Lookup(cols[0].Path)
+		if !ok {
+			t.Errorf("--field %s: path %q does not address the node",
+				field, cols[0].Path)
+			continue
+		}
+		if got != want {
+			t.Errorf("--field %s: path %q gave %q, want %q",
+				field, cols[0].Path, got, want)
+		}
+	}
+}
+
+// TestTwoSpellingsOfOneFieldAreOneColumn covers the pair the catalogue can
+// return either way. A caller naming a field twice wants it once.
+func TestTwoSpellingsOfOneFieldAreOneColumn(t *testing.T) {
+	cols := issue.ExtraColumns([]string{"fixVersions", "fixversions"})
+	if len(cols) != 1 {
+		t.Errorf("ExtraColumns = %v, want one fix-versions column", headersOf(cols))
+	}
+	if len(cols) == 1 && cols[0].Header != "fix-versions" {
+		t.Errorf("header = %q, want the name the node uses", cols[0].Header)
+	}
+}
+
+// TestTheReporterReachesTheOutput covers the field that was fetched on every
+// request and rendered nowhere.
+//
+// It is in DefaultFields, it is parsed into Issue.Reporter, and until
+// issue.list v4 no format showed it — so `--reporter ada` filtered on a value
+// no output could carry, and there was no way to check what the filter had
+// done. Found by asking why `--field reporter` did nothing, which it also did.
+func TestTheReporterReachesTheOutput(t *testing.T) {
+	node := issue.Issue{
+		Key: "ENG-1", ID: "1",
+		Reporter: issue.User{ID: "ada", Display: "Ada Lovelace"},
+	}.Node()
+
+	child, ok := node.ChildNamed("reporter")
+	if !ok {
+		t.Fatal("an issue reports no reporter, and every request asks for one")
+	}
+	if display, _ := child.AttrValue("display"); display != "Ada Lovelace" {
+		t.Errorf("reporter display = %q", display)
+	}
+	// Present and empty when Jira discloses nobody, on the same terms as the
+	// assignee: absent and nobody are different facts.
+	empty, ok := issue.Issue{Key: "ENG-2", ID: "2"}.Node().ChildNamed("reporter")
+	if !ok {
+		t.Fatal("the reporter element vanishes when there is no reporter")
+	}
+	if display, _ := empty.AttrValue("display"); display != "" {
+		t.Errorf("empty reporter display = %q", display)
+	}
+}
+
+// headersOf names the columns for a failure message.
+func headersOf(cols []render.Column) []string {
+	out := make([]string, 0, len(cols))
+	for _, c := range cols {
+		out = append(out, c.Header)
+	}
+	return out
 }

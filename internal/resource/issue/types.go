@@ -22,9 +22,9 @@ import (
 // commit that changes the corresponding golden file.
 const (
 	KindList    = "issue.list"
-	VersionList = 3
+	VersionList = 4
 	KindGet     = "issue.get"
-	VersionGet  = 5
+	VersionGet  = 6
 )
 
 // Body formats a description can arrive in.
@@ -516,6 +516,15 @@ func (i Issue) Node() *render.Node {
 		Attr("display", i.Assignee.Display)
 	n.Child(assignee)
 
+	// The reporter, on the same terms as the assignee. It was asked for on
+	// every request from the beginning — it is in DefaultFields — parsed into
+	// this struct, and then rendered nowhere at all, so `--reporter ada` could
+	// filter on a value no output could show. Found by asking why
+	// `--field reporter` did nothing, which it also did.
+	n.Child(render.El("reporter").
+		Attr("id", i.Reporter.ID).
+		Attr("display", i.Reporter.Display))
+
 	n.AttrIf("type", i.Type)
 	n.AttrIf("priority", i.Priority)
 	n.AttrIf("project", i.Project)
@@ -665,6 +674,38 @@ func ExtraFieldNames(resolved []string) []string {
 	return out
 }
 
+// nativeColumns is the TSV column a native field produces when --field names
+// one, keyed by the id ResolveFields returns.
+//
+// It exists because "already in the output" was true of the XML and false of
+// TSV, which is the default format. `--field created` resolved, was fetched,
+// was rendered as an element, and added no column — so on the format almost
+// everybody sees, the flag did nothing at all and said nothing about it. That
+// is the third time a --field bug has had this shape, and the invariant written
+// after the first two is that a flag either affects the output or does not
+// exist.
+//
+// The four fields ListColumns already projects are deliberately absent: naming
+// one is not a no-op, it asks for something already there, and adding a second
+// `updated` column would be a stranger answer than doing nothing. Every other
+// native field is here, and the paths are the node's own shape rather than the
+// field's name — issuetype renders as the `type` attribute, and fixVersions as
+// the `fix-versions` list.
+var nativeColumns = map[string]render.Column{
+	"reporter":    {Header: "reporter", Path: "reporter@display"},
+	"priority":    {Header: "priority", Path: "@priority"},
+	"issuetype":   {Header: "type", Path: "@type"},
+	"project":     {Header: "project", Path: "@project"},
+	"created":     {Header: "created", Path: "created"},
+	"resolution":  {Header: "resolution", Path: "@resolution"},
+	"parent":      {Header: "parent", Path: "@parent"},
+	"description": {Header: "description", Path: "description"},
+	"labels":      {Header: "labels", Path: "labels"},
+	"components":  {Header: "components", Path: "components"},
+	"fixversions": {Header: "fix-versions", Path: "fix-versions"},
+	"fixVersions": {Header: "fix-versions", Path: "fix-versions"},
+}
+
 // ExtraColumns returns the TSV columns for the resolved ids, appended after the
 // defaults.
 //
@@ -677,10 +718,42 @@ func ExtraFieldNames(resolved []string) []string {
 // format — looking exactly as it did before, which is the same as doing
 // nothing.
 func ExtraColumns(resolved []string) []render.Column {
-	extras := ExtraFieldNames(resolved)
-	out := make([]render.Column, 0, len(extras))
-	for _, id := range extras {
-		out = append(out, render.Column{Header: id, Path: id})
+	out := make([]render.Column, 0, len(resolved))
+	seen := map[string]bool{}
+	for _, id := range resolved {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+
+		// A native field points at where the node already puts it; anything
+		// else is an element named for its own id.
+		col, native := nativeColumns[id]
+		switch {
+		case native:
+			out = append(out, col)
+		case nativeFields[id]:
+			// Already one of the default columns. Asking for it is honoured by
+			// it being there, and a second copy would be the surprise.
+		default:
+			out = append(out, render.Column{Header: id, Path: id})
+		}
+	}
+	return dedupeColumns(out)
+}
+
+// dedupeColumns collapses two spellings of one field to a single column.
+// `--field fixVersions --field fixversions` resolves to two ids pointing at one
+// place in the node, and a caller who names a field twice wants it once.
+func dedupeColumns(cols []render.Column) []render.Column {
+	out := make([]render.Column, 0, len(cols))
+	seen := map[string]bool{}
+	for _, c := range cols {
+		if seen[c.Header] {
+			continue
+		}
+		seen[c.Header] = true
+		out = append(out, c)
 	}
 	return out
 }

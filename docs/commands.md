@@ -1513,7 +1513,7 @@ jr issue get ENG-101 --url
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.get` | v5 | always |
+| `issue.get` | v6 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
@@ -1729,7 +1729,7 @@ jr issue list --changed-by currentUser --changed-after -1w
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.list` | v3 | always |
+| `issue.list` | v4 | always |
 
 Default TSV columns: `key`, `status`, `assignee`, `updated`, `summary`
 

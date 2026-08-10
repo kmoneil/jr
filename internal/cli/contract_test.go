@@ -74,6 +74,14 @@ var malformedFragments = []string{
 	`) OR (1=1`,
 	`(project = ENG`,
 	`   `,
+	// Valid JQL, and not embeddable: the fragment is parenthesized and this
+	// tool's own ORDER BY is appended after it, and JQL does not allow one
+	// inside parentheses. Jira answered the result with a syntax error naming a
+	// character position in a query the caller never wrote. It belongs in this
+	// list rather than in a test of its own for the same reason as the rest:
+	// the surface that describes a query and the surface that sends it have to
+	// reach the same verdict on it.
+	`project = ENG ORDER BY created ASC`,
 }
 
 // TestRawJQLIsRefusedWhereverItIsAccepted is the finding underneath the finding

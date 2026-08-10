@@ -433,7 +433,7 @@ not a project scope, and a regular expression cannot tell the difference.`),
 		// this command genuinely cannot.
 		ExitCodes: []exitcode.Code{exitcode.NotFound},
 		Validate: func(_ context.Context, inv *registry.Invocation) error {
-			return jql.Validate(inv.Flags.String("jql"))
+			return jql.ValidateFragment(inv.Flags.String("jql"))
 		},
 		Run: runExplain,
 	}
@@ -476,7 +476,7 @@ func (e Explanation) Node() *render.Node {
 // commands use, so what it reports is what would be sent rather than a second
 // account of it.
 func Explain(fragment, project, sort, order string) (Explanation, error) {
-	if err := jql.Validate(fragment); err != nil {
+	if err := jql.ValidateFragment(fragment); err != nil {
 		return Explanation{}, err
 	}
 

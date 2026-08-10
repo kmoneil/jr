@@ -391,3 +391,75 @@ func FuzzTokenizeDoesNotPanic(f *testing.F) {
 		}
 	})
 }
+
+// TestValidateFragmentRefusesAnOrderBy covers the rule that applies only to a
+// query this tool is going to embed in a larger one.
+//
+// `jr issue list --jql 'project = ENG ORDER BY created ASC'` built
+// `(project = ENG ORDER BY created ASC) ORDER BY issuekey DESC`, which JQL does
+// not allow — an ORDER BY cannot appear inside parentheses — so Jira answered
+// with a syntax error naming a character position in a query the caller never
+// wrote. Both rules that produce it are right: the fragment is parenthesized so
+// an OR inside it cannot widen the scope, and every query carries an ORDER BY
+// so the ordering never depends on the server's undocumented default. What was
+// missing was a refusal.
+func TestValidateFragmentRefusesAnOrderBy(t *testing.T) {
+	refused := []string{
+		`project = ENG ORDER BY created ASC`,
+		`project = ENG order by created`,
+		`project = ENG ORDER BY created`,
+		// Inside a group, which is where it would break even without wrapping.
+		`(project = ENG ORDER BY created)`,
+	}
+	for _, q := range refused {
+		err := jql.ValidateFragment(q)
+		if err == nil {
+			t.Errorf("%q was accepted as a fragment", q)
+			continue
+		}
+		if code := errs.Coerce(err).Code; code != "JQL_HAS_ORDER_BY" {
+			t.Errorf("%q: code = %q, want JQL_HAS_ORDER_BY", q, code)
+		}
+	}
+}
+
+// TestValidateFragmentReadsTokensNotText is why the check tokenizes.
+//
+// A regular expression over the query text would refuse the first two of these,
+// and the first is an ordinary free-text search. The lexer settles it: the
+// words are inside a string, so they are a value.
+func TestValidateFragmentReadsTokensNotText(t *testing.T) {
+	accepted := []string{
+		`summary ~ "ORDER BY created"`,
+		`summary ~ "order by"`,
+		// A field genuinely called order. It is followed by an operator, and
+		// only the clause is followed by the word BY.
+		`order = 5`,
+		`"Order" = 5`,
+		// The word alone, which is not a clause.
+		`summary ~ order`,
+		`project = ENG`,
+	}
+	for _, q := range accepted {
+		if err := jql.ValidateFragment(q); err != nil {
+			t.Errorf("%q was refused: %v", q, err)
+		}
+	}
+}
+
+// TestValidateFragmentInheritsValidate keeps the two from drifting apart. A
+// fragment has to pass everything a query passes, and then some.
+func TestValidateFragmentInheritsValidate(t *testing.T) {
+	for _, q := range []string{`a) OR (1=1`, `(project = ENG`, `   `, ``} {
+		if err := jql.ValidateFragment(q); err == nil {
+			t.Errorf("%q passed as a fragment and Validate refuses it", q)
+		}
+	}
+	// And a query carrying its own ORDER BY is *valid*: `jr jql validate`
+	// reports on it and must not be made to call it malformed, which is the
+	// whole reason this is a second function rather than a rule inside the
+	// first.
+	if err := jql.Validate(`project = ENG ORDER BY created ASC`); err != nil {
+		t.Errorf("Validate refused a valid query: %v", err)
+	}
+}

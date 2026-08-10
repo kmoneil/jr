@@ -415,6 +415,20 @@ ids — rather than sent for Jira to reject opaquely. A field the server did not
 return comes back present and empty, so "no value" stays distinguishable from
 "you asked for something that does not exist".
 
+**It is not only for custom fields.** The default columns are five, and an issue
+carries more than that, so `--field` is also how you widen a listing with the
+ones already being fetched:
+
+```console
+$ jr issue list --field created --field reporter --field priority
+$ jr issue list --field labels        # a list flattens into one cell, comma-joined
+```
+
+Naming a field that is already a column — `summary`, `status`, `assignee`,
+`updated` — does nothing, because it is already there. Everything else gets a
+column, headed the way the document names it: `--field issuetype` is a `type`
+column, `--field fixVersions` a `fix-versions` one.
+
 If your team has fields that belong on every issue, store them on the context:
 
 ```console
