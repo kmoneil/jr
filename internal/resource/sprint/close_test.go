@@ -4,6 +4,7 @@ package sprint_test
 
 import (
 	"io"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -175,4 +176,112 @@ func runClose(
 		t.Fatalf("close: %v", err)
 	}
 	return doc, replayer
+}
+
+// TestTheRecordedCloseIsAConversationAServerHad is the last verb in this tree
+// to have been run against a real Jira, and it was run exactly once.
+//
+// Closing a sprint cannot be undone — the API offers no way to reopen one — so
+// this recording cost the sandbox's only sprint, and re-recording it means
+// somebody making a new one in the UI, since `jr` has no `sprint start`. That is
+// the reason it stayed unrecorded through four sessions of gate-building while
+// everything around it was covered.
+//
+// What it establishes over close.datacenter.json beside it: that the two-step
+// this command performs is the two-step Jira expects, and that the POST answers
+// **200 with a body** rather than the 204 the other agile writes give. The
+// constructed fixture had that right, which is worth saying out loud — three
+// others in this tree did not, and nothing but a recording could tell them
+// apart.
+func TestTheRecordedCloseIsAConversationAServerHad(t *testing.T) {
+	cassette, err := transport.LoadCassette(
+		filepath.Join("testdata", "close-recorded.cloud.json"),
+	)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !cassette.Evidence() {
+		t.Fatal("close-recorded.cloud.json is not a recording, so replaying it " +
+			"establishes nothing about the API")
+	}
+
+	cmd, ok := registry.Lookup("sprint.close")
+	if !ok {
+		t.Fatal("sprint close is not registered")
+	}
+	replayer := transport.NewReplayer(cassette)
+	conn, err := transport.New(transport.Options{
+		BaseURL: "https://recorded.invalid", HTTPClient: replayer.Client(), Retries: -1,
+	})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	flags := registry.NewFlags()
+	flags.SetBool("yes", true)
+	doc, err := cmd.Run(t.Context(), &registry.Invocation{
+		Jira: &stubSession{conn: conn, kind: site.Cloud}, Args: []string{"1"},
+		Flags: flags, Stderr: io.Discard, Progress: registry.NoProgress,
+	})
+	if err != nil {
+		t.Fatalf("the requests this code builds are not the ones the server "+
+			"answered: %v", err)
+	}
+
+	if state, _ := doc.Record.AttrValue("state"); state != "closed" {
+		t.Errorf("state = %q, want closed", state)
+	}
+	if action, _ := doc.Record.AttrValue("action"); action != "closed" {
+		t.Errorf("action = %q, want closed", action)
+	}
+	// The name comes from the read, which is the point of reading first: the
+	// acknowledgement names the iteration that ended rather than echoing the id
+	// back at the caller who typed it.
+	name, ok := doc.Record.ChildNamed("name")
+	if !ok || name.Text != "AGL Sprint 1" {
+		t.Errorf("name = %+v, want the sprint the read reported", name)
+	}
+	// Both interactions, in order: a close that skipped the precondition read
+	// would leave the GET unplayed.
+	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+		t.Errorf("the close did not make both calls: %v", unplayed)
+	}
+	if unmatched := replayer.Unmatched(); len(unmatched) > 0 {
+		t.Errorf("a request went somewhere the cassette does not answer: %v",
+			unmatched)
+	}
+}
+
+// TestTheCloseAnswersTwoHundredWithABody pins the divergence a caller would
+// otherwise meet at runtime.
+//
+// Every other agile write here answers 204 and nothing, and `send` is written
+// for that: it reads the status and discards the body. This one answers 200 and
+// a sprint, so a future change that started parsing the response of an agile
+// write would find one endpoint behaving differently from its neighbours. The
+// recording is where that fact lives.
+func TestTheCloseAnswersTwoHundredWithABody(t *testing.T) {
+	cassette, err := transport.LoadCassette(
+		filepath.Join("testdata", "close-recorded.cloud.json"),
+	)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if len(cassette.Interactions) != 2 {
+		t.Fatalf("got %d interactions, want the read and the write",
+			len(cassette.Interactions))
+	}
+
+	write := cassette.Interactions[1]
+	if write.Request.Method != transport.MethodPost {
+		t.Errorf("method = %q, want POST", write.Request.Method)
+	}
+	if write.Response.Status != 200 {
+		t.Errorf("status = %d, want 200 — this one is not a 204 like its "+
+			"neighbours", write.Response.Status)
+	}
+	if !strings.Contains(write.Response.Body, "completeDate") {
+		t.Errorf("the response carries no completeDate, so the 200 body is not "+
+			"the sprint Jira sent back: %s", write.Response.Body)
+	}
 }

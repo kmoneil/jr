@@ -1,0 +1,182 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB. `sprint close`, the last verb in this tree that had never been run. Both halves are here: the precondition read that finds the sprint active, and the POST that ends it. Jira answers the POST 200 with a body rather than 204, and the body carries completeDate \u2014 which the constructed Data Center fixture beside this one had right, for once. Recording it cost the sandbox's only sprint; there is no way to reopen one and no `sprint start` verb, so a re-recording is a new sprint made by hand in the UI.",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/agile/1.0/sprint/1"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Atl-Request-Id": [
+            "00000000-0000-0000-0000-000000000000"
+          ],
+          "Atl-Traceid": [
+            "56c53b93cac34bf7a62177235de6f47a"
+          ],
+          "Cache-Control": [
+            "no-cache, no-store, no-transform"
+          ],
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Date": [
+            "Mon, 10 Aug 2026 15:14:18 GMT"
+          ],
+          "Nel": [
+            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=349;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "Report-To": [
+            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
+          ],
+          "Server": [
+            "AtlassianEdge"
+          ],
+          "Server-Timing": [
+            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=1,cdn-upstream-connect;dur=91,cdn-upstream-fbl;dur=246,atl-edge;dur=123,atl-edge-internal;dur=29,atl-edge-upstream;dur=94,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW57-P4\",cdn-rid;desc=\"JLWr4Tm1mC4W-Muha5JHKAaSfXxzPNHP3qn2XLjtUqNTczrrADKlNg==\",cdn-downstream-fbl;dur=250"
+          ],
+          "Set-Cookie": [
+            "REDACTED"
+          ],
+          "Strict-Transport-Security": [
+            "max-age=63072000; includeSubDomains; preload"
+          ],
+          "Timing-Allow-Origin": [
+            "*"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "Via": [
+            "1.1 6f95cf93b84552056514ff4576f4badc.cloudfront.net (CloudFront)"
+          ],
+          "X-Aaccountid": [
+            "000000%3A00000000-0000-0000-0000-000000000000"
+          ],
+          "X-Amz-Cf-Id": [
+            "JLWr4Tm1mC4W-Muha5JHKAaSfXxzPNHP3qn2XLjtUqNTczrrADKlNg=="
+          ],
+          "X-Amz-Cf-Pop": [
+            "DFW57-P4"
+          ],
+          "X-Arequestid": [
+            "6eb0437a011079f5f2e9b2c2bbfad2cd"
+          ],
+          "X-Cache": [
+            "Miss from cloudfront"
+          ],
+          "X-Content-Type-Options": [
+            "nosniff"
+          ],
+          "X-Ratelimit-Limit": [
+            "350"
+          ],
+          "X-Ratelimit-Remaining": [
+            "349"
+          ],
+          "X-Xss-Protection": [
+            "1; mode=block"
+          ]
+        },
+        "body": "{\"id\":1,\"self\":\"https://recorded.invalid/rest/agile/1.0/sprint/1\",\"state\":\"active\",\"name\":\"AGL Sprint 1\",\"startDate\":\"2026-08-10T15:12:18.263Z\",\"endDate\":\"2026-08-24T15:12:13.000Z\",\"createdDate\":\"2026-08-10T13:35:48.975Z\",\"originBoardId\":3,\"goal\":\"\"}"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/agile/1.0/sprint/1",
+        "body": "{\"state\":\"closed\"}"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Atl-Request-Id": [
+            "00000000-0000-0000-0000-000000000000"
+          ],
+          "Atl-Traceid": [
+            "003b71d8acd748a5a264fbab15a05d00"
+          ],
+          "Cache-Control": [
+            "no-cache, no-store, no-transform"
+          ],
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Date": [
+            "Mon, 10 Aug 2026 15:14:18 GMT"
+          ],
+          "Nel": [
+            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=198;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "Report-To": [
+            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
+          ],
+          "Server": [
+            "AtlassianEdge"
+          ],
+          "Server-Timing": [
+            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=91,cdn-upstream-fbl;dur=321,atl-edge;dur=199,atl-edge-internal;dur=19,atl-edge-upstream;dur=179,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW57-P4\",cdn-rid;desc=\"KcPqwsQmXx6m4OwKNUSpNaSEvUJCqYlkVsTyuJUz_Vz9o1f0GOqqhw==\",cdn-downstream-fbl;dur=325"
+          ],
+          "Set-Cookie": [
+            "REDACTED"
+          ],
+          "Strict-Transport-Security": [
+            "max-age=63072000; includeSubDomains; preload"
+          ],
+          "Timing-Allow-Origin": [
+            "*"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "Via": [
+            "1.1 6f95cf93b84552056514ff4576f4badc.cloudfront.net (CloudFront)"
+          ],
+          "X-Aaccountid": [
+            "000000%3A00000000-0000-0000-0000-000000000000"
+          ],
+          "X-Amz-Cf-Id": [
+            "KcPqwsQmXx6m4OwKNUSpNaSEvUJCqYlkVsTyuJUz_Vz9o1f0GOqqhw=="
+          ],
+          "X-Amz-Cf-Pop": [
+            "DFW57-P4"
+          ],
+          "X-Arequestid": [
+            "b0766210b194ee7a8360fa93f9e0098a"
+          ],
+          "X-Cache": [
+            "Miss from cloudfront"
+          ],
+          "X-Content-Type-Options": [
+            "nosniff"
+          ],
+          "X-Ratelimit-Limit": [
+            "200"
+          ],
+          "X-Ratelimit-Remaining": [
+            "198"
+          ],
+          "X-Xss-Protection": [
+            "1; mode=block"
+          ]
+        },
+        "body": "{\"id\":1,\"self\":\"https://recorded.invalid/rest/agile/1.0/sprint/1\",\"state\":\"closed\",\"name\":\"AGL Sprint 1\",\"startDate\":\"2026-08-10T15:12:18.263Z\",\"endDate\":\"2026-08-24T15:12:13.000Z\",\"completeDate\":\"2026-08-10T15:14:18.859Z\",\"createdDate\":\"2026-08-10T13:35:48.975Z\",\"originBoardId\":3,\"goal\":\"\"}"
+      }
+    }
+  ]
+}

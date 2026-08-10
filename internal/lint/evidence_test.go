@@ -48,9 +48,18 @@ var recordedFixtures = map[string][]string{
 		"parentset-classic.cloud.json", "parentclear-classic.cloud.json",
 		"parentset-nextgen.cloud.json", "parentclear-nextgen.cloud.json",
 	},
-	"internal/resource/board":  {"boards-recorded.cloud.json", "board-recorded.cloud.json"},
-	"internal/resource/epic":   {"epics-recorded.cloud.json", "epic-recorded.cloud.json"},
-	"internal/resource/sprint": {"sprints-recorded.cloud.json", "sprint-recorded.cloud.json"},
+	"internal/resource/board": {"boards-recorded.cloud.json", "board-recorded.cloud.json"},
+	"internal/resource/epic":  {"epics-recorded.cloud.json", "epic-recorded.cloud.json"},
+	"internal/resource/sprint": {
+		"sprints-recorded.cloud.json", "sprint-recorded.cloud.json",
+		// The same sprint before and after it was started, so both renderings
+		// of the date columns rest on a server rather than on a guess.
+		"sprints-active-recorded.cloud.json", "sprint-active-recorded.cloud.json",
+		// The expensive one. Closing a sprint cannot be undone, so this cost
+		// the sandbox's only sprint and cannot be re-recorded without somebody
+		// making a new one by hand.
+		"close-recorded.cloud.json",
+	},
 	"internal/workflow": {
 		"epicadd.cloud.json", "epicremove.cloud.json", "sprintadd.cloud.json",
 		// The before and after of replacing the agile epic endpoint: the same
@@ -119,11 +128,10 @@ func TestRecordedFixturesStayRecorded(t *testing.T) {
 var unrecorded = map[string]string{
 	// The four Cloud agile rows were paid off on 2026-08-10, when a
 	// company-managed project with a scrum board and a sprint was added to the
-	// sandbox. `sprint close` is still the one verb in the tree with no
-	// recording of its own — it needs a *started* sprint, and starting one is
-	// UI work this tool has no verb for — but the package it lives in has
-	// recordings now, so it is a card and not a row here. This list is grouped
-	// by package and deployment and cannot express "one verb of four".
+	// sandbox. Every Cloud verb in this tree has now been run against a real
+	// Jira, `sprint close` last and once: closing a sprint cannot be undone, so
+	// that recording cost the sandbox's only iteration and re-recording it needs
+	// a new sprint made by hand in the UI.
 
 	// Every Data Center row has one cause, written out once per row rather than
 	// once for the group, because a row is what somebody deletes and the reason

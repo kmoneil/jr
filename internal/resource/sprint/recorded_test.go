@@ -119,3 +119,78 @@ func TestTheRecordedSprintIsAConversationAServerHad(t *testing.T) {
 		t.Errorf("the sprint was never read: %v", unplayed)
 	}
 }
+
+// TestTheRecordedActiveSprintListIsAConversationAServerHad is the other half of
+// the listing pair.
+//
+// sprints-recorded.cloud.json holds a `future` sprint, which carries neither
+// date, and this one holds the same sprint started. Between them both
+// renderings of the start and end columns are pinned against a real server —
+// empty and populated — which one recording could not do and which the
+// constructed fixtures get to decide for themselves.
+func TestTheRecordedActiveSprintListIsAConversationAServerHad(t *testing.T) {
+	cmd, ok := registry.Lookup("sprint.list")
+	if !ok {
+		t.Fatal("sprint list is not registered")
+	}
+	conn, replayer := recordedConn(t, "sprints-active-recorded.cloud.json")
+
+	var buf strings.Builder
+	stream, err := render.NewStream(&buf, render.TSV, render.StreamSpec{
+		Kind: cmd.Kind(), Version: cmd.KindVersion(),
+		Name: cmd.CollectionName, Columns: cmd.Columns,
+	})
+	if err != nil {
+		t.Fatalf("stream: %v", err)
+	}
+	result, err := cmd.Stream(t.Context(), &registry.Invocation{
+		Jira:  &stubSession{conn: conn, kind: site.Cloud, board: "3"},
+		Flags: registry.NewFlags(), Limit: registry.Limit{All: true},
+		Stderr: io.Discard, Progress: registry.NoProgress,
+	}, stream)
+	if err != nil {
+		t.Fatalf("the request this code builds is not the one the server "+
+			"answered: %v", err)
+	}
+	if err := stream.Close(result.Complete, result.NextPageToken); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+		t.Errorf("a recorded page was never requested: %v", unplayed)
+	}
+
+	// Jira sends the dates with milliseconds and a Z; the renderer normalizes
+	// to RFC 3339 seconds, and this is the only place that conversion is
+	// checked against bytes a server actually sent.
+	want := "id\tname\tstate\tstart\tend\n" +
+		"1\tAGL Sprint 1\tactive\t2026-08-10T15:12:18Z\t2026-08-24T15:12:13Z\n"
+	if buf.String() != want {
+		t.Errorf("listing =\n%q\nwant\n%q", buf.String(), want)
+	}
+}
+
+// TestTheRecordedActiveSprintIsAConversationAServerHad covers the read by id
+// with both dates set.
+func TestTheRecordedActiveSprintIsAConversationAServerHad(t *testing.T) {
+	cmd, ok := registry.Lookup("sprint.get")
+	if !ok {
+		t.Fatal("sprint get is not registered")
+	}
+	conn, replayer := recordedConn(t, "sprint-active-recorded.cloud.json")
+
+	doc, err := cmd.Run(t.Context(), &registry.Invocation{
+		Jira: &stubSession{conn: conn, kind: site.Cloud},
+		Args: []string{"1"}, Flags: registry.NewFlags(),
+		Stderr: io.Discard, Progress: registry.NoProgress,
+	})
+	if err != nil {
+		t.Fatalf("the request this code builds is not the one the server "+
+			"answered: %v", err)
+	}
+	if state, _ := doc.Record.AttrValue("state"); state != "active" {
+		t.Errorf("state = %q, want active", state)
+	}
+	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+		t.Errorf("the sprint was never read: %v", unplayed)
+	}
+}
