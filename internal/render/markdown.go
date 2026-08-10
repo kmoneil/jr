@@ -41,12 +41,39 @@ func registerFormat(f Format, doc func(*writer, *Doc), diagnostic func(*writer, 
 	extraDiagnostic[f] = diagnostic
 }
 
+// lineEndings collapses a carriage return into the newline it means.
+//
+// This is the one place markdown alters a value, and it is a *presentation*
+// decision rather than a fidelity one. §3.2 puts this format outside the
+// contract and says not to parse it, so nothing here is being mis-read — but a
+// terminal reading a CR returns the cursor to column 0, and what follows
+// overwrites what came before. "Closed as duplicate\rDO NOT MERGE" displays as
+// the second half alone, with the first half present in the data and absent
+// from the screen. The source is an issue summary, written by whoever can file
+// a ticket.
+//
+// Normalising rather than refusing, because UNRENDERABLE_VALUE is for a
+// character no format can carry and four of the five carry this one perfectly.
+// A format with no promises must not be the thing that fails a command. And
+// rather than escaping, because a `\r` in the middle of prose is noise to the
+// reader this format exists for.
+//
+// This is markdown's second documented lossy case, beside a leaf that carries
+// both text and attributes rendering only the text. Both have the same shape of
+// justification: what is dropped here is intact in the other four formats,
+// which is where anything parsing should be looking.
+//
+// CRLF is listed first so the pair collapses to one newline rather than two.
+// A Replacer matches the earlier pattern at a given position.
+var lineEndings = strings.NewReplacer("\r\n", "\n", "\r", "\n")
+
 // writeMarkdown emits a document as markdown.
 //
 // One writer covers every kind, because a Doc is a tree of Nodes and nothing
 // here knows what an issue is — the same reason the XML writer needs no
 // per-kind code.
 func writeMarkdown(w *writer, d *Doc) {
+	w.normalize = lineEndings.Replace
 	if d.Record != nil {
 		writeMarkdownRecord(w, d.Record, 1)
 		return
@@ -293,6 +320,10 @@ func markdownTitle(n *Node) string {
 // passed --format markdown and hit a 404 would get a diagnostic in some other
 // shape, or none.
 func writeMarkdownDiagnostic(w *writer, n *Node) {
+	// Set here as well as in writeMarkdown, because a diagnostic does not go
+	// through it. An error's detail carries the offending value, which is
+	// exactly the string most likely to hold what somebody put in a field.
+	w.normalize = lineEndings.Replace
 	w.raw("# " + n.Name + "\n\n")
 	for _, c := range n.Children {
 		if c.Text == "" {

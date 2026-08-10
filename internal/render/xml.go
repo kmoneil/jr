@@ -169,11 +169,28 @@ func escapeCDATA(s string) string { return cdataEscaper.Replace(s) }
 type writer struct {
 	w   io.Writer
 	err error
+	// normalize rewrites every string on its way out, for a format that has one
+	// rule applying to all of its output rather than to particular fields.
+	//
+	// It exists for markdown, which must not put a carriage return on a
+	// terminal and has six places that write data-derived text — a table cell,
+	// a title, a node's own text, a CDATA section, a list item, a diagnostic
+	// field. Fixing six sites is how a seventh gets added without the rule, and
+	// this project has already found that the copy which deviates is the bug.
+	// raw is the single funnel every one of them goes through.
+	//
+	// Nil for the four contract formats, which escape per field because what is
+	// legal depends on where the value sits: a tab is fine in XML element text
+	// and must be a reference in an attribute.
+	normalize func(string) string
 }
 
 func (w *writer) raw(s string) {
 	if w.err != nil {
 		return
+	}
+	if w.normalize != nil {
+		s = w.normalize(s)
 	}
 	_, w.err = io.WriteString(w.w, s)
 }

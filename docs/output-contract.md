@@ -105,11 +105,17 @@ Three things keep the exception contained rather than making it a hole:
   profiles refuse `--format markdown` with exit 2, do not list it in `--format`,
   and do not advertise it in the MCP tool schema. Asserted from both sides in
   `internal/render` and by `internal/lint/profiles_test.go`.
-- It is **lossy on purpose, in one place.** A leaf carrying both text and
+- It is **lossy on purpose, in two places.** A leaf carrying both text and
   attributes renders its text and drops the attributes:
   `<status category="in-progress">In Progress</status>` reads as `In Progress`.
-  The text is what a person is reading for. Every attribute is still in the
-  other three formats, which is where anything parsing should be looking.
+  The text is what a person is reading for. And a carriage return is normalised
+  to a newline, because this is the format that reaches a terminal and a
+  terminal reading `\r` returns the cursor to column 0 — `Closed as
+  duplicate\rDO NOT MERGE` displays as the second half alone, with the first
+  half present in the data and absent from the screen. The source is an issue
+  summary, so it is written by whoever can file a ticket. Everything either case
+  touches is still in the other four formats, which is where anything parsing
+  should be looking.
 
 It is still goldened in `internal/render/testdata`, and that is not a
 contradiction. Those files are regression tests: change the writer and the diff
