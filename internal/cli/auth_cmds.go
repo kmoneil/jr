@@ -279,8 +279,15 @@ while the site stayed authenticated.`),
 		LocalState:  true,
 		Destructive: true,
 		Outputs:     []registry.Output{{Kind: kindAuthStatus, Version: versionAuthStatus}},
-		ExitCodes:   []exitcode.Code{exitcode.NotFound, exitcode.Blocked},
-		Run:         a.runAuthLogout,
+		// Auth is the credential store's, not a request's. Reading the store to
+		// find what to remove refuses it at STORE_PERMISSIONS, STORE_INVALID, or
+		// STORE_UNREADABLE, all exit 4, and this command has to read it before
+		// it can delete anything. `auth status` and `auth token` declared that
+		// and this did not, which is the same asymmetry three of these commands
+		// had over --context: the reachable exit belongs to the layer below and
+		// only the ones somebody happened to probe by hand were corrected.
+		ExitCodes: []exitcode.Code{exitcode.Auth, exitcode.NotFound, exitcode.Blocked},
+		Run:       a.runAuthLogout,
 	}
 }
 

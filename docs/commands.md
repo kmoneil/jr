@@ -152,7 +152,7 @@ jr auth logout --site your-site.atlassian.net --yes
 | --- | --- | --- |
 | `auth.status` | v1 | always |
 
-Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND, `10` BLOCKED
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `10` BLOCKED
 
 ### `jr auth status`
 
