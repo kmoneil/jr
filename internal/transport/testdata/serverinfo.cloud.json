@@ -1,7 +1,7 @@
 {
   "deployment": "cloud",
   "source": "recorded",
-  "note": "Assembled from three recordings against the oneil-team Cloud sandbox on 2026-08-10, because TestContractAgainstBothDeployments drives four endpoints and JIRA_RECORD captures one invocation per file. Every interaction below is a real request and the response the server gave it, unmodified beyond JIRA_RECORD_SCRUB: `jr user me --refresh` produced the probe and /myself, `jr issue get KAN-9999` the 404, and `jr issue create --summary <300 chars>` the 400. Assembly was selection and concatenation only \u2014 nothing here was written by hand, which is what source=recorded is claiming. Interactions the test does not play were dropped, because the test asserts Replayer.Unplayed is empty.",
+  "note": "Assembled from three recordings against the Cloud sandbox on 2026-08-10, because TestContractAgainstBothDeployments drives four endpoints and JIRA_RECORD captures one invocation per file. Every interaction below is a real request and the response the server gave it, unmodified beyond JIRA_RECORD_SCRUB: `user me --refresh` produced the probe and /myself, an `issue get` on a key that does not exist produced the 404, and an `issue create` with a 300-character summary produced the 400. Assembly was selection and concatenation only \u2014 nothing here was written by hand, which is what source=recorded is claiming. Interactions the test does not play were dropped, because it asserts Replayer.Unplayed is empty. Site and project names are scrubbed here as they are in the bodies below; naming them in prose would undo the scrubbing one line above the data.",
   "interactions": [
     {
       "request": {
