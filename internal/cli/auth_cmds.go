@@ -17,9 +17,13 @@ import (
 
 // Output kinds owned by the auth commands.
 const (
-	kindAuthStatus    = "auth.status"
-	kindAuthToken     = "auth.token"
-	versionAuthStatus = 1
+	kindAuthStatus = "auth.status"
+	kindAuthToken  = "auth.token"
+	// v2 adds `site-scoped`, which reports whether the credential's provider is
+	// keyed by host. An exported JIRA_API_TOKEN is not, so it is sent to
+	// whatever site the invocation resolves — correct behaviour that nothing
+	// had ever said out loud.
+	versionAuthStatus = 2
 	versionAuthToken  = 1
 )
 
@@ -429,7 +433,15 @@ func authStatusDoc(site string, cred auth.Credential, found bool, sources []stri
 
 	if found {
 		n.Attr("scheme", string(cred.Scheme)).
-			Attr("source", cred.Source)
+			Attr("source", cred.Source).
+			// Whether the credential was looked up *for* this site or merely
+			// found. An exported JIRA_API_TOKEN is not keyed by host, so it
+			// follows whatever site the invocation resolves — from --site, from
+			// JIRA_SITE, or from a config.toml that is 0644 by design and meant
+			// to be shared between machines. Nothing there misbehaves; the
+			// composition is just worth one attribute in the command somebody
+			// already runs to ask where their credential comes from.
+			Attr("site-scoped", strconv.FormatBool(cred.SiteScoped))
 		if cred.User != "" {
 			n.Attr("user", cred.User)
 		}

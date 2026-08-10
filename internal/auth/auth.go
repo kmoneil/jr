@@ -95,6 +95,19 @@ type Credential struct {
 	// Source names where this credential came from, for `jr auth status`. It
 	// is never part of the credential itself.
 	Source string
+	// SiteScoped reports whether the provider that produced this credential
+	// was keyed by host — whether it was looked up *for* the site it is about
+	// to be sent to, or merely found.
+	//
+	// FileStore and NetrcProvider are keyed by host and set it. EnvProvider is
+	// not and deliberately leaves it false: an exported JIRA_API_TOKEN is used
+	// for whatever site the invocation resolves, which is the behaviour a CI
+	// job wants and is documented on EnvProvider.Lookup.
+	//
+	// The zero value is the cautious one. A credential built somewhere that
+	// never considered the question reports "not site-scoped", which
+	// overstates the case in `jr auth status` and never understates it.
+	SiteScoped bool
 }
 
 // Validate reports whether the credential can actually authenticate.

@@ -209,6 +209,96 @@ func TestHalfConfiguredEnvironmentIsLoud(t *testing.T) {
 	}
 }
 
+// TestAnEnvironmentCredentialFollowsWhateverSiteItIsPointedAt pins the decision
+// recorded on auth.EnvProvider.Lookup.
+//
+// FileStore and NetrcProvider are keyed by host: ask either for a site it has
+// never heard of and it says no. EnvProvider is not, on purpose. A CI job
+// exports JIRA_API_TOKEN and runs against one site, and making it name the host
+// in a third variable is friction with no payoff.
+//
+// The test exists for the reason TestANetrcIsReadWhateverItsMode does: adding
+// host-scoping here breaks nothing visible, tightens something, and reads as
+// security, so it is exactly the change that lands without an argument. The
+// argument is in the doc comment; this is what makes somebody read it.
+//
+// It does not assert the composition is harmless — an exported token plus a
+// config.toml that is 0644 by design does mean the site can come from a file
+// somebody else wrote. It asserts the tool says so, which is the whole of what
+// was decided: site-scoped is on the credential and reaches `jr auth status`.
+func TestAnEnvironmentCredentialFollowsWhateverSiteItIsPointedAt(t *testing.T) {
+	p := auth.EnvProvider{Getenv: env(map[string]string{auth.EnvToken: theToken})}
+
+	// Two unrelated hosts and no host at all. Nothing in the environment names
+	// any of them, and each must still be answered.
+	for _, site := range []string{
+		"acme.atlassian.invalid",
+		"jira.other-company.invalid",
+		"https://jira.example/context-path",
+		"",
+	} {
+		t.Run(site, func(t *testing.T) {
+			cred, ok, err := p.Lookup(site)
+			if err != nil {
+				t.Fatalf("the environment refused site %q: %v\n"+
+					"This is a deliberate decision, not an oversight — see the doc "+
+					"comment on auth.EnvProvider.Lookup. If it is being reversed, "+
+					"reverse that too, and say what happens to a CI job that "+
+					"exports a token and no host.", site, err)
+			}
+			if !ok {
+				t.Fatalf("the environment yielded no credential for site %q, "+
+					"though %s is set", site, auth.EnvToken)
+			}
+			if cred.Secret.Reveal() != theToken {
+				t.Errorf("credential = %+v, want the token in the environment", cred)
+			}
+			if cred.SiteScoped {
+				t.Error("an environment credential reports itself site-scoped, " +
+					"which `jr auth status` prints: it was not looked up for this " +
+					"site, it is the one that was found")
+			}
+		})
+	}
+}
+
+// TestAHostKeyedProviderReportsItselfSiteScoped is the other half of the
+// assertion above, and without it that one is satisfied by a field nothing ever
+// sets. An attribute `jr auth status` always prints as false says nothing about
+// anything.
+func TestAHostKeyedProviderReportsItselfSiteScoped(t *testing.T) {
+	const site = "acme.atlassian.invalid"
+
+	t.Run("credential store", func(t *testing.T) {
+		store := auth.FileStore{Path: filepath.Join(t.TempDir(), "credentials.toml")}
+		if err := store.Save(site, auth.Credential{
+			Scheme: auth.Bearer, Secret: auth.Secret(theToken),
+		}); err != nil {
+			t.Fatalf("save: %v", err)
+		}
+		cred, ok, err := store.Lookup(site)
+		if err != nil || !ok {
+			t.Fatalf("lookup: ok = %v, err = %v", ok, err)
+		}
+		if !cred.SiteScoped {
+			t.Error("a credential from the store reports itself not site-scoped, " +
+				"though the store is keyed by host and refuses a site it has not got")
+		}
+	})
+
+	t.Run("netrc", func(t *testing.T) {
+		path := writeNetrc(t, "machine "+site+" login ada password "+theToken+"\n")
+		cred, ok, err := auth.NetrcProvider{Path: path}.Lookup(site)
+		if err != nil || !ok {
+			t.Fatalf("lookup: ok = %v, err = %v", ok, err)
+		}
+		if !cred.SiteScoped {
+			t.Error("a credential from .netrc reports itself not site-scoped, " +
+				"though it was matched by a `machine` line naming this host")
+		}
+	})
+}
+
 func TestEnvProviderRejectsABadScheme(t *testing.T) {
 	p := auth.EnvProvider{Getenv: env(map[string]string{
 		auth.EnvToken: theToken, auth.EnvAuthScheme: "magic",

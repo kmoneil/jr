@@ -1,5 +1,5 @@
 kind	v	emitters
-auth.status	1	auth.login,auth.logout,auth.status
+auth.status	2	auth.login,auth.logout,auth.status
 auth.token	1	auth.token
 board.get	1	board.get
 board.list	1	board.list

@@ -70,10 +70,11 @@ func (s FileStore) Lookup(site string) (Credential, bool, error) {
 			WithRemedy("run `jr auth login --site %s` to replace it", site)
 	}
 	return Credential{
-		Scheme: scheme,
-		User:   stored.User,
-		Secret: Secret(stored.Token),
-		Source: s.Path,
+		Scheme:     scheme,
+		User:       stored.User,
+		Secret:     Secret(stored.Token),
+		Source:     s.Path,
+		SiteScoped: true, // Keyed by hostOf(site), three lines up.
 	}, true, nil
 }
 

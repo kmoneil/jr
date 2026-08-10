@@ -87,10 +87,11 @@ func (p NetrcProvider) Lookup(site string) (Credential, bool, error) {
 	}
 
 	return Credential{
-		Scheme: inferScheme(entry.login),
-		User:   entry.login,
-		Secret: Secret(entry.password),
-		Source: path,
+		Scheme:     inferScheme(entry.login),
+		User:       entry.login,
+		Secret:     Secret(entry.password),
+		Source:     path,
+		SiteScoped: true, // parseNetrc matched a `machine` line for this host.
 	}, true, nil
 }
 

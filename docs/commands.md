@@ -117,7 +117,7 @@ printf '%s' "$PAT" | jr auth login --site jira.acme.internal --token-stdin
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `auth.status` | v1 | always |
+| `auth.status` | v2 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `9` REMOTE
 
@@ -150,7 +150,7 @@ jr auth logout --site your-site.atlassian.net --yes
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `auth.status` | v1 | always |
+| `auth.status` | v2 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `10` BLOCKED
 
@@ -186,7 +186,7 @@ jr auth status --site your-site.atlassian.net
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `auth.status` | v1 | always |
+| `auth.status` | v2 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND
 

@@ -259,6 +259,36 @@ func TestCredentialFromEnvironmentBeatsTheStore(t *testing.T) {
 	}
 }
 
+// TestAuthStatusSaysWhetherTheCredentialIsSiteScoped tests the layer a user
+// invokes, because that is the whole point of the attribute: the fact is only
+// worth anything where somebody is already asking where their credential comes
+// from.
+//
+// The store and the environment answer for the same site, one after the other,
+// so the two spellings appear in one test and neither can be a constant. A
+// credential from the store was looked up *for* acme; the exported token is
+// merely the one that was found, and it would have been found just the same had
+// config.toml — which is 0644 by design, and meant to be shared between
+// machines — named a different host.
+func TestAuthStatusSaysWhetherTheCredentialIsSiteScoped(t *testing.T) {
+	env := session(t)
+	mustRun(t, env, "context", "create", "work", "--site", "acme.atlassian.invalid")
+	runWithStdin(t, env, strings.NewReader("stored-token"),
+		"auth", "login", "--no-verify", "--site", "acme.atlassian.invalid", "--token-stdin")
+
+	got := mustRun(t, env, "auth", "status")
+	if !strings.Contains(got.stdout, `site-scoped="true"`) {
+		t.Errorf("a credential from the store is not reported as site-scoped:\n%s", got.stdout)
+	}
+
+	env["JIRA_API_TOKEN"] = "env-token"
+	got = mustRun(t, env, "auth", "status")
+	if !strings.Contains(got.stdout, `site-scoped="false"`) {
+		t.Errorf("an environment credential is reported as site-scoped, "+
+			"though it is sent to whatever site is configured:\n%s", got.stdout)
+	}
+}
+
 // TestLogoutCannotRemoveAnEnvironmentCredential stops `auth logout` reporting
 // success while the site stays authenticated.
 func TestLogoutCannotRemoveAnEnvironmentCredential(t *testing.T) {

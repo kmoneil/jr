@@ -1,0 +1,28 @@
+      <element name="auth">
+        <attributes count="10">
+          <attribute name="site" type="string" optional="false"/>
+          <attribute name="authenticated" type="bool" optional="false"/>
+          <attribute name="scheme" type="string" optional="true" enum="basic,bearer"/>
+          <attribute name="source" type="string" optional="true"/>
+          <attribute name="site-scoped" type="bool" optional="true"/>
+          <attribute name="user" type="string" optional="true"/>
+          <attribute name="removed" type="bool" optional="true"/>
+          <attribute name="context" type="string" optional="true"/>
+          <attribute name="account" type="string" optional="true"/>
+          <attribute name="display" type="string" optional="true"/>
+        </attributes>
+        <elements count="1">
+          <element name="sources" list-of="source" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="source" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>

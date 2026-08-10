@@ -55,9 +55,15 @@ func authStatusSchema() *render.Schema {
 		Attrs: []render.Field{
 			{Name: "site", Type: render.TypeString},
 			{Name: "authenticated", Type: render.TypeBool},
-			// The three below are present only when a credential was found.
+			// The four below are present only when a credential was found.
 			{Name: "scheme", Type: render.TypeString, Optional: true, Enum: auth.Schemes()},
 			{Name: "source", Type: render.TypeString, Optional: true},
+			// Whether the source is keyed by host. False means the credential
+			// was not looked up for this site, it was merely the one found:
+			// JIRA_API_TOKEN is read whatever site the invocation resolves,
+			// deliberately, so that a CI job need not also name the host. See
+			// auth.EnvProvider.Lookup for why that is not being changed.
+			{Name: "site-scoped", Type: render.TypeBool, Optional: true},
 			{Name: "user", Type: render.TypeString, Optional: true},
 			// `auth logout` reuses this kind to say what it removed. It is the
 			// same fact — which credential a site would use — reported after
