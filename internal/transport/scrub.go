@@ -184,9 +184,9 @@ func (c *Cassette) Residue() []string {
 // Replace is strings.ReplaceAll over literals, and EncodedResidue hunts for
 // those same literals; neither knows what an identifier *is*. That is fine for
 // a long key and dangerous for a short one, because a short key cannot be
-// listed bare — `GE=ORG` would rewrite `GET` and `Set-Cookie` — so the caller
-// is forced to enumerate `GE-`, `"GE"`, `(GE)`, and whichever form they forget
-// is neither replaced nor reported.
+// listed bare — a target of `GE` would rewrite `GET` and `Set-Cookie` — so the
+// caller is forced to enumerate `GE-`, `"GE"`, `(GE)`, and whichever form they
+// forget is neither replaced nor reported.
 //
 // It happened: `"GE"` cleaned `"projectKey":"GE"` and left
 // `"displayName":"Widgets \(GE\)"` untouched, and the residue report was

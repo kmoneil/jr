@@ -200,14 +200,25 @@ the residue patterns are looser and expected to produce false positives.
 
 The third check is for **a declared identifier surviving in a form the caller did
 not declare**. `Replace` is a literal `strings.ReplaceAll`, so a short project
-key cannot be listed bare — `GE=ORG` would rewrite `GET` and `Set-Cookie` — and
-the caller enumerates `GE-`, `"GE"`, `(GE)` instead. Whichever form they forget
-is invisible to both checks above, because a project key is not a shape this
-package can know. `Cassette.StemResidue` strips the wrapping punctuation off
-each declared target and reports any surviving whole-word occurrence of what is
-left, which finds `(GE)` and does not fire on `GET`. It reports and never
-replaces: a stem match is a hint, and rewriting on a guess is how a fixture
-stops being a recording.
+key cannot be listed bare — a target of `GE` would rewrite `GET` and
+`Set-Cookie` — and the caller enumerates `GE-`, `"GE"`, `(GE)` instead. Whichever
+form they forget is invisible to both checks above, because a project key is not
+a shape this package can know. `Cassette.StemResidue` strips the wrapping
+punctuation off each declared target and reports any surviving whole-word
+occurrence of what is left, which finds `(GE)` and does not fire on `GET`. It
+reports and never replaces: a stem match is a hint, and rewriting on a guess is
+how a fixture stops being a recording.
+
+All three read **a recording**, and the fourth reads **the repository**.
+`internal/lint/scrubpairs_test.go` refuses a scrub *mapping* — a real identifier
+joined to its replacement by `=` — in any tracked file, because that is what
+turns the scrubbed fixtures back into a recording of a named instance and it has
+leaked twice, both times into a comment explaining the scrubber. It is a shape
+rule and not a value rule: a guard that greps for the real identifiers has to
+name them in the repository whose scrubbing exists to keep them out, and an
+untracked list would make the check skip in a fresh clone. What it does not see
+is a single identifier in prose, and a mapping written in words rather than with
+an `=`; those rest on review, and the test says so.
 
 Three properties make a fixture-backed test trustworthy:
 

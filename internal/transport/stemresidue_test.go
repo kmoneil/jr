@@ -58,8 +58,8 @@ func TestTheResidueCheckReadsHeaders(t *testing.T) {
 // TestStemResidueFindsTheFormTheCallerDidNotDeclare is the defect, exactly as
 // it happened.
 //
-// A two-letter project key cannot be scrubbed bare: `GE=ORG` as a
-// strings.ReplaceAll rewrites GET and PAGE. So the caller declares the
+// A two-letter project key cannot be scrubbed bare: `GE` as a
+// strings.ReplaceAll target rewrites GET and PAGE. So the caller declares the
 // quoted and suffixed forms, `"GE"` cleans "projectKey":"GE", and
 // "displayName":"Widgets (GE)" survives — reported by nothing, because a
 // project key is not a shape any pattern in this package can know.
