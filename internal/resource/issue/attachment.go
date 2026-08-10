@@ -360,9 +360,20 @@ func DownloadSchema() *render.Schema {
 		Attrs: []render.Field{
 			{Name: "id", Type: render.TypeString},
 			{Name: "issue", Type: render.TypeString},
-			// What was actually written, counted while writing. It is not the
-			// size the listing reported: if the two disagree, this is the one
-			// that happened.
+			// What was actually written, counted while writing.
+			//
+			// It cannot disagree with the length the server declared for the
+			// download, and this used to say it could. A body carrying a
+			// Content-Length is limited to it by net/http, and one that ends
+			// early fails with io.ErrUnexpectedEOF — so a file that exists here
+			// is a file that arrived whole. A response declaring no length is
+			// refused past the transport's ceiling rather than written short.
+			//
+			// It can still differ from the size `attachment list` reported, if
+			// the attachment changed between the listing and the download. That
+			// is a different claim from the one this comment used to make, and
+			// the difference matters: shrugging at a discrepancy that cannot
+			// occur is how somebody is talked out of a check worth keeping.
 			{Name: "bytes", Type: render.TypeInt},
 		},
 		Children: []render.Child{

@@ -54,6 +54,31 @@ const DefaultTimeout = 30 * time.Second
 // returns more than this is either misbehaving or should have been streamed.
 const maxResponseBytes = 64 << 20
 
+// maxUndeclaredStreamBytes bounds a streamed response body that declared no
+// length, which is the one shape nothing else bounds.
+//
+// The three cases, measured against httptest rather than assumed:
+//
+//   - Declares 10, sends 1000: net/http reads exactly 10. A body with a
+//     Content-Length is already limited to it, so the caller cannot be flooded.
+//   - Declares 1000, sends 10: io.Copy returns io.ErrUnexpectedEOF, so a short
+//     download already fails and the caller already removes the partial file.
+//   - Chunked, declares nothing: ContentLength is -1 and the body runs as long
+//     as the server keeps writing.
+//
+// Only the third needs anything, and only the third gets it. Capping a
+// *declared* length would refuse an attachment somebody legitimately stored,
+// which is a policy decision nobody asked for; this bounds the unknown, not the
+// known.
+//
+// 2 GiB is chosen to be a number no real attachment reaches while still
+// stopping a runaway before it fills a disk. Jira does not serve attachments
+// chunked, so in practice this fires for a proxy that re-encoded the response
+// or for a server that is misbehaving — and in both of those cases the download
+// could not have been verified whole anyway, because nothing said how long it
+// should be.
+const maxUndeclaredStreamBytes = 2 << 30
+
 // RequestInfo is what an Authorizer is told about the call it is signing. It
 // carries no body and no headers, because nothing an Authorizer legitimately
 // does needs them.
@@ -482,10 +507,54 @@ func (s *attemptScope) release() {
 // connection outlives the attempt, so its cancellation does too: closing the
 // stream is what releases it, which is why Response.Close exists and why a
 // caller that forgets it leaks a connection rather than merely a file handle.
-func (s *attemptScope) handOver(body io.ReadCloser) io.ReadCloser {
+func (s *attemptScope) handOver(body io.ReadCloser, declaredLength int64) io.ReadCloser {
 	s.stopDeadline()
 	s.handedOver = true
+	if declaredLength < 0 {
+		// No Content-Length, so nothing below this bounds the read. See
+		// maxUndeclaredStreamBytes.
+		body = &boundedBody{ReadCloser: body, left: maxUndeclaredStreamBytes}
+	}
 	return &cancelOnClose{ReadCloser: body, cancel: s.cancel}
+}
+
+// boundedBody fails a read past its limit instead of ending it.
+//
+// io.LimitReader is the wrong primitive here and the difference is the whole
+// point: it returns io.EOF, so a cap built on it writes a short file and
+// reports success. That is the silent truncation this project exists to
+// prevent, arriving through the door marked "safety limit". A caller copying
+// this to disk sees an error and removes what it wrote.
+type boundedBody struct {
+	io.ReadCloser
+	left int64
+}
+
+func (b *boundedBody) Read(p []byte) (int, error) {
+	if b.left <= 0 {
+		return 0, errUnboundedStream()
+	}
+	if int64(len(p)) > b.left {
+		p = p[:b.left]
+	}
+	n, err := b.ReadCloser.Read(p)
+	b.left -= int64(n)
+	return n, err
+}
+
+// errUnboundedStream is what a caller gets when a server streams past the
+// ceiling without ever saying how much it meant to send.
+//
+// Runtime, not Remote, and the reason is the one OFF_SITE_URL was corrected
+// for: Remote is exit 9 and marked retryable, and a server that streams without
+// declaring a length will do exactly the same on the next attempt. Advertising
+// a retry that cannot work is how an agent spends its budget on a certainty.
+func errUnboundedStream() error {
+	return errs.Runtime("UNBOUNDED_RESPONSE",
+		"the server streamed more than %d bytes without declaring a length",
+		int64(maxUndeclaredStreamBytes)).
+		WithRemedy("report this: a response with no Content-Length cannot be " +
+			"checked for completeness, so it is refused rather than written")
 }
 
 func (s *attemptScope) stopDeadline() {
@@ -612,7 +681,7 @@ func (c *Client) receive(r Request, target *url.URL, requestID string, attempt i
 		Attempts:  attempt,
 	}
 	if streaming {
-		out.Stream = scope.handOver(resp.Body)
+		out.Stream = scope.handOver(resp.Body, resp.ContentLength)
 	}
 	return out, nil
 }
