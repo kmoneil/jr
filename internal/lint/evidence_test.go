@@ -102,9 +102,6 @@ var unrecorded = map[string]string{
 		"is nothing for `sprint list` or `sprint get` to answer with",
 	"internal/workflow cloud": "the agile write verbs need a board with issues " +
 		"to move between containers, and `sprint close` ends a real iteration",
-	"internal/transport cloud": "the serverInfo probe, and the one entry here " +
-		"that is not blocked on anything: the Cloud sandbox can answer it today " +
-		"and nobody has recorded it",
 
 	// Every Data Center row has one cause, written out once per row rather than
 	// once for the group, because a row is what somebody deletes and the reason

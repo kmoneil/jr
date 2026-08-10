@@ -41,6 +41,22 @@ func replayClient(t *testing.T, deployment transport.Deployment) (
 	return c, replayer
 }
 
+// The requests below are the ones `jr` really sends, because the Cloud cassette
+// is a recording and a recording answers what it was asked. They were synthetic
+// before — a bare issue GET and a create with an empty summary — and neither is
+// a request this tool makes: `issue get` always names its fields, and an empty
+// summary is refused here before it reaches Jira, so that 400 could never have
+// been recorded at all.
+//
+// Coupling this to the default field set is deliberate. If that set changes the
+// conversation genuinely changes, and a contract test whose request no longer
+// matches the client's is asserting something nobody sends.
+const recordedGetFields = "summary,status,assignee,reporter,priority,issuetype,project,created,updated,labels,description,resolution,parent,components,fixVersions"
+
+// recordedCreateBody is a 300-character summary against Jira's 255 limit, which
+// is the shortest real request that produces a field error naming `summary`.
+const recordedCreateBody = `{"fields":{"issuetype":{"name":"Task"},"project":{"key":"ENG"},"summary":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}}`
+
 // apiBase is the REST prefix each deployment answers on. Cloud has moved to v3
 // for most endpoints; Data Center is still v2. A fixture recorded against one
 // proves nothing about the other, which is why both are replayed.
@@ -113,6 +129,7 @@ func TestContractAgainstBothDeployments(t *testing.T) {
 			t.Run("missing issue is exit 5", func(t *testing.T) {
 				resp, err := c.Do(t.Context(), transport.Request{
 					Method: http.MethodGet, Path: base + "/issue/ENG-9999",
+					Query: url.Values{"fields": {recordedGetFields}},
 				})
 				if err != nil {
 					t.Fatalf("do: %v", err)
@@ -135,7 +152,7 @@ func TestContractAgainstBothDeployments(t *testing.T) {
 				resp, err := c.Do(t.Context(), transport.Request{
 					Method: http.MethodPost,
 					Path:   base + "/issue",
-					Body:   []byte(`{"fields":{"project":{"key":"ENG"},"summary":""}}`),
+					Body:   []byte(recordedCreateBody),
 				})
 				if err != nil {
 					t.Fatalf("do: %v", err)

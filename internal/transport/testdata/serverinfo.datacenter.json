@@ -1,6 +1,7 @@
 {
   "deployment": "datacenter",
   "source": "constructed",
+  "note": "Hand-written, because the only Data Center available is production and recording it would bake real issue summaries and employee names into a committed file. The request shapes mirror the Cloud recording beside it, so the same test drives both and a divergence is the responses rather than the questions. What this proves is that a response is handled; only the Cloud half proves a request is accepted.",
   "interactions": [
     {
       "request": {
@@ -35,7 +36,8 @@
     {
       "request": {
         "method": "GET",
-        "path": "/rest/api/2/issue/ENG-9999"
+        "path": "/rest/api/2/issue/ENG-9999",
+        "query": "fields=summary%2Cstatus%2Cassignee%2Creporter%2Cpriority%2Cissuetype%2Cproject%2Ccreated%2Cupdated%2Clabels%2Cdescription%2Cresolution%2Cparent%2Ccomponents%2CfixVersions"
       },
       "response": {
         "status": 404,
@@ -51,7 +53,7 @@
       "request": {
         "method": "POST",
         "path": "/rest/api/2/issue",
-        "body": "{\"fields\":{\"project\":{\"key\":\"ENG\"},\"summary\":\"\"}}"
+        "body": "{\"fields\":{\"issuetype\":{\"name\":\"Task\"},\"project\":{\"key\":\"ENG\"},\"summary\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}}"
       },
       "response": {
         "status": 400,
