@@ -2,18 +2,14 @@
 <result kind="schema.command" v="1">
   <command name="schema" use="schema" mutating="false" destructive="false" paginated="true" kind="schema.commands" v="1">
     <summary>Describe every command this build contains</summary>
-    <description>
-<![CDATA[
-Prints the command surface as data: flags with types and enums, required
+    <description><![CDATA[Prints the command surface as data: flags with types and enums, required
 inputs, whether a command mutates or destroys, its output kind, and the exit
 codes it can produce.
 
 With no argument it lists every command. With a dotted command name it prints
 that one command in full. It is generated from the same registry that builds
 the command tree, so it cannot drift from what the binary actually does — and
-it lists only what this build contains.
-]]>
-    </description>
+it lists only what this build contains.]]></description>
     <outputs count="2">
       <output kind="schema.commands" v="1"/>
       <output kind="schema.command" v="1" when="a command name is given"/>
@@ -30,12 +26,8 @@ it lists only what this build contains.
       <exit-code code="5" name="NOT_FOUND">Referenced issue/project/board does not exist</exit-code>
     </exit-codes>
     <requires-tags count="0"/>
-    <example>
-<![CDATA[
-jr schema
+    <example><![CDATA[jr schema
 jr schema version
-jr schema --format json
-]]>
-    </example>
+jr schema --format json]]></example>
   </command>
 </result>

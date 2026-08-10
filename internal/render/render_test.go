@@ -198,6 +198,43 @@ func TestCDATATerminatorIsSplit(t *testing.T) {
 	}
 }
 
+// TestACDATAValueCarriesNoFraming asserts the value a consumer parses out of a
+// CDATA leaf is the value that went in, with nothing added at either end.
+//
+// The writer used to put a newline after `<![CDATA[` and one before `]]>`, and
+// then indent the closing tag. All three are element content, so `<summary>`
+// holding "before" parsed back as "\nbefore\n    " — and CDATA is the path that
+// carries descriptions, comment bodies, worklog comments, and dry-run request
+// bodies, the longest and least replaceable values this tool emits. An
+// attribute round-tripped exactly and plain element text round-tripped exactly;
+// this was the one leaf that did not.
+//
+// Every value here ends in whitespace on one side or the other, because that is
+// what framing made unreadable: with two newlines added at each end there is no
+// way for a consumer to tell a value that genuinely starts with a blank line
+// from one that does not, and a documented "strip one newline at each end"
+// would have destroyed the former to recover the latter. Equality after
+// decoding is the only assertion that separates them.
+func TestACDATAValueCarriesNoFraming(t *testing.T) {
+	for name, want := range map[string]string{
+		"no whitespace at all": "before",
+		"leading newline":      "\nbefore",
+		"trailing newline":     "before\n",
+		"newline at both ends": "\nbefore\n",
+		"leading spaces":       "    indented",
+		"trailing spaces":      "trailed    ",
+		"blank line inside":    "## Repro\n\nclient.Do(req)\n",
+		"only whitespace":      "\n\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, _ := parseXMLSummary(t, renderSummary(t, want, true))
+			if got != want {
+				t.Errorf("CDATA read back as %q, want %q", got, want)
+			}
+		})
+	}
+}
+
 func TestXMLAttributeEscaping(t *testing.T) {
 	doc := render.Record("t", 1, render.El("t").
 		Attr("v", "a\tb\nc \"d\" & <e> 'f'"))

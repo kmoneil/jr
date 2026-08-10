@@ -307,19 +307,29 @@ Long text is emitted as a child element, never an attribute, and never escaped
 beyond XML minimums:
 
 ````xml
-<description format="markdown">
-<![CDATA[
-## Repro
+<description format="markdown"><![CDATA[## Repro
 
 ```go
 client.Do(req)  // returns err == nil on 5xx
 ```
-]]>
-</description>
+]]></description>
 ````
 
 `format` is one of `markdown` (ADF converted), `adf` (raw JSON, with
 `--raw-body`), or `wiki` (Server/DC).
+
+Nothing is added around the section. The value a consumer parses out of the
+element is the value the tool holds, byte for byte, and **there is nothing to
+strip** — no leading newline, no trailing newline, no indentation before the
+closing tag. The opening tag, `<![CDATA[`, the value's first character, and the
+closing `]]></description>` all sit against each other, which is why the example
+above is not pretty-printed the way the rest of the document is.
+
+That costs a blank line before a fenced code block when a human reads raw XML.
+The alternative costs every consumer a trim that a general XML parser does not
+do for it, on the path that carries descriptions, comment bodies, worklog
+comments, and dry-run request bodies. This document tells you to parse the
+output; it cannot then hand you a value with the writer's own framing attached.
 
 A literal `]]>` inside the text is split across two CDATA sections
 (`]]]]><![CDATA[>`), which is the only way to carry that sequence.

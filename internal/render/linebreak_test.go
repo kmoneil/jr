@@ -57,21 +57,15 @@ func TestALineBreakSurvivesTheParse(t *testing.T) {
 				t.Errorf("attribute read back as %q, want %q", attr, want)
 			}
 
-			// CDATA is containment rather than equality, and the reason is a
-			// separate defect this test is deliberately not about: the writer
-			// frames a section with a newline at each end and leaves the
-			// closing tag's indentation in the element's content, so CDATA has
-			// never round-tripped byte-for-byte. Asserting equality here would
-			// make this test fail for that reason and read as if the line-break
-			// fix were wrong.
-			//
-			// Containment is still enough to catch the defect it pins. A CR
-			// that got normalised away leaves "before\rafter" absent from
-			// "\nbefore\nafter\n", so the assertion fails on exactly the bug
-			// and passes on the framing.
+			// CDATA is held to equality too, since the writer stopped framing
+			// the section. This assertion said Contains for one commit, because
+			// the framing put "\n\n" at each end of every value and the closing
+			// tag's indentation behind it — a weakened assertion is a test
+			// carrying somebody else's defect, and it is what raised the card
+			// that removed the framing.
 			cdata, _ := parseXMLSummary(t, renderSummary(t, want, true))
-			if !strings.Contains(cdata, want) {
-				t.Errorf("CDATA read back as %q, which does not carry %q", cdata, want)
+			if cdata != want {
+				t.Errorf("CDATA read back as %q, want %q", cdata, want)
 			}
 		})
 	}

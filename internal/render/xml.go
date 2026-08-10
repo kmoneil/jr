@@ -64,14 +64,28 @@ func writeXMLNode(w *writer, n *Node, depth int) {
 
 	// A leaf with text stays on one line unless it is mixed content, which is
 	// emitted verbatim inside a CDATA section.
+	//
+	// Nothing is added around the section. A newline after `<![CDATA[` and one
+	// before `]]>` used to frame the value, and both are element content: a
+	// consumer parsing <description> got "\n\n" ahead of the text, and "\n\n"
+	// plus the closing tag's indentation behind it. The contract describes this
+	// element as `<text name="text" type="string"/>` and promises the value is
+	// never escaped beyond XML minimums, so framing made every description,
+	// comment body, worklog comment, and dry-run body the one place a value did
+	// not survive its own round trip. An attribute always has; plain element
+	// text always has.
+	//
+	// It cost a human reading raw XML a blank line before a fenced code block.
+	// That is the audience this tool orders last, and it is the only thing the
+	// framing bought.
 	if len(n.Children) == 0 {
 		b.WriteByte('>')
 		if n.CDATA {
-			w.line(depth, b.String())
-			w.raw("<![CDATA[\n")
+			w.raw(strings.Repeat("  ", depth))
+			w.raw(b.String())
+			w.raw("<![CDATA[")
 			w.raw(escapeCDATA(n.Text))
-			w.raw("\n]]>\n")
-			w.line(depth, "</"+n.Name+">")
+			w.raw("]]></" + n.Name + ">\n")
 			return
 		}
 		b.WriteString(escapeXMLText(n.Text))
