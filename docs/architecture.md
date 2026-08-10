@@ -185,12 +185,12 @@ the residue patterns are looser and expected to produce false positives.
 
 The third check is for **a declared identifier surviving in a form the caller did
 not declare**. `Replace` is a literal `strings.ReplaceAll`, so a short project
-key cannot be listed bare — `ET=AGL` would rewrite `GET` and `Set-Cookie` — and
-the caller enumerates `ET-`, `"ET"`, `(ET)` instead. Whichever form they forget
+key cannot be listed bare — `GE=ORG` would rewrite `GET` and `Set-Cookie` — and
+the caller enumerates `GE-`, `"GE"`, `(GE)` instead. Whichever form they forget
 is invisible to both checks above, because a project key is not a shape this
 package can know. `Cassette.StemResidue` strips the wrapping punctuation off
 each declared target and reports any surviving whole-word occurrence of what is
-left, which finds `(ET)` and does not fire on `GET`. It reports and never
+left, which finds `(GE)` and does not fire on `GET`. It reports and never
 replaces: a stem match is a hint, and rewriting on a guess is how a fixture
 stops being a recording.
 

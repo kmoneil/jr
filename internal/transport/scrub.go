@@ -184,19 +184,19 @@ func (c *Cassette) Residue() []string {
 // Replace is strings.ReplaceAll over literals, and EncodedResidue hunts for
 // those same literals; neither knows what an identifier *is*. That is fine for
 // a long key and dangerous for a short one, because a short key cannot be
-// listed bare — `ET=AGL` would rewrite `GET` and `Set-Cookie` — so the caller
-// is forced to enumerate `ET-`, `"ET"`, `(ET)`, and whichever form they forget
+// listed bare — `GE=ORG` would rewrite `GET` and `Set-Cookie` — so the caller
+// is forced to enumerate `GE-`, `"GE"`, `(GE)`, and whichever form they forget
 // is neither replaced nor reported.
 //
-// It happened: `"ET"` cleaned `"projectKey":"ET"` and left
-// `"displayName":"Agile fixtures (ET)"` untouched, and the residue report was
+// It happened: `"GE"` cleaned `"projectKey":"GE"` and left
+// `"displayName":"Widgets \(GE\)"` untouched, and the residue report was
 // silent because nothing in it looks for a project key — that is not a shape
 // this package can know.
 //
 // The stem is the target with its leading and trailing punctuation removed and
-// its interior left alone, so `"ET"`, `ET-` and `(ET)` all stem to `ET` while
+// its interior left alone, so `"GE"`, `GE-` and `(GE)` all stem to `GE` while
 // `Software Team` stays `Software Team`. Matching is whole-word, which is what
-// separates `(ET)` from `GET`.
+// separates `(GE)` from `GET`.
 //
 // It reports and never replaces. A stem match is a hint: a summary may
 // legitimately contain the word, and rewriting on a guess is how a fixture

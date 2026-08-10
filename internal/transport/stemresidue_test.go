@@ -58,18 +58,18 @@ func TestTheResidueCheckReadsHeaders(t *testing.T) {
 // TestStemResidueFindsTheFormTheCallerDidNotDeclare is the defect, exactly as
 // it happened.
 //
-// A three-letter project key cannot be scrubbed bare: `ET=AGL` as a
-// strings.ReplaceAll rewrites GET and Set-Cookie. So the caller declares the
-// quoted and suffixed forms, `"ET"` cleans "projectKey":"ET", and
-// "displayName":"Agile fixtures (ET)" survives — reported by nothing, because a
+// A two-letter project key cannot be scrubbed bare: `GE=ORG` as a
+// strings.ReplaceAll rewrites GET and PAGE. So the caller declares the
+// quoted and suffixed forms, `"GE"` cleans "projectKey":"GE", and
+// "displayName":"Widgets (GE)" survives — reported by nothing, because a
 // project key is not a shape any pattern in this package can know.
 func TestStemResidueFindsTheFormTheCallerDidNotDeclare(t *testing.T) {
-	body := `{"location":{"projectKey":"AGL",` +
-		`"displayName":"Agile fixtures (ET)","name":"Agile fixtures (ET)"}}`
+	body := `{"location":{"projectKey":"ORG",` +
+		`"displayName":"Widgets (GE)","name":"Widgets (GE)"}}`
 	c := cassetteWith(body, nil)
 
 	// What the caller declared, which is everything except the bare word.
-	targets := []string{`"ET"`, "ET-", "ET board"}
+	targets := []string{`"GE"`, "GE-", "GE board"}
 
 	if hits := c.Residue(); len(hits) > 0 {
 		t.Errorf("the shape-based check reported %v, so this test is not "+
@@ -80,23 +80,23 @@ func TestStemResidueFindsTheFormTheCallerDidNotDeclare(t *testing.T) {
 		t.Fatal("a declared identifier survived in an undeclared form and " +
 			"nothing said so")
 	}
-	if !strings.Contains(strings.Join(got, "\n"), "ET") {
+	if !strings.Contains(strings.Join(got, "\n"), "GE") {
 		t.Errorf("the report does not name the surviving identifier: %v", got)
 	}
 }
 
 // TestStemResidueDoesNotFireOnTheWordsInsideOtherWords is the whole difficulty.
 //
-// The reason a short key cannot be replaced bare is that `ET` appears inside
-// GET, RESET and Set-Cookie. A check that reported those would fire on every
+// The reason a short key cannot be replaced bare is that `GE` appears inside
+// GET, PAGE and TARGET. A check that reported those would fire on every
 // recording ever made, and a report that always fires is one nobody reads —
 // which would leave this no better than the blind spot it replaces.
 func TestStemResidueDoesNotFireOnTheWordsInsideOtherWords(t *testing.T) {
-	c := cassetteWith(`{"method":"GET","note":"RESET the widget","x":"TARGET"}`,
+	c := cassetteWith(`{"method":"GET","note":"one PAGE of it","x":"TARGET"}`,
 		map[string][]string{"Set-Cookie": {"REDACTED"}})
 
-	if got := c.StemResidue([]string{`"ET"`, "ET-"}); len(got) > 0 {
-		t.Errorf("stem ET fired on a word containing it: %v", got)
+	if got := c.StemResidue([]string{`"GE"`, "GE-"}); len(got) > 0 {
+		t.Errorf("stem GE fired on a word containing it: %v", got)
 	}
 }
 
@@ -104,10 +104,10 @@ func TestStemResidueDoesNotFireOnTheWordsInsideOtherWords(t *testing.T) {
 // half of this change opened up.
 func TestStemResidueReadsHeadersToo(t *testing.T) {
 	c := cassetteWith(`{"ok":true}`, map[string][]string{
-		"X-Project": {"project (ET) is active"},
+		"X-Project": {"project (GE) is active"},
 	})
 
-	got := c.StemResidue([]string{`"ET"`})
+	got := c.StemResidue([]string{`"GE"`})
 	if len(got) == 0 {
 		t.Fatal("an undeclared form in a header was not reported")
 	}
@@ -121,10 +121,10 @@ func TestStemResidueReadsHeadersToo(t *testing.T) {
 // guard people learn to ignore.
 func TestStemResidueIsSilentWhenEveryFormWasDeclared(t *testing.T) {
 	c := cassetteWith(
-		`{"location":{"projectKey":"AGL","displayName":"Agile fixtures (AGL)"}}`,
+		`{"location":{"projectKey":"ORG","displayName":"Widgets (AGL)"}}`,
 		map[string][]string{"Content-Type": {"application/json"}},
 	)
-	if got := c.StemResidue([]string{`"ET"`, "ET-", "(ET)"}); len(got) > 0 {
+	if got := c.StemResidue([]string{`"GE"`, "GE-", "(GE)"}); len(got) > 0 {
 		t.Errorf("a fully scrubbed recording was reported as residue: %v", got)
 	}
 }

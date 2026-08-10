@@ -72,7 +72,7 @@ func (a *app) recorder(siteURL string) (*transport.Recorder, func()) {
 		residue = append(residue, cassette.EncodedResidue(targets)...)
 		// The forms of a declared identifier the caller did not declare. A
 		// short project key cannot be listed bare without rewriting GET and
-		// Set-Cookie, so the caller lists `ET-` and `"ET"` and whichever one
+		// Set-Cookie, so the caller lists `GE-` and `"GE"` and whichever one
 		// they miss is invisible to both of the checks above.
 		residue = append(residue, cassette.StemResidue(targets)...)
 
