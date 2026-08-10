@@ -1,0 +1,24 @@
+      <element name="epic">
+        <attributes count="4">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="action" type="string" optional="false" enum="removed"/>
+          <attribute name="requested" type="int" optional="false"/>
+          <attribute name="applied" type="int" optional="false"/>
+        </attributes>
+        <elements count="1">
+          <element name="issues" list-of="issue" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="issue" optional="true" repeated="true">
+                <attributes count="2">
+                  <attribute name="key" type="string" optional="false"/>
+                  <attribute name="status" type="string" optional="false" enum="moved,failed,not-attempted"/>
+                </attributes>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>

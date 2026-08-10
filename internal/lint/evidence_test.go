@@ -53,7 +53,10 @@ var recordedFixtures = map[string][]string{
 	"internal/resource/sprint": {"sprints-recorded.cloud.json", "sprint-recorded.cloud.json"},
 	"internal/workflow": {
 		"epicadd.cloud.json", "epicremove.cloud.json", "sprintadd.cloud.json",
-		"epicadd-nextgen.cloud.json",
+		// The before and after of replacing the agile epic endpoint: the same
+		// operation against a team-managed project, refused and then working.
+		// Either one alone is half an argument.
+		"epicadd-nextgen.cloud.json", "epicadd-nextgen-parent.cloud.json",
 	},
 }
 

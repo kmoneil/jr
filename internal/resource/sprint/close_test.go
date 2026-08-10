@@ -90,7 +90,12 @@ func TestDryRunPrintsTheRequestAndSendsNothing(t *testing.T) {
 	}
 	// The body it prints is the body it would have sent, not a description of
 	// one — a second rendering of the request would drift from the first.
-	body, ok := doc.Record.ChildNamed("body")
+	// The preview is a list even when it holds one request, so a consumer never
+	// has to branch on the count.
+	if len(doc.Record.Children) != 1 {
+		t.Fatalf("got %d requests, want the one this sends", len(doc.Record.Children))
+	}
+	body, ok := doc.Record.Children[0].ChildNamed("body")
 	if !ok {
 		t.Fatal("the dry run printed no body")
 	}

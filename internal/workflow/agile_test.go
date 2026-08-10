@@ -4,6 +4,7 @@ package workflow_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"path/filepath"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jira-cli/internal/exitcode"
 	"github.com/kmoneil/jira-cli/internal/idem"
 	"github.com/kmoneil/jira-cli/internal/registry"
 	"github.com/kmoneil/jira-cli/internal/render"
@@ -27,7 +29,8 @@ import (
 // three Data Center rows are constructed, and a constructed cassette proves a
 // request is unchanged and never that it was right — which is exactly how the
 // Cloud `epic.add` row spent two releases asserting a request Jira refuses for
-// the majority of Cloud projects. See TestTheAgileEpicEndpointIsCompanyManagedOnly.
+// the majority of Cloud projects. See
+// TestTheCloudEpicPathNeverCallsTheAgileEndpoint.
 func TestTheThreeVerbsSendWhatTheySay(t *testing.T) {
 	for _, tc := range []struct {
 		command, fixture string
@@ -48,8 +51,10 @@ func TestTheThreeVerbsSendWhatTheySay(t *testing.T) {
 			container: "sprint", id: "1", action: "added",
 		},
 		{
+			// Two issues and two requests: on Cloud an epic move is the parent
+			// field, which has no batched spelling.
 			command: "epic.add", fixture: "epicadd", kind: site.Cloud,
-			args:      []string{"AGL-1", "AGL-2"},
+			args:      []string{"AGL-1", "AGL-2", "AGL-3"},
 			container: "epic", id: "AGL-1", action: "added",
 		},
 		{
@@ -61,8 +66,15 @@ func TestTheThreeVerbsSendWhatTheySay(t *testing.T) {
 		},
 		{
 			command: "epic.remove", fixture: "epicremove", kind: site.Cloud,
-			args:      []string{"AGL-2"},
+			args:      []string{"AGL-2", "AGL-3"},
 			container: "epic", id: "none", action: "removed",
+		},
+		{
+			// The project style the old endpoint refused. Same verb, same
+			// arguments shape, no branch in the code — which is the claim.
+			command: "epic.add", fixture: "epicadd-nextgen-parent", kind: site.Cloud,
+			args:      []string{"OPS-5", "OPS-10"},
+			container: "epic", id: "OPS-5", action: "added",
 		},
 	} {
 		t.Run(tc.command+"/"+string(tc.kind), func(t *testing.T) {
@@ -88,47 +100,101 @@ func TestTheThreeVerbsSendWhatTheySay(t *testing.T) {
 	}
 }
 
-// TestTheAgileEpicEndpointIsCompanyManagedOnly pins the limit that no
-// constructed cassette contained, because whoever wrote one did not know it was
-// there.
+// TestTheCloudEpicPathNeverCallsTheAgileEndpoint is what stops this being
+// reinstated, and it asserts the request rather than the outcome.
 //
 // Cloud refuses `POST /rest/agile/1.0/epic/{ref}/issue` when the issue belongs
-// to a team-managed (next-gen) project, which is the default for every project
-// created on a Cloud site. This tool sends it anyway — nothing in
-// internal/workflow branches on project style — so `epic add` and `epic remove`
-// fail for most Cloud callers while epicadd.cloud.json reported the request
-// well-formed.
+// to a team-managed (next-gen) project — the default for every project created
+// on a Cloud site. Both epic verbs called it anyway for two releases, behind a
+// constructed cassette that reported the request well-formed.
 //
-// The refusal is a fixture rather than a sentence in a comment so that
-// reinstating the endpoint for every project fails a test. Jira's own message
-// names the route that does work, and this tool cannot take it: `issue edit`
-// has no --parent.
-func TestTheAgileEpicEndpointIsCompanyManagedOnly(t *testing.T) {
-	cmd, ok := registry.Lookup("epic.add")
-	if !ok {
-		t.Fatal("epic add is not registered")
-	}
-	conn, replayer := replayConn(t, "epicadd-nextgen.cloud.json")
+// The replacement has no branch on project style, so the way it regresses is
+// somebody reaching for the batched endpoint again because one request is
+// cheaper than three. This fails the moment they do.
+func TestTheCloudEpicPathNeverCallsTheAgileEndpoint(t *testing.T) {
+	for _, tc := range []struct {
+		command string
+		args    []string
+	}{
+		{"epic.add", []string{"OPS-5", "OPS-10", "OPS-11"}},
+		{"epic.remove", []string{"OPS-10", "OPS-11"}},
+	} {
+		t.Run(tc.command, func(t *testing.T) {
+			cmd, ok := registry.Lookup(tc.command)
+			if !ok {
+				t.Fatalf("%s is not registered", tc.command)
+			}
+			flags := registry.NewFlags()
+			flags.SetBool("dry-run", true)
+			doc, err := cmd.Run(t.Context(), &registry.Invocation{
+				Jira: &stubSession{kind: site.Cloud}, Args: tc.args, Flags: flags,
+				Stderr: io.Discard, Progress: registry.NoProgress,
+			})
+			if err != nil {
+				t.Fatalf("dry run: %v", err)
+			}
 
-	_, err := cmd.Run(t.Context(), &registry.Invocation{
-		Jira: &stubSession{conn: conn, kind: site.Cloud},
-		Args: []string{"OPS-5", "OPS-10"}, Flags: registry.NewFlags(),
-		Stderr: io.Discard, Progress: registry.NoProgress,
-	})
-	if err == nil {
-		t.Fatal("a next-gen issue was reported as added to an epic")
+			// One request per issue, because the parent field has no batched
+			// spelling. A count of one here would mean the batch came back.
+			requests := doc.Record.Children
+			want := len(tc.args)
+			if tc.command == "epic.add" {
+				want-- // the first argument is the epic, not an issue.
+			}
+			if len(requests) != want {
+				t.Fatalf("%d requests, want one per issue (%d)", len(requests), want)
+			}
+			for _, r := range requests {
+				path, _ := r.AttrValue("path")
+				if strings.Contains(path, "/rest/agile/") {
+					t.Errorf("path = %q, and the agile epic endpoint is refused "+
+						"for team-managed projects; see epicadd-nextgen.cloud.json",
+						path)
+				}
+				if method, _ := r.AttrValue("method"); method != transport.MethodPut {
+					t.Errorf("method = %q, want PUT of the parent field", method)
+				}
+			}
+		})
 	}
-	if code := errs.Coerce(err).Code; code != "BAD_REQUEST" {
-		t.Errorf("code = %q, want BAD_REQUEST", code)
+}
+
+// TestTheRefusalThatCausedTheChangeIsStillOnRecord keeps the evidence
+// load-bearing.
+//
+// epicadd-nextgen.cloud.json is a request this tool no longer makes, so nothing
+// drives it through a command any more, and an unread cassette is a file
+// somebody deletes during a tidy-up. Reading it here means the reason the
+// endpoint was replaced cannot quietly leave the tree — and it is the reason,
+// in Jira's own words, rather than in a comment restating them.
+func TestTheRefusalThatCausedTheChangeIsStillOnRecord(t *testing.T) {
+	cassette, err := transport.LoadCassette(
+		filepath.Join("testdata", "epicadd-nextgen.cloud.json"),
+	)
+	if err != nil {
+		t.Fatalf("load: %v", err)
 	}
-	// Jira names the way out in the body. Asserting it keeps the remedy in the
-	// test rather than only in a backlog card.
-	if detail := errs.Coerce(err).Detail; !strings.Contains(detail, "parent") {
-		t.Errorf("detail = %q, want Jira's own remedy naming the parent property",
-			detail)
+	if !cassette.Evidence() {
+		t.Fatal("the refusal is not a recording, so it is somebody's account " +
+			"of a refusal rather than one")
 	}
-	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
-		t.Errorf("the request was never sent: %v", unplayed)
+	if len(cassette.Interactions) != 1 {
+		t.Fatalf("got %d interactions, want the one refused request",
+			len(cassette.Interactions))
+	}
+
+	it := cassette.Interactions[0]
+	if !strings.Contains(it.Request.Path, "/rest/agile/") {
+		t.Errorf("path = %q, want the agile endpoint this replaced", it.Request.Path)
+	}
+	if it.Response.Status != 400 {
+		t.Errorf("status = %d, want the 400 that made the endpoint unusable",
+			it.Response.Status)
+	}
+	// Jira names the way out in the body, and that route is what the fix took.
+	if !strings.Contains(it.Response.Body, "parent") {
+		t.Errorf("the recorded refusal no longer names the parent property: %s",
+			it.Response.Body)
 	}
 }
 
@@ -243,10 +309,17 @@ func TestDryRunPrintsTheRequestAndSendsNothing(t *testing.T) {
 	if doc.Kind != registry.DryRunOutput().Kind {
 		t.Errorf("kind = %q, want the dry-run kind", doc.Kind)
 	}
-	if path, _ := doc.Record.AttrValue("path"); path != "/rest/agile/1.0/epic/none/issue" {
+	// v2 wraps every preview in a list, including a preview of one request. A
+	// shape that varied with the count would be a shape every consumer has to
+	// branch on.
+	if len(doc.Record.Children) != 1 {
+		t.Fatalf("got %d requests, want the one this sends", len(doc.Record.Children))
+	}
+	request := doc.Record.Children[0]
+	if path, _ := request.AttrValue("path"); path != "/rest/agile/1.0/epic/none/issue" {
 		t.Errorf("path = %q, want the agile API", path)
 	}
-	body, ok := doc.Record.ChildNamed("body")
+	body, ok := request.ChildNamed("body")
 	if !ok {
 		t.Fatal("the dry run printed no body")
 	}
@@ -374,4 +447,108 @@ func (s *stubSession) Fields() []string { return s.fields }
 
 func (s *stubSession) RequireBoard() (string, error) {
 	return "", errs.Usage("NO_BOARD", "this command needs a board and none is set")
+}
+
+// TestAHalfAppliedMoveSaysExactlyWhereItGotTo is the case the Cloud path
+// created and the batched endpoint could not have.
+//
+// One request per issue means a run can stop in the middle. What the caller
+// must never be given is a bare PERMISSION, because the safe reading of that —
+// nothing happened — is the false one, and the issue that did move stays moved.
+//
+// So all three facts are asserted: which issue moved, which was refused, and
+// which was never sent at all. The last is a separate status from "failed" on
+// purpose: "Jira refused this" and "nobody asked Jira" want different retries.
+func TestAHalfAppliedMoveSaysExactlyWhereItGotTo(t *testing.T) {
+	cmd, ok := registry.Lookup("epic.add")
+	if !ok {
+		t.Fatal("epic add is not registered")
+	}
+	conn, replayer := replayConn(t, "epicadd-partial.cloud.json")
+
+	_, err := cmd.Run(t.Context(), &registry.Invocation{
+		Jira:  &stubSession{conn: conn, kind: site.Cloud},
+		Args:  []string{"AGL-1", "AGL-2", "AGL-3", "AGL-4"},
+		Flags: registry.NewFlags(), Stderr: io.Discard,
+		Progress: registry.NoProgress,
+	})
+	if err == nil {
+		t.Fatal("a run that was refused halfway reported success")
+	}
+
+	partial, ok := errors.AsType[*registry.PartiallyApplied](err)
+	if !ok {
+		t.Fatalf("err = %T, want a PartiallyApplied carrying the document; "+
+			"without it the CLI has nothing to write and the caller cannot "+
+			"learn that AGL-2 moved", err)
+	}
+	// The exit is the cause's, which is what a caller branches on. Coerce
+	// traverses Unwrap, so wrapping must not hide it.
+	if code := errs.Coerce(err).Code; code != "FORBIDDEN" && code != "PERMISSION_DENIED" {
+		t.Logf("code = %q", code)
+	}
+	if exit := errs.Coerce(err).Exit; exit != exitcode.Permission {
+		t.Errorf("exit = %v, want %v — the failing request's own",
+			exit, exitcode.Permission)
+	}
+
+	record := partial.Doc.Record
+	if got, _ := record.AttrValue("requested"); got != "3" {
+		t.Errorf("requested = %q, want 3", got)
+	}
+	if got, _ := record.AttrValue("applied"); got != "1" {
+		t.Errorf("applied = %q, want 1", got)
+	}
+
+	issues, ok := record.ChildNamed("issues")
+	if !ok {
+		t.Fatal("the document named no issues")
+	}
+	want := []struct{ key, status string }{
+		{"AGL-2", workflow.StatusMoved},
+		{"AGL-3", workflow.StatusFailed},
+		{"AGL-4", workflow.StatusNotAttempted},
+	}
+	if len(issues.Children) != len(want) {
+		t.Fatalf("got %d issues, want %d", len(issues.Children), len(want))
+	}
+	for i, w := range want {
+		key, _ := issues.Children[i].AttrValue("key")
+		status, _ := issues.Children[i].AttrValue("status")
+		if key != w.key || status != w.status {
+			t.Errorf("issue %d = %s/%s, want %s/%s", i, key, status, w.key, w.status)
+		}
+	}
+
+	// The third PUT was never built into a sent request. The cassette has only
+	// two interactions, so this is the replayer confirming nothing else went
+	// out rather than the code reporting on itself.
+	if unmatched := replayer.Unmatched(); len(unmatched) > 0 {
+		t.Errorf("a request went out after the failure: %v", unmatched)
+	}
+}
+
+// TestTheDocumentAHalfAppliedMoveCarriesIsDeclared covers the part that would
+// otherwise be found by running it: a document the command does not declare is
+// refused at the CLI layer, and this one takes a different route to stdout than
+// every other result.
+func TestTheDocumentAHalfAppliedMoveCarriesIsDeclared(t *testing.T) {
+	cmd, _ := registry.Lookup("epic.add")
+	conn, _ := replayConn(t, "epicadd-partial.cloud.json")
+
+	_, err := cmd.Run(t.Context(), &registry.Invocation{
+		Jira:  &stubSession{conn: conn, kind: site.Cloud},
+		Args:  []string{"AGL-1", "AGL-2", "AGL-3"},
+		Flags: registry.NewFlags(), Stderr: io.Discard,
+		Progress: registry.NoProgress,
+	})
+	partial, ok := errors.AsType[*registry.PartiallyApplied](err)
+	if !ok {
+		t.Fatalf("err = %T, want PartiallyApplied", err)
+	}
+	if !cmd.Emits(partial.Doc.Kind, partial.Doc.Version) {
+		t.Errorf("epic add does not declare kind %q v%d, so the CLI would "+
+			"refuse to write it and the caller would learn nothing",
+			partial.Doc.Kind, partial.Doc.Version)
+	}
 }

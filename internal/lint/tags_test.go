@@ -75,6 +75,13 @@ func TestEveryTagEitherGatesCodeOrSaysWhyNot(t *testing.T) {
 var writeGatedNonMutations = map[string]string{
 	"internal/registry/schema_write.go": "the dry-run kind exists only where " +
 		"mutating commands do, so its schema is registered under the same tag",
+	"internal/registry/partial_write.go": "the error a half-applied write " +
+		"returns. Only a mutation can be half-applied, so a reader build has " +
+		"nothing that could produce one and the type would be dead surface",
+	"internal/cli/partial_write.go": "the one place a failing command writes " +
+		"to stdout, which exists so a half-applied write can say how far it " +
+		"got. Gated with the writes it serves, and paired with partial_noop.go " +
+		"so the reader build has the same call site and no behaviour",
 }
 
 // TestTheTagsThatGateCodeGateTheRightCode pins what `write` and `mcp` exclude,

@@ -451,11 +451,22 @@ func (c *Command) Available(has func(string) bool) bool {
 
 // Kinds every mutating command shares.
 const (
-	// KindDryRun is what --dry-run emits: the request that would have been
-	// sent, not a paraphrase of it.
+	// KindDryRun is what --dry-run emits: the requests that would have been
+	// sent, not a paraphrase of them.
 	KindDryRun = "dry-run"
 	// VersionDryRun is its schema version.
-	VersionDryRun = 1
+	//
+	// v2 wraps the request in a `requests` list. v1 was a single `request`
+	// record, which was true of every mutating command until `epic add` on
+	// Cloud became a PUT of the parent field per issue: the batched agile
+	// endpoint it used to call serves company-managed projects only. A preview
+	// that showed one of three requests would be a paraphrase of the run, which
+	// is the one thing --dry-run promises not to be.
+	//
+	// The list is always a list, including for the eighteen commands that send
+	// exactly one. A shape that varies with the count is a shape every consumer
+	// has to branch on, and the branch is the part that goes wrong.
+	VersionDryRun = 2
 )
 
 // DryRunOutput is the declaration every mutating command adds, so the shape
@@ -473,7 +484,17 @@ func DryRunOutput() Output {
 //
 // The Authorization header is not here and cannot be: this renders the request
 // as the command built it, before the transport attaches a credential.
-func DryRunDoc(command string, r transport.Request) *render.Doc {
+func DryRunDoc(command string, requests ...transport.Request) *render.Doc {
+	items := make([]*render.Node, 0, len(requests))
+	for _, r := range requests {
+		items = append(items, requestNode(command, r))
+	}
+	return render.Record(KindDryRun, VersionDryRun,
+		render.ListEl("requests", "request", items...))
+}
+
+// requestNode renders one request exactly as the command built it.
+func requestNode(command string, r transport.Request) *render.Node {
 	n := render.El("request").
 		Attr("command", command).
 		Attr("method", r.Method).
@@ -498,5 +519,5 @@ func DryRunDoc(command string, r transport.Request) *render.Doc {
 			Attr("content-type", "application/json").
 			SetCDATA(string(r.Body)))
 	}
-	return render.Record(KindDryRun, VersionDryRun, n)
+	return n
 }

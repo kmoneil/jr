@@ -1,0 +1,31 @@
+{
+  "deployment": "cloud",
+  "source": "constructed",
+  "note": "Constructed on purpose, and it is the one cassette here that has to be. A recording is a conversation a server had, and this is a conversation no sandbox will have on request: the first issue moves and the second is refused for lack of permission. The shape of both halves is real — the PUT is byte-identical to epicadd.cloud.json's, and the 403 body is Jira's own wording — but the sequence was chosen rather than observed, which is what source=constructed says.",
+  "interactions": [
+    {
+      "request": {
+        "method": "PUT",
+        "path": "/rest/api/3/issue/AGL-2",
+        "body": "{\"fields\":{\"parent\":{\"key\":\"AGL-1\"}}}"
+      },
+      "response": {
+        "status": 204
+      }
+    },
+    {
+      "request": {
+        "method": "PUT",
+        "path": "/rest/api/3/issue/AGL-3",
+        "body": "{\"fields\":{\"parent\":{\"key\":\"AGL-1\"}}}"
+      },
+      "response": {
+        "status": 403,
+        "header": {
+          "Content-Type": ["application/json;charset=UTF-8"]
+        },
+        "body": "{\"errorMessages\":[\"You do not have permission to edit issues in this project.\"],\"errors\":{}}"
+      }
+    }
+  ]
+}

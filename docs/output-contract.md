@@ -12,6 +12,13 @@ against; `jr contract` emits the machine-readable form of the same thing.
 a warning, never a "Fetching…". A command that fails writes nothing at all to
 stdout, so a consumer piping stdout never parses a half-result.
 
+There is exactly one exception, and it is a write that half-happened: a
+multi-request mutation that applied some of what it was asked writes its result
+document and *then* exits non-zero, because the failure alone cannot say which
+part was applied and "nothing happened" is the dangerous assumption to leave a
+caller with. See [Mutations](#mutations). Nothing else does this, and a document
+that arrives with a non-zero exit is always one of those.
+
 **stderr carries everything else**, always structured, always in the requested
 format: errors, and the truncation warning that accompanies exit 3.
 
@@ -636,11 +643,32 @@ preview is allowed, you look at the request in order to decide whether to
 confirm it. A read-only context is a statement about what that context is *for*,
 so the latch stays one-way and a dry run is refused too.
 
-`--dry-run` emits kind `dry-run` v1: the request itself, with its method, path,
-query, and body verbatim. It is built from the same `transport.Request` the
-command was about to send, so the preview and the real thing cannot drift, and
-the body can be pasted into `curl`. It never carries a credential, the document
-renders the request as the command built it, before the transport attaches one.
+`--dry-run` emits kind `dry-run` v2: a `requests` list holding every request the
+command would send, each with its method, path, query, and body verbatim. Each
+is built from the same `transport.Request` the command was about to send, so the
+preview and the real thing cannot drift, and a body can be pasted into `curl`.
+It never carries a credential, the document renders each request as the command
+built it, before the transport attaches one.
+
+The list is a list even when it holds one request, which is all but two of the
+mutating commands. A shape that varied with the count would be a shape every
+consumer has to branch on. v1 was a bare `request` record, and it was true of
+every command until `epic add` on Cloud became one request per issue.
+
+**A write that applies to several things can stop in the middle.** `epic add`
+and `epic remove` on Cloud set the parent field on each issue in turn, because
+that field is what carries epic membership on both project styles and it has no
+batched spelling. So `epic.add` v2 and `epic.remove` v2 carry `requested` and
+`applied` counts on the container and a `status` on each issue — `moved`,
+`failed`, or `not-attempted` for the ones after the failure, which were never
+sent. A run stops at the first failure.
+
+This is the one case where a command writes a result document to stdout *and*
+exits non-zero. The exit is the failing request's own, not a new code and not
+exit 3: exit 3 means a truncated result set, which a write does not have. The
+rule it bends — a failing command writes nothing at all to stdout — is right for
+a command that did nothing and wrong for one that did half the work, because a
+caller told only `PERMISSION` assumes nothing happened and something did.
 
 ### Preconditions
 

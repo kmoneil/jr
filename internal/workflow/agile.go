@@ -30,12 +30,15 @@ import (
 
 // Kinds and schema versions these verbs emit.
 const (
-	KindSprintAdd     = "sprint.add"
-	VersionSprintAdd  = 1
+	KindSprintAdd    = "sprint.add"
+	VersionSprintAdd = 1
+	// v2 added a status per issue and the applied/requested counts. On Cloud an
+	// epic move is one request per issue, so "all of them moved" stopped being
+	// the only outcome and the document had to be able to say so.
 	KindEpicAdd       = "epic.add"
-	VersionEpicAdd    = 1
+	VersionEpicAdd    = 2
 	KindEpicRemove    = "epic.remove"
-	VersionEpicRemove = 1
+	VersionEpicRemove = 2
 )
 
 func init() {
@@ -44,22 +47,20 @@ func init() {
 	registry.Register(epicRemoveCommand())
 
 	render.RegisterSchema(KindSprintAdd, MovedSchema("sprint", "added"))
-	render.RegisterSchema(KindEpicAdd, MovedSchema("epic", "added"))
-	render.RegisterSchema(KindEpicRemove, MovedSchema("epic", "removed"))
+	render.RegisterSchema(KindEpicAdd, AppliedSchema("epic", "added"))
+	render.RegisterSchema(KindEpicRemove, AppliedSchema("epic", "removed"))
 }
 
-// MovedSchema is the shape all three verbs share: the container, what happened,
-// and every issue it happened to.
+// MovedSchema is the shape of a move Jira applies in one request: the
+// container, what happened, and every issue it happened to.
 //
-// Jira answers all three with 204 and no body, so this reports what was asked
-// for. The issues are listed rather than counted because a caller has to be
-// able to check that the set it named is the set that moved.
+// Jira answers with 204 and no body, so this reports what was asked for. The
+// issues are listed rather than counted because a caller has to be able to
+// check that the set it named is the set that moved.
 func MovedSchema(container, action string) *render.Schema {
 	return &render.Schema{
 		Element: container,
 		Attrs: []render.Field{
-			// For epic remove this is the literal "none": leaving an epic is
-			// spelled as joining the absence of one, and there is no DELETE.
 			{Name: "id", Type: render.TypeString},
 			{Name: "action", Type: render.TypeString, Enum: []string{action}},
 		},
@@ -71,6 +72,54 @@ func MovedSchema(container, action string) *render.Schema {
 		},
 	}
 }
+
+// AppliedSchema is MovedSchema for a move that may take more than one request.
+//
+// On Cloud an epic move is a PUT of the parent field per issue, because the
+// batched agile endpoint serves company-managed projects only and the parent
+// field is the spelling that works on both styles. So a run can stop in the
+// middle, and a document that could only say "these moved" would have to either
+// lie about the ones that did not or omit them.
+//
+// requested and applied are the two numbers a caller compares. They are counts
+// rather than a complete="false", which means a truncated *result set* and
+// carries exit 3 with it — a write has no result set to truncate, and one code
+// meaning two things is the defect this avoids.
+func AppliedSchema(container, action string) *render.Schema {
+	return &render.Schema{
+		Element: container,
+		Attrs: []render.Field{
+			// For epic remove this is the literal "none": leaving an epic is
+			// spelled as joining the absence of one, and there is no DELETE.
+			{Name: "id", Type: render.TypeString},
+			{Name: "action", Type: render.TypeString, Enum: []string{action}},
+			{Name: "requested", Type: render.TypeInt},
+			{Name: "applied", Type: render.TypeInt},
+		},
+		Children: []render.Child{
+			{Schema: render.ListSchema("issues", "issue", &render.Schema{
+				Element: "issue",
+				Attrs: []render.Field{
+					{Name: "key", Type: render.TypeString},
+					{
+						Name: "status", Type: render.TypeString,
+						Enum: []string{StatusMoved, StatusFailed, StatusNotAttempted},
+					},
+				},
+			})},
+		},
+	}
+}
+
+// What one issue's move came to. A run stops at the first failure, so what
+// follows it was never sent — reported as such rather than as failed, because
+// "Jira refused this" and "nobody asked Jira" are different facts and the
+// caller's retry depends on which.
+const (
+	StatusMoved        = "moved"
+	StatusFailed       = "failed"
+	StatusNotAttempted = "not-attempted"
+)
 
 // MaxIssuesPerRequest is the agile API's cap on one move.
 //
@@ -258,6 +307,13 @@ func runEpicAdd(ctx context.Context, inv *registry.Invocation) (*render.Doc, err
 		return nil, err
 	}
 
+	if client.site.Kind == site.Cloud {
+		return client.applyParent(ctx, inv, parentMove{
+			kind: KindEpicAdd, version: VersionEpicAdd,
+			id: ref, action: "added", parent: ref, keys: keys,
+		})
+	}
+
 	req, err := moveRequest(
 		client.site.AgileBase()+"/epic/"+url.PathEscape(ref)+"/issue", keys,
 	)
@@ -272,7 +328,7 @@ func runEpicAdd(ctx context.Context, inv *registry.Invocation) (*render.Doc, err
 	}
 
 	return render.Record(KindEpicAdd, VersionEpicAdd,
-		movedNode("epic", inv.Args[0], "added", keys)), nil
+		appliedNode("epic", inv.Args[0], "added", allMoved(keys))), nil
 }
 
 func epicRemoveCommand() *registry.Command {
@@ -326,6 +382,13 @@ func runEpicRemove(ctx context.Context, inv *registry.Invocation) (*render.Doc, 
 		return nil, err
 	}
 
+	if client.site.Kind == site.Cloud {
+		return client.applyParent(ctx, inv, parentMove{
+			kind: KindEpicRemove, version: VersionEpicRemove,
+			id: noEpic, action: "removed", parent: issue.ParentSentinel, keys: keys,
+		})
+	}
+
 	req, err := moveRequest(client.site.AgileBase()+"/epic/"+noEpic+"/issue", keys)
 	if err != nil {
 		return nil, err
@@ -338,7 +401,94 @@ func runEpicRemove(ctx context.Context, inv *registry.Invocation) (*render.Doc, 
 	}
 
 	return render.Record(KindEpicRemove, VersionEpicRemove,
-		movedNode("epic", noEpic, "removed", keys)), nil
+		appliedNode("epic", noEpic, "removed", allMoved(keys))), nil
+}
+
+// parentMove is one `epic add` or `epic remove` on Cloud, where the move is a
+// PUT of the parent field per issue.
+type parentMove struct {
+	kind    string
+	version int
+	// id and action are what the result reports; parent is what goes in the
+	// body, which for a removal is the clearing word rather than a key.
+	id     string
+	action string
+	parent string
+	keys   []string
+}
+
+// applyParent moves each issue by setting or clearing its parent.
+//
+// This is the Cloud path for both epic verbs, and it is one request per issue
+// because the parent field offers no batched spelling. The batched agile
+// endpoint does, and Cloud refuses it for team-managed projects — the default
+// for every project created on a Cloud site — so the choice is between a path
+// that works for some callers and a path that works for all of them.
+//
+// It stops at the first failure rather than pressing on. Continuing would turn
+// one refusal into a list of them, and a caller who cannot do the first move is
+// overwhelmingly unlikely to want the rest attempted; what they need is to know
+// exactly where it got to, which the document says.
+func (c *client) applyParent(
+	ctx context.Context, inv *registry.Invocation, move parentMove,
+) (*render.Doc, error) {
+	client := &issue.Client{Transport: c.conn, Site: c.site}
+
+	requests := make([]transport.Request, 0, len(move.keys))
+	for _, key := range move.keys {
+		req, err := client.EditRequest(issue.EditOptions{
+			Key: key, Parent: move.parent, SetParent: true,
+		})
+		if err != nil {
+			return nil, err
+		}
+		requests = append(requests, req)
+	}
+
+	// Every request is built before any is sent, so a body this tool would have
+	// refused to build costs no half-applied move.
+	if inv.Flags.Bool("dry-run") {
+		return registry.DryRunDoc(move.kind, requests...), nil
+	}
+
+	statuses := make([]issueStatus, 0, len(move.keys))
+	var failure error
+	for i, req := range requests {
+		if failure != nil {
+			statuses = append(statuses, issueStatus{move.keys[i], StatusNotAttempted})
+			continue
+		}
+		if err := c.send(ctx, req); err != nil {
+			failure = err
+			statuses = append(statuses, issueStatus{move.keys[i], StatusFailed})
+			continue
+		}
+		statuses = append(statuses, issueStatus{move.keys[i], StatusMoved})
+	}
+
+	doc := render.Record(move.kind, move.version,
+		appliedNode("epic", move.id, move.action, statuses))
+	if failure != nil {
+		return nil, &registry.PartiallyApplied{Doc: doc, Cause: failure}
+	}
+	return doc, nil
+}
+
+// issueStatus is one issue and what its move came to.
+type issueStatus struct {
+	key    string
+	status string
+}
+
+// allMoved is the whole set, applied. It is what a single-request move reports:
+// Jira answered 204 for the batch, so either all of them moved or none did and
+// the command already failed.
+func allMoved(keys []string) []issueStatus {
+	out := make([]issueStatus, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, issueStatus{key, StatusMoved})
+	}
+	return out
 }
 
 // parseIssueKeys checks every key and returns them canonicalized.
@@ -445,6 +595,28 @@ func movedNode(container, id, action string, keys []string) *render.Node {
 	return render.El(container).
 		Attr("id", id).
 		Attr("action", action).
+		Child(render.ListEl("issues", "issue", items...))
+}
+
+// appliedNode is movedNode for a move that may take more than one request, and
+// so may stop in the middle. The counts are what a caller compares; the
+// per-issue status is what tells them where to resume.
+func appliedNode(container, id, action string, statuses []issueStatus) *render.Node {
+	items := make([]*render.Node, 0, len(statuses))
+	applied := 0
+	for _, s := range statuses {
+		if s.status == StatusMoved {
+			applied++
+		}
+		items = append(items, render.El("issue").
+			Attr("key", s.key).
+			Attr("status", s.status))
+	}
+	return render.El(container).
+		Attr("id", id).
+		Attr("action", action).
+		Attr("requested", strconv.Itoa(len(statuses))).
+		Attr("applied", strconv.Itoa(applied)).
 		Child(render.ListEl("issues", "issue", items...))
 }
 

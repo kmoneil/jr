@@ -270,6 +270,14 @@ func (a *app) runDocument(
 ) error {
 	doc, err := rc.Run(ctx, inv)
 	if err != nil {
+		// A write that applied some of what it was asked has to say which part,
+		// and the failure alone cannot. Everything else fails with stdout
+		// untouched, which is the rule this is the one exception to.
+		if applied, writeErr := a.writeAppliedSoFar(rc, inv, err); applied {
+			if writeErr != nil {
+				return writeErr
+			}
+		}
 		return err
 	}
 	// A command that owns stdout has already written everything that belongs

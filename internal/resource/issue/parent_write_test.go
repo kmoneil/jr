@@ -11,6 +11,7 @@ import (
 
 	"github.com/kmoneil/jira-cli/internal/errs"
 	"github.com/kmoneil/jira-cli/internal/registry"
+	"github.com/kmoneil/jira-cli/internal/render"
 	"github.com/kmoneil/jira-cli/internal/resource/issue"
 	"github.com/kmoneil/jira-cli/internal/site"
 	"github.com/kmoneil/jira-cli/internal/transport"
@@ -45,7 +46,21 @@ func parentEdit(
 	if err != nil {
 		return nil, err
 	}
-	body, ok := doc.Record.ChildNamed("body")
+	return dryRunBody(t, doc), nil
+}
+
+// dryRunBody pulls the single previewed request's body out of a dry-run
+// document. The kind wraps every preview in a `requests` list, including a
+// preview of one, so an edit's body is one level further down than the
+// unwrapped v1 shape put it.
+func dryRunBody(t *testing.T, doc *render.Doc) map[string]any {
+	t.Helper()
+
+	if len(doc.Record.Children) != 1 {
+		t.Fatalf("got %d requests, want the one an edit sends",
+			len(doc.Record.Children))
+	}
+	body, ok := doc.Record.Children[0].ChildNamed("body")
 	if !ok {
 		t.Fatal("the dry run printed no body")
 	}
@@ -53,7 +68,7 @@ func parentEdit(
 	if err := json.Unmarshal([]byte(body.Text), &payload); err != nil {
 		t.Fatalf("the request body is not JSON: %v\n%s", err, body.Text)
 	}
-	return payload, nil
+	return payload
 }
 
 // TestParentReachesTheRequest is the invariant a flag has to earn before it
@@ -278,12 +293,7 @@ func TestParentCombinesWithTheOtherFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run: %v", err)
 	}
-	body, _ := doc.Record.ChildNamed("body")
-
-	var payload map[string]any
-	if err := json.Unmarshal([]byte(body.Text), &payload); err != nil {
-		t.Fatalf("body is not JSON: %v", err)
-	}
+	payload := dryRunBody(t, doc)
 	fields, _ := payload["fields"].(map[string]any)
 	if len(fields) != 2 {
 		t.Errorf("fields = %v, want exactly summary and parent", fields)

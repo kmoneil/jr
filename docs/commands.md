@@ -664,8 +664,8 @@ jr epic add 10101 ENG-101 --dry-run
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `epic.add` | v1 | always |
-| `dry-run` | v1 | --dry-run is given |
+| `epic.add` | v2 | always |
+| `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
@@ -793,8 +793,8 @@ jr epic remove ENG-101 --dry-run
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `epic.remove` | v1 | always |
-| `dry-run` | v1 | --dry-run is given |
+| `epic.remove` | v2 | always |
+| `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
@@ -896,7 +896,7 @@ jr issue assign ENG-101 'Ada Lovelace' --if-unchanged eyJkIjo
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.assign` | v2 | always |
-| `dry-run` | v1 | --dry-run is given |
+| `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
@@ -1039,7 +1039,7 @@ jr issue attachment upload ENG-101 ./out.log --name run-42.log
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.attachment.upload` | v1 | always |
-| `dry-run` | v1 | --dry-run is given |
+| `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
@@ -1094,7 +1094,7 @@ jr issue clone ENG-101 --idempotency-key retry-1
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.clone` | v1 | always |
-| `dry-run` | v1 | --dry-run is given |
+| `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
@@ -1147,7 +1147,7 @@ jr issue comment add ENG-101 "$(cat notes.md)" --body-format markdown
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.comment.add` | v2 | always |
-| `dry-run` | v1 | --dry-run is given |
+| `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
@@ -1189,7 +1189,7 @@ jr issue comment delete ENG-101 10042 --yes
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.comment.delete` | v1 | always |
-| `dry-run` | v1 | --dry-run is given |
+| `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
@@ -1232,7 +1232,7 @@ jr issue comment edit ENG-101 10042 'Corrected: it was 9.12.7'
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.comment.edit` | v1 | always |
-| `dry-run` | v1 | --dry-run is given |
+| `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
@@ -1342,7 +1342,7 @@ jr issue create --type Bug --summary Probe --dry-run
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.create` | v1 | always |
-| `dry-run` | v1 | --dry-run is given |
+| `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
@@ -1387,7 +1387,7 @@ jr issue delete ENG-101 --dry-run
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.delete` | v1 | always |
-| `dry-run` | v1 | --dry-run is given |
+| `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
@@ -1465,7 +1465,7 @@ jr issue edit ENG-101 --priority High --if-unchanged eyJkIjo
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.edit` | v2 | always |
-| `dry-run` | v1 | --dry-run is given |
+| `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
@@ -1563,7 +1563,7 @@ jr issue link add ENG-1 relates to ENG-2 --dry-run
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.link.add` | v1 | always |
-| `dry-run` | v1 | --dry-run is given |
+| `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
@@ -1641,7 +1641,7 @@ jr issue link remove 10042 --yes
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.link.remove` | v1 | always |
-| `dry-run` | v1 | --dry-run is given |
+| `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
@@ -1800,7 +1800,7 @@ jr issue move ENG-101 Done --idempotency-key deploy-42
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.move` | v3 | always |
-| `dry-run` | v1 | --dry-run is given |
+| `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
@@ -1841,7 +1841,7 @@ jr issue watch ENG-101 --remove
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.watch` | v1 | always |
-| `dry-run` | v1 | --dry-run is given |
+| `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
@@ -1891,7 +1891,7 @@ jr issue worklog add ENG-101 30m --started 2026-08-05T09:00:00Z
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.worklog.add` | v2 | always |
-| `dry-run` | v1 | --dry-run is given |
+| `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
@@ -1930,7 +1930,7 @@ jr issue worklog delete ENG-101 10042 --yes
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.worklog.delete` | v1 | always |
-| `dry-run` | v1 | --dry-run is given |
+| `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
@@ -2470,7 +2470,7 @@ jr sprint add 128 ENG-1 --dry-run
 | Emits | Schema | When |
 | --- | --- | --- |
 | `sprint.add` | v1 | always |
-| `dry-run` | v1 | --dry-run is given |
+| `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
@@ -2520,7 +2520,7 @@ jr sprint close 128 --dry-run
 | Emits | Schema | When |
 | --- | --- | --- |
 | `sprint.close` | v1 | always |
-| `dry-run` | v1 | --dry-run is given |
+| `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 

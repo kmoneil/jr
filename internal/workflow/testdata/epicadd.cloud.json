@@ -1,13 +1,13 @@
 {
   "deployment": "cloud",
   "source": "recorded",
-  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB. The first time this verb reached a real Jira and was accepted. It replaces a constructed cassette that asserted this same request unchanged for two releases while nothing established it was ever right. The project is company-managed (classic), which is the endpoint's actual limit \u2014 see epicadd-nextgen.cloud.json for the same request refused.",
+  "note": "Recorded on 2026-08-10 against the Cloud sandbox, unmodified beyond JIRA_RECORD_SCRUB. `epic add` on Cloud, two issues, against a company-managed project. Two requests, because the parent field has no batched spelling \u2014 which is the whole reason this kind gained a per-issue status. It replaces a recording of the agile endpoint, which worked here and is refused on the project style most Cloud callers have; see epicadd-nextgen.cloud.json.",
   "interactions": [
     {
       "request": {
-        "method": "POST",
-        "path": "/rest/agile/1.0/epic/AGL-1/issue",
-        "body": "{\"issues\":[\"AGL-2\"]}"
+        "method": "PUT",
+        "path": "/rest/api/3/issue/AGL-2",
+        "body": "{\"fields\":{\"parent\":{\"key\":\"AGL-1\"}}}"
       },
       "response": {
         "status": 204,
@@ -16,22 +16,22 @@
             "00000000-0000-0000-0000-000000000000"
           ],
           "Atl-Traceid": [
-            "4345e7195cbe47faa69ca92a5e320b9d"
+            "fc6728d70c91469ab197e1c5d3c17a72"
           ],
           "Cache-Control": [
             "no-cache, no-store, no-transform"
           ],
           "Date": [
-            "Mon, 10 Aug 2026 13:52:56 GMT"
+            "Mon, 10 Aug 2026 14:47:29 GMT"
           ],
           "Nel": [
             "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
           ],
           "Ratelimit": [
-            "\"jira-burst-based\";r=199;t=1"
+            "\"jira-burst-based\";r=299;t=1"
           ],
           "Ratelimit-Policy": [
-            "\"jira-burst-based\";q=100;w=1"
+            "\"jira-burst-based\";q=50;w=1"
           ],
           "Report-To": [
             "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
@@ -40,7 +40,7 @@
             "AtlassianEdge"
           ],
           "Server-Timing": [
-            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=91,cdn-upstream-fbl;dur=681,atl-edge;dur=558,atl-edge-internal;dur=19,atl-edge-upstream;dur=539,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW59-P7\",cdn-rid;desc=\"N321QlgSaeqC6Kry3ie4pgnK0lYet47EHNDmappNWplWsYrRydT8nA==\",cdn-downstream-fbl;dur=687"
+            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=94,cdn-upstream-fbl;dur=652,atl-edge;dur=526,atl-edge-internal;dur=15,atl-edge-upstream;dur=510,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW59-P7\",cdn-rid;desc=\"7ZX8q3sKgaSZYrccPXEY3B-urisD5hLonR9St-SfF2ebYdjO2hcjVA==\",cdn-downstream-fbl;dur=656"
           ],
           "Set-Cookie": [
             "REDACTED"
@@ -55,19 +55,19 @@
             "Accept-Encoding"
           ],
           "Via": [
-            "1.1 9485615792f5f5ecef76608e38635192.cloudfront.net (CloudFront)"
+            "1.1 7b20f970e787d67ae77f7af9dea94ba2.cloudfront.net (CloudFront)"
           ],
           "X-Aaccountid": [
             "000000%3A00000000-0000-0000-0000-000000000000"
           ],
           "X-Amz-Cf-Id": [
-            "N321QlgSaeqC6Kry3ie4pgnK0lYet47EHNDmappNWplWsYrRydT8nA=="
+            "7ZX8q3sKgaSZYrccPXEY3B-urisD5hLonR9St-SfF2ebYdjO2hcjVA=="
           ],
           "X-Amz-Cf-Pop": [
             "DFW59-P7"
           ],
           "X-Arequestid": [
-            "3148647c0607a4e271947712fe01d115"
+            "f9674271199acad732b15cf8e37016fb"
           ],
           "X-Cache": [
             "Miss from cloudfront"
@@ -76,10 +76,94 @@
             "nosniff"
           ],
           "X-Ratelimit-Limit": [
-            "200"
+            "300"
           ],
           "X-Ratelimit-Remaining": [
-            "199"
+            "299"
+          ],
+          "X-Xss-Protection": [
+            "1; mode=block"
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "PUT",
+        "path": "/rest/api/3/issue/AGL-3",
+        "body": "{\"fields\":{\"parent\":{\"key\":\"AGL-1\"}}}"
+      },
+      "response": {
+        "status": 204,
+        "header": {
+          "Atl-Request-Id": [
+            "00000000-0000-0000-0000-000000000000"
+          ],
+          "Atl-Traceid": [
+            "100393aa35a2458f9fa6427b1d55aba9"
+          ],
+          "Cache-Control": [
+            "no-cache, no-store, no-transform"
+          ],
+          "Date": [
+            "Mon, 10 Aug 2026 14:47:29 GMT"
+          ],
+          "Nel": [
+            "{\"failure_fraction\": 0.01, \"include_subdomains\": true, \"max_age\": 600, \"report_to\": \"endpoint-1\"}"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=298;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=50;w=1"
+          ],
+          "Report-To": [
+            "{\"endpoints\": [{\"url\": \"https://dz8aopenkvv6s.cloudfront.net\"}], \"group\": \"endpoint-1\", \"include_subdomains\": true, \"max_age\": 600}"
+          ],
+          "Server": [
+            "AtlassianEdge"
+          ],
+          "Server-Timing": [
+            "cdn-upstream-layer;desc=\"EDGE\",cdn-upstream-dns;dur=0,cdn-upstream-connect;dur=93,cdn-upstream-fbl;dur=653,atl-edge;dur=526,atl-edge-internal;dur=16,atl-edge-upstream;dur=510,atl-edge-pop;desc=\"aws-us-east-1\",cdn-cache-miss,cdn-pop;desc=\"DFW59-P7\",cdn-rid;desc=\"DfNiuGSdpnzRsbtFtSbKbDAEVa58XECAZC4yFQ2r21IBV5VmA3GNiA==\",cdn-downstream-fbl;dur=657"
+          ],
+          "Set-Cookie": [
+            "REDACTED"
+          ],
+          "Strict-Transport-Security": [
+            "max-age=63072000; includeSubDomains; preload"
+          ],
+          "Timing-Allow-Origin": [
+            "*"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "Via": [
+            "1.1 7b20f970e787d67ae77f7af9dea94ba2.cloudfront.net (CloudFront)"
+          ],
+          "X-Aaccountid": [
+            "000000%3A00000000-0000-0000-0000-000000000000"
+          ],
+          "X-Amz-Cf-Id": [
+            "DfNiuGSdpnzRsbtFtSbKbDAEVa58XECAZC4yFQ2r21IBV5VmA3GNiA=="
+          ],
+          "X-Amz-Cf-Pop": [
+            "DFW59-P7"
+          ],
+          "X-Arequestid": [
+            "589aa8221e3c9851b3540db6076b5239"
+          ],
+          "X-Cache": [
+            "Miss from cloudfront"
+          ],
+          "X-Content-Type-Options": [
+            "nosniff"
+          ],
+          "X-Ratelimit-Limit": [
+            "300"
+          ],
+          "X-Ratelimit-Remaining": [
+            "298"
           ],
           "X-Xss-Protection": [
             "1; mode=block"

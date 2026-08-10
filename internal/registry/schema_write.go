@@ -18,7 +18,7 @@ func init() {
 // is text rather than anything structured: what --dry-run promises is the exact
 // bytes that would have gone out, pasteable into curl.
 func DryRunSchema() *render.Schema {
-	return &render.Schema{
+	return render.ListSchema("requests", "request", &render.Schema{
 		Element: "request",
 		Attrs: []render.Field{
 			{Name: "command", Type: render.TypeString},
@@ -39,5 +39,5 @@ func DryRunSchema() *render.Schema {
 				Text:    &render.Field{Type: render.TypeString},
 			}, Optional: true},
 		},
-	}
+	})
 }

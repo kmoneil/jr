@@ -1,0 +1,37 @@
+      <element name="requests" list-of="request">
+        <attributes count="1">
+          <attribute name="count" type="int" optional="false"/>
+        </attributes>
+        <elements count="1">
+          <element name="request" optional="true" repeated="true">
+            <attributes count="3">
+              <attribute name="command" type="string" optional="false"/>
+              <attribute name="method" type="string" optional="false"/>
+              <attribute name="path" type="string" optional="false"/>
+            </attributes>
+            <elements count="2">
+              <element name="query" list-of="param" optional="true" repeated="false">
+                <attributes count="1">
+                  <attribute name="count" type="int" optional="false"/>
+                </attributes>
+                <elements count="1">
+                  <element name="param" optional="true" repeated="true">
+                    <attributes count="1">
+                      <attribute name="name" type="string" optional="false"/>
+                    </attributes>
+                    <text name="text" type="string" optional="false"/>
+                    <elements count="0"/>
+                  </element>
+                </elements>
+              </element>
+              <element name="body" optional="true" repeated="false">
+                <attributes count="1">
+                  <attribute name="content-type" type="string" optional="false"/>
+                </attributes>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>

@@ -272,8 +272,12 @@ func TestLinkRemoveTargetsTheLinkNotThePair(t *testing.T) {
 	if doc.Kind != registry.KindDryRun {
 		t.Fatalf("kind = %q", doc.Kind)
 	}
-	method, _ := doc.Record.AttrValue("method")
-	path, _ := doc.Record.AttrValue("path")
+	if len(doc.Record.Children) != 1 {
+		t.Fatalf("got %d requests, want the one this sends", len(doc.Record.Children))
+	}
+	request := doc.Record.Children[0]
+	method, _ := request.AttrValue("method")
+	path, _ := request.AttrValue("path")
 	if method != transport.MethodDelete || path != "/rest/api/2/issueLink/10042" {
 		t.Errorf("request = %s %s", method, path)
 	}
