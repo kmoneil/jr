@@ -1,0 +1,23 @@
+# What to record when the instance is served under a context path.
+#
+# Same format as manifest.tsv: <group>	<cassette>	<command>
+#
+# These are a separate run and a separate file because the recorder stores
+# req.URL.Path verbatim. Under CONTEXT_PATH=/jira every path in every cassette
+# gains the prefix, so recording the root manifest here would rewrite all
+# twenty-one root recordings into a different deployment shape without saying
+# so. record.sh refuses each manifest against the wrong instance.
+#
+# Data Center is often served under a context path and none of this project's
+# fixtures carried one. Three defects came out of that shape — Relative
+# returning before the host check, the prefix applied twice, and /jiraxyz
+# reading as inside /jira — and all three were argued from documentation and
+# fixed without ever being observed. These recordings are the observation.
+#
+# The commands assume the seed: project ENG, board 1, an attachment on ENG-4.
+
+internal/site datacenter	internal/site/testdata/serverinfo-contextpath.datacenter.json	user me --refresh
+internal/resource/project datacenter	internal/resource/project/testdata/projects-contextpath.datacenter.json	project list
+internal/resource/issue datacenter	internal/resource/issue/testdata/list-contextpath.datacenter.json	issue list --project ENG --limit 5
+internal/resource/issue datacenter	internal/resource/issue/testdata/attachments-contextpath.datacenter.json	issue attachment list ENG-4
+internal/resource/issue datacenter	internal/resource/issue/testdata/download-contextpath.datacenter.json	issue attachment download ENG-4 10000 --output -

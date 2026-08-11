@@ -1,0 +1,36 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/jira/rest/api/2/serverInfo"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"baseUrl\":\"http://recorded.invalid/jira\",\"version\":\"10.4.0\",\"versionNumbers\":[10,4,0],\"deploymentType\":\"Server\",\"buildNumber\":10040001,\"buildDate\":\"2025-01-22T00:00:00.000+0000\",\"databaseBuildNumber\":10040001,\"serverTime\":\"2026-08-11T17:12:52.360+0000\",\"scmInfo\":\"acd8e7f368f3161107af9716fd81856c7e0820e1\",\"serverTitle\":\"jr fixtures\"}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/jira/rest/api/2/myself"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"self\":\"http://recorded.invalid/jira/rest/api/2/user?username=ada\",\"key\":\"JIRAUSER10000\",\"name\":\"ada\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"deleted\":false,\"timeZone\":\"Etc/UTC\",\"locale\":\"en_US\",\"groups\":{\"size\":2,\"items\":[]},\"applicationRoles\":{\"size\":1,\"items\":[]},\"expand\":\"groups,applicationRoles\"}"
+      }
+    }
+  ]
+}

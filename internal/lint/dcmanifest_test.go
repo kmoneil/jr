@@ -9,8 +9,18 @@ import (
 	"testing"
 )
 
-// manifestPath is the recording recipe for the Data Center rig.
-const manifestPath = repoRoot + "/scripts/dc/manifest.tsv"
+// manifestPaths are the recording recipes for the Data Center rig.
+//
+// Two files because they describe two instances. The recorder stores
+// req.URL.Path verbatim, so everything recorded under a context path carries
+// the prefix and everything recorded at the root does not; running one
+// manifest against the other's instance would rewrite every cassette into a
+// shape nobody asked for. record.sh refuses each against the wrong one, and
+// both are read here so a recording in either is covered.
+var manifestPaths = []string{
+	repoRoot + "/scripts/dc/manifest.tsv",
+	repoRoot + "/scripts/dc/manifest-contextpath.tsv",
+}
 
 // manifestFloor is how many entries the file must carry before a clean result
 // means anything, for the same reason every other walk here has a floor: a
@@ -19,6 +29,7 @@ const manifestFloor = 15
 
 // manifestEntry is one line of scripts/dc/manifest.tsv.
 type manifestEntry struct {
+	file     string // which manifest it came from
 	line     int
 	group    string // a key shaped like the ones in unrecorded
 	cassette string // repository-relative path
@@ -45,8 +56,8 @@ func TestEveryDataCenterRecordingCanBeRemade(t *testing.T) {
 	entries := readManifest(t)
 
 	if len(entries) < manifestFloor {
-		t.Fatalf("manifest holds %d entries, want at least %d — the file moved "+
-			"or the parser stopped parsing", len(entries), manifestFloor)
+		t.Fatalf("the manifests hold %d entries between them, want at least %d — "+
+			"a file moved or the parser stopped parsing", len(entries), manifestFloor)
 	}
 
 	groups := cassetteGroups(t)
@@ -54,20 +65,20 @@ func TestEveryDataCenterRecordingCanBeRemade(t *testing.T) {
 	named := map[string]manifestEntry{}
 	for _, e := range entries {
 		if _, ok := groups[e.group]; !ok {
-			t.Errorf("manifest line %d names the group %q, which no cassette in "+
+			t.Errorf("%s line %d names the group %q, which no cassette in "+
 				"the tree belongs to. A recipe for a group that does not exist "+
-				"is a recipe nobody can follow", e.line, e.group)
+				"is a recipe nobody can follow", e.file, e.line, e.group)
 		}
 
 		if !strings.HasSuffix(e.cassette, ".datacenter.json") {
-			t.Errorf("manifest line %d writes %q, which is not a Data Center "+
+			t.Errorf("%s line %d writes %q, which is not a Data Center "+
 				"cassette. A recording filed under the wrong deployment is "+
-				"evidence for the API it did not come from", e.line, e.cassette)
+				"evidence for the API it did not come from", e.file, e.line, e.cassette)
 		}
 
 		if prior, ok := named[e.cassette]; ok {
-			t.Errorf("manifest lines %d and %d both write %s; the second "+
-				"recording silently replaces the first", prior.line, e.line, e.cassette)
+			t.Errorf("%s lines %d and %d both write %s; the second "+
+				"recording silently replaces the first", e.file, prior.line, e.line, e.cassette)
 		}
 		named[e.cassette] = e
 
@@ -76,13 +87,13 @@ func TestEveryDataCenterRecordingCanBeRemade(t *testing.T) {
 			// invocation. It still has to say why, in the file the operator
 			// reads, rather than in a plan nobody opens.
 			if len(strings.TrimSpace(e.command)) < 2 {
-				t.Errorf("manifest line %d is a gap with no reason", e.line)
+				t.Errorf("%s line %d is a gap with no reason", e.file, e.line)
 			}
 			continue
 		}
 		if !strings.HasPrefix(e.command, "jr ") && !isJiraVerb(e.command) {
-			t.Errorf("manifest line %d has the command %q, which does not look "+
-				"like jr arguments", e.line, e.command)
+			t.Errorf("%s line %d has the command %q, which does not look "+
+				"like jr arguments", e.file, e.line, e.command)
 		}
 	}
 
@@ -119,6 +130,16 @@ func isJiraVerb(command string) bool {
 func readManifest(t *testing.T) []manifestEntry {
 	t.Helper()
 
+	var out []manifestEntry
+	for _, path := range manifestPaths {
+		out = append(out, readOneManifest(t, path)...)
+	}
+	return out
+}
+
+func readOneManifest(t *testing.T, manifestPath string) []manifestEntry {
+	t.Helper()
+
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
 		t.Fatalf("read %s: %v", manifestPath, err)
@@ -132,11 +153,12 @@ func readManifest(t *testing.T) []manifestEntry {
 		}
 		fields := strings.Split(line, "\t")
 		if len(fields) != 3 {
-			t.Errorf("manifest line %d has %d tab-separated fields, want 3: %q",
-				i+1, len(fields), line)
+			t.Errorf("%s line %d has %d tab-separated fields, want 3: %q",
+				filepath.Base(manifestPath), i+1, len(fields), line)
 			continue
 		}
 		out = append(out, manifestEntry{
+			file:     filepath.Base(manifestPath),
 			line:     i + 1,
 			group:    strings.TrimSpace(fields[0]),
 			cassette: strings.TrimSpace(fields[1]),

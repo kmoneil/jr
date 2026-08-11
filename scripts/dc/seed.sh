@@ -146,6 +146,25 @@ JSON
 	say "issues created"
 fi
 
+# 4b. An attachment, because it is the one thing that makes the server hand
+#     back a URL this tool then has to follow. `issue attachment download`
+#     resolves the `content` link through transport.Relative, which is the only
+#     place a server-supplied URL becomes a request — and under a context path
+#     it is the code that has to not repeat the prefix or wander off the site.
+if api GET "/rest/api/2/issue/${SEED_ISSUE:-ENG-4}?fields=attachment" |
+	grep -q '"filename"'; then
+	say "attachment exists"
+else
+	tmp=$(mktemp -d)
+	printf 'summary,status\nENG-1,To Do\n' >"$tmp/rows.csv"
+	curl -sS -u "$auth" -X POST \
+		-H 'X-Atlassian-Token: no-check' \
+		-F "file=@$tmp/rows.csv" \
+		"$base/rest/api/2/issue/${SEED_ISSUE:-ENG-4}/attachments" >/dev/null
+	rm -rf "$tmp"
+	say "attachment added to ${SEED_ISSUE:-ENG-4}"
+fi
+
 # 5. The board the scrum template made, and a sprint on it.
 board=$(api GET "/rest/agile/1.0/board?projectKeyOrId=$project" | jq -r '.values[0].id // empty')
 [ -n "$board" ] || {

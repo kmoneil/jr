@@ -168,8 +168,10 @@ key Atlassian publishes for running a Data Center product without the SDK —
 keeping where a real instance cannot produce the shape on request, an
 out-of-order page or an absent email, and it says `"source": "constructed"` so
 the difference is legible. `scripts/dc/manifest.tsv` maps every Data Center
-recording to the command that remakes it, and
-`internal/lint/dcmanifest_test.go` refuses a recording that is not in it: a
+recording to the command that remakes it — with a second manifest for the
+instance served under a context path, because the recorder stores the request
+path verbatim and one instance must not write the other's cassettes — and
+`internal/lint/dcmanifest_test.go` refuses a recording that is not in either: a
 fixture nobody can reproduce stops being evidence the first time a request
 changes.
 
@@ -360,7 +362,7 @@ name to `customfield_10042` should not cost a round trip on every invocation.
 | `resource/*`    | Pure struct-in/struct-out unit tests, plus a fuzzer on anything that parses | 90%                                     |
 | `transport/`    | Replayed recordings, Cloud + DC                                | The four exchanges the contract test plays — probe, account, a 404, a field error — on both deployments |
 | Fixture evidence | Cassettes grouped by package and deployment, each group needing a recording behind it | A group with none names itself and its reason, and the list can only shrink. Empty since 2026-08-11 |
-| Reproducibility | Every Data Center recording mapped to the command that remakes it, in `scripts/dc/manifest.tsv` | A recording the manifest does not name fails the build |
+| Reproducibility | Every Data Center recording mapped to the command that remakes it, in `scripts/dc/manifest.tsv` and `manifest-contextpath.tsv` | A recording neither manifest names fails the build |
 | Output contract | Golden files per kind, per format                              | Any diff requires a version bump in the same commit |
 | Documented contract | Every `kind="…" v="…"` in the docs compared to the registry's kinds | The number a reader copies matches the one the binary emits |
 | Command reference | `docs/commands.md` rendered from the registry and compared | Exact under the full profile; every command present is documented under a reduced one |

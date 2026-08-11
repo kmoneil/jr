@@ -56,7 +56,10 @@ stepname() {
 # saved. Trusting the URL replays finished steps, and the admin-account step is
 # not idempotent: the second attempt fails because the user already exists.
 first_step() {
-	curl -sS -L -c "$jar" -b "$jar" -o "$page" "$base/"
+	# --max-time is generous because the wizard's first render is slow on a
+	# cold instance: a 20-second ceiling returned an empty body here, and an
+	# empty body has no setup form in it, which read as "the wizard finished".
+	curl -sS -L --max-time 120 -c "$jar" -b "$jar" -o "$page" "$base/" || true
 	rendered_step
 }
 
@@ -68,7 +71,19 @@ first_step() {
 rendered_step() {
 	local action
 	action=$(sed -nE 's#.*<form[^>]*action="(Setup[A-Za-z]*)\.jspa".*#\1#p' "$page" | head -1)
-	printf '%s\n' "${action:-Done}"
+	if [ -n "$action" ]; then
+		printf '%s\n' "$action"
+		return
+	fi
+	# No setup form has two meanings and they are opposite: the wizard is
+	# finished, or the page never arrived. Distinguish them by the size of what
+	# came back rather than by its absence, because a timeout and a redirect to
+	# the dashboard both leave no form behind.
+	if [ ! -s "$page" ] || [ "$(wc -c <"$page")" -lt 2048 ]; then
+		printf 'Unready\n'
+		return
+	fi
+	printf 'Done\n'
 }
 
 # post sends one wizard step and prints the step Jira redirected to.
@@ -139,7 +154,7 @@ done
 say "Jira is answering at $base, state $(jira_state "$base")"
 
 current=$(first_step)
-for _ in $(seq 1 12); do
+for _ in $(seq 1 40); do
 	say "step: $current"
 	case $current in
 	SetupDatabase)
@@ -181,7 +196,22 @@ for _ in $(seq 1 12); do
 	SetupMailNotifications)
 		current=$(post SetupMailNotifications --data-urlencode "noemail=true")
 		;;
+	Unready)
+		# The instance answered /status but has not rendered the wizard yet.
+		# Waiting is the whole remedy; concluding anything here is how a
+		# half-set-up instance reports itself finished and fails at the first
+		# REST call with a 503.
+		say "  no wizard page yet, state $(jira_state "$base"); waiting"
+		sleep 15
+		current=$(first_step)
+		;;
 	Done | SetupComplete | Dashboard | MyJiraHome | *)
+		if [ "$(jira_state "$base")" != "RUNNING" ]; then
+			say "  no setup form, but the instance is still $(jira_state "$base")"
+			sleep 15
+			current=$(first_step)
+			continue
+		fi
 		say "setup complete: $base"
 		say "  administrator: $admin_user / $admin_password"
 		exit 0
@@ -189,5 +219,5 @@ for _ in $(seq 1 12); do
 	esac
 done
 
-say "the wizard did not finish in 12 steps; last step was $current"
+say "the wizard did not finish; last step was $current"
 exit 1

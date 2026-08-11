@@ -425,10 +425,28 @@ func (c *Client) attachmentMeta(ctx context.Context, id string) (Attachment, err
 	}
 
 	var raw rawAttachment
-	if err := json.Unmarshal(resp.Body, &raw); err != nil || raw.ID == "" {
+	if err := json.Unmarshal(resp.Body, &raw); err != nil || raw.Content == "" {
+		// The content URL is what this request exists to get, and on Data
+		// Center it is the only way to the bytes. A body without one cannot be
+		// downloaded whatever else it carries.
+		//
+		// The check used to be on `id`, which a real Data Center does not send
+		// back: it answers /rest/api/2/attachment/10000 with the filename, the
+		// size, the author and the content URL, and no id at all. So every
+		// download against every Data Center failed with MALFORMED_ATTACHMENT
+		// — exit 9, and marked retryable, so a caller was invited to try again
+		// against a response that will never change. The hand-written fixture
+		// had an id in it because its author put one there.
 		return Attachment{}, errs.Remote("MALFORMED_ATTACHMENT",
-			"the response for attachment %s is not a usable attachment", id).
-			WithRequestID(resp.RequestID).Wrap(err)
+			"the response for attachment %s carries no content URL", id).
+			WithRequestID(resp.RequestID).
+			WithRemedy("check that the id names an attachment rather than an issue").
+			Wrap(err)
+	}
+	// The caller asked by id, so it is known here whether or not the server
+	// repeated it.
+	if raw.ID == "" {
+		raw.ID = id
 	}
 	return raw.convert()
 }

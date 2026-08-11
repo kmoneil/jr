@@ -1,0 +1,39 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/jira/rest/api/2/attachment/10000"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"self\":\"http://recorded.invalid/jira/rest/api/2/attachment/10000\",\"filename\":\"rows.csv\",\"author\":{\"self\":\"http://recorded.invalid/jira/rest/api/2/user?username=ada\",\"key\":\"JIRAUSER10000\",\"name\":\"ada\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true},\"created\":\"2026-08-11T17:10:45.165+0000\",\"size\":27,\"mimeType\":\"text/csv\",\"properties\":{},\"content\":\"http://recorded.invalid/jira/secure/attachment/10000/rows.csv\"}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/jira/secure/attachment/10000/rows.csv"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Disposition": [
+            "inline; filename*=UTF-8''rows.csv;"
+          ],
+          "Content-Type": [
+            "text/csv;charset=UTF-8"
+          ]
+        },
+        "body": "summary,status\nENG-1,To Do\n"
+      }
+    }
+  ]
+}

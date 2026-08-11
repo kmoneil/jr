@@ -2,7 +2,8 @@
 #
 # Record jr's conversation with the rig into a cassette.
 #
-#   ./record.sh --all
+#   ./record.sh --all           the root manifest
+#   ./record.sh --contextpath   the context-path manifest
 #   ./record.sh internal/resource/board/testdata/boards-recorded.datacenter.json board list
 #
 # --all walks manifest.tsv, which is also what internal/lint reads, so the
@@ -73,9 +74,39 @@ one() {
 	}
 }
 
+# Which manifest, and the check that keeps one instance from writing the
+# other's cassettes.
+#
+# The recorder stores req.URL.Path verbatim, so the context path is in every
+# path of every cassette recorded under one. Running the root manifest against
+# a /jira instance would rewrite all twenty-one root recordings into a
+# different deployment shape and report success, which is the kind of quiet
+# damage a fixture tree cannot detect on its own.
+manifest=$here/manifest.tsv
+case ${1:-} in
+--contextpath)
+	manifest=$here/manifest-contextpath.tsv
+	[ -n "${CONTEXT_PATH:-}" ] || {
+		say "refusing: --contextpath against an instance served at the root."
+		say "Set CONTEXT_PATH=/jira in .env, then 'make dc-down && make dc-up'."
+		exit 2
+	}
+	set -- --all
+	;;
+--all)
+	[ -z "${CONTEXT_PATH:-}" ] || {
+		say "refusing: the root manifest against an instance served under"
+		say "${CONTEXT_PATH}. Every recorded path would gain that prefix and all"
+		say "twenty-one root cassettes would be rewritten into another shape."
+		say "Use --contextpath, or clear CONTEXT_PATH and re-create the instance."
+		exit 2
+	}
+	;;
+esac
+
 if [ "${1:-}" != "--all" ]; then
 	[ "$#" -ge 2 ] || {
-		say "usage: $0 --all | $0 <cassette-path-from-repo-root> <jr args...>"
+		say "usage: $0 --all | $0 --contextpath | $0 <cassette-path> <jr args...>"
 		exit 2
 	}
 	one "$@"
@@ -106,7 +137,7 @@ while IFS=$'\t' read -r group cassette command; do
 	else
 		failed=$((failed + 1))
 	fi
-done <"$here/manifest.tsv"
+done <"$manifest"
 
 say
 say "recorded $recorded, skipped $skipped, failed $failed"

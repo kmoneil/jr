@@ -1,0 +1,22 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/jira/rest/api/2/issue/ENG-4",
+        "query": "fields=attachment"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10003\",\"self\":\"http://recorded.invalid/jira/rest/api/2/issue/10003\",\"key\":\"ENG-4\",\"fields\":{\"attachment\":[{\"self\":\"http://recorded.invalid/jira/rest/api/2/attachment/10000\",\"id\":\"10000\",\"filename\":\"rows.csv\",\"author\":{\"self\":\"http://recorded.invalid/jira/rest/api/2/user?username=ada\",\"name\":\"ada\",\"key\":\"JIRAUSER10000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"Etc/UTC\"},\"created\":\"2026-08-11T17:10:45.165+0000\",\"size\":27,\"mimeType\":\"text/csv\",\"content\":\"http://recorded.invalid/jira/secure/attachment/10000/rows.csv\"}]},\"renderedFields\":null}"
+      }
+    }
+  ]
+}
