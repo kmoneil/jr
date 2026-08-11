@@ -362,6 +362,7 @@ name to `customfield_10042` should not cost a round trip on every invocation.
 | `resource/*`    | Pure struct-in/struct-out unit tests, plus a fuzzer on anything that parses | 90%                                     |
 | `transport/`    | Replayed recordings, Cloud + DC                                | The four exchanges the contract test plays — probe, account, a 404, a field error — on both deployments |
 | Fixture evidence | Cassettes grouped by package and deployment, each group needing a recording behind it | A group with none names itself and its reason, and the list can only shrink. Empty since 2026-08-11 |
+| Evidence coverage | Every package that builds a `transport.Request` needs a cassette per deployment, found by parsing rather than by a list | A package with no cassettes at all is invisible to the grouping above, so it is asked for separately. One row outstanding: `internal/site cloud` |
 | Reproducibility | Every Data Center recording mapped to the command that remakes it, in `scripts/dc/manifest.tsv` and `manifest-contextpath.tsv` | A recording neither manifest names fails the build |
 | Output contract | Golden files per kind, per format                              | Any diff requires a version bump in the same commit |
 | Documented contract | Every `kind="…" v="…"` in the docs compared to the registry's kinds | The number a reader copies matches the one the binary emits |
