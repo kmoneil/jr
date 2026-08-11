@@ -108,6 +108,30 @@ real; only the assembly is ours.
 `serverInfo` carries Jira's own build SHA in `scmInfo`, which trips the
 identifier check and is Atlassian's, not yours.
 
+## After recording: what the fixtures still claim
+
+```sh
+python3 scripts/dc/fielddiff.py
+```
+
+It walks every Data Center cassette, groups them by endpoint, and reports each
+field a **constructed** fixture claims that no **recording** of the same
+endpoint carries. A hand-written fixture asserts both halves of an exchange, so
+it can invent a field the server never sends — and the code then comes to
+depend on it. Four published fields got there that way and are structurally
+empty on every Data Center: `has-screen` on a transition, `project` on a board,
+`private` on a project, `lead` on a component.
+
+Most of what it prints is ordinary data dependence — an issue with no links has
+no `issuelinks` — so it is an operator tool rather than a gate. When something
+looks invented, probe the rig for it under every expand the endpoint documents
+before concluding anything:
+
+```sh
+curl -sS -u ada:fixtures-only \
+  'http://<rig>/rest/api/2/issue/ENG-8/transitions?expand=transitions.fields' | jq .
+```
+
 ## Recording against another version
 
 `JIRA_VERSION` in `.env`. The default is 10.4, which is post-9.0 and therefore
