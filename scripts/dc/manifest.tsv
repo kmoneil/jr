@@ -44,3 +44,8 @@ internal/resource/epic datacenter	internal/resource/epic/testdata/epic-recorded.
 internal/workflow datacenter	internal/workflow/testdata/sprintadd-recorded.datacenter.json	sprint add 1 ENG-2
 internal/workflow datacenter	internal/workflow/testdata/epicadd-recorded.datacenter.json	epic add ENG-1 ENG-3
 internal/workflow datacenter	internal/workflow/testdata/epicremove-recorded.datacenter.json	epic remove ENG-3
+
+# The refusal is version-specific and credential-specific: an 11.x instance,
+# and a basic credential, which no seeded profile holds because the seeded one
+# holds a token that works. record-auth-refusal.sh makes both.
+internal/transport datacenter	internal/transport/testdata/basic-refused.datacenter.json	!recorded by scripts/dc/record-auth-refusal.sh, which needs JIRA_VERSION=11.3.5 and stores a basic credential with --no-verify

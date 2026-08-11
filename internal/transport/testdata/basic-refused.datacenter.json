@@ -1,0 +1,22 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/serverInfo"
+      },
+      "response": {
+        "status": 403,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"message\":\"Basic Authentication has been disabled on this instance.\"}"
+      }
+    }
+  ],
+  "note": "Recorded against Jira Software Data Center 11.3.5, which disables HTTP Basic by default: the deployment probe is the first request any run makes and it is refused, so this is the whole conversation. Regenerate with scripts/dc/record-auth-refusal.sh."
+}

@@ -105,6 +105,16 @@ func (s *session) connect(ctx context.Context) (*transport.Client, site.Info, er
 	}
 	if rec != nil {
 		opts.RoundTripper = rec
+		// Registered before anything is sent, not after the probe answers.
+		//
+		// It used to be registered on the way out, once the deployment was
+		// known, which meant a run that *failed* wrote no cassette at all —
+		// and a failure is the conversation most worth recording. A Data
+		// Center 11 refusing basic authentication answers the probe with a 403
+		// and nothing else happens, so the exchange this tool most needed a
+		// fixture of was the one it could not capture.
+		rec.Cassette().Source = transport.Recorded
+		s.app.cleanup = append(s.app.cleanup, save)
 	}
 	client, err := transport.New(opts)
 	if err != nil {
@@ -117,10 +127,9 @@ func (s *session) connect(ctx context.Context) (*transport.Client, site.Info, er
 	}
 	if rec != nil {
 		// The deployment is a label on the cassette and is not known until the
-		// probe has answered, which is after the recorder was already running.
+		// probe has answered. A cassette saved before that keeps the
+		// placeholder, which is the honest answer: nothing told us.
 		rec.Cassette().Deployment = recordedDeployment(info)
-		rec.Cassette().Source = transport.Recorded
-		s.app.cleanup = append(s.app.cleanup, save)
 	}
 	return client, info, nil
 }

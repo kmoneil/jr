@@ -24,11 +24,81 @@ here=$(cd "$(dirname "$0")" && pwd)
 base=$(jira_base)
 admin_user=${ADMIN_USER:-ada}
 admin_password=${ADMIN_PASSWORD:-fixtures-only}
-auth="$admin_user:$admin_password"
 
 project=${SEED_PROJECT:-ENG}
 second_user=${SEED_USER:-grace}
 second_fullname=${SEED_USER_FULLNAME:-Grace Hopper}
+
+# How this script authenticates, which is not a given any more.
+#
+# Jira Data Center 11 refuses HTTP Basic outright — a fresh 11.3.5 answers
+# `403 {"message":"Basic Authentication has been disabled on this instance."}`
+# to every REST call — and refuses /rest/auth/1/session for two-step
+# verification as well. 10.4 still accepts Basic. So the seeding logs in the
+# way a browser does when Basic is gone, mints a personal access token through
+# the session, and sends that as a bearer token: the same credential jr uses.
+auth_args=(-u "$admin_user:$admin_password")
+bearer=""
+session=$(mktemp)
+trap 'rm -f "$session"' EXIT
+
+setup_auth() {
+	local code
+	if [ -n "${SEED_TOKEN:-}" ]; then
+		bearer=$SEED_TOKEN
+		auth_args=(-H "Authorization: Bearer $bearer")
+		say "seeding over the token in SEED_TOKEN"
+		return
+	fi
+	code=$(curl -sS -o /dev/null -w '%{http_code}' \
+		-u "$admin_user:$admin_password" "$base/rest/api/2/myself")
+	if [ "$code" = "200" ]; then
+		say "seeding over basic auth"
+		return
+	fi
+	say "basic auth answered $code; logging in for a session instead"
+
+	# The login form, not the REST session endpoint: /rest/auth/1/session is
+	# refused on 11.x too, for two-step verification.
+	curl -sS -c "$session" -b "$session" -o /dev/null "$base/login.jsp"
+	local token
+	token=$(awk '$6 == "atlassian.xsrf.token" { print $7 }' "$session" | tail -1)
+	curl -sS -c "$session" -b "$session" -o /dev/null -X POST "$base/login.jsp" \
+		--data-urlencode "os_username=$admin_user" \
+		--data-urlencode "os_password=$admin_password" \
+		--data-urlencode "os_destination=/secure/" \
+		--data-urlencode "atl_token=$token" \
+		--data-urlencode "login=Log In"
+
+	bearer=$(curl -sS -c "$session" -b "$session" -X POST \
+		"$base/rest/pat/latest/tokens" \
+		-H 'Content-Type: application/json' \
+		-H 'X-Atlassian-Token: no-check' \
+		-d '{"name":"jr fixture seeding","expirationDuration":1}' |
+		jq -r 'if type == "object" then .rawToken // empty else empty end' 2>/dev/null || true)
+	[ -n "$bearer" ] || {
+		say
+		say "This instance takes neither basic auth nor a scripted login, so the"
+		say "seeding has no way in."
+		say
+		say "Jira 11 disables basic auth, refuses /rest/auth/1/session for"
+		say "two-step verification, and renders its login form in JavaScript, so"
+		say "there is no form to post either. Every route a script has is closed."
+		say
+		say "Two ways forward:"
+		say "  - seed on 10.4 instead: JIRA_VERSION=10.4.0 in .env, then"
+		say "    make dc-down && make dc-up"
+		say "  - or make a token by hand at $base — log in as"
+		say "    ${ADMIN_USER:-ada}, avatar → Profile → Personal Access Tokens —"
+		say "    and re-run with SEED_TOKEN=<token> ./scripts/dc/seed.sh"
+		say
+		say "The refusal itself needs none of this:"
+		say "  ./scripts/dc/record-auth-refusal.sh"
+		exit 1
+	}
+	auth_args=(-H "Authorization: Bearer $bearer")
+	say "seeding over a personal access token"
+}
 
 # api METHOD PATH [JSON] — prints the response body, fails loudly on an error
 # status. Every seed step goes through it so a failure names the call.
@@ -36,11 +106,11 @@ api() {
 	local method=$1 path=$2 body=${3:-}
 	local out status
 	if [ -n "$body" ]; then
-		out=$(curl -sS -u "$auth" -X "$method" "$base$path" \
+		out=$(curl -sS "${auth_args[@]}" -X "$method" "$base$path" \
 			-H 'Content-Type: application/json' \
 			-d "$body" -w '\n%{http_code}')
 	else
-		out=$(curl -sS -u "$auth" -X "$method" "$base$path" -w '\n%{http_code}')
+		out=$(curl -sS "${auth_args[@]}" -X "$method" "$base$path" -w '\n%{http_code}')
 	fi
 	status=${out##*$'\n'}
 	body=${out%$'\n'*}
@@ -56,9 +126,12 @@ api() {
 	esac
 }
 
-exists() { curl -sS -o /dev/null -w '%{http_code}' -u "$auth" "$base$1"; }
+exists() {
+	curl -sS -o /dev/null -w '%{http_code}' "${auth_args[@]}" "$base$1"
+}
 
 say "seeding $base as $admin_user"
+setup_auth
 
 # 1. The project. Scrum rather than Kanban: the sprint verbs need a board with
 #    sprints on it, and a Kanban board has none.
@@ -157,7 +230,7 @@ if api GET "/rest/api/2/issue/${SEED_ISSUE:-ENG-4}?fields=attachment" |
 else
 	tmp=$(mktemp -d)
 	printf 'summary,status\nENG-1,To Do\n' >"$tmp/rows.csv"
-	curl -sS -u "$auth" -X POST \
+	curl -sS "${auth_args[@]}" -X POST \
 		-H 'X-Atlassian-Token: no-check' \
 		-F "file=@$tmp/rows.csv" \
 		"$base/rest/api/2/issue/${SEED_ISSUE:-ENG-4}/attachments" >/dev/null
@@ -190,6 +263,12 @@ token_file=$here/profile/token
 mkdir -p "$(dirname "$token_file")"
 if [ -s "$token_file" ]; then
 	say "token exists: $token_file"
+elif [ -n "$bearer" ]; then
+	# Already minted one to do the seeding with, on an instance that refuses
+	# Basic. Making a second would leave the first behind with nothing holding
+	# it.
+	printf '%s' "$bearer" >"$token_file"
+	say "token written: $token_file"
 else
 	api POST /rest/pat/latest/tokens \
 		'{"name":"jr fixture recording","expirationDuration":1}' |

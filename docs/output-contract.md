@@ -701,9 +701,10 @@ Most of the above are decided before a request goes out. One is not, and it is
 worth naming because the server's own answer sends the caller to the wrong
 place.
 
-| Code               | Exit | Meaning                                                                                                                                                                                                    |
-| ------------------ | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SPRINTS_REFUSED`  | 2    | Jira refused a sprint listing for that board. Only a scrum board has sprints, and a 400 whose remedy reads "check the request" sends somebody looking at their flags. `detail` keeps the server's own message, so the likely cause is offered without being asserted. |
+| Code                  | Exit | Meaning                                                                                                                                                                                                    |
+| --------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SPRINTS_REFUSED`     | 2    | Jira refused a sprint listing for that board. Only a scrum board has sprints, and a 400 whose remedy reads "check the request" sends somebody looking at their flags. `detail` keeps the server's own message, so the likely cause is offered without being asserted. |
+| `AUTH_SCHEME_REFUSED` | 4    | The instance does not accept the credential's scheme at all. Jira Data Center 11 disables HTTP Basic by default and answers every call `403 Basic Authentication has been disabled on this instance` — with no header saying so, which is why the body is what identifies it. Distinct from `UNAUTHORIZED`, which is a credential this instance would accept and did not recognise, and from `FORBIDDEN`, which is exit 6 and means the account lacks a right. The remedy is a personal access token; no permission change can help. |
 
 ### Idempotency
 

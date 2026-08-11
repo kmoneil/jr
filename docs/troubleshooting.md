@@ -161,6 +161,33 @@ Common causes, in the order they are worth checking:
 - **Basic auth is disabled.** Many Data Center instances require a personal
   access token and reject username/password. Use `--scheme bearer`.
 
+### `AUTH_SCHEME_REFUSED` — the instance does not take that kind of credential
+
+```
+code: AUTH_SCHEME_REFUSED
+detail: GET https://jira.example.com/rest/api/2/serverInfo;
+        Basic Authentication has been disabled on this instance.
+```
+
+**Jira Data Center 11 disables HTTP Basic by default.** A username and password,
+a `.netrc` entry, or `JIRA_API_TOKEN` alongside `JIRA_EMAIL` all authenticate as
+Basic, and a default 11.x instance refuses every one of them on the first
+request — the deployment probe — before anything else is tried.
+
+Nothing about the account is wrong and no permission change helps. Create a
+personal access token instead:
+
+1. In Jira: your avatar → **Profile** → **Personal Access Tokens** → **Create
+   token**.
+2. Store it as a bearer credential:
+
+```console
+$ printf '%s' "$TOKEN" | jr auth login --site https://jira.example.com --token-stdin
+```
+
+A token supplied on its own is used as a bearer token; the scheme only needs
+naming when a user is also present. `jr auth status` shows which one is in play.
+
 ### Exit 6 — authenticated but not allowed
 
 The credential is fine; the account cannot do that. Worth knowing:

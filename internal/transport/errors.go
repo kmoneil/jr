@@ -76,6 +76,26 @@ func parseJiraError(body []byte, contentType string) string {
 	return snippet(body)
 }
 
+// basicAuthRefused reports whether a 403 is the instance refusing the
+// credential's scheme rather than the account's rights.
+//
+// Jira Data Center 11 disables HTTP Basic by default. A fresh 11.3.5 answers
+// every REST call `403 {"message":"Basic Authentication has been disabled on
+// this instance."}` — no `X-Authentication-Denied-Reason`, no
+// `WWW-Authenticate`, nothing structured at all. So the message is the only
+// signal there is, which is worth stating plainly rather than hiding: matching
+// on prose is fragile, and the alternative is what shipped, which reported a
+// credential the server will never accept as a permission problem, at exit 6,
+// with a remedy telling the caller to go and look at project permissions.
+//
+// Narrow on purpose. Both words have to be there, so a project permission
+// error that happens to mention "disabled" is not swept up.
+func basicAuthRefused(detail string) bool {
+	lower := strings.ToLower(detail)
+	return strings.Contains(lower, "basic authentication") &&
+		strings.Contains(lower, "disabled")
+}
+
 // isHTML reports whether a body is a web page rather than an API response.
 //
 // It matters because a JSON API answering with HTML means the request reached a
@@ -136,13 +156,22 @@ func statusError(resp *Response) *errs.Error {
 			WithRemedy("run `jr auth login`, or check that the token has not expired")
 
 	case resp.Status == http.StatusForbidden:
-		// Jira answers 403 both for "you may not do this" and for an auth
-		// failure that tripped a CAPTCHA. The header is the only way to tell,
-		// and they need different remedies.
+		// Jira answers 403 for at least three different things, and they need
+		// different remedies: an auth failure that tripped a CAPTCHA, a
+		// credential scheme the instance does not accept at all, and the
+		// ordinary "you may not do this".
 		if reason := resp.Header.Get("X-Authentication-Denied-Reason"); reason != "" {
 			e = errs.Auth("AUTHENTICATION_DENIED", "Jira denied authentication").
 				WithRemedy("log in through the web UI to clear the challenge, then retry")
 			detail = joinDetail(reason, detail)
+			break
+		}
+		if basicAuthRefused(detail) {
+			e = errs.Auth("AUTH_SCHEME_REFUSED",
+				"this instance does not accept basic authentication").
+				WithRemedy("create a personal access token in Jira — your avatar " +
+					"→ Profile → Personal Access Tokens → Create token — and store " +
+					"it with `jr auth login --site <site> --token-stdin`")
 			break
 		}
 		e = errs.Permission("FORBIDDEN", "authenticated, but not permitted to do this").
