@@ -133,27 +133,18 @@ var unrecorded = map[string]string{
 	// that recording cost the sandbox's only iteration and re-recording it needs
 	// a new sprint made by hand in the UI.
 
-	// Every Data Center row has one cause, written out once per row rather than
-	// once for the group, because a row is what somebody deletes and the reason
-	// has to travel with it.
-	"internal/resource/board datacenter":   dataCenterBlocked,
-	"internal/resource/epic datacenter":    dataCenterBlocked,
-	"internal/resource/issue datacenter":   dataCenterBlocked,
-	"internal/resource/jql datacenter":     dataCenterBlocked,
-	"internal/resource/project datacenter": dataCenterBlocked,
-	"internal/resource/sprint datacenter":  dataCenterBlocked,
-	"internal/resource/user datacenter":    dataCenterBlocked,
-	"internal/transport datacenter":        dataCenterBlocked,
-	"internal/workflow datacenter":         dataCenterBlocked,
+	// The nine Data Center rows were paid off on 2026-08-11. They had one cause
+	// between them — the only Data Center available was production — and it
+	// turned out to be a licence problem rather than an access problem.
+	// Atlassian's self-serve trials ended in March 2026 and Data Center is
+	// end-of-life, but the timebomb licence published for running a Data Center
+	// product without the SDK still licenses a local container for three hours
+	// per install. `scripts/dc` is that container, and `make dc-up dc-record`
+	// is how every one of these recordings is regenerated.
+	//
+	// This map being empty is the state to keep it in. An entry here is a
+	// conversation nobody has evidence for.
 }
-
-// dataCenterBlocked is why no Data Center conversation in this tree is
-// evidence. The only Data Center instance available is production, and
-// recording against production is refused; a local container with an
-// evaluation licence is the way out, and the agile endpoints need Jira
-// Software rather than Core.
-const dataCenterBlocked = "the only Data Center instance available is " +
-	"production and recording against it is refused; needs a local container"
 
 // TestEveryDeploymentIsBackedByARecordingOrSaysWhyNot holds each package's
 // cassettes, per deployment, to having at least one recording behind them.

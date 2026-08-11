@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/agile/1.0/epic/ENG-1"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"id\":10000,\"key\":\"ENG-1\",\"self\":\"http://recorded.invalid/rest/agile/1.0/epic/10000\",\"name\":\"Recording the API\",\"summary\":\"Record every Data Center conversation\",\"color\":{\"key\":\"color_1\"},\"done\":false}"
+      }
+    }
+  ]
+}

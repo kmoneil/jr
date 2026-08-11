@@ -1,0 +1,22 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/agile/1.0/board",
+        "query": "maxResults=50\u0026startAt=0"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"maxResults\":50,\"startAt\":0,\"total\":1,\"isLast\":true,\"values\":[{\"id\":1,\"self\":\"http://recorded.invalid/rest/agile/1.0/board/1\",\"name\":\"ENG board\",\"type\":\"scrum\"}]}"
+      }
+    }
+  ]
+}

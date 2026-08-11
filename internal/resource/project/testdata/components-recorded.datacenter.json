@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/project/ENG/components"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "[{\"self\":\"http://recorded.invalid/rest/api/2/component/10000\",\"id\":\"10000\",\"name\":\"api\",\"description\":\"REST surface\",\"assigneeType\":\"PROJECT_DEFAULT\",\"assignee\":{\"self\":\"http://recorded.invalid/rest/api/2/user?username=ada\",\"key\":\"JIRAUSER10000\",\"name\":\"ada\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true},\"realAssigneeType\":\"PROJECT_DEFAULT\",\"realAssignee\":{\"self\":\"http://recorded.invalid/rest/api/2/user?username=ada\",\"key\":\"JIRAUSER10000\",\"name\":\"ada\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true},\"isAssigneeTypeValid\":true,\"project\":\"ENG\",\"projectId\":10000,\"archived\":false,\"deleted\":false}]"
+      }
+    }
+  ]
+}

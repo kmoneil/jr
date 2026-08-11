@@ -1,0 +1,22 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/user/search",
+        "query": "maxResults=51\u0026username=a"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "[{\"self\":\"http://recorded.invalid/rest/api/2/user?username=ada\",\"key\":\"JIRAUSER10000\",\"name\":\"ada\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"deleted\":false,\"timeZone\":\"Etc/UTC\",\"locale\":\"en_US\"}]"
+      }
+    }
+  ]
+}

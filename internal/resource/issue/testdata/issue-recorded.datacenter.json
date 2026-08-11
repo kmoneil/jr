@@ -1,0 +1,22 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/issue/ENG-1",
+        "query": "fields=summary%2Cstatus%2Cassignee%2Creporter%2Cpriority%2Cissuetype%2Cproject%2Ccreated%2Cupdated%2Clabels%2Cdescription%2Cresolution%2Cparent%2Ccomponents%2CfixVersions"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10000\",\"self\":\"http://recorded.invalid/rest/api/2/issue/10000\",\"key\":\"ENG-1\",\"fields\":{\"summary\":\"Record every Data Center conversation\",\"issuetype\":{\"self\":\"http://recorded.invalid/rest/api/2/issuetype/10000\",\"id\":\"10000\",\"description\":\"Created by Jira Software - do not edit or delete. Issue type for a big user story that needs to be broken down.\",\"iconUrl\":\"http://recorded.invalid/images/icons/issuetypes/epic.svg\",\"name\":\"Epic\",\"subtask\":false},\"components\":[],\"created\":\"2026-08-11T16:37:31.272+0000\",\"description\":null,\"project\":{\"self\":\"http://recorded.invalid/rest/api/2/project/10000\",\"id\":\"10000\",\"key\":\"ENG\",\"name\":\"Engineering\",\"projectTypeKey\":\"software\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"}},\"reporter\":{\"self\":\"http://recorded.invalid/rest/api/2/user?username=ada\",\"name\":\"ada\",\"key\":\"JIRAUSER10000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"Etc/UTC\"},\"fixVersions\":[],\"priority\":{\"self\":\"http://recorded.invalid/rest/api/2/priority/3\",\"iconUrl\":\"http://recorded.invalid/images/icons/priorities/medium.svg\",\"name\":\"Medium\",\"id\":\"3\"},\"resolution\":null,\"labels\":[],\"assignee\":{\"self\":\"http://recorded.invalid/rest/api/2/user?username=ada\",\"name\":\"ada\",\"key\":\"JIRAUSER10000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"Etc/UTC\"},\"updated\":\"2026-08-11T16:37:31.272+0000\",\"status\":{\"self\":\"http://recorded.invalid/rest/api/2/status/10000\",\"description\":\"\",\"iconUrl\":\"http://recorded.invalid/\",\"name\":\"To Do\",\"id\":\"10000\",\"statusCategory\":{\"self\":\"http://recorded.invalid/rest/api/2/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"default\",\"name\":\"To Do\"}}},\"renderedFields\":null}"
+      }
+    }
+  ]
+}

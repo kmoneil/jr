@@ -1,0 +1,22 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/project",
+        "query": "expand=lead"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "[{\"expand\":\"description,lead,url,projectKeys\",\"self\":\"http://recorded.invalid/rest/api/2/project/10000\",\"id\":\"10000\",\"key\":\"ENG\",\"lead\":{\"self\":\"http://recorded.invalid/rest/api/2/user?username=ada\",\"key\":\"JIRAUSER10000\",\"name\":\"ada\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true},\"name\":\"Engineering\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"projectTypeKey\":\"software\",\"archived\":false}]"
+      }
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/project/ENG"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"expand\":\"description,lead,url,projectKeys\",\"self\":\"http://recorded.invalid/rest/api/2/project/10000\",\"id\":\"10000\",\"key\":\"ENG\",\"description\":\"Fixture project for jr's Data Center recordings\",\"lead\":{\"self\":\"http://recorded.invalid/rest/api/2/user?username=ada\",\"key\":\"JIRAUSER10000\",\"name\":\"ada\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true},\"components\":[{\"self\":\"http://recorded.invalid/rest/api/2/component/10000\",\"id\":\"10000\",\"name\":\"api\",\"description\":\"REST surface\",\"isAssigneeTypeValid\":false}],\"issueTypes\":[{\"self\":\"http://recorded.invalid/rest/api/2/issuetype/10002\",\"id\":\"10002\",\"description\":\"A task that needs to be done.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Task\",\"subtask\":false,\"avatarId\":10318},{\"self\":\"http://recorded.invalid/rest/api/2/issuetype/10003\",\"id\":\"10003\",\"description\":\"The sub-task of the issue\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Sub-task\",\"subtask\":true,\"avatarId\":10316},{\"self\":\"http://recorded.invalid/rest/api/2/issuetype/10001\",\"id\":\"10001\",\"description\":\"Created by Jira Software - do not edit or delete. Issue type for a user story.\",\"iconUrl\":\"http://recorded.invalid/images/icons/issuetypes/story.svg\",\"name\":\"Story\",\"subtask\":false},{\"self\":\"http://recorded.invalid/rest/api/2/issuetype/10004\",\"id\":\"10004\",\"description\":\"A problem which impairs or prevents the functions of the product.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Bug\",\"subtask\":false,\"avatarId\":10303},{\"self\":\"http://recorded.invalid/rest/api/2/issuetype/10000\",\"id\":\"10000\",\"description\":\"Created by Jira Software - do not edit or delete. Issue type for a big user story that needs to be broken down.\",\"iconUrl\":\"http://recorded.invalid/images/icons/issuetypes/epic.svg\",\"name\":\"Epic\",\"subtask\":false}],\"assigneeType\":\"PROJECT_LEAD\",\"versions\":[{\"self\":\"http://recorded.invalid/rest/api/2/version/10000\",\"id\":\"10000\",\"description\":\"First release\",\"name\":\"1.0\",\"archived\":false,\"released\":false,\"projectId\":10000}],\"name\":\"Engineering\",\"roles\":{\"Administrators\":\"http://recorded.invalid/rest/api/2/project/10000/role/10002\"},\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"projectTypeKey\":\"software\",\"archived\":false}"
+      }
+    }
+  ]
+}

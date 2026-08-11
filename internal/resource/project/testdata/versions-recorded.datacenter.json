@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/project/ENG/versions"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "[{\"self\":\"http://recorded.invalid/rest/api/2/version/10000\",\"id\":\"10000\",\"description\":\"First release\",\"name\":\"1.0\",\"archived\":false,\"released\":false,\"projectId\":10000}]"
+      }
+    }
+  ]
+}

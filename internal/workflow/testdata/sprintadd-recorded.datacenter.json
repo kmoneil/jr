@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/agile/1.0/sprint/1/issue",
+        "body": "{\"issues\":[\"ENG-2\"]}"
+      },
+      "response": {
+        "status": 204,
+        "header": {
+          "Content-Type": [
+            "text/html;charset=UTF-8"
+          ]
+        }
+      }
+    }
+  ]
+}

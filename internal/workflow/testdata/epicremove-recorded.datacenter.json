@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/agile/1.0/epic/none/issue",
+        "body": "{\"issues\":[\"ENG-3\"]}"
+      },
+      "response": {
+        "status": 204,
+        "header": {
+          "Content-Type": [
+            "text/html;charset=UTF-8"
+          ]
+        }
+      }
+    }
+  ]
+}

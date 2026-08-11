@@ -1,0 +1,22 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/2/search",
+        "body": "{\"jql\":\"project = NOSUCHPROJECT\",\"maxResults\":0,\"validateQuery\":true}"
+      },
+      "response": {
+        "status": 400,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"errorMessages\":[\"The value 'NOSUCHPROJECT' does not exist for the field 'project'.\"],\"errors\":{}}"
+      }
+    }
+  ]
+}

@@ -155,11 +155,23 @@ and pagination shape, so a fixture recorded against one proves nothing about
 the other, and a resource that ships only the Cloud recording has tested half
 of what it claims to.
 
-**Record them; do not write them.** Every cassette in this repository was
+**Record them; do not write them.** Every cassette in this repository was once
 written by hand, and three encoded an assumption rather than the API: an
 endpoint removed in Jira 9.0, a parameter of the wrong type, an expand nobody
 documents as necessary. All three passed their tests. A cassette proves a
 request is *unchanged*; only a recorded one proves it was ever *right*.
+
+Both deployments are recorded now. Cloud comes from a free sandbox site; Data
+Center comes from a local container in `scripts/dc`, licensed with the timebomb
+key Atlassian publishes for running a Data Center product without the SDK —
+`make dc-up`, then `make dc-record`. A constructed cassette is still worth
+keeping where a real instance cannot produce the shape on request, an
+out-of-order page or an absent email, and it says `"source": "constructed"` so
+the difference is legible. `scripts/dc/manifest.tsv` maps every Data Center
+recording to the command that remakes it, and
+`internal/lint/dcmanifest_test.go` refuses a recording that is not in it: a
+fixture nobody can reproduce stops being evidence the first time a request
+changes.
 
 `JIRA_RECORD=<path>` writes an invocation's whole conversation to a cassette.
 It is an environment variable rather than a flag because a flag would join the
@@ -346,8 +358,9 @@ name to `customfield_10042` should not cost a round trip on every invocation.
 | `jql/`          | Table-driven, plus a fuzzer asserting no input escapes quoting | 100% of renderer branches                           |
 | `adf/`          | Golden files, round-trip property test, three fuzzers           | Corpus of ≥200 real documents, asserted             |
 | `resource/*`    | Pure struct-in/struct-out unit tests, plus a fuzzer on anything that parses | 90%                                     |
-| `transport/`    | Replayed fixtures, Cloud + DC                                  | Every endpoint                                      |
-| Fixture evidence | Cassettes grouped by package and deployment, each group needing a recording behind it | A group with none names itself and its reason, and the list can only shrink |
+| `transport/`    | Replayed recordings, Cloud + DC                                | The four exchanges the contract test plays — probe, account, a 404, a field error — on both deployments |
+| Fixture evidence | Cassettes grouped by package and deployment, each group needing a recording behind it | A group with none names itself and its reason, and the list can only shrink. Empty since 2026-08-11 |
+| Reproducibility | Every Data Center recording mapped to the command that remakes it, in `scripts/dc/manifest.tsv` | A recording the manifest does not name fails the build |
 | Output contract | Golden files per kind, per format                              | Any diff requires a version bump in the same commit |
 | Documented contract | Every `kind="…" v="…"` in the docs compared to the registry's kinds | The number a reader copies matches the one the binary emits |
 | Command reference | `docs/commands.md` rendered from the registry and compared | Exact under the full profile; every command present is documented under a reduced one |

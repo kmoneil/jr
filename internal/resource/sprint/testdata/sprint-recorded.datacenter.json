@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/agile/1.0/sprint/1"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"id\":1,\"self\":\"http://recorded.invalid/rest/agile/1.0/sprint/1\",\"state\":\"future\",\"name\":\"ENG Sprint 1\",\"originBoardId\":1,\"synced\":false,\"autoStartStop\":false}"
+      }
+    }
+  ]
+}
