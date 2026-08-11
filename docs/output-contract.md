@@ -484,9 +484,11 @@ not what the column is about.
 ### Timestamps out are UTC; dates in are not
 
 Every timestamp this tool **emits** is RFC 3339 in UTC. That is a property of
-the output and it is normalized here, so two deployments that serve different
-formats — Data Center writes an offset with no colon — reach a consumer as one
-shape.
+the output and not of the server: an issue's `created` and `updated` are not RFC
+3339 on either deployment. They arrive as `2026-08-11T16:37:31.272+0000` from a
+recorded Data Center and as `2026-08-06T11:30:39.194-0500` from a recorded Cloud
+site — an offset with no colon in both, differing in the zone it names and not
+in the spelling. Normalizing here is what makes them one shape.
 
 Every date a caller **sends** is evaluated by Jira, in the timezone on the
 **Jira account's profile**. Not UTC, and not the clock of the machine running
