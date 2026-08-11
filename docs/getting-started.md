@@ -20,7 +20,7 @@ nothing about Jira's API, JQL, or how `jr` is put together.
 There is no release binary yet, so build from source. You need Go 1.26.
 
 ```console
-$ git clone <this repo> && cd jira-cli
+$ git clone https://github.com/kmoneil/jr && cd jr
 $ make build
 ```
 

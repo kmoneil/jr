@@ -1,11 +1,47 @@
+<div align="center">
+
+<img src="docs/assets/jr.png" alt="jr" width="160">
+
 # jr
 
-A Jira client whose output is a versioned contract.
+### A Jira client whose output is a versioned contract
 
-Built for scripts and agents first, humans second. Every result is a document
-with a `kind`, a schema version, and a promise about what it means, so a caller
-can pin it, verify it, and act on it without reading the output to check whether
-it looks right.
+Built for scripts and agents first, humans second —
+and it would rather fail than hand you something that merely looks right.
+
+![Go 1.26](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
+![Status: pre-release](https://img.shields.io/badge/status-pre--release-f5a623)
+![MCP: built in](https://img.shields.io/badge/MCP-server%20built%20in-f5a623)
+![Network in tests: none](https://img.shields.io/badge/tests-never%20touch%20the%20network-4c1)
+
+**[Getting started](docs/getting-started.md)** ·
+[Recipes](docs/recipes.md) ·
+[Commands](docs/commands.md) ·
+[Output contract](docs/output-contract.md) ·
+[Troubleshooting](docs/troubleshooting.md)
+
+</div>
+
+---
+
+Every result is a document with a `kind`, a schema version, and a promise about
+what it means. Pin it, parse it, act on it, and never squint at the output
+wondering whether it is the whole answer.
+
+The whole idea, in one command:
+
+```console
+$ jr issue list --limit 2; echo "exit $?"
+key      status       assignee      updated               summary
+ENG-101  In Progress  Ada Lovelace  2026-08-04T11:32:07Z  Retry logic drops...
+ENG-102  To Do                      2026-08-04T09:00:00Z  Tabs and newlines...
+exit 3
+```
+
+Two rows came back and there were more, so the exit is 3 and the warning — with
+a token to resume from — went to stderr. stdout stayed exactly as parseable as
+it was. No script downstream will ever mistake that page for the whole result
+set, and the same is true of every command, in every format, on every path.
 
 > **Status: pre-release, and deliberately untagged.** The command surface is
 > complete and tested: 62 commands in the full build, 40 in the reader. Every
@@ -13,7 +49,14 @@ it looks right.
 > pinning. See [Not yet implemented](#not-yet-implemented) for what is knowingly
 > absent.
 
+**Jump to:** [Quickstart](#quickstart) · [Why this exists](#why-this-exists) ·
+[Commands](#what-works-today) · [A short tour](#a-short-tour) · [MCP](#mcp) ·
+[Docs](#documentation) · [Build profiles](#build-profiles) ·
+[Development](#development)
+
 ## Quickstart
+
+Four commands and you are querying. The longest part is fetching a token.
 
 ```console
 $ make build                                     # → bin/jr, needs Go 1.26
@@ -43,50 +86,60 @@ examples for common tasks in [docs/recipes.md](docs/recipes.md).
 ## Why this exists
 
 Because the guarantee is the product, and a guarantee is not a feature you can
-add.
+bolt on afterwards.
 
-`jr` is built around a small number of promises that have to hold on every path
-at once. Every result carries a `kind` and a schema version. A result set that
-was truncated is never reported as complete, in any format. Nothing is guessed:
-a date that does not parse, a field name that does not resolve, an assignee that
-matches two people, a deployment the probe does not recognise, all fail rather
-than being approximated into something plausible. A credential is never written
-to a log, a config file, or a process argument.
+Picture the failure this is built against. A nightly script lists everything in
+a project, gets fifty rows because that is where the API stopped, exits 0, and
+files a tidy report. It does that for a month. Nothing errored, nothing was
+obviously wrong, and the only way to catch it was to already suspect it. That
+is not a bug you fix once — it is a property of a tool that would rather
+produce something than admit it cannot.
+
+Invert that and you get the whole design:
+
+- **Truncation is never silent.** `complete="false"`, or exit 3, or both — in
+  every format, streamed or buffered, with a token to resume from.
+- **Nothing is guessed.** A date that will not parse, a field name that
+  resolves to nothing, an assignee matching two people, a deployment the probe
+  does not recognise: each is a refusal with a code and a remedy, never a
+  plausible substitute.
+- **stdout is data.** Warnings, progress, and errors are structured and go to
+  stderr. A failing command writes nothing at all to stdout.
+- **Exit codes never change meaning.** New conditions get new numbers, and the
+  table is frozen by test.
+- **Credentials stay out of the places they leak from.** Never a flag value,
+  never the config file, never a log line, never a `%v`.
 
 Each of those is worth nothing in isolation. "Never reports a truncated result
-as complete" means something when it is true of all sixty commands, all four
-formats, both the streaming and the buffered path, and every future command
-somebody adds next year. That is not a patch, and it is not ten patches. It is a
-property of how the whole thing is put together: one registry that every command
-is declared in, one package allowed to encode output, one package allowed to
-speak HTTP, one place where a JQL string can be quoted, and a test suite whose
-job is to fail when any of it stops being true.
+as complete" only means something when it is true of every command, all four
+formats, both the streaming and the buffered path, and whatever gets added next
+year. That is not a patch, and it is not ten patches. It is a property of how
+the thing is put together: one registry every command is declared in, one
+package allowed to encode output, one allowed to speak HTTP, one place a JQL
+string can be quoted, and a test suite whose only job is to fail the day any of
+that stops being true.
 
-So the honest description of what we wanted is not a feature the existing
-clients are missing. It is a different centre of gravity, and asking a
-maintainer to accept a change of purpose is not a fair thing to ask. The
-established Jira CLIs are built for a person at a terminal, they are good at
-that, and they have users who are happy. Some of the promises above can only be
-kept by refusing things that currently work, such as an offset-shaped pagination
-flag or a partial result that exits zero. Imposing that on somebody else's users
-through a pull request would be the wrong way to treat them. Promising it on day
-one, in a tool nobody depends on yet, is just the contract.
+**This is not a complaint about the other Jira CLIs.** They are built for a
+person at a terminal, they are good at it, and their users are happy. Keeping
+the promises above means refusing things that work perfectly well for that
+audience — an offset-shaped pagination flag, a partial result that exits zero —
+and arriving in somebody else's project to take those away would be a poor way
+to treat their users. Promising it on day one, in a tool nobody depends on yet,
+is just the contract.
 
-This is meant to sit alongside those tools rather than replace them. Different
-audience, different bargain. If you want a rich interactive Jira experience,
-they are the better answer and there is no argument here. If you are writing a
-script or pointing an agent at Jira and you need to know that the output means
-what it says, that is what this is for.
+So: different audience, different bargain. Want a rich interactive Jira
+experience? Use those. Writing a script, or pointing an agent at Jira, and need
+to know the output means what it says? That is this.
 
 The TUI, when it arrives, will be a consumer of this tool rather than the
-product, which is the same idea from the other end.
+product — the same idea from the other end.
 
 ## Install
 
-There is no release binary yet. Build from source, with Go 1.26:
+No release binary yet, and that is deliberate. Build from source with Go 1.26:
 
 ```
-git clone <this repo> && cd jira-cli
+git clone https://github.com/kmoneil/jr && cd jr
 make build          # → bin/jr
 make hooks          # install the pre-commit gate; contributors only, once per clone
 ```
@@ -96,7 +149,8 @@ Then see the [quickstart](#quickstart) above, or
 
 ## What works today
 
-62 commands in the full build, 40 in the reader.
+Everything below is built, tested, and asserted by the suite — 62 commands in
+the full build, 40 in the reader.
 
 ```
 jr auth      login logout status token
@@ -154,6 +208,12 @@ Everything else described in this README is built. 62 commands in the full
 build, and `internal/lint` asserts both that number and the tag table above
 against the binaries rather than against this sentence. If a tag here is said to gate nothing and
 starts gating something, the build fails until this list is corrected.
+
+## A short tour
+
+The rest of this page is the interesting half: what each promise looks like in
+practice, and the failure it exists to prevent. Skim the bold sentences if you
+are in a hurry.
 
 ### Reading one issue
 
@@ -629,36 +689,37 @@ the ones meant to carry the least. The wire format is asserted by test.
 
 ## Documentation
 
-Start here if you are new:
-
-| Document                                             | Covers                                                                        |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------- |
-| [docs/getting-started.md](docs/getting-started.md)   | Install, get a token, log in, first query, reading the output                 |
-| [docs/recipes.md](docs/recipes.md)                   | Worked examples: searching, bulk edits, exports, sprints, CI, agents          |
-| [docs/troubleshooting.md](docs/troubleshooting.md)   | Every common failure by error code, and what to do about it                   |
-| [docs/commands.md](docs/commands.md)                 | Every command and its flags, generated from the registry and asserted current |
-
-Reference:
+**New here?** Read them in this order.
 
 | Document                                           | Covers                                                                        |
 | -------------------------------------------------- | ----------------------------------------------------------------------------- |
-| [docs/output-contract.md](docs/output-contract.md) | Formats, envelope, truncation, escaping, exit codes, errors, stability policy |
-| [docs/build-profiles.md](docs/build-profiles.md)   | Build tags, shipped profiles, compile-out enforcement                         |
-| [docs/architecture.md](docs/architecture.md)       | Package layout, the dependency rule, testing gates                            |
+| [getting-started.md](docs/getting-started.md)      | Install, get a token, log in, first query, reading the output                 |
+| [recipes.md](docs/recipes.md)                      | Worked examples: searching, bulk edits, exports, sprints, CI, agents          |
+| [troubleshooting.md](docs/troubleshooting.md)      | Every common failure by error code, and what to do about it                   |
+| [commands.md](docs/commands.md)                    | Every command and its flags, generated from the registry and asserted current |
+
+**Building against it?** These are the contracts.
+
+| Document                                           | Covers                                                                        |
+| -------------------------------------------------- | ----------------------------------------------------------------------------- |
+| [output-contract.md](docs/output-contract.md)      | Formats, envelope, truncation, escaping, exit codes, errors, stability policy |
+| [build-profiles.md](docs/build-profiles.md)        | Build tags, shipped profiles, compile-out enforcement                         |
+| [architecture.md](docs/architecture.md)            | Package layout, the dependency rule, testing gates                            |
 
 Design spec: `_plans/design/jira-cli-v2-spec.md`.
 
 ## Build profiles
 
-Features are selected at compile time. An excluded feature contributes zero
-bytes and zero attack surface, and `jr schema` does not list it.
+Features are selected at compile time, so an excluded one contributes zero
+bytes and zero attack surface — and `jr schema` does not list it. A reader
+build does not refuse to write; it does not contain the code that could.
 
-```
-make build         # full     everything
-make build-agent   # agent    no TTY, no interactivity, no browser, no clipboard
-make build-reader  # reader   physically cannot mutate Jira
-make build-ci      # ci       query only, smallest possible
-```
+| Build              | Profile  | What you get                                        |
+| ------------------ | -------- | --------------------------------------------------- |
+| `make build`       | full     | Everything, including the human-facing extras        |
+| `make build-agent` | agent    | No TTY, no interactivity, no browser, no clipboard   |
+| `make build-reader`| reader   | Physically cannot mutate Jira                        |
+| `make build-ci`    | ci       | Query only, smallest possible                        |
 
 ## Development
 
