@@ -159,7 +159,7 @@ of what it claims to.
 written by hand, and three encoded an assumption rather than the API: an
 endpoint removed in Jira 9.0, a parameter of the wrong type, an expand nobody
 documents as necessary. All three passed their tests. A cassette proves a
-request is *unchanged*; only a recorded one proves it was ever *right*.
+request is _unchanged_; only a recorded one proves it was ever _right_.
 
 Both deployments are recorded now. Cloud comes from a free sandbox site; Data
 Center comes from a local container in `scripts/dc`, licensed with the timebomb
@@ -186,7 +186,7 @@ command surface, appear in `jr schema`, and need declaring on every command,
 for something no caller of this tool should reach for.
 
 The save is registered before the first request goes out, not after the probe
-answers, so a run that *fails* still writes a cassette — and a failure is the
+answers, so a run that _fails_ still writes a cassette — and a failure is the
 conversation most worth having a fixture of. It used to be registered on the
 way out, once the deployment was known, and a Data Center 11 refusing basic
 authentication answers the probe with a 403 and does nothing else: the exchange
@@ -240,7 +240,7 @@ reports and never replaces: a stem match is a hint, and rewriting on a guess is
 how a fixture stops being a recording.
 
 All three read **a recording**, and the fourth reads **the repository**.
-`internal/lint/scrubpairs_test.go` refuses a scrub *mapping* — a real identifier
+`internal/lint/scrubpairs_test.go` refuses a scrub _mapping_ — a real identifier
 joined to its replacement by `=` — in any tracked file, because that is what
 turns the scrubbed fixtures back into a recording of a named instance and it has
 leaked twice, both times into a comment explaining the scrubber. It is a shape
@@ -268,15 +268,15 @@ a token cannot reach a fixture file even if recording is interrupted.
 
 ## Config, state, cache
 
-| Path                                     | Contents                                           | Mode |
-| ---------------------------------------- | -------------------------------------------------- | ---- |
-| `$XDG_CONFIG_HOME/jr/`                   | The config directory                               | 0700 |
-| `$XDG_CONFIG_HOME/jr/config.toml`        | Contexts, defaults. Hand-editable.                 | 0644 |
-| `$XDG_STATE_HOME/jr/`                    | The state directory                                | 0700 |
-| `$XDG_STATE_HOME/jr/credentials.toml`    | Stored credentials                                 | 0600 |
-| `$XDG_STATE_HOME/jr/idempotency.toml`    | What a mutating request already did                | 0600 |
-| `$XDG_CACHE_HOME/jr/<site>/`             | One site's cache directory                         | 0700 |
-| `$XDG_CACHE_HOME/jr/<site>/<key>.json`   | Deployment probe, field catalogue, create metadata | 0600 |
+| Path                                   | Contents                                           | Mode |
+| -------------------------------------- | -------------------------------------------------- | ---- |
+| `$XDG_CONFIG_HOME/jr/`                 | The config directory                               | 0700 |
+| `$XDG_CONFIG_HOME/jr/config.toml`      | Contexts, defaults. Hand-editable.                 | 0644 |
+| `$XDG_STATE_HOME/jr/`                  | The state directory                                | 0700 |
+| `$XDG_STATE_HOME/jr/credentials.toml`  | Stored credentials                                 | 0600 |
+| `$XDG_STATE_HOME/jr/idempotency.toml`  | What a mutating request already did                | 0600 |
+| `$XDG_CACHE_HOME/jr/<site>/`           | One site's cache directory                         | 0700 |
+| `$XDG_CACHE_HOME/jr/<site>/<key>.json` | Deployment probe, field catalogue, create metadata | 0600 |
 
 Every row is asserted by `TestTheDocumentedModesAreTheOnesOnDisk` in
 `internal/lint`, which drives each file's real write path and stats the result.
@@ -292,7 +292,7 @@ The file mode is what travels when the file is copied into a dotfiles
 repository, and 0644 says it is not a secret; the directory mode stays behind,
 so 0700 costs nothing the 0644 was buying and keeps site hostnames and project
 keys away from other users of the machine. The cache directory is 0700 for a
-sharper version of the same reason: its entries are *named* for the site, so a
+sharper version of the same reason: its entries are _named_ for the site, so a
 listing publishes the hostname even though every file in it is 0600.
 
 `os.MkdirAll` leaves an existing directory's mode alone, so these apply to a new
@@ -359,7 +359,7 @@ usable signal, since a pid means nothing across containers or after a reboot.
 Because a lock can be broken, it carries an id, and a release removes the file
 only when the id is still its own. Releasing by path composed with breaking by
 age into a third writer: a holder that stalled past `LockStale` had its lock
-broken, and then on waking deleted the *new* holder's lock, letting a third
+broken, and then on waking deleted the _new_ holder's lock, letting a third
 process in while the second was still mid-write. A run that finds its lock gone
 or replaced reports `LEDGER_LOCK_STOLEN` rather than assuming its write
 survived — it may have been the one another run's rename replaced, and a claim
@@ -371,23 +371,23 @@ name to `customfield_10042` should not cost a round trip on every invocation.
 
 ## Testing
 
-| Layer           | Method                                                         | Gate                                                |
-| --------------- | -------------------------------------------------------------- | --------------------------------------------------- |
-| `jql/`          | Table-driven, plus a fuzzer asserting no input escapes quoting | 100% of renderer branches                           |
-| `adf/`          | Golden files, round-trip property test, three fuzzers           | Corpus of ≥200 real documents, asserted             |
-| `resource/*`    | Pure struct-in/struct-out unit tests, plus a fuzzer on anything that parses | 90%                                     |
-| `transport/`    | Replayed recordings, Cloud + DC                                | The four exchanges the contract test plays — probe, account, a 404, a field error — on both deployments, plus the recorded Data Center 403 that separates a refused authentication scheme from a missing permission |
-| Fixture evidence | Cassettes grouped by package and deployment, each group needing a recording behind it | A group with none names itself and its reason, and the list can only shrink. Empty since 2026-08-11 |
-| Evidence coverage | Every package that builds a `transport.Request` needs a cassette per deployment, found by parsing rather than by a list | A package with no cassettes at all is invisible to the grouping above, so it is asked for separately. One row outstanding: `internal/site cloud` |
-| Reproducibility | Every Data Center recording mapped to the command that remakes it, in `scripts/dc/manifest.tsv` and `manifest-contextpath.tsv` | A recording neither manifest names fails the build |
-| Output contract | Golden files per kind, per format                              | Any diff requires a version bump in the same commit |
-| Documented contract | Every `kind="…" v="…"` in the docs compared to the registry's kinds | The number a reader copies matches the one the binary emits |
-| Command reference | `docs/commands.md` rendered from the registry and compared | Exact under the full profile; every command present is documented under a reduced one |
-| CLI surface     | Snapshot tests of `--help`, `schema`, exit codes               | Any diff is reviewed                                |
-| Architecture    | Import-graph assertions                                        | Every PR                                            |
-| Build profiles  | Matrix build of all profiles, a size assertion, and a command count per profile | Every PR                           |
-| Fuzzing         | `make fuzz`, all 20 targets, built with the full tag set       | Every PR, 60s per target                            |
-| Complexity      | `make complexity`, gocognit over `internal/` and `cmd/`        | Cognitive 15, or an exemption naming its score and its reason |
+| Layer               | Method                                                                                                                         | Gate                                                                                                                                                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `jql/`              | Table-driven, plus a fuzzer asserting no input escapes quoting                                                                 | 100% of renderer branches                                                                                                                                                                                           |
+| `adf/`              | Golden files, round-trip property test, three fuzzers                                                                          | Corpus of ≥200 real documents, asserted                                                                                                                                                                             |
+| `resource/*`        | Pure struct-in/struct-out unit tests, plus a fuzzer on anything that parses                                                    | 90%                                                                                                                                                                                                                 |
+| `transport/`        | Replayed recordings, Cloud + DC                                                                                                | The four exchanges the contract test plays — probe, account, a 404, a field error — on both deployments, plus the recorded Data Center 403 that separates a refused authentication scheme from a missing permission |
+| Fixture evidence    | Cassettes grouped by package and deployment, each group needing a recording behind it                                          | A group with none names itself and its reason, and the list can only shrink. Empty since 2026-08-11                                                                                                                 |
+| Evidence coverage   | Every package that builds a `transport.Request` needs a cassette per deployment, found by parsing rather than by a list        | A package with no cassettes at all is invisible to the grouping above, so it is asked for separately. One row outstanding: `internal/site cloud`                                                                    |
+| Reproducibility     | Every Data Center recording mapped to the command that remakes it, in `scripts/dc/manifest.tsv` and `manifest-contextpath.tsv` | A recording neither manifest names fails the build                                                                                                                                                                  |
+| Output contract     | Golden files per kind, per format                                                                                              | Any diff requires a version bump in the same commit                                                                                                                                                                 |
+| Documented contract | Every `kind="…" v="…"` in the docs compared to the registry's kinds                                                            | The number a reader copies matches the one the binary emits                                                                                                                                                         |
+| Command reference   | `docs/commands.md` rendered from the registry and compared                                                                     | Exact under the full profile; every command present is documented under a reduced one                                                                                                                               |
+| CLI surface         | Snapshot tests of `--help`, `schema`, exit codes                                                                               | Any diff is reviewed                                                                                                                                                                                                |
+| Architecture        | Import-graph assertions                                                                                                        | Every PR                                                                                                                                                                                                            |
+| Build profiles      | Matrix build of all profiles, a size assertion, and a command count per profile                                                | Every PR                                                                                                                                                                                                            |
+| Fuzzing             | `make fuzz`, all 20 targets, built with the full tag set                                                                       | Every PR, 60s per target                                                                                                                                                                                            |
+| Complexity          | `make complexity`, gocognit over `internal/` and `cmd/`                                                                        | Cognitive 15, or an exemption naming its score and its reason                                                                                                                                                       |
 
 **A red from the fuzz sweep means the target, and the toolchain does not get a
 vote.** Go 1.26 fails a fuzz target that found nothing. When the time budget

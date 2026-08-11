@@ -369,7 +369,7 @@ reasons you cannot see.
 Two limits, stated rather than worked around. **Comments are not searchable.**
 JQL has no field for comment authorship, so nothing here answers "issues I
 commented on"; `--involving` says so instead of quietly approximating it. And
-**`CHANGED` names one field at a time** — there is no way to ask whether *any*
+**`CHANGED` names one field at a time** — there is no way to ask whether _any_
 field changed — so `--changed-field` defaults to `status` and anything else has
 to be asked for by name. It is refused on its own, because a flag that selects
 what another flag looks at changes no output by itself.
@@ -398,7 +398,7 @@ ENG-101   In Progress  Ada       2026-08-01T10:00:00Z  First         https://acm
 **A bare URL, deliberately.** A terminal hyperlink is an OSC 8 escape sequence
 wrapped around display text; it would make the cell clickable and it would put
 escape bytes in a data column, and stdout is data only. Most terminals linkify
-a bare URL anyway, so ⌘/ctrl-click works *and* `cut -f6 | xargs open` works —
+a bare URL anyway, so ⌘/ctrl-click works _and_ `cut -f6 | xargs open` works —
 the clickable string and the parseable string are the same string.
 
 Off by default, because forty bytes a row for something most callers throw away
@@ -693,20 +693,20 @@ the ones meant to carry the least. The wire format is asserted by test.
 
 **New here?** Read them in this order.
 
-| Document                                           | Covers                                                                        |
-| -------------------------------------------------- | ----------------------------------------------------------------------------- |
-| [getting-started.md](docs/getting-started.md)      | Install, get a token, log in, first query, reading the output                 |
-| [recipes.md](docs/recipes.md)                      | Worked examples: searching, bulk edits, exports, sprints, CI, agents          |
-| [troubleshooting.md](docs/troubleshooting.md)      | Every common failure by error code, and what to do about it                   |
-| [commands.md](docs/commands.md)                    | Every command and its flags, generated from the registry and asserted current |
+| Document                                      | Covers                                                                        |
+| --------------------------------------------- | ----------------------------------------------------------------------------- |
+| [getting-started.md](docs/getting-started.md) | Install, get a token, log in, first query, reading the output                 |
+| [recipes.md](docs/recipes.md)                 | Worked examples: searching, bulk edits, exports, sprints, CI, agents          |
+| [troubleshooting.md](docs/troubleshooting.md) | Every common failure by error code, and what to do about it                   |
+| [commands.md](docs/commands.md)               | Every command and its flags, generated from the registry and asserted current |
 
 **Building against it?** These are the contracts.
 
-| Document                                           | Covers                                                                        |
-| -------------------------------------------------- | ----------------------------------------------------------------------------- |
-| [output-contract.md](docs/output-contract.md)      | Formats, envelope, truncation, escaping, exit codes, errors, stability policy |
-| [build-profiles.md](docs/build-profiles.md)        | Build tags, shipped profiles, compile-out enforcement                         |
-| [architecture.md](docs/architecture.md)            | Package layout, the dependency rule, testing gates                            |
+| Document                                      | Covers                                                                        |
+| --------------------------------------------- | ----------------------------------------------------------------------------- |
+| [output-contract.md](docs/output-contract.md) | Formats, envelope, truncation, escaping, exit codes, errors, stability policy |
+| [build-profiles.md](docs/build-profiles.md)   | Build tags, shipped profiles, compile-out enforcement                         |
+| [architecture.md](docs/architecture.md)       | Package layout, the dependency rule, testing gates                            |
 
 Design spec: `_plans/design/jira-cli-v2-spec.md`.
 
@@ -716,12 +716,12 @@ Features are selected at compile time, so an excluded one contributes zero
 bytes and zero attack surface — and `jr schema` does not list it. A reader
 build does not refuse to write; it does not contain the code that could.
 
-| Build              | Profile  | What you get                                        |
-| ------------------ | -------- | --------------------------------------------------- |
-| `make build`       | full     | Everything, including the human-facing extras        |
-| `make build-agent` | agent    | No TTY, no interactivity, no browser, no clipboard   |
-| `make build-reader`| reader   | Physically cannot mutate Jira                        |
-| `make build-ci`    | ci       | Query only, smallest possible                        |
+| Build               | Profile | What you get                                       |
+| ------------------- | ------- | -------------------------------------------------- |
+| `make build`        | full    | Everything, including the human-facing extras      |
+| `make build-agent`  | agent   | No TTY, no interactivity, no browser, no clipboard |
+| `make build-reader` | reader  | Physically cannot mutate Jira                      |
+| `make build-ci`     | ci      | Query only, smallest possible                      |
 
 ## Development
 
@@ -876,4 +876,3 @@ like one recorded from a server.
 None of that makes the code correct. It makes the claims checkable, which is the
 part you cannot verify by reading a diff, and it is the standard this project
 should be held to no matter who or what typed it.
-

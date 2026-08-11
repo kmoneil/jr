@@ -140,7 +140,7 @@ $ jr auth login --site ... --token-file ~/.secrets/jira
 **`jr auth login` never prompts.** If stdin is a terminal it refuses and lists
 the alternatives rather than waiting — a command that waits with no prompt and
 no output is indistinguishable from a hang, and a headless build has no human to
-wait for. That is why the token is read by *the shell* above and piped in, which
+wait for. That is why the token is read by _the shell_ above and piped in, which
 gets you the interactive login without the tool ever blocking on input.
 
 Three things happen, and it is worth knowing all three:

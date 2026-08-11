@@ -14,7 +14,7 @@ stdout, so a consumer piping stdout never parses a half-result.
 
 There is exactly one exception, and it is a write that half-happened: a
 multi-request mutation that applied some of what it was asked writes its result
-document and *then* exits non-zero, because the failure alone cannot say which
+document and _then_ exits non-zero, because the failure alone cannot say which
 part was applied and "nothing happened" is the dangerous assumption to leave a
 caller with. See [Mutations](#mutations). Nothing else does this, and a document
 that arrives with a non-zero exit is always one of those.
@@ -63,7 +63,7 @@ A collection says whether it is exhaustive in its envelope. A record could not
 say it at all: `Doc.IsComplete` returned true for every record, and said so in
 its own comment, until `issue get --with-comments` had to carry a comment
 thread. A thread is paged, so a bounded one is the normal case rather than an
-edge, and *`complete="false"` or exit 3* is unqualified.
+edge, and _`complete="false"` or exit 3_ is unqualified.
 
 So a **container inside a record** may carry `complete`, beside the `count` it
 already has:
@@ -111,7 +111,7 @@ Three things keep the exception contained rather than making it a hole:
   The text is what a person is reading for. And a carriage return is normalised
   to a newline, because this is the format that reaches a terminal and a
   terminal reading `\r` returns the cursor to column 0 — `Closed as
-  duplicate\rDO NOT MERGE` displays as the second half alone, with the first
+duplicate\rDO NOT MERGE` displays as the second half alone, with the first
   half present in the data and absent from the screen. The source is an issue
   summary, so it is written by whoever can file a ticket. Everything either case
   touches is still in the other four formats, which is where anything parsing
@@ -129,12 +129,12 @@ The split is per content shape rather than one format everywhere, and that was
 settled by measuring rather than by taste. `issue list --limit 100`, rendered
 from the same document in each format:
 
-| Format | Bytes  | Tokens (proxy) | vs TSV  | Tokens/row |
-| ------ | ------ | -------------- | ------- | ---------- |
-| `tsv`  | 7,977  | 2,930          | 1.00x   | 29.3       |
-| `xml`  | 35,030 | 12,755         | 4.35x   | 127.5      |
-| `json` | 45,088 | 15,959         | 5.45x   | 159.6      |
-| `yaml` | 33,085 | 12,866         | 4.39x   | 128.7      |
+| Format | Bytes  | Tokens (proxy) | vs TSV | Tokens/row |
+| ------ | ------ | -------------- | ------ | ---------- |
+| `tsv`  | 7,977  | 2,930          | 1.00x  | 29.3       |
+| `xml`  | 35,030 | 12,755         | 4.35x  | 127.5      |
+| `json` | 45,088 | 15,959         | 5.45x  | 159.6      |
+| `yaml` | 33,085 | 12,866         | 4.39x  | 128.7      |
 
 The same document as a single record, `issue get`:
 
@@ -152,7 +152,7 @@ structured text, which is exactly the shape being measured here. The bytes are
 exact, and they put the structured formats at 4.15-5.65x TSV against the
 proxy's 4.35-5.45x, the same band and the same conclusion, reached
 independently. They do not agree on the figure, and they disagree on whether
-XML or YAML is the cheaper of the two. So the *decision* stands on the bytes;
+XML or YAML is the cheaper of the two. So the _decision_ stands on the bytes;
 the token columns are corroboration, and neither is a Claude token count. Run
 `make cost` with credentials to replace them with one, it counts through
 Anthropic's own `count_tokens` endpoint.
@@ -342,7 +342,7 @@ characters, the section is closed and reopened around it:
 `before]]>&#13;<![CDATA[after`.
 
 This is not cosmetic. XML 1.0 §2.11 requires a processor to translate `\r\n`
-and any lone `\r` to `\n` *before parsing*, so a raw carriage return on the wire
+and any lone `\r` to `\n` _before parsing_, so a raw carriage return on the wire
 reaches a consumer as a newline — the value it reads is not the value Jira
 holds. Escaping is the only spelling that survives, and it applies inside CDATA
 too, because the normalization runs on the raw input rather than on parsed
@@ -350,7 +350,7 @@ content.
 
 Newline and tab are **not** escaped in element text. Neither is altered by
 §2.11 there, and escaping them would make every multi-line description
-unreadable for no fidelity gained. Both *are* escaped in an attribute value,
+unreadable for no fidelity gained. Both _are_ escaped in an attribute value,
 where a separate rule — attribute-value normalization — turns each into a
 space.
 
@@ -376,13 +376,13 @@ Five Jira constructs have no CommonMark or GFM spelling. Each is written as a
 link with a documented scheme, so the value survives the conversion and a
 consumer can recognise it:
 
-| ADF                | Markdown                                        |
-| ------------------ | ----------------------------------------------- |
-| `mention`          | `[@Ada Lovelace](jira-user:557058:abc)`         |
-| `media`            | `![alt](jira-media:<collection>/<id>)`          |
-| `status`           | `[Blocked](jira-status:red)`                    |
-| `date`             | `[2026-08-06](jira-date:1785974400000)`         |
-| `panel`            | `> [!WARNING]`: GitHub alert syntax, with ADF's own panel type |
+| ADF       | Markdown                                                       |
+| --------- | -------------------------------------------------------------- |
+| `mention` | `[@Ada Lovelace](jira-user:557058:abc)`                        |
+| `media`   | `![alt](jira-media:<collection>/<id>)`                         |
+| `status`  | `[Blocked](jira-status:red)`                                   |
+| `date`    | `[2026-08-06](jira-date:1785974400000)`                        |
+| `panel`   | `> [!WARNING]`: GitHub alert syntax, with ADF's own panel type |
 
 A `media` node that carries a URL rather than an id, an external or linked
 image, keeps that URL instead. An `inlineCard`, `blockCard`, or `embedCard`
@@ -510,7 +510,7 @@ issue created at `2026-08-10T14:02:37Z`:
 The account said `America/Chicago`, which in August is UTC−5, and the two agree.
 
 So `--created-after startOfDay()` means "since 05:00Z" for that caller: a
-request for *today* that silently omits the first five hours of it, reported
+request for _today_ that silently omits the first five hours of it, reported
 `complete="true"` at exit 0. There is nothing wrong with the result — it is the
 answer to the question Jira was asked.
 
@@ -617,18 +617,18 @@ sent for Jira to reject. The refusal carries the candidates, because an error
 that only says "unknown" leaves the caller to go and read a catalogue to find
 their typo.
 
-| Code                   | Exit   | Meaning                                                                                                                                                             |
-| ---------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `UNKNOWN_FIELD`        | 2      | No field by that id, name, or clause name. `detail` lists the near misses, each with its id.                                                                        |
-| `AMBIGUOUS_FIELD`      | 2      | Several fields share that name. `detail` lists every candidate with its id; pass the id.                                                                            |
-| `INVALID_FIELD`        | 2      | The field resolved, but its id cannot be an element name or collides with one the command already emits.                                                            |
-| `UNKNOWN_TRANSITION`   | 2      | The issue offers no such move _right now_. `detail` lists every transition it does offer, with its id and destination.                                              |
-| `AMBIGUOUS_TRANSITION` | 2      | Two transitions share that name and lead to different statuses. `detail` lists both.                                                                                |
-| `UNKNOWN_ISSUE_TYPE`   | 2      | The project offers no such type. `detail` lists the ones it does. It used to be 2 or 5 depending on which lookup answered; the type name is now always resolved before the fields are fetched, so there is one path and one code. |
-| `AMBIGUOUS_ISSUE_TYPE` | 2      | Several types share that name; pass the id.                                                                                                                         |
-| `UNKNOWN_USER`         | 2      | No user with that display name, email, or id. `detail` lists the plausible near misses with their ids, and is absent where the search returned nothing that shares a word with what was typed. A partial match is a near miss, not a resolution. |
-| `AMBIGUOUS_USER`       | 2      | Several users share that display name. `detail` lists every candidate with its id, whether the account is inactive, and whether it is an app rather than a person.  |
-| `UNKNOWN_PROJECT`      | 5      | The project does not exist, or this credential may not create in it. Reported for either status the createmeta route answers an unaddressable project with, a 10.3 Data Center says 400, and 404 is equally plausible elsewhere. |
+| Code                   | Exit | Meaning                                                                                                                                                                                                                                          |
+| ---------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `UNKNOWN_FIELD`        | 2    | No field by that id, name, or clause name. `detail` lists the near misses, each with its id.                                                                                                                                                     |
+| `AMBIGUOUS_FIELD`      | 2    | Several fields share that name. `detail` lists every candidate with its id; pass the id.                                                                                                                                                         |
+| `INVALID_FIELD`        | 2    | The field resolved, but its id cannot be an element name or collides with one the command already emits.                                                                                                                                         |
+| `UNKNOWN_TRANSITION`   | 2    | The issue offers no such move _right now_. `detail` lists every transition it does offer, with its id and destination.                                                                                                                           |
+| `AMBIGUOUS_TRANSITION` | 2    | Two transitions share that name and lead to different statuses. `detail` lists both.                                                                                                                                                             |
+| `UNKNOWN_ISSUE_TYPE`   | 2    | The project offers no such type. `detail` lists the ones it does. It used to be 2 or 5 depending on which lookup answered; the type name is now always resolved before the fields are fetched, so there is one path and one code.                |
+| `AMBIGUOUS_ISSUE_TYPE` | 2    | Several types share that name; pass the id.                                                                                                                                                                                                      |
+| `UNKNOWN_USER`         | 2    | No user with that display name, email, or id. `detail` lists the plausible near misses with their ids, and is absent where the search returned nothing that shares a word with what was typed. A partial match is a near miss, not a resolution. |
+| `AMBIGUOUS_USER`       | 2    | Several users share that display name. `detail` lists every candidate with its id, whether the account is inactive, and whether it is an app rather than a person.                                                                               |
+| `UNKNOWN_PROJECT`      | 5    | The project does not exist, or this credential may not create in it. Reported for either status the createmeta route answers an unaddressable project with, a 10.3 Data Center says 400, and 404 is equally plausible elsewhere.                 |
 
 Field resolution costs one request against a cold cache and none against a warm
 one; a command that names nothing to resolve makes no extra request at all.
@@ -703,9 +703,9 @@ Most of the above are decided before a request goes out. Two are not, and both
 are worth naming because the server's own answer sends the caller to the wrong
 place.
 
-| Code                  | Exit | Meaning                                                                                                                                                                                                    |
-| --------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SPRINTS_REFUSED`     | 2    | Jira refused a sprint listing for that board. Only a scrum board has sprints, and a 400 whose remedy reads "check the request" sends somebody looking at their flags. `detail` keeps the server's own message, so the likely cause is offered without being asserted. |
+| Code                  | Exit | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| --------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `SPRINTS_REFUSED`     | 2    | Jira refused a sprint listing for that board. Only a scrum board has sprints, and a 400 whose remedy reads "check the request" sends somebody looking at their flags. `detail` keeps the server's own message, so the likely cause is offered without being asserted.                                                                                                                                                                                                                                                                |
 | `AUTH_SCHEME_REFUSED` | 4    | The instance does not accept the credential's scheme at all. Jira Data Center 11 disables HTTP Basic by default and answers every call `403 Basic Authentication has been disabled on this instance` — with no header saying so, which is why the body is what identifies it. Distinct from `UNAUTHORIZED`, which is a credential this instance would accept and did not recognise, and from `FORBIDDEN`, which is exit 6 and means the account lacks a right. The remedy is a personal access token; no permission change can help. |
 
 ### Idempotency
@@ -714,12 +714,12 @@ A mutating command that carries an idempotency key records `(site, key)` before
 it sends anything, and the outcome afterwards. A repeat with the same key
 returns the original result rather than making a second one.
 
-| Code                      | Exit | Meaning                                                                                                                                                                                    |
-| ------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `IDEMPOTENCY_KEY_REUSED`  | 7    | The key was already used for a different request — another operation, or on `issue move` another issue or another transition. Answering one with the other's result would be worse than refusing. |
-| `INVALID_IDEMPOTENCY_KEY` | 2    | 1 to 128 characters of letters, digits, and `. _ : -`.                                                                                                                                     |
-| `LEDGER_INVALID`          | 1    | The ledger could not be parsed. It is refused rather than ignored: everywhere else an unreadable cache is a miss because the cost is a round trip, and here the cost is a duplicate issue. |
-| `LEDGER_LOCKED`           | 1    | Another run is writing the ledger and did not finish.                                                                                                                                      |
+| Code                      | Exit | Meaning                                                                                                                                                                                                |
+| ------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `IDEMPOTENCY_KEY_REUSED`  | 7    | The key was already used for a different request — another operation, or on `issue move` another issue or another transition. Answering one with the other's result would be worse than refusing.      |
+| `INVALID_IDEMPOTENCY_KEY` | 2    | 1 to 128 characters of letters, digits, and `. _ : -`.                                                                                                                                                 |
+| `LEDGER_INVALID`          | 1    | The ledger could not be parsed. It is refused rather than ignored: everywhere else an unreadable cache is a miss because the cost is a round trip, and here the cost is a duplicate issue.             |
+| `LEDGER_LOCKED`           | 1    | Another run is writing the ledger and did not finish.                                                                                                                                                  |
 | `LEDGER_LOCK_STOLEN`      | 1    | This run was presumed dead while it held the ledger, so another run broke its lock and this run's write may have been lost. The request may or may not have been sent; read the issue before retrying. |
 
 An attempt that claimed a key and then died leaves the claim pending, and a
@@ -763,7 +763,7 @@ costs nothing and cannot half-happen.
 The two are relaxed differently for `--dry-run`, and the asymmetry is
 deliberate. A missing `--yes` is a step the caller has not taken yet, so a
 preview is allowed, you look at the request in order to decide whether to
-confirm it. A read-only context is a statement about what that context is *for*,
+confirm it. A read-only context is a statement about what that context is _for_,
 so the latch stays one-way and a dry run is refused too.
 
 `--dry-run` emits kind `dry-run` v2: a `requests` list holding every request the
@@ -786,7 +786,7 @@ batched spelling. So `epic.add` v2 and `epic.remove` v2 carry `requested` and
 `failed`, or `not-attempted` for the ones after the failure, which were never
 sent. A run stops at the first failure.
 
-This is the one case where a command writes a result document to stdout *and*
+This is the one case where a command writes a result document to stdout _and_
 exits non-zero. The exit is the failing request's own, not a new code and not
 exit 3: exit 3 means a truncated result set, which a write does not have. The
 rule it bends — a failing command writes nothing at all to stdout — is right for
@@ -829,38 +829,38 @@ one they got should not have to infer it from the absence of a claim. The
 element is absent when the flag was not passed; it never appears saying a check
 did not happen.
 
-| Code                      | Exit | Meaning                                    |
-| ------------------------- | ---- | ------------------------------------------- |
-| `READ_ONLY`               | 10   | A context, `--readonly`, or `JIRA_READONLY` forbids changing Jira. It is a one-way latch within an invocation: nothing a command does turns it off, and `JIRA_READONLY=0` does not clear a context that was created read-only. Changing what a context is for is a separate act, `context edit --unset readonly`. |
-| `CONFIRMATION_REQUIRED`   | 10   | A destructive command was run without `--yes`. Not raised for `--dry-run`: a preview is not the thing being confirmed, and you look at it in order to decide. |
-| `IDEMPOTENT_IN_FLIGHT`    | 7    | Another run holds this key and has not finished; it may already have done the work. |
-| `STALE_WRITE`             | 7    | `--if-unchanged` was given a precondition and the issue has changed since it was taken, so nothing was sent. `detail` carries both versions. This is the §6.3 stale write: without the flag the later write silently overwrites the earlier one and both callers exit 0. |
-| `INVALID_PRECONDITION`    | 2    | `--if-unchanged` was given something this tool did not issue: not a token at all, one naming no issue, one for another issue, or one minted against the other deployment. Refused rather than compared, because comparing a foreign value would report "the issue changed", which is a claim about this issue that nobody checked. Everything but the deployment is settled locally, so a typo costs no round trip. |
-| `INVALID_ENCODING`        | 2    | Text that is not valid UTF-8. It is refused, never repaired: substituting U+FFFD would put a character in Jira the caller never wrote. |
-| `CONFLICTING_LABEL_FLAGS` | 2    | `--label` replaces the whole set, so it cannot be combined with `--add-label` or `--remove-label`. |
-| `AMBIGUOUS_LINK_DIRECTION`| 2    | A link type's name was given where a direction was needed. `"Blocks"` reads either way; `detail` offers both phrasings. |
-| `UNKNOWN_LINK_TYPE`       | 2    | No relationship by that phrase. `detail` lists every phrase the site offers, because link wording is customizable. |
-| `INVALID_DURATION`        | 2    | Not a Jira duration. The format is a count of `w`, `d`, `h`, or `m`, largest first. Nothing is converted between them: a working week is a site setting. |
-| `SELF_LINK`               | 2    | Both ends of a link are the same issue. |
-| `SELF_EPIC`               | 2    | An epic was named as one of the issues to move into it. |
-| `SELF_PARENT`             | 2    | An issue was named as its own parent. Settled locally, so the cycle costs no round trip. |
-| `NOTHING_TO_EDIT`         | 2    | An edit was given nothing to change, `issue edit` with no field, `context edit` with no setting. |
-| `CONFLICTING_EDIT`        | 2    | `context edit` was asked to set and clear the same setting. Both at once has no single right answer, and picking one would make the result depend on an implementation detail nobody can see. |
-| `UNCONSTRAINED_QUERY`     | 2    | `issue list --limit all` with no filter would page until the instance is exhausted and return every issue in every project the credential can see. The default bound makes an unfiltered query harmless, one request, fifty rows, so only the pairing is refused. `--all-projects` is how to mean it. |
-| `INVALID_API_VERSION`     | 2    | `--api-version` accepts 2 or 3. Cloud serves v3; Data Center serves v2. |
-| `TOO_MANY_ISSUES`         | 2    | More issues than the agile API moves at once. It is refused rather than split across requests: two requests can half-succeed, and the outcome would be neither moved nor not moved. |
-| `DESTINATION_EXISTS`      | 7    | A download would replace a file that is already there. It refuses rather than overwriting, because a download that silently replaced a file is indistinguishable from one that worked, and the file it replaced is not recoverable. `--force` allows it. |
-| `OFF_SITE_URL`            | 1    | A URL the server supplied points outside the configured site, another host, another scheme, or outside the context path, and this tool will not follow it. Data Center reports an attachment's content as an absolute URL; following it on trust is how a credential reaches a host nobody chose. The check does not depend on how the URL is spelled: `//host/path` names a host while carrying no scheme, and a path beginning with `/` is resolved against the site's origin, so both are held to the same rule as an absolute URL. The refusal never echoes the URL, one can carry userinfo or a signed parameter, and names only the part that differs. |
-| `UNBOUNDED_RESPONSE`      | 1    | A streamed response ran past 2 GiB without ever declaring a length. A body carrying a `Content-Length` is limited to it by the HTTP client, and one that ends early fails — so a download either arrives whole or fails, and neither needs this. A response with no declared length is bounded by nothing at any layer, and it also cannot be checked for completeness, so it is refused rather than written. Not retryable: a server that streams without declaring a length will do the same next time. The ceiling does not apply to a *declared* length, because capping one would refuse an attachment somebody legitimately stored. |
-| `UNRENDERABLE_VALUE`      | 1    | A value in the result holds a character no output format can carry, most of C0, `U+FFFE`, `U+FFFF`, or a byte that is not valid UTF-8. XML 1.0 forbids these outright, so escaping is not available: `&#1;` is no more legal than the raw byte. The refusal does not depend on `--format`, even though JSON and YAML could encode one, because the flag chooses an encoding and not what this tool is willing to say. Distinct from `INVALID_ENCODING`, which is exit 2 and is a value the *caller* supplied: this one comes back from Jira, so the caller has done nothing to correct. The message names the field. |
-| `UNSAFE_FILENAME`         | 1    | A download with no `--output` takes its destination from the filename the server reports, and that filename is not one. A name carrying a directory separator, a parent reference, or an absolute path would put the bytes somewhere nobody asked for; Data Center reports the filename on the attachment itself, so the value is the server's rather than the caller's. The name is still reported in full by `issue attachment list`, refusing to *write* it is not refusing to *say* it. Pass `--output <path>` to name the destination yourself. Exit 1 and not 9: the server returns the same filename next time, so retrying cannot help, and 9 publishes a refusal as retryable. |
-| `BODY_NOT_REPLAYABLE`     | 1    | A retry needed the request body again and could not get it, a body read from a pipe cannot be sent twice. The request fails rather than going out short, because a second attempt carrying nothing would be accepted as a successful upload of an empty file. |
-| `SPRINT_NOT_ACTIVE`       | 7    | Only a running sprint can be closed. The sprint is read first, so the wrong state costs one read and no mutation. |
-| `SPRINT_NOT_FUTURE`       | 7    | Only a planned sprint can be started. The two wrong states get different remedies: an active sprint is already running and can be closed, and a closed one cannot be reopened by any API. |
-| `SPRINT_HAS_NO_DATES`     | 2    | `sprint start` on a sprint that has no window, with none supplied. Jira will not run a sprint that has no dates, so this is the server's rule refused a round trip earlier. It names only the half that is missing: a sprint created with both dates needs neither flag. |
-| `INVALID_SPRINT_DATE`     | 2    | `--start` or `--end` is not an RFC 3339 timestamp. A bare date names no time and no zone, and choosing one would decide when somebody's iteration begins on their behalf. An offset is accepted and normalized to UTC, which is a spelling of an instant rather than a different instant. |
-| `INVALID_SPRINT_WINDOW`   | 2    | The sprint would end before it starts. Jira refuses the same thing — "the start date of a sprint must be before the end date" — so this is that verdict without the round trip. On `sprint start` the pair checked is the effective one, so `--end` alone can be backwards against a start date the sprint already holds. |
-| `INVALID_SPRINT_NAME`     | 2    | `sprint create` was given no name, or one that is entirely whitespace. Anything else is accepted: a sprint name is free text, it never reaches a URL path, and what a team calls its iteration is not this tool's business. |
+| Code                       | Exit | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `READ_ONLY`                | 10   | A context, `--readonly`, or `JIRA_READONLY` forbids changing Jira. It is a one-way latch within an invocation: nothing a command does turns it off, and `JIRA_READONLY=0` does not clear a context that was created read-only. Changing what a context is for is a separate act, `context edit --unset readonly`.                                                                                                                                                                                                                                                                                                                                                                       |
+| `CONFIRMATION_REQUIRED`    | 10   | A destructive command was run without `--yes`. Not raised for `--dry-run`: a preview is not the thing being confirmed, and you look at it in order to decide.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `IDEMPOTENT_IN_FLIGHT`     | 7    | Another run holds this key and has not finished; it may already have done the work.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `STALE_WRITE`              | 7    | `--if-unchanged` was given a precondition and the issue has changed since it was taken, so nothing was sent. `detail` carries both versions. This is the §6.3 stale write: without the flag the later write silently overwrites the earlier one and both callers exit 0.                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `INVALID_PRECONDITION`     | 2    | `--if-unchanged` was given something this tool did not issue: not a token at all, one naming no issue, one for another issue, or one minted against the other deployment. Refused rather than compared, because comparing a foreign value would report "the issue changed", which is a claim about this issue that nobody checked. Everything but the deployment is settled locally, so a typo costs no round trip.                                                                                                                                                                                                                                                                     |
+| `INVALID_ENCODING`         | 2    | Text that is not valid UTF-8. It is refused, never repaired: substituting U+FFFD would put a character in Jira the caller never wrote.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `CONFLICTING_LABEL_FLAGS`  | 2    | `--label` replaces the whole set, so it cannot be combined with `--add-label` or `--remove-label`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `AMBIGUOUS_LINK_DIRECTION` | 2    | A link type's name was given where a direction was needed. `"Blocks"` reads either way; `detail` offers both phrasings.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `UNKNOWN_LINK_TYPE`        | 2    | No relationship by that phrase. `detail` lists every phrase the site offers, because link wording is customizable.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `INVALID_DURATION`         | 2    | Not a Jira duration. The format is a count of `w`, `d`, `h`, or `m`, largest first. Nothing is converted between them: a working week is a site setting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `SELF_LINK`                | 2    | Both ends of a link are the same issue.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `SELF_EPIC`                | 2    | An epic was named as one of the issues to move into it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `SELF_PARENT`              | 2    | An issue was named as its own parent. Settled locally, so the cycle costs no round trip.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `NOTHING_TO_EDIT`          | 2    | An edit was given nothing to change, `issue edit` with no field, `context edit` with no setting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `CONFLICTING_EDIT`         | 2    | `context edit` was asked to set and clear the same setting. Both at once has no single right answer, and picking one would make the result depend on an implementation detail nobody can see.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `UNCONSTRAINED_QUERY`      | 2    | `issue list --limit all` with no filter would page until the instance is exhausted and return every issue in every project the credential can see. The default bound makes an unfiltered query harmless, one request, fifty rows, so only the pairing is refused. `--all-projects` is how to mean it.                                                                                                                                                                                                                                                                                                                                                                                   |
+| `INVALID_API_VERSION`      | 2    | `--api-version` accepts 2 or 3. Cloud serves v3; Data Center serves v2.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `TOO_MANY_ISSUES`          | 2    | More issues than the agile API moves at once. It is refused rather than split across requests: two requests can half-succeed, and the outcome would be neither moved nor not moved.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `DESTINATION_EXISTS`       | 7    | A download would replace a file that is already there. It refuses rather than overwriting, because a download that silently replaced a file is indistinguishable from one that worked, and the file it replaced is not recoverable. `--force` allows it.                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `OFF_SITE_URL`             | 1    | A URL the server supplied points outside the configured site, another host, another scheme, or outside the context path, and this tool will not follow it. Data Center reports an attachment's content as an absolute URL; following it on trust is how a credential reaches a host nobody chose. The check does not depend on how the URL is spelled: `//host/path` names a host while carrying no scheme, and a path beginning with `/` is resolved against the site's origin, so both are held to the same rule as an absolute URL. The refusal never echoes the URL, one can carry userinfo or a signed parameter, and names only the part that differs.                            |
+| `UNBOUNDED_RESPONSE`       | 1    | A streamed response ran past 2 GiB without ever declaring a length. A body carrying a `Content-Length` is limited to it by the HTTP client, and one that ends early fails — so a download either arrives whole or fails, and neither needs this. A response with no declared length is bounded by nothing at any layer, and it also cannot be checked for completeness, so it is refused rather than written. Not retryable: a server that streams without declaring a length will do the same next time. The ceiling does not apply to a _declared_ length, because capping one would refuse an attachment somebody legitimately stored.                                               |
+| `UNRENDERABLE_VALUE`       | 1    | A value in the result holds a character no output format can carry, most of C0, `U+FFFE`, `U+FFFF`, or a byte that is not valid UTF-8. XML 1.0 forbids these outright, so escaping is not available: `&#1;` is no more legal than the raw byte. The refusal does not depend on `--format`, even though JSON and YAML could encode one, because the flag chooses an encoding and not what this tool is willing to say. Distinct from `INVALID_ENCODING`, which is exit 2 and is a value the _caller_ supplied: this one comes back from Jira, so the caller has done nothing to correct. The message names the field.                                                                    |
+| `UNSAFE_FILENAME`          | 1    | A download with no `--output` takes its destination from the filename the server reports, and that filename is not one. A name carrying a directory separator, a parent reference, or an absolute path would put the bytes somewhere nobody asked for; Data Center reports the filename on the attachment itself, so the value is the server's rather than the caller's. The name is still reported in full by `issue attachment list`, refusing to _write_ it is not refusing to _say_ it. Pass `--output <path>` to name the destination yourself. Exit 1 and not 9: the server returns the same filename next time, so retrying cannot help, and 9 publishes a refusal as retryable. |
+| `BODY_NOT_REPLAYABLE`      | 1    | A retry needed the request body again and could not get it, a body read from a pipe cannot be sent twice. The request fails rather than going out short, because a second attempt carrying nothing would be accepted as a successful upload of an empty file.                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `SPRINT_NOT_ACTIVE`        | 7    | Only a running sprint can be closed. The sprint is read first, so the wrong state costs one read and no mutation.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `SPRINT_NOT_FUTURE`        | 7    | Only a planned sprint can be started. The two wrong states get different remedies: an active sprint is already running and can be closed, and a closed one cannot be reopened by any API.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `SPRINT_HAS_NO_DATES`      | 2    | `sprint start` on a sprint that has no window, with none supplied. Jira will not run a sprint that has no dates, so this is the server's rule refused a round trip earlier. It names only the half that is missing: a sprint created with both dates needs neither flag.                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `INVALID_SPRINT_DATE`      | 2    | `--start` or `--end` is not an RFC 3339 timestamp. A bare date names no time and no zone, and choosing one would decide when somebody's iteration begins on their behalf. An offset is accepted and normalized to UTC, which is a spelling of an instant rather than a different instant.                                                                                                                                                                                                                                                                                                                                                                                               |
+| `INVALID_SPRINT_WINDOW`    | 2    | The sprint would end before it starts. Jira refuses the same thing — "the start date of a sprint must be before the end date" — so this is that verdict without the round trip. On `sprint start` the pair checked is the effective one, so `--end` alone can be backwards against a start date the sprint already holds.                                                                                                                                                                                                                                                                                                                                                               |
+| `INVALID_SPRINT_NAME`      | 2    | `sprint create` was given no name, or one that is entirely whitespace. Anything else is accepted: a sprint name is free text, it never reaches a URL path, and what a team calls its iteration is not this tool's business.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 ### The sprint lifecycle
 
@@ -905,11 +905,11 @@ reports, so the two can be compared without either being reformatted first.
 Text bound for a description or a comment is **contained, never converted**,
 unless `--body-format` says otherwise.
 
-| `--body-format` | What happens                                              |
-| --------------- | --------------------------------------------------------- |
-| `text` (default) | The text is contained, not interpreted.                  |
-| `markdown`      | The text is parsed and becomes the document it describes.  |
-| `adf`           | The text is a document, as JSON, and is sent as given.     |
+| `--body-format`  | What happens                                              |
+| ---------------- | --------------------------------------------------------- |
+| `text` (default) | The text is contained, not interpreted.                   |
+| `markdown`       | The text is parsed and becomes the document it describes. |
+| `adf`            | The text is a document, as JSON, and is sent as given.    |
 
 Under `text`, Data Center takes a string of wiki markup and gets the text as
 typed. Cloud will not accept a string where a document belongs, so the text is
@@ -1023,7 +1023,7 @@ The contract is enforced by golden files, not by review discipline:
 shipped tag set. **A diff in a golden file is a change every consumer sees.**
 Bump the schema version of the affected kind in the same commit.
 
-The split is not cosmetic. A kind's *shape* is the same in every build that has
+The split is not cosmetic. A kind's _shape_ is the same in every build that has
 the kind, so it is pinned once and every profile compares against the same file.
 What differs between builds is which kinds exist and which commands emit them,
 and that is what the per-profile sets carry, `contract.tsv` is the inventory,
@@ -1044,7 +1044,7 @@ Update this document in the same change that alters any of:
 - A `kind` or its schema version, **including the worked examples above**.
   `internal/lint/kindversions_test.go` compares every `kind="…" v="…"` printed
   in this file and in the README against `registry.Kinds`, the same source
-  `jr contract` prints from. `make golden` pins each kind's *shape* and refuses
+  `jr contract` prints from. `make golden` pins each kind's _shape_ and refuses
   a changed shape at an unchanged version; nothing pinned the number where a
   reader looks for it, and the examples here had been stale for two bumps
   before the test existed. A document whose first instruction is "branch on `v`"

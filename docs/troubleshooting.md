@@ -261,7 +261,7 @@ midnight. For an account on `America/Chicago` in August, `startOfDay()` is
 `complete="true"` at exit 0.
 
 The same applies to a bare literal: `--created-after "2026-08-10 00:00"` is
-midnight *there*, not here.
+midnight _there_, not here.
 
 To mean your own day, convert it and send an absolute literal:
 
@@ -440,7 +440,7 @@ eyJkIjoiY2xvdWQiLCJrIjoiRU5HLTEwMSIsInUiOiIyMDI2LTA4LTA0VDExOjQxOjU1LjAwOFoifQ
 $ jr issue edit ENG-101 --priority High --if-unchanged eyJkIjoiY2xvdWQi...
 ```
 
-Retrying with the *same* precondition will fail the same way every time, which
+Retrying with the _same_ precondition will fail the same way every time, which
 is the point: it describes a version of the issue that no longer exists.
 
 `updated` moves for any change, including a comment somebody added, so this can

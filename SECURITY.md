@@ -33,7 +33,7 @@ be a proxy that lies.
 
 **Assumed hostile: values that flow into a query.** A label, a status, a display
 name, or a `--jql` fragment may come from a ticket, a pipeline variable, or a
-model. None of them may change what a query *scopes*.
+model. None of them may change what a query _scopes_.
 
 **Assumed trusted: the caller.** Flags, arguments, the config file, and the
 context are the operator's own instructions. `jr issue delete ENG-1 --yes` does
@@ -79,7 +79,7 @@ can read it. `TestTokenIsNotAcceptedOnTheCommandLine`.
 
 - **`config.toml` holds a reference, never a secret.** The config is meant to be
   hand-edited and kept in a dotfiles repository. The secret lives under the
-  state directory at mode 0600, and is *refused on read* if it is wider.
+  state directory at mode 0600, and is _refused on read_ if it is wider.
   `TestConfigFileNeverContainsACredential`, `TestCredentialFileIsNotWorldReadable`.
 - **Redaction happens where the event is built, not where it is printed.** A
   `transport.Event` is scrubbed inside the transport, so no present or future
@@ -109,7 +109,7 @@ can read it. `TestTokenIsNotAcceptedOnTheCommandLine`.
   content URL points somewhere else is `OFF_SITE_URL`, refused rather than
   fetched. `TestAnOffSiteContentURLIsRefused`.
 - **A server-supplied filename is not written blindly.** `issue attachment
-  download` refuses a name that is not a plain filename — absolute, containing a
+download` refuses a name that is not a plain filename — absolute, containing a
   separator, a parent reference, or a Windows device name — with
   `UNSAFE_FILENAME`, rather than reducing it to something it guesses was meant.
   `--output` is how the caller names a destination. A download never replaces an
@@ -159,7 +159,7 @@ can read it. `TestTokenIsNotAcceptedOnTheCommandLine`.
 - **Read-only is a one-way latch within an invocation.** `--readonly`,
   `JIRA_READONLY`, or a context created read-only turns it on; nothing a command
   does turns it off, and `JIRA_READONLY=0` does not clear it. Changing what a
-  context is *for* is a deliberate edit — `context edit --unset readonly` — and
+  context is _for_ is a deliberate edit — `context edit --unset readonly` — and
   not something an invocation can do to itself. `TestReadOnlyIsAOneWayLatch`,
   `TestReadOnlyIsNotRelaxedForADryRun`.
 - **Destructive commands require `--yes`**, and a dry run is allowed without it,
@@ -204,7 +204,7 @@ it, so a partially-written document can never be parsed as a whole one.
 - **The test suite never touches the network.** Every host in a test uses a
   reserved TLD — `.invalid`, `.test`, `.example` — enforced by
   `internal/lint/hosts_test.go`. This was learned the hard way: when `auth
-  login` grew credential verification, the suite began sending test tokens to a
+login` grew credential verification, the suite began sending test tokens to a
   plausible-looking domain that turned out to exist. Nothing in the tests had
   changed; a behaviour change had turned an inert string into a real request.
 - **Fixtures are recordings.** Each cassette records whether it was recorded or
@@ -220,7 +220,7 @@ the same string its own notification emails use. It can withhold rows: a page
 that claims to be the last one is believed, because there is no second source to
 check it against. It can make requests slow or expensive, bounded only by
 `--max-requests` and by whatever timeout the caller sets. And it can serve an
-attachment whose *contents* are hostile; `jr` writes bytes to the path you named
+attachment whose _contents_ are hostile; `jr` writes bytes to the path you named
 and never opens them.
 
 What it cannot do is get the credential sent anywhere else, get a file written

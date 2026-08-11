@@ -11,21 +11,21 @@ converts a class of runtime bugs into link errors.
 
 ## Tags
 
-| Tag         | Intends to gate                                         | Gates today                    |
-| ----------- | ------------------------------------------------------- | ------------------------------ |
-| `write`     | All mutating commands                                   | the 21 mutating verbs          |
-| `mcp`       | `jr mcp serve`                                          | `jr mcp serve`                 |
-| `prompt`    | Interactive prompts, the setup wizard, completion       | `jr completion`                |
-| `admin`     | Project, board, and sprint administration               | `jr sprint close`              |
-| `tui`       | `jr ui`, interactive tables                             | **nothing**, no `jr ui` yet   |
-| `render`    | Human-readable rendering for a terminal                 | `--format markdown`            |
-| `browser`   | `jr open`, the OAuth browser flow                       | **nothing**, no OAuth yet     |
-| `clipboard` | Copying keys and URLs                                   | **nothing**, nothing copies   |
+| Tag         | Intends to gate                                   | Gates today                 |
+| ----------- | ------------------------------------------------- | --------------------------- |
+| `write`     | All mutating commands                             | the 21 mutating verbs       |
+| `mcp`       | `jr mcp serve`                                    | `jr mcp serve`              |
+| `prompt`    | Interactive prompts, the setup wizard, completion | `jr completion`             |
+| `admin`     | Project, board, and sprint administration         | `jr sprint close`           |
+| `tui`       | `jr ui`, interactive tables                       | **nothing**, no `jr ui` yet |
+| `render`    | Human-readable rendering for a terminal           | `--format markdown`         |
+| `browser`   | `jr open`, the OAuth browser flow                 | **nothing**, no OAuth yet   |
+| `clipboard` | Copying keys and URLs                             | **nothing**, nothing copies |
 
 The right-hand column is not documentation that can drift. Two tests hold it,
 because it makes two different claims.
 
-`internal/lint/tags_test.go` asserts that a tag gates *code at all*: one gating
+`internal/lint/tags_test.go` asserts that a tag gates _code at all_: one gating
 nothing must be listed in `notYetGating` with a reason, and one that starts
 gating something fails the test until it is taken off that list. A file that
 only records the tag is set, or a package that is nothing but a doc comment,
@@ -93,12 +93,12 @@ them to go stale. It exists because these numbers were four releases out of date
 26, 25, 18, 17 against a real 54, 52, 35, 34, which is what a number in a
 document that nothing checks eventually becomes.
 
-| Profile  | Commands | Not present                                   |
-| -------- | -------- | --------------------------------------------- |
-| `full`   | 62       | none                                          |
-| `agent`  | 60       | `completion`, `sprint close`                  |
-| `reader` | 40       | the above, plus the 20 mutating verbs         |
-| `ci`     | 39       | the above, plus `mcp serve`                   |
+| Profile  | Commands | Not present                           |
+| -------- | -------- | ------------------------------------- |
+| `full`   | 62       | none                                  |
+| `agent`  | 60       | `completion`, `sprint close`          |
+| `reader` | 40       | the above, plus the 20 mutating verbs |
+| `ci`     | 39       | the above, plus `mcp serve`           |
 
 `make test-profiles` runs the whole suite under every shipped tag set, and the
 contract tests inside it assert the surface directly: no mutating command
@@ -154,7 +154,7 @@ Put the registration in a file carrying the tag:
 
 package issue
 
-import "github.com/kmoneil/jira-cli/internal/registry"
+import "github.com/kmoneil/jr/internal/registry"
 
 func init() {
 	registry.Register(createCommand())

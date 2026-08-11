@@ -64,7 +64,7 @@ own turns that key ordering around rather than doing nothing.
 **Dates are evaluated in the Jira account's timezone, not yours.** An offset
 like `-30d` is relative to now and unaffected, but anything with a day boundary
 in it — `startOfDay()`, `2026-01-01`, `startOfWeek()` — means that boundary
-*there*. `jr user me` reports the zone:
+_there_. `jr user me` reports the zone:
 
 ```console
 $ jr user me | grep timezone
@@ -80,7 +80,7 @@ $ jr issue list --created-after \
     "$(TZ=America/Chicago date -d @$start '+%Y-%m-%d %H:%M')"
 ```
 
-Timestamps coming *back* are always RFC 3339 in UTC, whichever way the query
+Timestamps coming _back_ are always RFC 3339 in UTC, whichever way the query
 went in.
 
 ### When the flags do not cover it
