@@ -87,8 +87,17 @@ examples for common tasks in [docs/recipes.md](docs/recipes.md).
 
 ## Why this exists
 
-Because the guarantee is the product, and a guarantee is not a feature you can
-bolt on afterwards.
+**First, honestly: I built it for me.** I wanted my own Jira work to be
+scriptable without babysitting it — to pipe a query into something else at two
+in the morning and trust the rows, to point an agent at a board without
+wondering what it would do next. And I wanted control over the tool itself:
+which commands exist, what they refuse, what a build even contains, and what
+happens on the day the answer is "I can't". That is a short list of wants, and
+none of it was satisfied by adding flags to something else.
+
+Everything below is what those two wants turn into when you take them
+seriously — because the guarantee is the product, and a guarantee is not a
+feature you can bolt on afterwards.
 
 Picture the failure this is built against. A nightly script lists everything in
 a project, gets fifty rows because that is where the API stopped, exits 0, and
