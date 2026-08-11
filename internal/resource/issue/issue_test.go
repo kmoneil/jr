@@ -402,6 +402,13 @@ func TestBuildQuery(t *testing.T) {
 			`status IN ("Open", "In Review") AND status != "Closed"` + byKey,
 		},
 		{
+			// The other half of the pair. Sub-tasks are the everyday exclusion
+			// and the reason --not-type is not a symmetry exercise.
+			"types excluded",
+			issue.QueryOptions{NotTypes: []string{"Sub-task", "Epic"}},
+			`issuetype NOT IN ("Sub-task", "Epic")` + byKey,
+		},
+		{
 			// --order with no --sort orders the field that is there anyway,
 			// rather than being dropped for want of a --sort beside it.
 			"order without sort",
@@ -2488,7 +2495,8 @@ func TestAnUnconstrainedSweepIsRefused(t *testing.T) {
 // directory, and a relative date parses locally.
 var guardFlagValue = map[string]string{
 	"jql": "labels = retry", "status": "Open", "not-status": "Closed",
-	"label": "retry", "not-label": "wontfix", "type": "Bug",
+	"label": "retry", "not-label": "wontfix",
+	"type": "Bug", "not-type": "Sub-task",
 	"assignee": "currentUser", "reporter": "currentUser",
 	"creator": "currentUser", "involving": "currentUser",
 	"watcher": "currentUser", "voter": "currentUser",

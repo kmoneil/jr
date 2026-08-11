@@ -187,11 +187,11 @@ That is close to creation order and is not update order: a date filter narrows
 the set and never orders it, so "everything touched today, newest first" is
 --updated-after -1d --sort updated --order desc.
 
---status and --not-status are the two directions of one filter, and both repeat:
---not-status Done --not-status Closed sends status NOT IN (Done, Closed).
-Neither splits on commas, because a status may contain one: --not-status
-Done,Closed names one status with a comma in it, which is not a status any
-project has.
+Every list filter has both directions: --status and --not-status, --type and
+--not-type, --label and --not-label. Each repeats, so --not-status Done
+--not-status Closed sends status NOT IN (Done, Closed). None of them splits on
+commas, because a status or a label may contain one: --not-status Done,Closed
+names a single status with a comma in it, which is not a status any project has.
 
 --assignee and --reporter ask who an issue belongs to. --involving,
 --was-assignee, --worklog-author, and --changed-by ask who touched it, which is
@@ -235,6 +235,10 @@ to status and everything else has to be asked for.`),
 			{
 				Name: "type", Short: "t", Type: registry.TypeString, Repeatable: true,
 				Usage: "issue type to match; repeat for several",
+			},
+			{
+				Name: "not-type", Type: registry.TypeString, Repeatable: true,
+				Usage: "issue type to exclude; repeat for several",
 			},
 			{
 				Name: "assignee", Short: "a", Type: registry.TypeString,
@@ -670,7 +674,7 @@ func refuseUnconstrainedSweep(inv *registry.Invocation) error {
 // TestEveryFilterConstrainsTheSweepGuard holds the two to each other.
 var constrainingFlags = []string{
 	"--project", "--jql", "--status", "--not-status",
-	"--label", "--not-label", "--type",
+	"--label", "--not-label", "--type", "--not-type",
 	"--assignee", "--reporter", "--creator", "--involving", "--watcher",
 	"--voter", "--worklog-author", "--was-assignee", "--changed-by",
 	"--created-after", "--created-before", "--updated-after", "--updated-before",
@@ -825,6 +829,7 @@ func listQuery(inv *registry.Invocation) QueryOptions {
 		Labels:      inv.Flags.StringSlice("label"),
 		NotLabels:   inv.Flags.StringSlice("not-label"),
 		Types:       inv.Flags.StringSlice("type"),
+		NotTypes:    inv.Flags.StringSlice("not-type"),
 
 		Assignee: resolvedUser(inv, "assignee"),
 		Reporter: resolvedUser(inv, "reporter"),
@@ -884,24 +889,27 @@ func (o QueryOptions) Constrained() bool {
 			return true
 		}
 	}
-	return len(o.Statuses) > 0 || len(o.NotStatuses) > 0 || len(o.Labels) > 0 ||
-		len(o.NotLabels) > 0 || len(o.Types) > 0
+	return len(o.Statuses) > 0 || len(o.NotStatuses) > 0 ||
+		len(o.Labels) > 0 || len(o.NotLabels) > 0 ||
+		len(o.Types) > 0 || len(o.NotTypes) > 0
 }
 
 // QueryOptions are the filter flags, before they become JQL.
 type QueryOptions struct {
 	Project string
 	JQL     string
-	// Statuses and NotStatuses are the two directions of the same filter, and
-	// both are lists: `status NOT IN (Closed, Done)` is the question a caller
-	// asks far more often than any one status they want, and writing it as a
-	// --jql fragment is the one path where a typo becomes a wider result set
-	// rather than a refusal.
+	// Each list filter carries both directions. `status NOT IN (Closed, Done)`
+	// is the question a caller asks far more often than any one status they
+	// want, and writing it as a --jql fragment is the one path where a typo
+	// becomes a wider result set rather than a refusal. Having it for one field
+	// and not the next is a surface people have to memorise, so all three pair
+	// up.
 	Statuses    []string
 	NotStatuses []string
 	Labels      []string
 	NotLabels   []string
 	Types       []string
+	NotTypes    []string
 
 	// Who the issue belongs to now.
 	Assignee string
@@ -953,6 +961,7 @@ func BuildQuery(opt QueryOptions) (string, error) {
 	b.In("labels", opt.Labels...)
 	b.NotIn("labels", opt.NotLabels...)
 	b.In("issuetype", opt.Types...)
+	b.NotIn("issuetype", opt.NotTypes...)
 
 	addParticipants(b, opt)
 	if err := addDates(b, opt); err != nil {

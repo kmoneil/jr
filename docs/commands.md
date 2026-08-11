@@ -1682,11 +1682,11 @@ That is close to creation order and is not update order: a date filter narrows
 the set and never orders it, so "everything touched today, newest first" is
 --updated-after -1d --sort updated --order desc.
 
---status and --not-status are the two directions of one filter, and both repeat:
---not-status Done --not-status Closed sends status NOT IN (Done, Closed).
-Neither splits on commas, because a status may contain one: --not-status
-Done,Closed names one status with a comma in it, which is not a status any
-project has.
+Every list filter has both directions: --status and --not-status, --type and
+--not-type, --label and --not-label. Each repeats, so --not-status Done
+--not-status Closed sends status NOT IN (Done, Closed). None of them splits on
+commas, because a status or a label may contain one: --not-status Done,Closed
+names a single status with a comma in it, which is not a status any project has.
 
 --assignee and --reporter ask who an issue belongs to. --involving,
 --was-assignee, --worklog-author, and --changed-by ask who touched it, which is
@@ -1718,6 +1718,7 @@ jr issue list --changed-by currentUser --changed-after -1w
 | `--label` | `string` | — | label to match; repeat for several (repeatable) |
 | `--not-label` | `string` | — | label to exclude; repeat for several (repeatable) |
 | `--type`, `-t` | `string` | — | issue type to match; repeat for several (repeatable) |
+| `--not-type` | `string` | — | issue type to exclude; repeat for several (repeatable) |
 | `--assignee`, `-a` | `string` | — | assignee, by display name, email, or id; the word currentUser resolves to the caller |
 | `--reporter` | `string` | — | reporter, by display name, email, or id; the word currentUser resolves to the caller |
 | `--creator` | `string` | — | who filed the issue, which unlike the reporter cannot be changed afterwards |
