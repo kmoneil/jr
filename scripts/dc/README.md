@@ -137,8 +137,13 @@ curl -sS -u ada:fixtures-only \
 `JIRA_VERSION` in `.env`. The default is 10.4, which is post-9.0 and therefore
 records the *replacement* createmeta endpoint. The two other passes worth doing:
 
-- **9.12** — the last line before the createmeta removal and the last with an
-  embedded H2 database. Records the shape a customer on 9.x LTS still serves.
+- **9.12** — the last line with an embedded H2 database, and the LTS a lot of
+  customers are still on. Swept on 2026-08-11 with `scripts/dc/smoke.sh`: 22 of
+  23 read verbs exit 0, the twenty-third being `field list` exiting 3 on an
+  honestly truncated catalogue, and all ten write verbs exit 0. It also
+  confirmed that the four fields in
+  `_plans/backlog/fields-a-data-center-never-populates.md` are absent there
+  too, so none of them is a 10.4 regression.
 - **11.3** — the current line. **Refuses HTTP Basic entirely**
   (`403 {"message":"Basic Authentication has been disabled on this instance."}`)
   so a personal access token is the only way in, and adds `maxResultWindow` to
@@ -146,6 +151,21 @@ records the *replacement* createmeta endpoint. The two other passes worth doing:
 
 Changing the version means `make dc-down` first: the volume holds the old
 cluster.
+
+## Checking a version rather than recording it
+
+```sh
+./scripts/dc/smoke.sh
+```
+
+One row per command: the exit code, and the error code when there is one. It
+asserts nothing — a sweep that decided what "wrong" means would have to know
+which refusals are correct, and several are. `field list` exits 3 against a
+catalogue larger than the default limit, which is the contract working.
+
+This is the cheaper half of a version pass. The recordings pin what one Data
+Center answered; the sweep asks whether another one answers at all, which is
+the question Jira 11 answered with a defect no fixture could have found.
 
 ## The context path is a second, separate run
 
