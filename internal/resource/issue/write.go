@@ -379,7 +379,15 @@ func runCreate(ctx context.Context, inv *registry.Invocation) (*render.Doc, erro
 	if err != nil {
 		return nil, err
 	}
-	client := &Client{Transport: conn, Site: info}
+	// BodyFormat, because CreateRequest reads it off the client to encode the
+	// description and this is the only place it can be set. Without it the flag
+	// was declared, documented, and dropped: `--body-format markdown` on Cloud
+	// sent the markdown as plain text, and on Data Center a format that site
+	// cannot store was accepted in silence rather than refused.
+	client := &Client{
+		Transport: conn, Site: info,
+		BodyFormat: inv.Flags.String("body-format"),
+	}
 
 	req, err := client.CreateRequest(CreateOptions{
 		Project:     project,
@@ -794,7 +802,10 @@ func runEdit(ctx context.Context, inv *registry.Invocation) (*render.Doc, error)
 	if err != nil {
 		return nil, err
 	}
-	client := &Client{Transport: conn, Site: info}
+	client := &Client{
+		Transport: conn, Site: info,
+		BodyFormat: inv.Flags.String("body-format"),
+	}
 
 	opt := EditOptions{
 		Key:          inv.Args[0],
