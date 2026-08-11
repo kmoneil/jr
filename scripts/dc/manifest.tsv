@@ -1,0 +1,46 @@
+# What to record, and which ledger row each recording pays off.
+#
+# Tab-separated: <group>	<cassette>	<command>
+#
+#   group     a key from `unrecorded` in internal/lint/evidence_test.go
+#   cassette  the file to write, relative to the repository root
+#   command   the jr invocation that produces it, or `!<reason>` for a row no
+#             single invocation can produce. Shell quoting applies inside this
+#             field, because a JQL string is one argument and word-splitting a
+#             manifest is how it stops being one.
+#
+# internal/lint/dcmanifest_test.go reads this file and requires every
+# outstanding Data Center row to appear here, so the checklist is read by the
+# build rather than by whoever remembers to open the README.
+#
+# The commands assume the seed: project ENG, board 1, users ada and grace.
+
+internal/transport datacenter	internal/transport/testdata/serverinfo.datacenter.json	!TestContractAgainstBothDeployments plays exactly four interactions — serverInfo, myself, a 404 issue GET, and a POST that must 400 on summary — and no single jr invocation produces that set. Recording it needs the four merged, or the test taught to drive a cassette recorded by a command.
+
+internal/resource/user datacenter	internal/resource/user/testdata/me-recorded.datacenter.json	user me
+internal/resource/user datacenter	internal/resource/user/testdata/users-recorded.datacenter.json	user list a
+
+internal/resource/project datacenter	internal/resource/project/testdata/projects-recorded.datacenter.json	project list
+internal/resource/project datacenter	internal/resource/project/testdata/project-recorded.datacenter.json	project get ENG
+internal/resource/project datacenter	internal/resource/project/testdata/components-recorded.datacenter.json	project components ENG
+internal/resource/project datacenter	internal/resource/project/testdata/versions-recorded.datacenter.json	project versions ENG
+internal/resource/project datacenter	internal/resource/project/testdata/statuses-recorded.datacenter.json	project statuses ENG
+
+internal/resource/issue datacenter	internal/resource/issue/testdata/list-recorded.datacenter.json	issue list --project ENG --limit 5
+internal/resource/issue datacenter	internal/resource/issue/testdata/issue-recorded.datacenter.json	issue get ENG-1
+
+internal/resource/jql datacenter	internal/resource/jql/testdata/validate-recorded.datacenter.json	jql validate --jql 'project = ENG ORDER BY key DESC'
+internal/resource/jql datacenter	internal/resource/jql/testdata/invalid-recorded.datacenter.json	jql validate --jql 'project = NOSUCHPROJECT'
+
+internal/resource/board datacenter	internal/resource/board/testdata/boards-recorded.datacenter.json	board list
+internal/resource/board datacenter	internal/resource/board/testdata/board-recorded.datacenter.json	board get 1
+
+internal/resource/sprint datacenter	internal/resource/sprint/testdata/sprints-recorded.datacenter.json	sprint list --board 1
+internal/resource/sprint datacenter	internal/resource/sprint/testdata/sprint-recorded.datacenter.json	sprint get 1
+
+internal/resource/epic datacenter	internal/resource/epic/testdata/epics-recorded.datacenter.json	epic list --board 1
+internal/resource/epic datacenter	internal/resource/epic/testdata/epic-recorded.datacenter.json	epic get ENG-1
+
+internal/workflow datacenter	internal/workflow/testdata/sprintadd-recorded.datacenter.json	sprint add 1 ENG-2
+internal/workflow datacenter	internal/workflow/testdata/epicadd-recorded.datacenter.json	epic add ENG-1 ENG-3
+internal/workflow datacenter	internal/workflow/testdata/epicremove-recorded.datacenter.json	epic remove ENG-3

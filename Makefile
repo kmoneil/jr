@@ -248,6 +248,22 @@ fuzz-jql-date:
 # internal/lint/docs_test.go, which runs under `make test` like every other
 # invariant: exact comparison under the full profile, and "everything here is
 # documented" under a reduced one.
+## dc-up: start a licensed local Jira Data Center and point a throwaway profile at it
+.PHONY: dc-up
+dc-up:
+	@scripts/dc/up.sh
+
+## dc-record: re-record every Data Center cassette against that instance
+.PHONY: dc-record
+dc-record:
+	@scripts/dc/record.sh --all
+	@scripts/dc/record-transport.sh
+
+## dc-down: destroy the local Data Center, its database, and its licence
+.PHONY: dc-down
+dc-down:
+	@docker compose -f scripts/dc/docker-compose.yml down -v
+
 ## docs: regenerate docs/commands.md from the registry
 .PHONY: docs
 docs:

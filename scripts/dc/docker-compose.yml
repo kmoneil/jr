@@ -1,0 +1,65 @@
+name: jr-fixtures
+
+# A Jira Software Data Center to record `*.datacenter.json` cassettes against.
+#
+# The upstream image is used directly rather than wrapped in a Dockerfile. The
+# only thing a wrapper bought was a container-side healthcheck, and that needs
+# an HTTP client the base image does not promise — the published tags span ubi9
+# and ubuntu, so the package manager to install one with is not knowable from
+# here. Readiness is polled from the host by up.sh instead, where curl exists
+# and where the waiting is happening anyway.
+
+services:
+  db:
+    image: postgres:${POSTGRES_VERSION:-16}
+    environment:
+      POSTGRES_DB: ${DB_NAME:-jira}
+      POSTGRES_USER: ${DB_USER:-jira}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-jira}
+      # Jira wants UTF8 with the C collation on PostgreSQL. The default comes
+      # from the host locale, which is not guaranteed to be either, and Jira
+      # refuses during setup rather than at first use — after the licence has
+      # been entered, which is the step worth not repeating.
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-jira} -d ${DB_NAME:-jira}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  jira:
+    image: atlassian/jira-software:${JIRA_VERSION:-10.4.0}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      # Loopback on the host side, deliberately. This instance holds a licence
+      # and a personal access token, and a Jira with admin/admin reachable from
+      # the network is a different thing from a local fixture rig.
+      #
+      # Jira still listens on 8080 inside the container, which is what
+      # ATL_TOMCAT_* and every recorded self link speak to.
+      - "127.0.0.1:${JIRA_PORT:-9493}:8080"
+    environment:
+      ATL_JDBC_URL: jdbc:postgresql://db:5432/${DB_NAME:-jira}
+      ATL_JDBC_USER: ${DB_USER:-jira}
+      ATL_JDBC_PASSWORD: ${DB_PASSWORD:-jira}
+      ATL_DB_DRIVER: org.postgresql.Driver
+      ATL_DB_TYPE: postgres72
+      ATL_TOMCAT_CONTEXTPATH: ${CONTEXT_PATH:-}
+      ATL_TOMCAT_SCHEME: http
+      ATL_PROXY_NAME: ${PROXY_NAME:-}
+      ATL_PROXY_PORT: ${PROXY_PORT:-}
+      JVM_MINIMUM_MEMORY: ${JVM_MINIMUM_MEMORY:-1024m}
+      JVM_MAXIMUM_MEMORY: ${JVM_MAXIMUM_MEMORY:-2048m}
+    volumes:
+      # Named, so a restart keeps the licence, the setup, and the seed. The
+      # licence is the only step here that expires: `down` keeps it until the
+      # three hours are up, `down -v` throws it away and buys three more.
+      - jiradata:/var/atlassian/application-data/jira
+
+volumes:
+  pgdata:
+  jiradata:

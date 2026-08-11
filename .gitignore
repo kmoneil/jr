@@ -41,3 +41,9 @@ coverage.html
 *.pem
 *.key
 .netrc
+
+# Local Data Center recording rig (scripts/dc). The compose env, the licence
+# key, and the throwaway jr profile are all local-only.
+scripts/dc/.env
+scripts/dc/licence.txt
+scripts/dc/profile/

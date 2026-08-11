@@ -1,0 +1,186 @@
+#!/usr/bin/env bash
+#
+# Seed the rig with the fictional identifiers the fixtures already use.
+#
+# Every name in here is invented, from the first keystroke. That is the cheap
+# half of the scrubbing problem: if nothing real ever enters the instance, no
+# mapping from a real identifier to a fictional one has to exist, and a mapping
+# is what internal/lint/scrubpairs_test.go refuses to let into the repository.
+# Nothing to scrub beats scrubbing correctly.
+#
+# ENG is the key because it is already the fictional project in the Data Center
+# cassettes, so a recording lands beside the constructed fixture it replaces
+# without a rename.
+#
+# Idempotent: every step checks for what it would create and says "exists"
+# instead. Re-running after a failure half way through is the normal case.
+set -euo pipefail
+
+here=$(cd "$(dirname "$0")" && pwd)
+
+# shellcheck disable=SC1091
+. "$here/common.sh"
+
+base=$(jira_base)
+admin_user=${ADMIN_USER:-ada}
+admin_password=${ADMIN_PASSWORD:-fixtures-only}
+auth="$admin_user:$admin_password"
+
+project=${SEED_PROJECT:-ENG}
+second_user=${SEED_USER:-grace}
+second_fullname=${SEED_USER_FULLNAME:-Grace Hopper}
+
+# api METHOD PATH [JSON] — prints the response body, fails loudly on an error
+# status. Every seed step goes through it so a failure names the call.
+api() {
+	local method=$1 path=$2 body=${3:-}
+	local out status
+	if [ -n "$body" ]; then
+		out=$(curl -sS -u "$auth" -X "$method" "$base$path" \
+			-H 'Content-Type: application/json' \
+			-d "$body" -w '\n%{http_code}')
+	else
+		out=$(curl -sS -u "$auth" -X "$method" "$base$path" -w '\n%{http_code}')
+	fi
+	status=${out##*$'\n'}
+	body=${out%$'\n'*}
+	case $status in
+	2*)
+		printf '%s' "$body"
+		;;
+	*)
+		say "$method $path -> $status"
+		say "$body"
+		return 1
+		;;
+	esac
+}
+
+exists() { curl -sS -o /dev/null -w '%{http_code}' -u "$auth" "$base$1"; }
+
+say "seeding $base as $admin_user"
+
+# 1. The project. Scrum rather than Kanban: the sprint verbs need a board with
+#    sprints on it, and a Kanban board has none.
+if [ "$(exists "/rest/api/2/project/$project")" = "200" ]; then
+	say "project $project exists"
+else
+	api POST /rest/api/2/project "$(
+		cat <<JSON
+{"key":"$project","name":"Engineering","projectTypeKey":"software",
+ "projectTemplateKey":"com.pyxis.greenhopper.jira:gh-scrum-template",
+ "lead":"$admin_user","assigneeType":"PROJECT_LEAD",
+ "description":"Fixture project for jr's Data Center recordings"}
+JSON
+	)" >/dev/null
+	say "project $project created"
+fi
+
+# 2. A second user, so `user list` and `user get` return more than yourself.
+if [ "$(exists "/rest/api/2/user?username=$second_user")" = "200" ]; then
+	say "user $second_user exists"
+else
+	api POST /rest/api/2/user "$(
+		cat <<JSON
+{"name":"$second_user","password":"fixtures-only",
+ "emailAddress":"$second_user@recorded.invalid","displayName":"$second_fullname"}
+JSON
+	)" >/dev/null
+	say "user $second_user created"
+fi
+
+# 3. A component and a version, so `project components` and `project versions`
+#    record something other than an empty collection. Both already have an
+#    empty-case cassette; what is missing is the populated one.
+if api GET "/rest/api/2/project/$project/components" | grep -q '"name":"api"'; then
+	say "component api exists"
+else
+	api POST /rest/api/2/component \
+		"{\"name\":\"api\",\"project\":\"$project\",\"description\":\"REST surface\"}" >/dev/null
+	say "component api created"
+fi
+
+if api GET "/rest/api/2/project/$project/versions" | grep -q '"name":"1.0"'; then
+	say "version 1.0 exists"
+else
+	api POST /rest/api/2/version \
+		"{\"name\":\"1.0\",\"project\":\"$project\",\"description\":\"First release\"}" >/dev/null
+	say "version 1.0 created"
+fi
+
+# 4. Issues. Mixed types, and one of everything a default column reads: an
+#    assignee, a label, a component, a fix version.
+#
+# The Epic needs its name in the Epic Name custom field, which is a different
+# field id on every instance, so it is looked up rather than assumed.
+epic_field=$(api GET /rest/api/2/field |
+	jq -r '.[] | select(.name == "Epic Name") | .id' | head -1)
+say "epic name field: ${epic_field:-<none>}"
+
+issue_count=$(api GET "/rest/api/2/search?jql=project%20%3D%20$project&maxResults=0" | jq -r .total)
+if [ "$issue_count" -ge 5 ]; then
+	say "$issue_count issues exist"
+else
+	create_issue() {
+		local type=$1 summary=$2 extra=$3
+		api POST /rest/api/2/issue "$(
+			cat <<JSON
+{"fields":{"project":{"key":"$project"},"issuetype":{"name":"$type"},
+ "summary":"$summary"$extra}}
+JSON
+		)" | jq -r .key
+	}
+
+	epic_extra=""
+	[ -n "$epic_field" ] && epic_extra=",\"$epic_field\":\"Recording the API\""
+	epic=$(create_issue Epic "Record every Data Center conversation" "$epic_extra")
+	say "epic $epic"
+
+	create_issue Story "Page a search by keyset" \
+		",\"assignee\":{\"name\":\"$admin_user\"},\"labels\":[\"pagination\"]" >/dev/null
+	create_issue Task "Quote a JQL value exactly once" \
+		",\"assignee\":{\"name\":\"$second_user\"},\"components\":[{\"name\":\"api\"}]" >/dev/null
+	create_issue Bug "A truncated result reports itself complete" \
+		",\"fixVersions\":[{\"name\":\"1.0\"}],\"labels\":[\"contract\",\"truncation\"]" >/dev/null
+	create_issue Task "Refuse an unrecognised deployment type" "" >/dev/null
+	say "issues created"
+fi
+
+# 5. The board the scrum template made, and a sprint on it.
+board=$(api GET "/rest/agile/1.0/board?projectKeyOrId=$project" | jq -r '.values[0].id // empty')
+[ -n "$board" ] || {
+	say "no board for $project — the scrum template did not create one"
+	exit 1
+}
+say "board $board"
+
+sprints=$(api GET "/rest/agile/1.0/board/$board/sprint" | jq -r '.values | length')
+if [ "$sprints" -ge 1 ]; then
+	say "$sprints sprint(s) exist"
+else
+	api POST /rest/agile/1.0/sprint \
+		"{\"name\":\"$project Sprint 1\",\"originBoardId\":$board}" >/dev/null
+	say "sprint created"
+fi
+
+# 6. A personal access token, which is what jr sends to Data Center. Basic auth
+#    is what this script uses and is not what a fixture should record: Jira
+#    11.x refuses it outright, so a rig that only ever proved Basic would be
+#    recording a conversation the current line cannot have.
+token_file=$here/profile/token
+mkdir -p "$(dirname "$token_file")"
+if [ -s "$token_file" ]; then
+	say "token exists: $token_file"
+else
+	api POST /rest/pat/latest/tokens \
+		'{"name":"jr fixture recording","expirationDuration":1}' |
+		jq -r .rawToken >"$token_file"
+	[ -s "$token_file" ] || {
+		say "no token came back"
+		exit 1
+	}
+	say "token written: $token_file"
+fi
+
+say
+say "seeded. board $board, project $project, users $admin_user and $second_user"
