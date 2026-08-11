@@ -382,6 +382,26 @@ func TestBuildQuery(t *testing.T) {
 			`labels = "a" AND labels != "wontfix"` + byKey,
 		},
 		{
+			// The everyday query. One excluded status is an inequality and
+			// several are a NOT IN, the same collapse --status already makes.
+			"statuses excluded",
+			issue.QueryOptions{NotStatuses: []string{"Done", "Closed"}},
+			`status NOT IN ("Done", "Closed")` + byKey,
+		},
+		{
+			"one status excluded",
+			issue.QueryOptions{NotStatuses: []string{"Closed"}},
+			`status != "Closed"` + byKey,
+		},
+		{
+			"statuses in and out",
+			issue.QueryOptions{
+				Statuses:    []string{"Open", "In Review"},
+				NotStatuses: []string{"Closed"},
+			},
+			`status IN ("Open", "In Review") AND status != "Closed"` + byKey,
+		},
+		{
 			// --order with no --sort orders the field that is there anyway,
 			// rather than being dropped for want of a --sort beside it.
 			"order without sort",
@@ -2467,8 +2487,8 @@ func TestAnUnconstrainedSweepIsRefused(t *testing.T) {
 // needing a network: currentUser resolves through JQL rather than the
 // directory, and a relative date parses locally.
 var guardFlagValue = map[string]string{
-	"jql": "labels = retry", "status": "Open", "label": "retry",
-	"not-label": "wontfix", "type": "Bug",
+	"jql": "labels = retry", "status": "Open", "not-status": "Closed",
+	"label": "retry", "not-label": "wontfix", "type": "Bug",
 	"assignee": "currentUser", "reporter": "currentUser",
 	"creator": "currentUser", "involving": "currentUser",
 	"watcher": "currentUser", "voter": "currentUser",
@@ -2654,6 +2674,14 @@ func TestTheOrderingFlagsReachTheQuery(t *testing.T) {
 				f.SetString("order", "desc")
 			},
 			want: `updated >= "-1d" ORDER BY updated DESC, issuekey DESC`,
+		},
+		{
+			name: "several statuses excluded",
+			set: func(f registry.Flags) {
+				f.SetString("not-status", "Closed")
+				f.SetString("not-status", "Done")
+			},
+			want: `status NOT IN ("Closed", "Done") ORDER BY issuekey DESC`,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -1682,6 +1682,12 @@ That is close to creation order and is not update order: a date filter narrows
 the set and never orders it, so "everything touched today, newest first" is
 --updated-after -1d --sort updated --order desc.
 
+--status and --not-status are the two directions of one filter, and both repeat:
+--not-status Done --not-status Closed sends status NOT IN (Done, Closed).
+Neither splits on commas, because a status may contain one: --not-status
+Done,Closed names one status with a comma in it, which is not a status any
+project has.
+
 --assignee and --reporter ask who an issue belongs to. --involving,
 --was-assignee, --worklog-author, and --changed-by ask who touched it, which is
 a different question: --updated-after means somebody updated the issue, not
@@ -1699,6 +1705,7 @@ Examples:
 jr issue list --project ENG --status 'In Progress'
 jr issue list --jql 'labels IN (retry, transport)' --limit all
 jr issue list --assignee currentUser --sort updated --order desc
+jr issue list --not-status Done --not-status Closed --updated-after -1d
 jr issue list --involving currentUser --updated-after -7d
 jr issue list --changed-by currentUser --changed-after -1w
 ```
@@ -1707,6 +1714,7 @@ jr issue list --changed-by currentUser --changed-after -1w
 | --- | --- | --- | --- |
 | `--jql` | `string` | — | raw JQL, combined with the other filters and always parenthesized |
 | `--status` | `string` | — | status to match; repeat for several (repeatable) |
+| `--not-status` | `string` | — | status to exclude; repeat for several (repeatable) |
 | `--label` | `string` | — | label to match; repeat for several (repeatable) |
 | `--not-label` | `string` | — | label to exclude; repeat for several (repeatable) |
 | `--type`, `-t` | `string` | — | issue type to match; repeat for several (repeatable) |

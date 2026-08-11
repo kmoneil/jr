@@ -32,6 +32,9 @@ $ jr issue list --type Bug --label regression
 # Excluding a label
 $ jr issue list --type Bug --not-label wontfix
 
+# Excluding statuses: everything still live
+$ jr issue list --not-status Done --not-status Closed
+
 # Created or updated in a window; offsets are relative to now
 $ jr issue list --created-after -30d
 $ jr issue list --updated-after 2026-01-01 --updated-before 2026-02-01
@@ -44,7 +47,9 @@ $ jr issue list --updated-after -1d --sort updated --order desc
 ```
 
 Repeatable flags OR together, so `--status 'To Do' --status 'In Progress'` means
-either. Different flags AND together.
+either. Different flags AND together. A repeated flag is also the only way to
+name several values: nothing splits on commas, so `--status 'To Do,In Progress'`
+asks for one status with a comma in its name.
 
 **A filter never orders anything.** Without `--sort`, results come back by issue
 key descending — near enough to creation order to be mistaken for "most recent",

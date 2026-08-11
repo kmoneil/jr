@@ -187,6 +187,12 @@ That is close to creation order and is not update order: a date filter narrows
 the set and never orders it, so "everything touched today, newest first" is
 --updated-after -1d --sort updated --order desc.
 
+--status and --not-status are the two directions of one filter, and both repeat:
+--not-status Done --not-status Closed sends status NOT IN (Done, Closed).
+Neither splits on commas, because a status may contain one: --not-status
+Done,Closed names one status with a comma in it, which is not a status any
+project has.
+
 --assignee and --reporter ask who an issue belongs to. --involving,
 --was-assignee, --worklog-author, and --changed-by ask who touched it, which is
 a different question: --updated-after means somebody updated the issue, not
@@ -201,6 +207,7 @@ to status and everything else has to be asked for.`),
 			buildinfo.App + " issue list --project ENG --status 'In Progress'",
 			buildinfo.App + " issue list --jql 'labels IN (retry, transport)' --limit all",
 			buildinfo.App + " issue list --assignee currentUser --sort updated --order desc",
+			buildinfo.App + " issue list --not-status Done --not-status Closed --updated-after -1d",
 			buildinfo.App + " issue list --involving currentUser --updated-after -7d",
 			buildinfo.App + " issue list --changed-by currentUser --changed-after -1w",
 		}, "\n"),
@@ -212,6 +219,10 @@ to status and everything else has to be asked for.`),
 			{
 				Name: "status", Type: registry.TypeString, Repeatable: true,
 				Usage: "status to match; repeat for several",
+			},
+			{
+				Name: "not-status", Type: registry.TypeString, Repeatable: true,
+				Usage: "status to exclude; repeat for several",
 			},
 			{
 				Name: "label", Type: registry.TypeString, Repeatable: true,
@@ -658,7 +669,8 @@ func refuseUnconstrainedSweep(inv *registry.Invocation) error {
 // filter missing from here narrows the query and is not offered as a way to.
 // TestEveryFilterConstrainsTheSweepGuard holds the two to each other.
 var constrainingFlags = []string{
-	"--project", "--jql", "--status", "--label", "--not-label", "--type",
+	"--project", "--jql", "--status", "--not-status",
+	"--label", "--not-label", "--type",
 	"--assignee", "--reporter", "--creator", "--involving", "--watcher",
 	"--voter", "--worklog-author", "--was-assignee", "--changed-by",
 	"--created-after", "--created-before", "--updated-after", "--updated-before",
@@ -807,11 +819,12 @@ func ListQueryFor(inv *registry.Invocation) QueryOptions { return listQuery(inv)
 // the one thing the guard exists to be right about.
 func listQuery(inv *registry.Invocation) QueryOptions {
 	opt := QueryOptions{
-		JQL:       inv.Flags.String("jql"),
-		Statuses:  inv.Flags.StringSlice("status"),
-		Labels:    inv.Flags.StringSlice("label"),
-		NotLabels: inv.Flags.StringSlice("not-label"),
-		Types:     inv.Flags.StringSlice("type"),
+		JQL:         inv.Flags.String("jql"),
+		Statuses:    inv.Flags.StringSlice("status"),
+		NotStatuses: inv.Flags.StringSlice("not-status"),
+		Labels:      inv.Flags.StringSlice("label"),
+		NotLabels:   inv.Flags.StringSlice("not-label"),
+		Types:       inv.Flags.StringSlice("type"),
 
 		Assignee: resolvedUser(inv, "assignee"),
 		Reporter: resolvedUser(inv, "reporter"),
@@ -871,18 +884,24 @@ func (o QueryOptions) Constrained() bool {
 			return true
 		}
 	}
-	return len(o.Statuses) > 0 || len(o.Labels) > 0 ||
+	return len(o.Statuses) > 0 || len(o.NotStatuses) > 0 || len(o.Labels) > 0 ||
 		len(o.NotLabels) > 0 || len(o.Types) > 0
 }
 
 // QueryOptions are the filter flags, before they become JQL.
 type QueryOptions struct {
-	Project   string
-	JQL       string
-	Statuses  []string
-	Labels    []string
-	NotLabels []string
-	Types     []string
+	Project string
+	JQL     string
+	// Statuses and NotStatuses are the two directions of the same filter, and
+	// both are lists: `status NOT IN (Closed, Done)` is the question a caller
+	// asks far more often than any one status they want, and writing it as a
+	// --jql fragment is the one path where a typo becomes a wider result set
+	// rather than a refusal.
+	Statuses    []string
+	NotStatuses []string
+	Labels      []string
+	NotLabels   []string
+	Types       []string
 
 	// Who the issue belongs to now.
 	Assignee string
@@ -930,6 +949,7 @@ func BuildQuery(opt QueryOptions) (string, error) {
 		b.Project(opt.Project)
 	}
 	b.In("status", opt.Statuses...)
+	b.NotIn("status", opt.NotStatuses...)
 	b.In("labels", opt.Labels...)
 	b.NotIn("labels", opt.NotLabels...)
 	b.In("issuetype", opt.Types...)
