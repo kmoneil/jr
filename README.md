@@ -6,8 +6,8 @@
 
 ### A Jira client whose output is a versioned contract
 
-Built for scripts and agents first, humans second —
-and it would rather fail than hand you something that merely looks right.
+Built for scripts and agents first, humans second.
+It would rather fail than hand you something that merely looks right.
 
 ![Go 1.26](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache--2.0-f5a623)](LICENSE)
@@ -40,9 +40,9 @@ ENG-102  To Do                      2026-08-04T09:00:00Z  Tabs and newlines...
 exit 3
 ```
 
-Two rows came back and there were more, so the exit is 3 and the warning — with
-a token to resume from — went to stderr. stdout stayed exactly as parseable as
-it was. No script downstream will ever mistake that page for the whole result
+Two rows came back and there were more, so the exit is 3 and the warning went
+to stderr carrying a token to resume from. stdout stayed exactly as parseable
+as it was. No script downstream will ever mistake that page for the whole result
 set, and the same is true of every command, in every format, on every path.
 
 > **Status: pre-release, and deliberately untagged.** The command surface is
@@ -88,7 +88,7 @@ examples for common tasks in [docs/recipes.md](docs/recipes.md).
 ## Why this exists
 
 **First, honestly: I built it for me.** I wanted my own Jira work to be
-scriptable without babysitting it — to pipe a query into something else at two
+scriptable without babysitting it: to pipe a query into something else at two
 in the morning and trust the rows, to point an agent at a board without
 wondering what it would do next. And I wanted control over the tool itself:
 which commands exist, what they refuse, what a build even contains, and what
@@ -96,19 +96,19 @@ happens on the day the answer is "I can't". That is a short list of wants, and
 none of it was satisfied by adding flags to something else.
 
 Everything below is what those two wants turn into when you take them
-seriously — because the guarantee is the product, and a guarantee is not a
+seriously, because the guarantee is the product, and a guarantee is not a
 feature you can bolt on afterwards.
 
 Picture the failure this is built against. A nightly script lists everything in
 a project, gets fifty rows because that is where the API stopped, exits 0, and
 files a tidy report. It does that for a month. Nothing errored, nothing was
 obviously wrong, and the only way to catch it was to already suspect it. That
-is not a bug you fix once — it is a property of a tool that would rather
+is not a bug you fix once. It is a property of a tool that would rather
 produce something than admit it cannot.
 
 Invert that and you get the whole design:
 
-- **Truncation is never silent.** `complete="false"`, or exit 3, or both — in
+- **Truncation is never silent.** `complete="false"`, or exit 3, or both, in
   every format, streamed or buffered, with a token to resume from.
 - **Nothing is guessed.** A date that will not parse, a field name that
   resolves to nothing, an assignee matching two people, a deployment the probe
@@ -133,9 +133,9 @@ that stops being true.
 **This is not a complaint about the other Jira CLIs.** They are built for a
 person at a terminal, they are good at it, and their users are happy. Keeping
 the promises above means refusing things that work perfectly well for that
-audience — an offset-shaped pagination flag, a partial result that exits zero —
-and arriving in somebody else's project to take those away would be a poor way
-to treat their users. Promising it on day one, in a tool nobody depends on yet,
+audience, such as an offset-shaped pagination flag or a partial result that
+exits zero. Arriving in somebody else's project to take those away would be a
+poor way to treat their users. Promising it on day one, in a tool nobody depends on yet,
 is just the contract.
 
 So: different audience, different bargain. Want a rich interactive Jira
@@ -143,7 +143,7 @@ experience? Use those. Writing a script, or pointing an agent at Jira, and need
 to know the output means what it says? That is this.
 
 The TUI, when it arrives, will be a consumer of this tool rather than the
-product — the same idea from the other end.
+product, which is the same idea from the other end.
 
 ## Install
 
@@ -160,7 +160,7 @@ Then see the [quickstart](#quickstart) above, or
 
 ## What works today
 
-Everything below is built, tested, and asserted by the suite — 62 commands in
+Everything below is built, tested, and asserted by the suite: 62 commands in
 the full build, 40 in the reader.
 
 ```
@@ -250,7 +250,7 @@ both identically; `get` simply has more of it filled in.
 A malformed key is rejected locally: `jr issue get foo` is exit 2 without a
 round trip, because a 404 for a typo reads like a missing issue. That holds on a
 cold cache, where the deployment probe would otherwise go first and answer a
-typo with `NETWORK` at exit 9 — a refusal published as worth retrying. Every
+typo with `NETWORK` at exit 9, a refusal published as worth retrying. Every
 command taking an identifier is held to it by
 `TestALocalRefusalOutranksTheDeploymentProbe`.
 
@@ -371,15 +371,15 @@ $ jr issue list --creator currentUser            # who filed it, which cannot be
 
 `--involving` is one person across `assignee`, `reporter`, `creator`, and
 `worklogAuthor`, OR-ed together and parenthesized inside your project scope.
-Its `--help` names those four fields, and a test holds the help to the query —
-a bundle that does not say what it covers is a bundle whose result is short for
+Its `--help` names those four fields, and a test holds the help to the query.
+A bundle that does not say what it covers is a bundle whose result is short for
 reasons you cannot see.
 
 Two limits, stated rather than worked around. **Comments are not searchable.**
 JQL has no field for comment authorship, so nothing here answers "issues I
 commented on"; `--involving` says so instead of quietly approximating it. And
-**`CHANGED` names one field at a time** — there is no way to ask whether _any_
-field changed — so `--changed-field` defaults to `status` and anything else has
+**`CHANGED` names one field at a time.** There is no way to ask whether _any_
+field changed, so `--changed-field` defaults to `status` and anything else has
 to be asked for by name. It is refused on its own, because a flag that selects
 what another flag looks at changes no output by itself.
 
@@ -391,7 +391,7 @@ permission rather than by what it matched.
 Every one of these takes a display name, an email, an id, or the word
 `currentUser`, and an unresolvable name is refused rather than sent. `watcher =
 "Ada Lovelace"` against Cloud matches nothing and comes back complete, empty,
-and successful — indistinguishable from "you are watching nothing".
+and successful, which is indistinguishable from "you are watching nothing".
 
 ### Opening one in a browser
 
@@ -407,18 +407,18 @@ ENG-101   In Progress  Ada       2026-08-01T10:00:00Z  First         https://acm
 **A bare URL, deliberately.** A terminal hyperlink is an OSC 8 escape sequence
 wrapped around display text; it would make the cell clickable and it would put
 escape bytes in a data column, and stdout is data only. Most terminals linkify
-a bare URL anyway, so ⌘/ctrl-click works _and_ `cut -f6 | xargs open` works —
-the clickable string and the parseable string are the same string.
+a bare URL anyway, so ⌘/ctrl-click works _and_ `cut -f6 | xargs open` works.
+The clickable string and the parseable string are the same string.
 
 Off by default, because forty bytes a row for something most callers throw away
 is not a default. The column is **appended**, after any `--field` columns, so
 turning it on cannot move a column you already parse. In the structured formats
-it is a `<url>` element, declared optional in the schema — `jr contract` shows
+it is a `<url>` element, declared optional in the schema. `jr contract` shows
 it, and adding it bumped `issue.list` to v3 and `issue.get` to v4.
 
 The link is built from the base URL the deployment reports about itself, not
 from the site you configured. Those are usually the same string and are allowed
-to differ — a reverse proxy, an internal hostname, a context path — and the one
+to differ (a reverse proxy, an internal hostname, a context path), and the one
 Jira reports is the one its own notification emails use. A site that reports no
 base URL is `NO_BASE_URL` and exit 1, refused in validation before a single row
 reaches stdout, rather than a link assembled from a guess.
@@ -431,7 +431,7 @@ opens JSON.
 Two callers edit one issue. The first sets the summary; the second, holding a
 copy read before that, sets the priority and sends along the summary it read.
 Jira applies both. The first edit is gone, both commands exit 0, and both say
-what they set. Nothing was truncated, nothing errored, nothing lied — the write
+what they set. Nothing was truncated, nothing errored, nothing lied. The write
 was simply lost. Survivable when the only caller was a person at a terminal;
 `jr mcp serve` ships, and the population of concurrent editors is now however
 many agents somebody points at one board.
@@ -450,8 +450,8 @@ $ echo $?
 ```
 
 **It is a check with a window, and it says so.** Neither deployment offers a
-validator on an issue — no `ETag`, no `Last-Modified`, and `PUT /issue/{key}`
-honours no `If-Match` — so this is a read, a comparison, and then the write,
+validator on an issue: no `ETag`, no `Last-Modified`, and `PUT /issue/{key}`
+honours no `If-Match`. So this is a read, a comparison, and then the write,
 about one round trip wide. A write that ran one carries
 `<precondition method="read-compare"/>`, because a conditional request the
 server evaluates and a read-then-write are not the same promise, and the
@@ -497,8 +497,8 @@ matters: an offset cursor shifts when anyone creates an issue mid-run, so a
 long `--limit all` silently skips or repeats rows while reporting itself
 complete. A keyset cursor names a position in the data and cannot shift.
 
-Keyset needs that exact ordering, so anything else — a `--sort` on another
-field, or an `--order asc` that reverses the key — falls back to offsets. The
+Keyset needs that exact ordering, so anything else falls back to offsets: a
+`--sort` on another field, or an `--order asc` that reverses the key. The
 result says which was used. And because the whole scheme rests on
 JQL comparing keys by number rather than as text (`ENG-999` sorts _below_
 `ENG-1000`, which a string comparison gets backwards), each page is verified to
@@ -590,7 +590,7 @@ no human to wait for.
 
 That refusal is why the first form hands the reading to the shell rather than
 asking for it back. `read -s` does not echo, and what is typed at a `read`
-prompt never enters the history — so a human gets the interactive login they
+prompt never enters the history, so a human gets the interactive login they
 wanted, and the tool keeps the invariant that nothing ever blocks on input.
 Trailing whitespace is trimmed from a token however it arrives, so a stray
 newline is not a wrong token.
@@ -722,7 +722,7 @@ Design spec: `_plans/design/jira-cli-v2-spec.md`.
 ## Build profiles
 
 Features are selected at compile time, so an excluded one contributes zero
-bytes and zero attack surface — and `jr schema` does not list it. A reader
+bytes and zero attack surface, and `jr schema` does not list it. A reader
 build does not refuse to write; it does not contain the code that could.
 
 | Build               | Profile | What you get                                       |
@@ -761,13 +761,13 @@ on rather than quietly rewrite.
 
 One thing is deliberately undecided: whether `pkg/jira` becomes a supported
 library or stays an internal detail. It is an empty package today and the import
-lint keeps it CLI-free either way, so do not import it yet — the output contract
+lint keeps it CLI-free either way, so do not import it yet. The output contract
 is the interface, and it is the one with a version on it.
 
 ## Security
 
 [SECURITY.md](SECURITY.md) is the threat model, what is impossible by
-construction rather than by care, and how to report a vulnerability — privately,
+construction rather than by care, and how to report a vulnerability: privately,
 to kevin@oneil.xyz, with an acknowledgement inside three working days.
 
 Every claim in it names the test that holds it, and a lint fails the build when
@@ -825,7 +825,7 @@ like one recorded from a server.
   `validateQuery=strict` where Data Center takes a boolean. `project list` never
   populated its lead column, because neither deployment expands the lead unless
   asked. `issue attachment download` required an `id` a real Data Center does
-  not send, so it had failed on every Data Center since the verb shipped — and
+  not send, so it had failed on every Data Center since the verb shipped, and
   failed as retryable, inviting the caller to try again against a response that
   will never change. In each case a hand-written fixture encoded the assumption
   rather than the API, the last of them by carrying a field the server omits,
@@ -836,14 +836,14 @@ like one recorded from a server.
   time: its corpus is 247 documents Jira Cloud actually stored plus 23 it
   refused, and the round-trip fuzzer over them found fourteen bugs that no
   hand-written case would have.
-- **Where the evidence does not exist, the repository says so — and then goes
+- **Where the evidence does not exist, the repository says so, and then goes
   and gets it.** Every Data Center fixture here was constructed until August
   2026, because the only Data Center available was production and recording
   against it is refused. They are recordings now, taken from a local Jira
   Software Data Center: `scripts/dc` stands one up under the three-hour timebomb
   licence Atlassian publishes for running a Data Center product without the SDK,
   fetched at run time and never committed, and `make dc-up dc-record` remakes
-  all of them — the reads, the transport contract, thirteen write verbs, and a
+  all of them: the reads, the transport contract, thirteen write verbs, and a
   second pass under a context path, which no fixture had carried and in which
   three defects had been argued from documentation and fixed unobserved. Each
   cassette still carries whether it was recorded or written, the ledger of
@@ -862,8 +862,8 @@ like one recorded from a server.
   list while doing nothing at all. `--order` was: it was harvested, passed
   along, and dropped by a branch that only looked at `--sort`, so
   `issue list --order asc` came back descending and said nothing. Flags are now
-  driven — each one, on each command, on both deployments, with it and without
-  it, against a transport that records what was asked — and the requests, the
+  driven: each one, on each command, on both deployments, with it and without
+  it, against a transport that records what was asked. The requests, the
   columns, the document, or the error has to differ. That found `--body-format`
   dead on `issue create` and `issue edit` on its first run, where the
   documentation had been right and the wiring had never existed. The examples

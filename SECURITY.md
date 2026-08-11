@@ -2,7 +2,7 @@
 
 `jr` holds a credential to somebody's Jira and does what a script tells it to.
 Two things follow from that, and this document is about both: the credential
-must not leak, and a result must never claim more than it can back up — a
+must not leak, and a result must never claim more than it can back up. A
 script that acts on a partial answer it believes is complete is a security
 problem wearing a correctness costume.
 
@@ -16,7 +16,7 @@ disclosed publicly within **90 days** of the report, sooner if a fix ships
 earlier, later only by agreement with the reporter.
 
 Include the invocation and, if you can, the response that triggers it. A
-recorded exchange is worth more than a description — cassettes are how this
+recorded exchange is worth more than a description. Cassettes are how this
 project keeps evidence, and yours may end up as one.
 
 ## Supported versions
@@ -54,7 +54,7 @@ Absences, not options. There is no flag that enables these and no hook to wire
 one to.
 
 - **No process is ever started.** No shelling out to a browser, a clipboard, or
-  a keyring helper — a child process would inherit the environment, which is
+  a keyring helper. A child process would inherit the environment, which is
   where `JIRA_API_TOKEN` lives. `os/exec` appears in the test tree and nowhere
   else, held there by `TestNothingShippedExecutesAProcess`.
 - **No cgo.** Pure Go, standard library plus four dependencies.
@@ -103,21 +103,22 @@ can read it. `TestTokenIsNotAcceptedOnTheCommandLine`.
 ## Talking to Jira
 
 - **A request path is relative, always.** An absolute path would let a
-  server-supplied value redirect the request — and the `Authorization` header —
-  to another host. `FuzzRelativeStaysOnTheSite`.
+  server-supplied value redirect the request, and the `Authorization` header
+  with it, to another host. `FuzzRelativeStaysOnTheSite`.
 - **A server-supplied URL is not followed off-site.** An attachment whose
   content URL points somewhere else is `OFF_SITE_URL`, refused rather than
   fetched. `TestAnOffSiteContentURLIsRefused`.
 - **A server-supplied filename is not written blindly.** `issue attachment
-download` refuses a name that is not a plain filename — absolute, containing a
-  separator, a parent reference, or a Windows device name — with
-  `UNSAFE_FILENAME`, rather than reducing it to something it guesses was meant.
+download` refuses a name that is not a plain filename, whether it is absolute,
+  contains a separator, contains a parent reference, or is a Windows device
+  name. It is `UNSAFE_FILENAME`, rather than a reduction to something the tool
+  guesses was meant.
   `--output` is how the caller names a destination. A download never replaces an
   existing file without `--force`.
 - **A non-idempotent request is not replayed after an upstream error.** A POST
   that got a 503 may have been processed; retrying it is how one `issue create`
-  becomes two issues. Only a 429 — refused before processing — or a caller
-  holding an idempotency key allows a POST retry.
+  becomes two issues. Only a 429, which is refused before processing, or a
+  caller holding an idempotency key allows a POST retry.
   `TestPostIsNotReplayedAfterAnUpstreamError`.
 - **Retries count against `--max-requests`.** A budget that ignored them would
   bound nothing. `TestRetriesCountAgainstTheBudget`, `TestBudgetStopsALongRun`.
@@ -128,7 +129,7 @@ download` refuses a name that is not a plain filename — absolute, containing a
 
 - **JQL is built, never concatenated.** `internal/jql` owns the only place a
   value is quoted. A caller's `--jql` fragment is always parenthesized, and a
-  fragment whose own parentheses do not balance is refused before it is sent —
+  fragment whose own parentheses do not balance is refused before it is sent.
   `a) OR (1=1` would otherwise close the wrapper, escape the project scope, and
   return a wider result set that reports itself complete.
   `TestRawJQLCannotEscapeTheProjectScope`,
@@ -144,7 +145,7 @@ download` refuses a name that is not a plain filename — absolute, containing a
   `FuzzEpicRefIsSafeInAPath`, `FuzzAValidProjectKeyIsASafePathSegment`,
   `FuzzBrowseURLStaysUnderBrowse`.
 - **A value is never altered to make it representable.** Invalid UTF-8 is
-  refused with `INVALID_ENCODING`, not replaced with U+FFFD — a query for
+  refused with `INVALID_ENCODING`, not replaced with U+FFFD. A query for
   something other than what was asked for is a wrong answer that looks like a
   right one. `TestInvalidUTF8IsRefusedNotReplaced`.
 - **A data column never carries an escape sequence.** `--url` emits a bare URL
@@ -159,7 +160,7 @@ download` refuses a name that is not a plain filename — absolute, containing a
 - **Read-only is a one-way latch within an invocation.** `--readonly`,
   `JIRA_READONLY`, or a context created read-only turns it on; nothing a command
   does turns it off, and `JIRA_READONLY=0` does not clear it. Changing what a
-  context is _for_ is a deliberate edit — `context edit --unset readonly` — and
+  context is _for_ is a deliberate edit, `context edit --unset readonly`, and
   not something an invocation can do to itself. `TestReadOnlyIsAOneWayLatch`,
   `TestReadOnlyIsNotRelaxedForADryRun`.
 - **Destructive commands require `--yes`**, and a dry run is allowed without it,
@@ -186,8 +187,9 @@ A result set cut short is never reported as complete, in any format: the
 envelope says `complete="false"`, TSV has no envelope so it is a structured
 stderr warning plus exit 3, and both carry a token to resume from. The reason
 this is here rather than only in the output contract is that the failure is
-silent by nature — a nightly job that reads fifty rows as the whole project
-makes decisions on a subset and reports success, and nothing downstream can tell.
+silent by nature. A nightly job that reads fifty rows as the whole project
+makes decisions on a subset and reports success, and nothing downstream can
+tell.
 
 `stdout` is data and nothing else. A failing command writes nothing at all to
 it, so a partially-written document can never be parsed as a whole one.
@@ -202,7 +204,7 @@ it, so a partially-written document can never be parsed as a whole one.
 - **`make vuln` runs govulncheck** over the full tag set and fails closed. It is
   part of `make ci`.
 - **The test suite never touches the network.** Every host in a test uses a
-  reserved TLD — `.invalid`, `.test`, `.example` — enforced by
+  reserved TLD (`.invalid`, `.test`, `.example`), enforced by
   `internal/lint/hosts_test.go`. This was learned the hard way: when `auth
 login` grew credential verification, the suite began sending test tokens to a
   plausible-looking domain that turned out to exist. Nothing in the tests had
@@ -215,10 +217,10 @@ login` grew credential verification, the suite began sending test tokens to a
 Stated plainly, because a threat model that only lists wins is not one.
 
 It can lie about the data. Wrong issues, wrong statuses, a `baseUrl` pointing at
-a phishing host — `--url` prints what the server reports about itself, which is
-the same string its own notification emails use. It can withhold rows: a page
-that claims to be the last one is believed, because there is no second source to
-check it against. It can make requests slow or expensive, bounded only by
+a phishing host, since `--url` prints what the server reports about itself,
+which is the same string its own notification emails use. It can withhold rows:
+a page that claims to be the last one is believed, because there is no second
+source to check it against. It can make requests slow or expensive, bounded only by
 `--max-requests` and by whatever timeout the caller sets. And it can serve an
 attachment whose _contents_ are hostile; `jr` writes bytes to the path you named
 and never opens them.
@@ -232,5 +234,5 @@ cut short reported as complete.
 Update this file in the same change that alters what the tool treats as hostile,
 adds a way for a credential or a request to leave the process, changes the
 read-only or confirmation gates, or changes the disclosure process. Every claim
-above names the test that holds it — if you move or rename one, this document is
-part of the change.
+above names the test that holds it, so if you move or rename one, this document
+is part of the change.

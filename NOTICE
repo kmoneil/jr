@@ -1,4 +1,4 @@
-jr — a Jira client whose output is a versioned contract
+jr: a Jira client whose output is a versioned contract
 Copyright 2026 Kevin O'Neil
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use
