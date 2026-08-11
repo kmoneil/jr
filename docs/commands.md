@@ -1677,6 +1677,11 @@ filters, so an OR inside it cannot escape the project scope. A fragment whose
 own parentheses do not balance is refused rather than sent, because wrapping
 contains only a fragment that balances.
 
+Results come back ordered by issue key descending unless --sort names a field.
+That is close to creation order and is not update order: a date filter narrows
+the set and never orders it, so "everything touched today, newest first" is
+--updated-after -1d --sort updated --order desc.
+
 --assignee and --reporter ask who an issue belongs to. --involving,
 --was-assignee, --worklog-author, and --changed-by ask who touched it, which is
 a different question: --updated-after means somebody updated the issue, not
@@ -1723,8 +1728,8 @@ jr issue list --changed-by currentUser --changed-after -1w
 | `--changed-before` | `string` | — | only issues whose --changed-field changed on or before this date |
 | `--worklog-after` | `string` | — | only issues with work logged on or after this date |
 | `--worklog-before` | `string` | — | only issues with work logged on or before this date |
-| `--sort`, `-s` | `string` | — | field to sort by, e.g. updated |
-| `--order`, `-o` | `asc\|desc` | `asc` | sort direction |
+| `--sort`, `-s` | `string` | — | field to sort by, e.g. updated; results are ordered by issue key when this is not given, which is close to creation order and not update order |
+| `--order`, `-o` | `asc\|desc` | — | sort direction; applies to --sort, or to the issue key ordering when there is no --sort (default desc for the key, asc for a named field) |
 | `--field` | `string` | — | extra field to include, by id or name, e.g. customfield_10042 or 'Story Points'; added to the default set and to the context's, repeat for several (repeatable) |
 | `--no-context-fields` | `bool` | — | ignore the field set stored in the context, and ask only for the fields named by --field |
 | `--url` | `bool` | — | include the browse URL, built from the site's own base URL; a bare URL, which most terminals make clickable |
@@ -2014,7 +2019,8 @@ which one you are getting.
 Every query carries an ORDER BY, and this shows that too. The default is the
 issue key descending, because pagination has to be stable and the key is the
 only field that is both unique and immutable. A --sort keeps the key as a
-tiebreaker.
+tiebreaker, and --order sets the direction either way — on its own it turns the
+default key ordering around rather than being ignored.
 
 The project comes from the resolved context, exactly as it does on issue list,
 so this explains the query that command would actually build.
@@ -2034,7 +2040,7 @@ jr jql explain --jql 'labels = retry' --sort updated --order desc
 | --- | --- | --- | --- |
 | `--jql` | `string` | — | the query to check (required) |
 | `--sort` | `string` | — | field to order by; the issue key stays as a tiebreaker |
-| `--order` | `asc\|desc` | — | direction for --sort |
+| `--order` | `asc\|desc` | — | direction for --sort, or for the issue key ordering when there is no --sort |
 
 | Emits | Schema | When |
 | --- | --- | --- |

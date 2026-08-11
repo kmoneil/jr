@@ -38,10 +38,18 @@ $ jr issue list --updated-after 2026-01-01 --updated-before 2026-02-01
 
 # Sorted, with the issue key as a stable tiebreaker you get for free
 $ jr issue list --sort updated --order desc
+
+# What moved today, newest first: the date filter narrows, --sort orders
+$ jr issue list --updated-after -1d --sort updated --order desc
 ```
 
 Repeatable flags OR together, so `--status 'To Do' --status 'In Progress'` means
 either. Different flags AND together.
+
+**A filter never orders anything.** Without `--sort`, results come back by issue
+key descending — near enough to creation order to be mistaken for "most recent",
+which is why `--updated-after` above is paired with a `--sort`. `--order` on its
+own turns that key ordering around rather than doing nothing.
 
 **Dates are evaluated in the Jira account's timezone, not yours.** An offset
 like `-30d` is relative to now and unaffected, but anything with a day boundary

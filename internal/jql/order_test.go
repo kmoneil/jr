@@ -22,6 +22,18 @@ func TestEveryQueryCarriesAnOrderBy(t *testing.T) {
 			want: "ORDER BY issuekey DESC",
 		},
 		{
+			// --order with no --sort names the direction of the ordering that
+			// is there anyway. Dropping it instead answered an explicit `asc`
+			// with a descending result set.
+			name: "order without sort", order: "asc",
+			want: "ORDER BY issuekey ASC",
+		},
+		{
+			name:  "order without sort, the default direction said out loud",
+			order: "desc",
+			want:  "ORDER BY issuekey DESC",
+		},
+		{
 			// A sort with no direction is ascending, and the key follows as a
 			// tiebreaker: a caller's field is rarely unique, so ties would
 			// break arbitrarily and differently each run.
@@ -64,13 +76,18 @@ func TestEveryQueryCarriesAnOrderBy(t *testing.T) {
 // without saying so.
 func TestAnUnknownOrderIsRefused(t *testing.T) {
 	for _, order := range []string{"descending!", "up", "1", "as c"} {
-		err := jql.AppendOrder(jql.New(), "updated", order)
-		if err == nil {
-			t.Errorf("AppendOrder accepted --order %q", order)
-			continue
-		}
-		if code := errs.Coerce(err).Code; code != "INVALID_ORDER" {
-			t.Errorf("%q: code = %q, want INVALID_ORDER", order, code)
+		for _, sort := range []string{"updated", ""} {
+			// With no --sort as well: the direction still applies, so a
+			// misspelling still has to be refused rather than fall through to
+			// the default it happens to resemble.
+			err := jql.AppendOrder(jql.New(), sort, order)
+			if err == nil {
+				t.Errorf("AppendOrder accepted --order %q with --sort %q", order, sort)
+				continue
+			}
+			if code := errs.Coerce(err).Code; code != "INVALID_ORDER" {
+				t.Errorf("%q: code = %q, want INVALID_ORDER", order, code)
+			}
 		}
 	}
 	// The spellings that are accepted, so the refusal above is not just strict.
@@ -92,15 +109,20 @@ func TestSortsByKeyIsTheKeysetPrecondition(t *testing.T) {
 		want        bool
 	}{
 		{"", "", true},
-		{"", "asc", true},
-		{"issuekey", "", true},
+		{"", "desc", true},
 		{"issuekey", "desc", true},
 		{"ISSUEKEY", "desc", true},
 		// Ascending by key is still the wrong direction to resume with a
-		// less-than bound.
+		// less-than bound, however the caller spelled it. `--order asc` with no
+		// --sort answered true while AppendOrder was dropping the order, and
+		// naming the key with no direction ascends like any other named field.
 		{"issuekey", "asc", false},
+		{"", "asc", false},
+		{"issuekey", "", false},
 		{"updated", "", false},
 		{"updated", "desc", false},
+		// An order that will be refused is not an ordering to resume from.
+		{"", "sideways", false},
 	} {
 		if got := jql.SortsByKey(tc.sort, tc.order); got != tc.want {
 			t.Errorf("SortsByKey(%q, %q) = %v, want %v",

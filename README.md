@@ -426,8 +426,9 @@ matters: an offset cursor shifts when anyone creates an issue mid-run, so a
 long `--limit all` silently skips or repeats rows while reporting itself
 complete. A keyset cursor names a position in the data and cannot shift.
 
-Keyset needs the key ordering, so a `--sort` on another field falls back to
-offsets. The result says which was used. And because the whole scheme rests on
+Keyset needs that exact ordering, so anything else — a `--sort` on another
+field, or an `--order asc` that reverses the key — falls back to offsets. The
+result says which was used. And because the whole scheme rests on
 JQL comparing keys by number rather than as text (`ENG-999` sorts _below_
 `ENG-1000`, which a string comparison gets backwards), each page is verified to
 start below its cursor. A server that disagrees is an error, not a quietly

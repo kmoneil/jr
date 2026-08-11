@@ -182,6 +182,11 @@ filters, so an OR inside it cannot escape the project scope. A fragment whose
 own parentheses do not balance is refused rather than sent, because wrapping
 contains only a fragment that balances.
 
+Results come back ordered by issue key descending unless --sort names a field.
+That is close to creation order and is not update order: a date filter narrows
+the set and never orders it, so "everything touched today, newest first" is
+--updated-after -1d --sort updated --order desc.
+
 --assignee and --reporter ask who an issue belongs to. --involving,
 --was-assignee, --worklog-author, and --changed-by ask who touched it, which is
 a different question: --updated-after means somebody updated the issue, not
@@ -307,12 +312,20 @@ to status and everything else has to be asked for.`),
 			},
 			{
 				Name: "sort", Short: "s", Type: registry.TypeString,
-				Usage: "field to sort by, e.g. updated",
+				Usage: "field to sort by, e.g. updated; " +
+					"results are ordered by issue key when this is not given, " +
+					"which is close to creation order and not update order",
 			},
 			{
 				Name: "order", Short: "o", Type: registry.TypeEnum,
-				Enum: []string{"asc", "desc"}, Default: "asc",
-				Usage: "sort direction",
+				Enum: []string{"asc", "desc"},
+				// No declared default, because there is no single one: the key
+				// ordering nobody asked for descends and a named --sort
+				// ascends. Declaring "asc" printed a default that the common
+				// invocation did not use, next to a flag that was then ignored.
+				Usage: "sort direction; applies to --sort, or to the issue key " +
+					"ordering when there is no --sort " +
+					"(default desc for the key, asc for a named field)",
 			},
 			{
 				Name: "field", Type: registry.TypeString, Repeatable: true,

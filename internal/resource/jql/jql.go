@@ -398,7 +398,8 @@ which one you are getting.
 Every query carries an ORDER BY, and this shows that too. The default is the
 issue key descending, because pagination has to be stable and the key is the
 only field that is both unique and immutable. A --sort keeps the key as a
-tiebreaker.
+tiebreaker, and --order sets the direction either way — on its own it turns the
+default key ordering around rather than being ignored.
 
 The project comes from the resolved context, exactly as it does on issue list,
 so this explains the query that command would actually build.
@@ -418,7 +419,8 @@ not a project scope, and a regular expression cannot tell the difference.`),
 			},
 			{
 				Name: "order", Type: registry.TypeEnum, Enum: []string{"asc", "desc"},
-				Usage: "direction for --sort",
+				Usage: "direction for --sort, or for the issue key ordering " +
+					"when there is no --sort",
 			},
 		},
 		// The context's project is part of the answer, so this needs the

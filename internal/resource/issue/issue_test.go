@@ -382,6 +382,13 @@ func TestBuildQuery(t *testing.T) {
 			`labels = "a" AND labels != "wontfix"` + byKey,
 		},
 		{
+			// --order with no --sort orders the field that is there anyway,
+			// rather than being dropped for want of a --sort beside it.
+			"order without sort",
+			issue.QueryOptions{Order: "asc"},
+			`ORDER BY issuekey ASC`,
+		},
+		{
 			"currentUser is a function, not a string",
 			issue.QueryOptions{Assignee: "currentUser"},
 			`assignee = currentUser()` + byKey,
@@ -465,7 +472,7 @@ func TestSortsByKey(t *testing.T) {
 	yes := []issue.QueryOptions{
 		{},
 		{Project: "ENG"},
-		{Sort: "issuekey"},
+		{Order: "desc"},
 		{Sort: "issuekey", Order: "desc"},
 		{Sort: "ISSUEKEY", Order: "DESC"},
 	}
@@ -479,8 +486,12 @@ func TestSortsByKey(t *testing.T) {
 		{Sort: "updated"},
 		{Sort: "created", Order: "desc"},
 		// Ascending by key is a different order from the descending default,
-		// so a cursor taken from one cannot resume the other.
+		// so a cursor taken from one cannot resume the other. All three of
+		// these build an ascending key order: a named field with no direction
+		// ascends, and --order now reaches the default field too.
 		{Sort: "issuekey", Order: "asc"},
+		{Sort: "issuekey"},
+		{Order: "asc"},
 	}
 	for _, opt := range no {
 		if opt.SortsByKey() {
@@ -2473,7 +2484,7 @@ var guardFlagValue = map[string]string{
 // with the reason each one does not.
 var notAFilter = map[string]string{
 	"sort":              "ordering an unbounded query does not make it smaller",
-	"order":             "same, and it is meaningless without --sort",
+	"order":             "same: it turns the ordering around and drops no rows",
 	"field":             "it widens each row rather than narrowing the set",
 	"no-context-fields": "it removes columns, not rows",
 	"all-projects":      "it is the way past the guard, not a way to satisfy it",
@@ -2603,6 +2614,61 @@ func TestAllProjectsLiftsTheContextProject(t *testing.T) {
 		Jira: &stubSession{project: "ENG"}, Flags: registry.NewFlags(),
 	}); got.Project != "ENG" {
 		t.Errorf("project = %q, want the context's", got.Project)
+	}
+}
+
+// TestTheOrderingFlagsReachTheQuery walks the flags from the shape a caller
+// types to the JQL that goes out, for the two that were easiest to believe were
+// working.
+//
+// --order without --sort was harvested, passed along, and then dropped by the
+// ordering policy, so `-o asc` answered with a descending result set and
+// nothing said so. And a date filter orders nothing: --updated-after -1d with
+// no --sort comes back in key order, which on a busy project looks enough like
+// "recent first" to be mistaken for it.
+func TestTheOrderingFlagsReachTheQuery(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		set  func(registry.Flags)
+		want string
+	}{
+		{
+			name: "a date filter does not order the result",
+			set: func(f registry.Flags) {
+				f.SetString("updated-after", "-1d")
+			},
+			want: `updated >= "-1d" ORDER BY issuekey DESC`,
+		},
+		{
+			name: "the direction alone turns the key ordering around",
+			set: func(f registry.Flags) {
+				f.SetString("order", "asc")
+			},
+			want: `ORDER BY issuekey ASC`,
+		},
+		{
+			name: "asking for it by update time",
+			set: func(f registry.Flags) {
+				f.SetString("updated-after", "-1d")
+				f.SetString("sort", "updated")
+				f.SetString("order", "desc")
+			},
+			want: `updated >= "-1d" ORDER BY updated DESC, issuekey DESC`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			flags := registry.NewFlags()
+			tc.set(flags)
+			got, err := issue.BuildQuery(issue.ListQueryFor(&registry.Invocation{
+				Jira: &stubSession{unscoped: true}, Flags: flags,
+			}))
+			if err != nil {
+				t.Fatalf("BuildQuery: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("got  %s\nwant %s", got, tc.want)
+			}
+		})
 	}
 }
 
