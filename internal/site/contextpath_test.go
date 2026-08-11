@@ -101,6 +101,15 @@ func TestWhoamiUnderAContextPathIsAConversationAServerHad(t *testing.T) {
 // for /rest/api/2/serverInfo and the replayer would answer nothing.
 func recordedClient(t *testing.T, fixture string) (*transport.Client, *transport.Replayer) {
 	t.Helper()
+	return recordedClientAt(t, fixture, "https://recorded.invalid/jira")
+}
+
+// recordedClientAt is the same for a recording made at the root, where the
+// base carries no path.
+func recordedClientAt(
+	t *testing.T, fixture, base string,
+) (*transport.Client, *transport.Replayer) {
+	t.Helper()
 
 	cassette, err := transport.LoadCassette(filepath.Join("testdata", fixture))
 	if err != nil {
@@ -112,7 +121,7 @@ func recordedClient(t *testing.T, fixture string) (*transport.Client, *transport
 	}
 	replayer := transport.NewReplayer(cassette)
 	client, err := transport.New(transport.Options{
-		BaseURL:    "https://recorded.invalid/jira",
+		BaseURL:    base,
 		HTTPClient: replayer.Client(),
 		Retries:    -1,
 	})

@@ -68,3 +68,10 @@ internal/resource/issue datacenter	internal/resource/issue/testdata/link-add-rec
 internal/resource/issue datacenter	internal/resource/issue/testdata/move-recorded.datacenter.json	!scripts/dc/record-writes.sh, which runs: jr issue move <subject> <the first transition that changes the status>
 internal/resource/issue datacenter	internal/resource/issue/testdata/clone-recorded.datacenter.json	!scripts/dc/record-writes.sh, which runs: jr issue clone <subject> --summary 'Recorded write path, cloned'
 internal/resource/issue datacenter	internal/resource/issue/testdata/delete-recorded.datacenter.json	!scripts/dc/record-writes.sh, which runs: jr issue delete <the clone> --yes
+
+# The last two of the three bugs this project cites live behind these: the
+# createmeta route removed in Jira 9.0, and the transitions this tool must never
+# cache. Both are read through internal/site, so the recordings sit with the
+# code rather than with the command.
+internal/site datacenter	internal/site/testdata/createmeta-recorded.datacenter.json	meta createmeta --project ENG --type Task --refresh
+internal/site datacenter	internal/site/testdata/transitions-recorded.datacenter.json	meta transitions ENG-8

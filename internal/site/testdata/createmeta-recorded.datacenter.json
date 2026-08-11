@@ -1,0 +1,53 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/serverInfo"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"baseUrl\":\"http://recorded.invalid\",\"version\":\"10.4.0\",\"versionNumbers\":[10,4,0],\"deploymentType\":\"Server\",\"buildNumber\":10040001,\"buildDate\":\"2025-01-22T00:00:00.000+0000\",\"databaseBuildNumber\":10040001,\"serverTime\":\"2026-08-11T18:04:44.099+0000\",\"scmInfo\":\"acd8e7f368f3161107af9716fd81856c7e0820e1\",\"serverTitle\":\"jr fixtures\"}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/issue/createmeta/ENG/issuetypes",
+        "query": "maxResults=100\u0026startAt=0"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"maxResults\":100,\"startAt\":0,\"total\":5,\"isLast\":true,\"values\":[{\"self\":\"http://recorded.invalid/rest/api/2/issuetype/10000\",\"id\":\"10000\",\"description\":\"Created by Jira Software - do not edit or delete. Issue type for a big user story that needs to be broken down.\",\"iconUrl\":\"http://recorded.invalid/images/icons/issuetypes/epic.svg\",\"name\":\"Epic\",\"subtask\":false},{\"self\":\"http://recorded.invalid/rest/api/2/issuetype/10001\",\"id\":\"10001\",\"description\":\"Created by Jira Software - do not edit or delete. Issue type for a user story.\",\"iconUrl\":\"http://recorded.invalid/images/icons/issuetypes/story.svg\",\"name\":\"Story\",\"subtask\":false},{\"self\":\"http://recorded.invalid/rest/api/2/issuetype/10002\",\"id\":\"10002\",\"description\":\"A task that needs to be done.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Task\",\"subtask\":false},{\"self\":\"http://recorded.invalid/rest/api/2/issuetype/10003\",\"id\":\"10003\",\"description\":\"The sub-task of the issue\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Sub-task\",\"subtask\":true},{\"self\":\"http://recorded.invalid/rest/api/2/issuetype/10004\",\"id\":\"10004\",\"description\":\"A problem which impairs or prevents the functions of the product.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Bug\",\"subtask\":false}]}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/issue/createmeta/ENG/issuetypes/10002",
+        "query": "maxResults=100\u0026startAt=0"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"maxResults\":100,\"startAt\":0,\"total\":14,\"isLast\":true,\"values\":[{\"required\":true,\"schema\":{\"type\":\"string\",\"system\":\"summary\"},\"name\":\"Summary\",\"fieldId\":\"summary\",\"hasDefaultValue\":false,\"operations\":[\"set\"]},{\"required\":true,\"schema\":{\"type\":\"issuetype\",\"system\":\"issuetype\"},\"name\":\"Issue Type\",\"fieldId\":\"issuetype\",\"hasDefaultValue\":false,\"operations\":[],\"allowedValues\":[{\"self\":\"http://recorded.invalid/rest/api/2/issuetype/10002\",\"id\":\"10002\",\"description\":\"A task that needs to be done.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Task\",\"subtask\":false,\"avatarId\":10318}]},{\"required\":true,\"schema\":{\"type\":\"user\",\"system\":\"reporter\"},\"name\":\"Reporter\",\"fieldId\":\"reporter\",\"autoCompleteUrl\":\"http://recorded.invalid/rest/api/latest/user/search?username=\",\"hasDefaultValue\":false,\"operations\":[\"set\"]},{\"required\":false,\"schema\":{\"type\":\"array\",\"items\":\"component\",\"system\":\"components\"},\"name\":\"Component/s\",\"fieldId\":\"components\",\"hasDefaultValue\":false,\"operations\":[\"add\",\"set\",\"remove\"],\"allowedValues\":[{\"self\":\"http://recorded.invalid/rest/api/2/component/10000\",\"id\":\"10000\",\"name\":\"api\",\"description\":\"REST surface\"}]},{\"required\":false,\"schema\":{\"type\":\"string\",\"system\":\"description\"},\"name\":\"Description\",\"fieldId\":\"description\",\"hasDefaultValue\":false,\"operations\":[\"set\"]},{\"required\":false,\"schema\":{\"type\":\"array\",\"items\":\"version\",\"system\":\"fixVersions\"},\"name\":\"Fix Version/s\",\"fieldId\":\"fixVersions\",\"hasDefaultValue\":false,\"operations\":[\"set\",\"add\",\"remove\"],\"allowedValues\":[{\"self\":\"http://recorded.invalid/rest/api/2/version/10000\",\"id\":\"10000\",\"description\":\"First release\",\"name\":\"1.0\",\"archived\":false,\"released\":false,\"projectId\":10000}]},{\"required\":false,\"schema\":{\"type\":\"priority\",\"system\":\"priority\"},\"name\":\"Priority\",\"fieldId\":\"priority\",\"hasDefaultValue\":true,\"operations\":[\"set\"],\"allowedValues\":[{\"self\":\"http://recorded.invalid/rest/api/2/priority/1\",\"iconUrl\":\"http://recorded.invalid/images/icons/priorities/highest.svg\",\"name\":\"Highest\",\"id\":\"1\"},{\"self\":\"http://recorded.invalid/rest/api/2/priority/2\",\"iconUrl\":\"http://recorded.invalid/images/icons/priorities/high.svg\",\"name\":\"High\",\"id\":\"2\"},{\"self\":\"http://recorded.invalid/rest/api/2/priority/3\",\"iconUrl\":\"http://recorded.invalid/images/icons/priorities/medium.svg\",\"name\":\"Medium\",\"id\":\"3\"},{\"self\":\"http://recorded.invalid/rest/api/2/priority/4\",\"iconUrl\":\"http://recorded.invalid/images/icons/priorities/low.svg\",\"name\":\"Low\",\"id\":\"4\"},{\"self\":\"http://recorded.invalid/rest/api/2/priority/5\",\"iconUrl\":\"http://recorded.invalid/images/icons/priorities/lowest.svg\",\"name\":\"Lowest\",\"id\":\"5\"}],\"defaultValue\":{\"self\":\"http://recorded.invalid/rest/api/2/priority/3\",\"iconUrl\":\"http://recorded.invalid/images/icons/priorities/medium.svg\",\"name\":\"Medium\",\"id\":\"3\"}},{\"required\":false,\"schema\":{\"type\":\"array\",\"items\":\"string\",\"system\":\"labels\"},\"name\":\"Labels\",\"fieldId\":\"labels\",\"autoCompleteUrl\":\"http://recorded.invalid/rest/api/1.0/labels/suggest?query=\",\"hasDefaultValue\":false,\"operations\":[\"add\",\"set\",\"remove\"]},{\"required\":false,\"schema\":{\"type\":\"array\",\"items\":\"attachment\",\"system\":\"attachment\"},\"name\":\"Attachment\",\"fieldId\":\"attachment\",\"hasDefaultValue\":false,\"operations\":[]},{\"required\":false,\"schema\":{\"type\":\"array\",\"items\":\"issuelinks\",\"system\":\"issuelinks\"},\"name\":\"Linked Issues\",\"fieldId\":\"issuelinks\",\"autoCompleteUrl\":\"http://recorded.invalid/rest/api/2/issue/picker?currentProjectId=\u0026showSubTaskParent=true\u0026showSubTasks=true\u0026currentIssueKey=null\u0026query=\",\"hasDefaultValue\":false,\"operations\":[\"add\"]},{\"required\":false,\"schema\":{\"type\":\"any\",\"custom\":\"com.pyxis.greenhopper.jira:gh-epic-link\",\"customId\":10102},\"name\":\"Epic Link\",\"fieldId\":\"customfield_10102\",\"hasDefaultValue\":false,\"operations\":[\"set\"]},{\"required\":false,\"schema\":{\"type\":\"array\",\"items\":\"string\",\"custom\":\"com.pyxis.greenhopper.jira:gh-sprint\",\"customId\":10101},\"name\":\"Sprint\",\"fieldId\":\"customfield_10101\",\"hasDefaultValue\":false,\"operations\":[\"set\"]},{\"required\":false,\"schema\":{\"type\":\"user\",\"system\":\"assignee\"},\"name\":\"Assignee\",\"fieldId\":\"assignee\",\"autoCompleteUrl\":\"http://recorded.invalid/rest/api/latest/user/assignable/search?issueKey=null\u0026username=\",\"hasDefaultValue\":true,\"operations\":[\"set\"],\"defaultValue\":{\"name\":\"-1\"}},{\"required\":true,\"schema\":{\"type\":\"project\",\"system\":\"project\"},\"name\":\"Project\",\"fieldId\":\"project\",\"hasDefaultValue\":false,\"operations\":[\"set\"],\"allowedValues\":[{\"self\":\"http://recorded.invalid/rest/api/2/project/10000\",\"id\":\"10000\",\"key\":\"ENG\",\"name\":\"Engineering\",\"projectTypeKey\":\"software\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"}}]}]}"
+      }
+    }
+  ]
+}
