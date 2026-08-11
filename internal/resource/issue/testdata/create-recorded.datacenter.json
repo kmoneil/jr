@@ -1,0 +1,22 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/2/issue",
+        "body": "{\"fields\":{\"description\":\"Created by scripts/dc/record-writes.sh\",\"issuetype\":{\"name\":\"Task\"},\"project\":{\"key\":\"ENG\"},\"summary\":\"Recorded write path\"}}"
+      },
+      "response": {
+        "status": 201,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"id\":\"10007\",\"key\":\"ENG-8\",\"self\":\"http://recorded.invalid/rest/api/2/issue/10007\"}"
+      }
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/issueLinkType"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"issueLinkTypes\":[{\"id\":\"10000\",\"name\":\"Blocks\",\"inward\":\"is blocked by\",\"outward\":\"blocks\",\"self\":\"http://recorded.invalid/rest/api/2/issueLinkType/10000\"},{\"id\":\"10001\",\"name\":\"Cloners\",\"inward\":\"is cloned by\",\"outward\":\"clones\",\"self\":\"http://recorded.invalid/rest/api/2/issueLinkType/10001\"},{\"id\":\"10002\",\"name\":\"Duplicate\",\"inward\":\"is duplicated by\",\"outward\":\"duplicates\",\"self\":\"http://recorded.invalid/rest/api/2/issueLinkType/10002\"},{\"id\":\"10003\",\"name\":\"Relates\",\"inward\":\"relates to\",\"outward\":\"relates to\",\"self\":\"http://recorded.invalid/rest/api/2/issueLinkType/10003\"}]}"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/2/issueLink",
+        "body": "{\"inwardIssue\":{\"key\":\"ENG-2\"},\"outwardIssue\":{\"key\":\"ENG-8\"},\"type\":{\"name\":\"Relates\"}}"
+      },
+      "response": {
+        "status": 201,
+        "header": {
+          "Content-Type": [
+            "text/html;charset=UTF-8"
+          ]
+        }
+      }
+    }
+  ]
+}

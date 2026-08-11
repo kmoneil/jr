@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "PUT",
+        "path": "/rest/api/2/issue/ENG-8",
+        "body": "{\"fields\":{\"summary\":\"Recorded write path, edited\"}}"
+      },
+      "response": {
+        "status": 204,
+        "header": {
+          "Content-Type": [
+            "text/html;charset=UTF-8"
+          ]
+        }
+      }
+    }
+  ]
+}

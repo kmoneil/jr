@@ -49,3 +49,22 @@ internal/workflow datacenter	internal/workflow/testdata/epicremove-recorded.data
 # and a basic credential, which no seeded profile holds because the seeded one
 # holds a token that works. record-auth-refusal.sh makes both.
 internal/transport datacenter	internal/transport/testdata/basic-refused.datacenter.json	!recorded by scripts/dc/record-auth-refusal.sh, which needs JIRA_VERSION=11.3.5 and stores a basic credential with --no-verify
+
+# The write verbs are a sequence, not a set: each needs the instance in the
+# state the one before it left, and two of them need an id that only the step
+# before can supply. scripts/dc/record-writes.sh is the unit of reproduction,
+# and the command each row would have carried is written out beside it.
+
+internal/resource/issue datacenter	internal/resource/issue/testdata/create-recorded.datacenter.json	!scripts/dc/record-writes.sh, which runs: jr issue create --project ENG --type Task --summary 'Recorded write path' --description ...
+internal/resource/issue datacenter	internal/resource/issue/testdata/edit-recorded.datacenter.json	!scripts/dc/record-writes.sh, which runs: jr issue edit <subject> --summary 'Recorded write path, edited'
+internal/resource/issue datacenter	internal/resource/issue/testdata/assign-recorded.datacenter.json	!scripts/dc/record-writes.sh, which runs: jr issue assign <subject> grace
+internal/resource/issue datacenter	internal/resource/issue/testdata/watch-recorded.datacenter.json	!scripts/dc/record-writes.sh, which runs: jr issue watch <subject>
+internal/resource/issue datacenter	internal/resource/issue/testdata/unwatch-recorded.datacenter.json	!scripts/dc/record-writes.sh, which runs: jr issue watch <subject> --remove
+internal/resource/issue datacenter	internal/resource/issue/testdata/comment-add-recorded.datacenter.json	!scripts/dc/record-writes.sh, which runs: jr issue comment add <subject> 'Recorded by the fixture rig'
+internal/resource/issue datacenter	internal/resource/issue/testdata/comment-delete-recorded.datacenter.json	!scripts/dc/record-writes.sh, which runs: jr issue comment delete <subject> <the id the add returned> --yes
+internal/resource/issue datacenter	internal/resource/issue/testdata/worklog-add-recorded.datacenter.json	!scripts/dc/record-writes.sh, which runs: jr issue worklog add <subject> 1h
+internal/resource/issue datacenter	internal/resource/issue/testdata/worklog-delete-recorded.datacenter.json	!scripts/dc/record-writes.sh, which runs: jr issue worklog delete <subject> <the id the add returned> --yes
+internal/resource/issue datacenter	internal/resource/issue/testdata/link-add-recorded.datacenter.json	!scripts/dc/record-writes.sh, which runs: jr issue link add <subject> 'relates to' ENG-2
+internal/resource/issue datacenter	internal/resource/issue/testdata/move-recorded.datacenter.json	!scripts/dc/record-writes.sh, which runs: jr issue move <subject> <the first transition that changes the status>
+internal/resource/issue datacenter	internal/resource/issue/testdata/clone-recorded.datacenter.json	!scripts/dc/record-writes.sh, which runs: jr issue clone <subject> --summary 'Recorded write path, cloned'
+internal/resource/issue datacenter	internal/resource/issue/testdata/delete-recorded.datacenter.json	!scripts/dc/record-writes.sh, which runs: jr issue delete <the clone> --yes

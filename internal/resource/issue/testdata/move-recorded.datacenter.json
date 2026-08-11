@@ -1,0 +1,37 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/issue/ENG-8/transitions",
+        "query": "expand=transitions.fields"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"expand\":\"transitions\",\"transitions\":[{\"id\":\"11\",\"name\":\"To Do\",\"description\":\"\",\"opsbarSequence\":2147483647,\"to\":{\"self\":\"http://recorded.invalid/rest/api/2/status/10000\",\"description\":\"\",\"iconUrl\":\"http://recorded.invalid/\",\"name\":\"To Do\",\"id\":\"10000\",\"statusCategory\":{\"self\":\"http://recorded.invalid/rest/api/2/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"default\",\"name\":\"To Do\"}},\"fields\":{}},{\"id\":\"21\",\"name\":\"In Progress\",\"description\":\"\",\"opsbarSequence\":2147483647,\"to\":{\"self\":\"http://recorded.invalid/rest/api/2/status/3\",\"description\":\"This issue is being actively worked on at the moment by the assignee.\",\"iconUrl\":\"http://recorded.invalid/images/icons/statuses/inprogress.png\",\"name\":\"In Progress\",\"id\":\"3\",\"statusCategory\":{\"self\":\"http://recorded.invalid/rest/api/2/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"inprogress\",\"name\":\"In Progress\"}},\"fields\":{}},{\"id\":\"31\",\"name\":\"Done\",\"description\":\"\",\"opsbarSequence\":2147483647,\"to\":{\"self\":\"http://recorded.invalid/rest/api/2/status/10001\",\"description\":\"\",\"iconUrl\":\"http://recorded.invalid/\",\"name\":\"Done\",\"id\":\"10001\",\"statusCategory\":{\"self\":\"http://recorded.invalid/rest/api/2/statuscategory/3\",\"id\":3,\"key\":\"done\",\"colorName\":\"success\",\"name\":\"Done\"}},\"fields\":{}}]}"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/2/issue/ENG-8/transitions",
+        "body": "{\"transition\":{\"id\":\"21\"}}"
+      },
+      "response": {
+        "status": 204,
+        "header": {
+          "Content-Type": [
+            "text/html;charset=UTF-8"
+          ]
+        }
+      }
+    }
+  ]
+}

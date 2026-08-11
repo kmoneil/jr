@@ -1,0 +1,20 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "DELETE",
+        "path": "/rest/api/2/issue/ENG-8/worklog/10002"
+      },
+      "response": {
+        "status": 204,
+        "header": {
+          "Content-Type": [
+            "text/html;charset=UTF-8"
+          ]
+        }
+      }
+    }
+  ]
+}
