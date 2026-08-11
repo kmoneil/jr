@@ -119,10 +119,10 @@ jr version | schema | contract
 
 Global: `--format tsv|xml|json|yaml`, plus `markdown` in a build with the
 `render` tag, for reading and never for parsing. Also `--context`, `--site`,
-`--project`, `--readonly`, `--describe`, `--debug`, `--refresh`, `--retries`,
-`--max-requests`, and `--limit` on collections. `JIRA_FORMAT`, `JIRA_CONTEXT`,
-`JIRA_SITE`, `JIRA_PROJECT`, and `JIRA_READONLY` set the same things from the
-environment.
+`--project`, `--board`, `--readonly`, `--describe`, `--debug`, `--refresh`,
+`--retries`, `--max-requests`, `--api-version`, and `--limit` on collections.
+`JIRA_FORMAT`, `JIRA_CONTEXT`, `JIRA_SITE`, `JIRA_PROJECT`, `JIRA_BOARD`, and
+`JIRA_READONLY` set the same things from the environment.
 
 ```console
 $ jr schema --limit 3; echo "exit $?"
@@ -670,6 +670,9 @@ make test-profiles  # the suite under every shipped tag set
 make fuzz           # every fuzz target, FUZZTIME each (default 60s)
 make golden         # rewrite the output-contract golden files
 make docs           # regenerate docs/commands.md from the registry
+make dc-up          # a licensed local Jira Data Center to record against
+make dc-record      # re-record every Data Center cassette against it
+make dc-down        # destroy it, its database, and its licence
 make cost           # what each format costs, in tokens (needs uv, and network)
 make vuln           # govulncheck over every profile's code (needs network)
 make lint fmt vet
@@ -719,23 +722,37 @@ plausibility: an endpoint recalled from memory looks exactly like one read off a
 real response, and a fixture that encodes what its author assumed passes exactly
 like one recorded from a server.
 
-- **Claims about Jira are measured, not remembered.** Three bugs shipped and
-  were found by pointing a real build at a real instance, not by any test.
+- **Claims about Jira are measured, not remembered.** Five bugs shipped and were
+  found by pointing a real build at a real instance, not by any test.
   `meta createmeta` called an endpoint removed in Jira 9.0. `jql validate` sent
   `validateQuery=strict` where Data Center takes a boolean. `project list` never
   populated its lead column, because neither deployment expands the lead unless
-  asked. In each case a hand-written fixture encoded the assumption rather than
-  the API, and passed happily for months. The ADF converter is the same lesson
-  applied ahead of time: its corpus is 247 documents Jira Cloud actually stored
-  plus 23 it refused, and the round-trip fuzzer over them found fourteen bugs
-  that no hand-written case would have.
-- **Where the evidence does not exist, the repository says so.** Every Data
-  Center fixture in the suite is constructed, because the only Data Center
-  instance available is production and recording against it is refused. Each
-  cassette carries whether it was recorded or written, a lint keeps that field
-  honest, and the gap is tracked as a blocked task rather than described as
-  coverage. A constructed fixture proves a response is handled. It can never
-  prove a request was accepted.
+  asked. `issue attachment download` required an `id` a real Data Center does
+  not send, so it had failed on every Data Center since the verb shipped — and
+  failed as retryable, inviting the caller to try again against a response that
+  will never change. In each case a hand-written fixture encoded the assumption
+  rather than the API, the last of them by carrying a field the server omits,
+  and passed happily for months. The fifth had no fixture to be wrong: Jira Data
+  Center 11 disables HTTP Basic by default, and the 403 that produces was
+  reported as a permission problem, at the exit for one, with a remedy pointing
+  at project permissions. The ADF converter is the same lesson applied ahead of
+  time: its corpus is 247 documents Jira Cloud actually stored plus 23 it
+  refused, and the round-trip fuzzer over them found fourteen bugs that no
+  hand-written case would have.
+- **Where the evidence does not exist, the repository says so — and then goes
+  and gets it.** Every Data Center fixture here was constructed until August
+  2026, because the only Data Center available was production and recording
+  against it is refused. They are recordings now, taken from a local Jira
+  Software Data Center: `scripts/dc` stands one up under the three-hour timebomb
+  licence Atlassian publishes for running a Data Center product without the SDK,
+  fetched at run time and never committed, and `make dc-up dc-record` remakes
+  all of them — the reads, the transport contract, thirteen write verbs, and a
+  second pass under a context path, which no fixture had carried and in which
+  three defects had been argued from documentation and fixed unobserved. Each
+  cassette still carries whether it was recorded or written, the ledger of
+  unrecorded deployments is empty, and a recording no manifest says how to
+  remake fails the build. A constructed fixture proves a response is handled. It
+  can never prove a request was accepted.
 - **A documented number nothing checks is a number that was true once.** The
   build-profile table is asserted by building each profile and counting what the
   binary reports. Its four counts were four releases stale before that test

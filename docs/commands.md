@@ -1535,10 +1535,14 @@ Creates a link, written as a sentence: &lt;from> &lt;relationship> &lt;to>. So
 
 reads "ENG-1 blocks ENG-2", and reversing the relationship reverses the link.
 
-The relationship is a phrase, not a type name, and that is deliberate. "Blocks"
-names a relationship without saying which way it runs, so it is refused with
-both readings rather than resolved to one. Guessing would be wrong half the
+The relationship is a phrase, not a type name, and that is deliberate. A type
+name says nothing about which way the link runs: "Duplicate" is refused with
+both of its readings rather than resolved to one, and so is "relates", whose
+type offers "relates to" in both directions. Guessing would be wrong half the
 time, and the issue that ends up blocked is the one nobody was watching.
+
+"Blocks" works, and by coincidence rather than by rule: it is the outward
+phrase as well as the type name, and phrases are matched first.
 
 An unknown phrase is refused with every phrase the site offers. Link wording is
 customizable, so showing what exists beats guessing at a near match.
@@ -1548,7 +1552,7 @@ Examples:
 ```console
 jr issue link add ENG-1 blocks ENG-2
 jr issue link add ENG-1 "is blocked by" ENG-2
-jr issue link add ENG-1 relates to ENG-2 --dry-run
+jr issue link add ENG-1 "relates to" ENG-2 --dry-run
 ```
 
 | Argument | Required | Description |

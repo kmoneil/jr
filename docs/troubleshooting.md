@@ -158,8 +158,11 @@ Common causes, in the order they are worth checking:
   the credential store, deliberately, so CI can override a disk config. That
   also means a forgotten `export JIRA_API_TOKEN=` in your shell silently beats
   the credential you just stored. `jr auth status` names the source.
-- **Basic auth is disabled.** Many Data Center instances require a personal
-  access token and reject username/password. Use `--scheme bearer`.
+- **Basic auth is disabled.** Jira Data Center 11 turns HTTP Basic off by
+  default and refuses the first request of every run. It has its own code —
+  `AUTH_SCHEME_REFUSED`, below — and its own fix, a personal access token.
+  `--scheme bearer` names the scheme for a token you already hold; it cannot
+  turn a password into one.
 
 ### `AUTH_SCHEME_REFUSED` — the instance does not take that kind of credential
 
@@ -539,7 +542,11 @@ If a command you expected is missing, it was compiled out. See
 
 ### Still stuck
 
-The error `code` is the thing to search for. Every code is listed with its exit
-status and meaning in
-[output-contract.md](output-contract.md#errors), and every exit code a given
-command can produce is listed in its entry in [commands.md](commands.md).
+The error `code` is the thing to search for.
+[output-contract.md](output-contract.md#errors) explains the codes where the
+message alone is not enough — the resolution failures, the refusals a server
+sends, the idempotency ledger — with the exit each one carries, and every exit
+code a given command can produce is listed in its entry in
+[commands.md](commands.md). A code in neither is not undocumented: the error
+itself carries `exit`, `exit-name`, and a `remedy`, and a code is stable
+forever, so a script can branch on one no page here names.

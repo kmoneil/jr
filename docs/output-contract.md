@@ -697,8 +697,8 @@ a mistyped flag.
 
 ### Refusals the server sends
 
-Most of the above are decided before a request goes out. One is not, and it is
-worth naming because the server's own answer sends the caller to the wrong
+Most of the above are decided before a request goes out. Two are not, and both
+are worth naming because the server's own answer sends the caller to the wrong
 place.
 
 | Code                  | Exit | Meaning                                                                                                                                                                                                    |

@@ -315,11 +315,16 @@ converted between them, because how long a working day is is a site setting.
 $ jr issue link list ENG-101
 $ jr issue link add ENG-101 blocks ENG-102
 $ jr issue link add ENG-101 'is blocked by' ENG-99
+$ jr issue link add ENG-101 'relates to' ENG-102
 ```
 
 Link wording is customizable per site, so an unknown phrase is refused with
-every phrase your site does offer. `"Blocks"` on its own reads in either
-direction and is refused as ambiguous, with both phrasings offered.
+every phrase your site does offer. The relationship is a phrase and not a type
+name: `jr issue link add ENG-101 relates ENG-102` is refused with
+`AMBIGUOUS_LINK_DIRECTION`, because `Relates` is the type and `relates to` is
+the phrase, and a type name says nothing about which way the link runs.
+`blocks` works because it is the outward phrase of the `Blocks` type as well as
+its name — a coincidence rather than a rule.
 
 ```console
 # Attachments
@@ -631,6 +636,12 @@ export JIRA_API_TOKEN="$JIRA_TOKEN"   # from your secret store
 export JIRA_FORMAT=json
 export JIRA_READONLY=1                # if the job only reads
 ```
+
+On Data Center, leave `JIRA_EMAIL` unset. A token with a user beside it is sent
+as HTTP Basic and a token on its own is sent as a bearer token, and a default
+Jira 11 refuses Basic outright — `AUTH_SCHEME_REFUSED`, exit 4, on the first
+request, before the job does anything. The variable that makes it work is the
+one you leave out.
 
 Then branch on the exit code, not on the output:
 

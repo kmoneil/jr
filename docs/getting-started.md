@@ -62,9 +62,13 @@ Create a personal access token from your profile menu → **Personal Access
 Tokens** → **Create token**. This exists in Jira 8.14 and later. A personal
 access token stands alone: there is no email to pair it with.
 
-If your Data Center instance is older than 8.14, or personal access tokens are
-disabled, you can use your username and password instead — `--user` rather than
-`--email` in the next step.
+Get the token even if you know your password. **Jira Data Center 11 disables
+HTTP Basic by default**, so a username and password — and `.netrc`, which is
+the same scheme — is refused on the first request any run makes, the deployment
+probe, with `AUTH_SCHEME_REFUSED` and exit 4. Nothing about the account is
+wrong and no permission change helps. Username and password is for an instance
+older than 8.14, which has no personal access tokens to offer, or one that has
+Basic switched back on: `--user` rather than `--email` in the next step.
 
 Now get it into this shell without typing it as an argument. Let the shell read
 it — `-s` means it does not echo, and what you type at a `read` prompt does not
@@ -101,7 +105,8 @@ $ printf '%s' "$TOKEN" | jr auth login \
     --token-stdin
 ```
 
-**Data Center, with a username and password:**
+**Data Center, with a username and password** — only against an instance that
+still accepts it:
 
 ```console
 $ printf '%s' "$PASSWORD" | jr auth login \
@@ -109,6 +114,13 @@ $ printf '%s' "$PASSWORD" | jr auth login \
     --user your.username \
     --token-stdin
 ```
+
+If that comes back `AUTH_SCHEME_REFUSED`, exit 4, the instance is a Jira 11 with
+HTTP Basic switched off. It fails here rather than three commands later because
+`auth login` checks the credential against the site before storing it, which is
+what that check is for. Go back and create a personal access token: the same
+command with `--user` dropped stores it as a bearer token, because the scheme is
+inferred from whether a user was given.
 
 If your Jira lives under a path, include it: `--site jira.company.com/jira`.
 
@@ -164,9 +176,10 @@ without editing it.
 $ jr user me
 ```
 
-This is the cheapest command that proves a credential is good, and it prints
-your **account id** — the value every command that takes a user actually wants,
-and the one thing a token cannot tell you by looking at it.
+This is the cheapest command that proves a credential is good, and it prints the
+**id every command that takes a user actually wants** — an accountId on Cloud, a
+username on Data Center. The two are not interchangeable, and it is the one
+thing a token cannot tell you by looking at it.
 
 If it fails, [troubleshooting.md](troubleshooting.md) maps the error codes to
 fixes. The error is structured and names a remedy; read it before anything else.

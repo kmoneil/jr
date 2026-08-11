@@ -163,8 +163,13 @@ request is *unchanged*; only a recorded one proves it was ever *right*.
 
 Both deployments are recorded now. Cloud comes from a free sandbox site; Data
 Center comes from a local container in `scripts/dc`, licensed with the timebomb
-key Atlassian publishes for running a Data Center product without the SDK —
-`make dc-up`, then `make dc-record`. A constructed cassette is still worth
+key Atlassian publishes for running a Data Center product without the SDK — the
+only key an individual can still get, since self-serve Data Center trials ended
+in March 2026 and the product is end-of-life. `scripts/dc/licence.py` fetches it
+at run time and nothing vendors it: the page it comes from says not to
+distribute the key, and a copy committed here would be distributing it. One key
+licenses one install for three hours, so a session is `make dc-up`,
+`make dc-record`, `make dc-down`, and the instance is gone with its database. A constructed cassette is still worth
 keeping where a real instance cannot produce the shape on request, an
 out-of-order page or an absent email, and it says `"source": "constructed"` so
 the difference is legible. `scripts/dc/manifest.tsv` maps every Data Center
@@ -179,6 +184,17 @@ changes.
 It is an environment variable rather than a flag because a flag would join the
 command surface, appear in `jr schema`, and need declaring on every command,
 for something no caller of this tool should reach for.
+
+The save is registered before the first request goes out, not after the probe
+answers, so a run that *fails* still writes a cassette — and a failure is the
+conversation most worth having a fixture of. It used to be registered on the
+way out, once the deployment was known, and a Data Center 11 refusing basic
+authentication answers the probe with a 403 and does nothing else: the exchange
+this tool most needed a recording of was the one the recorder could not
+capture. The deployment is a label the probe supplies, so a cassette from a run
+that never got an answer carries the recorder's default rather than an
+observation — worth reading before it is committed, and cheaper than the
+alternative, which was no file at all.
 
 A recording is scrubbed **as it is written**, never as a later step somebody has
 to remember, on the same reasoning as credential redaction: a file that only
@@ -360,7 +376,7 @@ name to `customfield_10042` should not cost a round trip on every invocation.
 | `jql/`          | Table-driven, plus a fuzzer asserting no input escapes quoting | 100% of renderer branches                           |
 | `adf/`          | Golden files, round-trip property test, three fuzzers           | Corpus of ≥200 real documents, asserted             |
 | `resource/*`    | Pure struct-in/struct-out unit tests, plus a fuzzer on anything that parses | 90%                                     |
-| `transport/`    | Replayed recordings, Cloud + DC                                | The four exchanges the contract test plays — probe, account, a 404, a field error — on both deployments |
+| `transport/`    | Replayed recordings, Cloud + DC                                | The four exchanges the contract test plays — probe, account, a 404, a field error — on both deployments, plus the recorded Data Center 403 that separates a refused authentication scheme from a missing permission |
 | Fixture evidence | Cassettes grouped by package and deployment, each group needing a recording behind it | A group with none names itself and its reason, and the list can only shrink. Empty since 2026-08-11 |
 | Evidence coverage | Every package that builds a `transport.Request` needs a cassette per deployment, found by parsing rather than by a list | A package with no cassettes at all is invisible to the grouping above, so it is asked for separately. One row outstanding: `internal/site cloud` |
 | Reproducibility | Every Data Center recording mapped to the command that remakes it, in `scripts/dc/manifest.tsv` and `manifest-contextpath.tsv` | A recording neither manifest names fails the build |
@@ -419,19 +435,34 @@ Recorded HTTP contract tests are mandatory, not optional. Pure-function unit
 tests would not have caught any of the incumbent bugs this project exists to
 avoid, all of them live at the seam between the CLI and a real Jira.
 
-**Which is a rule the tree does not yet keep, and the gap is now enumerated
-rather than described.** A cassette that was written and one that was recorded
-replay identically, so nothing in the suite could tell how much of it was
-evidence. Grouping every cassette by package and deployment answered it:
-eleven recordings, all Cloud, covering four groups of eighteen — and **no Data
-Center conversation anywhere rested on a recording**, against 62 cassettes
-asserting what somebody believed Data Center does. `unrecorded` in
-`internal/lint/evidence_test.go` is that inventory. Each entry names a group
-and why there is no recording behind it: five wait on a scrum board in the
-Cloud sandbox, nine on a Data Center instance that is not production. The test
-refuses an entry whose group has since been recorded, so the list can only
-shrink, and refuses a new group that arrives with neither a recording nor a
-reason.
+**Which is a rule the tree now keeps, and the ledger is what got it there.** A
+cassette that was written and one that was recorded replay identically, so
+nothing in the suite could tell how much of it was evidence. Grouping every
+cassette by package and deployment answered it: eleven recordings, all Cloud,
+covering four groups of eighteen — and **no Data Center conversation anywhere
+rested on a recording**, against 62 cassettes asserting what somebody believed
+Data Center does. `unrecorded` in `internal/lint/evidence_test.go` was that
+inventory, one entry per group naming why nothing behind it was a recording,
+with the test refusing an entry whose group has since been recorded so the list
+could only shrink.
+
+It reached empty on 2026-08-11: the Cloud rows paid off by a scrum board added
+to the sandbox, the Data Center rows by `scripts/dc`, which turned "the only
+Data Center available is production" from an access problem into a licence
+problem with a local answer. A new group arriving with neither a recording nor
+a reason still fails.
+
+The gap moved rather than closed, twice. A recording nobody can reproduce rots
+the first time a request changes, which is what the manifests answer. And a
+package with no cassettes at all never forms a group, so the ledger was
+structurally unable to see one — `internal/site`, where every deployment
+difference in this tool lives and where two of the three bugs this project
+keeps citing were, was invisible to it until
+`internal/lint/reachesjira_test.go` asked the prior question. That one is
+driven from the code, by parsing for `transport.Request{` rather than from a
+list somebody has to maintain. One row is outstanding there,
+`internal/site cloud`, and paying it is one `jr user me --refresh` against the
+sandbox.
 
 ## Bodies that do not fit in memory
 
