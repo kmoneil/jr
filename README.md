@@ -748,6 +748,11 @@ set beside it. A diff in one is a change every consumer sees: bump the schema
 version of the affected kind in the same commit, which `make golden` will insist
 on rather than quietly rewrite.
 
+One thing is deliberately undecided: whether `pkg/jira` becomes a supported
+library or stays an internal detail. It is an empty package today and the import
+lint keeps it CLI-free either way, so do not import it yet — the output contract
+is the interface, and it is the one with a version on it.
+
 ## How this was built
 
 This tool was built with AI assistance. Most of the lines here were typed by a
@@ -851,20 +856,3 @@ None of that makes the code correct. It makes the claims checkable, which is the
 part you cannot verify by reading a diff, and it is the standard this project
 should be held to no matter who or what typed it.
 
-## Open questions
-
-Carried from the spec:
-
-1. ~~**TSV vs XML default for lists.**~~ **Decided: TSV stays.** A hundred
-   issues cost 2,930 tokens as TSV and 12,755 as XML, which is 4.35x, or 9,825
-   tokens saved per page. The same document as a single record is 1.21x, because one
-   record has one of everything and the framing has nothing to compound over.
-   That is why the default follows content shape instead of being one format
-   everywhere. Numbers and method in
-   [docs/output-contract.md](docs/output-contract.md#what-the-defaults-cost);
-   reproduce with `make cost`.
-2. **Whether `pkg/jira` is a supported public library** or an internal detail.
-   Still open; the import lint keeps it CLI-free either way.
-3. ~~**Write-side ADF.**~~ **Decided and shipped:** a documented subset with
-   loud rejection of the rest, via `--body-format text|markdown|adf`. Loud
-   rejection beat silent mangling.
