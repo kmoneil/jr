@@ -18,5 +18,6 @@
         "body": "{\"errorMessages\": [\"upstream exploded\"]}"
       }
     }
-  ]
+  ],
+  "note": "Constructed, and it has to be: the interaction is a 503, and a healthy server does not answer one on request. What the test needs is a create that failed without saying whether it was processed, which is the case an idempotency key exists for. The request shape beside it is real \u2014 create-recorded.datacenter.json is the same POST accepted by a Jira Software Data Center 10.4.0."
 }

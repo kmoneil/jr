@@ -33,5 +33,6 @@
         "body": "{\"errorMessages\": [\"The issue 'ENG-101' has subtasks and subtasks are not deleted.\"]}"
       }
     }
-  ]
+  ],
+  "note": "Half of this cannot be recorded. The first interaction \u2014 a delete refused because the issue has subtasks \u2014 is real and is recorded beside it in delete-parent-recorded.datacenter.json, with Jira's own wording, which differs from the prose invented here. The second is a delete refused even with deleteSubtasks=true, which a healthy server does not do; it exists to prove the remedy stops naming a flag the caller already passed."
 }

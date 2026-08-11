@@ -1,0 +1,22 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "DELETE",
+        "path": "/rest/api/2/issue/ENG-12"
+      },
+      "response": {
+        "status": 400,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"errorMessages\":[\"The issue 'ENG-12' has subtasks.  You must specify the 'deleteSubtasks' parameter to delete this issue and all its subtasks.\"],\"errors\":{}}"
+      }
+    }
+  ],
+  "note": "Deleting an issue that has a subtask, refused by Jira Software Data Center 10.4.0 in prose. The cassette beside it, delete-subtasks.datacenter.json, carries a second interaction this cannot: a delete that is refused even with deleteSubtasks=true, which a healthy server does not do. Regenerate with scripts/dc/record-refusals.sh."
+}

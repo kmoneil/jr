@@ -34,5 +34,6 @@
         "body": "{\"errorMessages\": [\"upstream exploded\"]}"
       }
     }
-  ]
+  ],
+  "note": "Constructed for the same reason as create-fails: the transition POST answers 503, which no healthy instance can be asked to do. The GET beside it is the real shape \u2014 move-recorded.datacenter.json carries both requests as a Data Center 10.4.0 answered them."
 }

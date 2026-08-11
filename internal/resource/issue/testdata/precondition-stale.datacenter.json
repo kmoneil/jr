@@ -34,5 +34,6 @@
         "body": ""
       }
     }
-  ]
+  ],
+  "note": "Constructed by construction. The PUT in here is the request that must NEVER be sent: --if-unchanged compares the caller's precondition against the issue it just read and refuses locally, and the interaction exists so the replayer could answer it if the refusal ever stopped working. A recording cannot contain an exchange that does not happen."
 }

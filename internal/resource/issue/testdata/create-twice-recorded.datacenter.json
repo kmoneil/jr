@@ -1,0 +1,39 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "note": "Two identical creates against Jira Software Data Center 10.4.0, each a real invocation, concatenated because JIRA_RECORD writes one cassette per run and the point of the test is that the second request is really sent. Regenerate with scripts/dc/record-refusals.sh.",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/2/issue",
+        "body": "{\"fields\":{\"issuetype\":{\"name\":\"Bug\"},\"project\":{\"key\":\"ENG\"},\"summary\":\"a summary\"}}"
+      },
+      "response": {
+        "status": 201,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"id\":\"10009\",\"key\":\"ENG-10\",\"self\":\"http://recorded.invalid/rest/api/2/issue/10009\"}"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/2/issue",
+        "body": "{\"fields\":{\"issuetype\":{\"name\":\"Bug\"},\"project\":{\"key\":\"ENG\"},\"summary\":\"a summary\"}}"
+      },
+      "response": {
+        "status": 201,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"id\":\"10010\",\"key\":\"ENG-11\",\"self\":\"http://recorded.invalid/rest/api/2/issue/10010\"}"
+      }
+    }
+  ]
+}
