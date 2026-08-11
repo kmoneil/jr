@@ -10,6 +10,7 @@ Built for scripts and agents first, humans second —
 and it would rather fail than hand you something that merely looks right.
 
 ![Go 1.26](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache--2.0-f5a623)](LICENSE)
 ![Status: pre-release](https://img.shields.io/badge/status-pre--release-f5a623)
 ![MCP: built in](https://img.shields.io/badge/MCP-server%20built%20in-f5a623)
 ![Network in tests: none](https://img.shields.io/badge/tests-never%20touch%20the%20network-4c1)
@@ -18,7 +19,8 @@ and it would rather fail than hand you something that merely looks right.
 [Recipes](docs/recipes.md) ·
 [Commands](docs/commands.md) ·
 [Output contract](docs/output-contract.md) ·
-[Troubleshooting](docs/troubleshooting.md)
+[Troubleshooting](docs/troubleshooting.md) ·
+[Security](SECURITY.md)
 
 </div>
 
@@ -52,7 +54,7 @@ set, and the same is true of every command, in every format, on every path.
 **Jump to:** [Quickstart](#quickstart) · [Why this exists](#why-this-exists) ·
 [Commands](#what-works-today) · [A short tour](#a-short-tour) · [MCP](#mcp) ·
 [Docs](#documentation) · [Build profiles](#build-profiles) ·
-[Development](#development)
+[Development](#development) · [Security](#security) · [License](#license)
 
 ## Quickstart
 
@@ -752,6 +754,25 @@ One thing is deliberately undecided: whether `pkg/jira` becomes a supported
 library or stays an internal detail. It is an empty package today and the import
 lint keeps it CLI-free either way, so do not import it yet — the output contract
 is the interface, and it is the one with a version on it.
+
+## Security
+
+[SECURITY.md](SECURITY.md) is the threat model, what is impossible by
+construction rather than by care, and how to report a vulnerability — privately,
+to kevin@oneil.xyz, with an acknowledgement inside three working days.
+
+Every claim in it names the test that holds it, and a lint fails the build when
+a cited test stops existing. It is also honest about the other direction: there
+is a section on what a hostile Jira can still do to you, because a threat model
+that only lists wins is not one.
+
+## License
+
+[Apache License 2.0](LICENSE). Copyright 2026 Kevin O'Neil.
+
+Nothing is vendored, and [NOTICE](NOTICE) lists the four direct dependencies a
+binary links, with their licences and the one upstream NOTICE that has to travel
+with them.
 
 ## How this was built
 

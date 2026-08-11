@@ -63,6 +63,12 @@ func countClaims() []countClaim {
 		pkg:      "internal/jql",
 		sentence: regexp.MustCompile(`(?i)\b(\w+) fuzzers back it up`),
 	}, {
+		// The same sentence, in the document where a reader is least able to
+		// check it for themselves.
+		doc:      "../../SECURITY.md",
+		pkg:      "internal/jql",
+		sentence: regexp.MustCompile(`(?i)\b(\w+) fuzzers back it up`),
+	}, {
 		doc:      "../../docs/architecture.md",
 		pkg:      "internal/adf",
 		sentence: regexp.MustCompile(`(?i)round-trip property test, (\w+) fuzzers`),

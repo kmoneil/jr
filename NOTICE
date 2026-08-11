@@ -1,0 +1,58 @@
+jr — a Jira client whose output is a versioned contract
+Copyright 2026 Kevin O'Neil
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+
+--------------------------------------------------------------------------------
+
+Third-party code
+
+Nothing is vendored into this repository: every file here is covered by the
+licence above. A linked `jr` binary is not, and a distributed binary has to
+carry these licences with it. `go.mod` is the authority; this is the same list
+spelled out.
+
+    github.com/BurntSushi/toml            MIT
+                                          Copyright (c) 2013 TOML authors
+    github.com/spf13/cobra                Apache-2.0
+    github.com/spf13/pflag                BSD-3-Clause
+                                          Copyright (c) 2012 Alex Ogier
+                                          Copyright (c) 2012 The Go Authors
+    gopkg.in/yaml.v3                      MIT and Apache-2.0
+    github.com/inconshreveable/mousetrap  Apache-2.0
+                                          (indirect, reached through cobra)
+
+Four direct dependencies and one indirect. Each licence text is in the module's
+own source, which `go mod download` fetches and `go.sum` pins.
+
+gopkg.in/yaml.v3 carries a NOTICE of its own. Section 4(d) of the Apache License
+requires it to travel with the work, so it is reproduced here in full:
+
+    Copyright 2011-2016 Canonical Ltd.
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+No other dependency ships a NOTICE, so there is nothing further to reproduce.
+
+Everything else this tool needs is the Go standard library. `make vuln` runs
+govulncheck over the full tag set and fails closed, so a build that cannot be
+checked is a build that does not pass.

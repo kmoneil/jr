@@ -254,6 +254,33 @@ func TestTransportOwnsHTTP(t *testing.T) {
 	}
 }
 
+// TestNothingShippedExecutesAProcess holds the sentence SECURITY.md publishes:
+// no build of this tool spawns anything.
+//
+// It is true today by absence rather than by decision, and an absence nobody
+// asserts is a line somebody adds in a hurry — the obvious way to open a browse
+// URL, copy a key to the clipboard, or read a credential out of a system
+// keyring is to shell out, and all three are declared build tags waiting for an
+// implementation. A process this tool starts inherits its environment, which is
+// where `JIRA_API_TOKEN` lives.
+//
+// The tests are exempt: internal/lint builds and runs the binaries it makes
+// claims about, which is the whole method here.
+func TestNothingShippedExecutesAProcess(t *testing.T) {
+	for _, p := range loadPackages(t) {
+		self := short(p.ImportPath)
+		for _, imp := range p.Imports {
+			if imp != "os/exec" {
+				continue
+			}
+			t.Errorf("%s imports os/exec; no shipped build starts a process, "+
+				"and one it started would inherit the credential in its "+
+				"environment. If this is deliberate, SECURITY.md says "+
+				"otherwise and has to change in the same commit", self)
+		}
+	}
+}
+
 func isAllowed(self string, allowed []string) bool {
 	for _, a := range allowed {
 		if strings.HasSuffix(a, "/") {
