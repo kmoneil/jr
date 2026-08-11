@@ -760,6 +760,19 @@ like one recorded from a server.
   existed. The error-code table is asserted by resolving each call site to the
   exit it actually produces, which found a code documented at exit 1 and built
   at exit 9, quietly advertising a refusal as retryable.
+- **A declaration nothing exercises is a claim, not a behaviour.** Every gate
+  here read the registry, and a flag can be typed, enumerated, given an exit
+  code, rendered into the reference page and classified in a test's exemption
+  list while doing nothing at all. `--order` was: it was harvested, passed
+  along, and dropped by a branch that only looked at `--sort`, so
+  `issue list --order asc` came back descending and said nothing. Flags are now
+  driven — each one, on each command, on both deployments, with it and without
+  it, against a transport that records what was asked — and the requests, the
+  columns, the document, or the error has to differ. That found `--body-format`
+  dead on `issue create` and `issue edit` on its first run, where the
+  documentation had been right and the wiring had never existed. The examples
+  `--help` publishes are re-parsed by the binary for the same reason: one of
+  them shipped with its arguments in an order the command does not take.
 - **A gate that runs and cannot fail is worse than none**, because it reads as
   coverage. The dead-code pass added to catch symbols compiled into profiles
   that never use them first shipped as a fake: its build-tags flag did not
