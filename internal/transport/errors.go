@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // jiraError is the error body Jira returns. Both shapes appear in the wild:

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/jql"
+	"github.com/kmoneil/jr/internal/jql"
 )
 
 func TestParseDateAccepts(t *testing.T) {

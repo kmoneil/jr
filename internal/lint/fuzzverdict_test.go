@@ -32,7 +32,7 @@ fuzz: elapsed: 21s, execs: 1430825 (0/sec), new interesting: 8 (total: 367)
     context deadline exceeded
 FAIL
 exit status 1
-FAIL	github.com/kmoneil/jira-cli/internal/transport	21.047s`
+FAIL	github.com/kmoneil/jr/internal/transport	21.047s`
 
 const crasherOutput = `fuzz: elapsed: 0s, gathering baseline coverage: 0/24 completed
 fuzz: elapsed: 1s, gathering baseline coverage: 24/24 completed, now fuzzing with 10 workers
@@ -46,7 +46,7 @@ fuzz: elapsed: 3s, execs: 148258 (49418/sec), new interesting: 2 (total: 26)
     go test -run=FuzzRelativeStaysOnTheSite/6f1a2b3c4d5e
 FAIL
 exit status 1
-FAIL	github.com/kmoneil/jira-cli/internal/transport	3.146s`
+FAIL	github.com/kmoneil/jr/internal/transport	3.146s`
 
 func TestTheFuzzSweepNeverCallsACrasherAFlake(t *testing.T) {
 	for _, tc := range []struct {

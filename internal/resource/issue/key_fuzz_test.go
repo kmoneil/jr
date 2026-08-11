@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/resource/issue"
+	"github.com/kmoneil/jr/internal/resource/issue"
 )
 
 // safeSegment is the property every accepted key has to satisfy.

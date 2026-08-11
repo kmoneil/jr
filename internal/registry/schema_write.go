@@ -2,7 +2,7 @@
 
 package registry
 
-import "github.com/kmoneil/jira-cli/internal/render"
+import "github.com/kmoneil/jr/internal/render"
 
 // The dry-run kind exists only in a build that has mutating commands, so its
 // schema is registered from a file carrying the same tag. Registering it

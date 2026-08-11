@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/adf"
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jr/internal/adf"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/exitcode"
 )
 
 // roundTrip is the property the write subset is defined by: markdown that this

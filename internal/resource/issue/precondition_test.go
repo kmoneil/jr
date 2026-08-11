@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/registry"
-	"github.com/kmoneil/jira-cli/internal/resource/issue"
-	"github.com/kmoneil/jira-cli/internal/site"
+	"github.com/kmoneil/jr/internal/registry"
+	"github.com/kmoneil/jr/internal/resource/issue"
+	"github.com/kmoneil/jr/internal/site"
 )
 
 // TestIssueGetReportsAPreconditionAndIssueListDoesNot is the shape decision.

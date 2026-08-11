@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/exitcode"
-	"github.com/kmoneil/jira-cli/internal/site"
-	"github.com/kmoneil/jira-cli/internal/transport"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/exitcode"
+	"github.com/kmoneil/jr/internal/site"
+	"github.com/kmoneil/jr/internal/transport"
 )
 
 // cloudDirectory and dcDirectory carry different identifiers on purpose.

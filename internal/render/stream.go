@@ -3,7 +3,7 @@ package render
 import (
 	"io"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // StreamSpec describes the collection a Stream will emit.

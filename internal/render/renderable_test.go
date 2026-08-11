@@ -8,9 +8,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/exitcode"
-	"github.com/kmoneil/jira-cli/internal/render"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/exitcode"
+	"github.com/kmoneil/jr/internal/render"
 )
 
 // TestEveryWriterEmitsWhatItsOwnParserWillRead is the assertion none of the

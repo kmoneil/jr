@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/adf"
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jr/internal/adf"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/exitcode"
 )
 
 // convert parses a document and renders it, which is the path a description

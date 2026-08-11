@@ -3,7 +3,7 @@ package site_test
 import (
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/site"
+	"github.com/kmoneil/jr/internal/site"
 )
 
 // Cloud names the caller by accountId and Data Center by name and key. A

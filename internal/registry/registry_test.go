@@ -4,9 +4,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/exitcode"
-	"github.com/kmoneil/jira-cli/internal/registry"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/exitcode"
+	"github.com/kmoneil/jr/internal/registry"
 )
 
 // The rules this project promises about the command surface — banned flags,

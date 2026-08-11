@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/transport"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/transport"
 )
 
 // FieldsPath is the endpoint that lists a site's fields, relative to the API

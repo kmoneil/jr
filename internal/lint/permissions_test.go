@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kmoneil/jira-cli/internal/auth"
-	"github.com/kmoneil/jira-cli/internal/idem"
-	"github.com/kmoneil/jira-cli/internal/jctx"
-	"github.com/kmoneil/jira-cli/internal/site"
+	"github.com/kmoneil/jr/internal/auth"
+	"github.com/kmoneil/jr/internal/idem"
+	"github.com/kmoneil/jr/internal/jctx"
+	"github.com/kmoneil/jr/internal/site"
 )
 
 // architectureDoc publishes the mode of every file and directory this tool

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/buildinfo"
+	"github.com/kmoneil/jr/internal/buildinfo"
 )
 
 // notYetGating names the tags that are declared but gate no code, with the

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // FromMarkdown converts markdown to an ADF document.

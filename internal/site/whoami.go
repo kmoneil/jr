@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/transport"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/transport"
 )
 
 // Account is who a credential authenticates as.

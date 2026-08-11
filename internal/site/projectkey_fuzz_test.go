@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/site"
+	"github.com/kmoneil/jr/internal/site"
 )
 
 // FuzzAValidProjectKeyIsASafePathSegment is the property the four `project`

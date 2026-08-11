@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/buildinfo"
-	"github.com/kmoneil/jira-cli/internal/cli"
-	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jr/internal/buildinfo"
+	"github.com/kmoneil/jr/internal/cli"
+	"github.com/kmoneil/jr/internal/exitcode"
 )
 
 // TestEveryExampleParses runs every example a command publishes.

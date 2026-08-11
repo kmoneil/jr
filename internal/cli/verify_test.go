@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jr/internal/exitcode"
 )
 
 // fakeJira serves the two endpoints `auth login` verifies against.

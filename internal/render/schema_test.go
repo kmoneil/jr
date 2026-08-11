@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/render"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/render"
 )
 
 // widget is a shape with one of everything the schema language can express, so

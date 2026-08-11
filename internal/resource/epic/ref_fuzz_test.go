@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/resource/epic"
+	"github.com/kmoneil/jr/internal/resource/epic"
 )
 
 // FuzzValidateRefProducesASafePathSegment holds this resource to the same

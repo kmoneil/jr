@@ -6,8 +6,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/registry"
-	"github.com/kmoneil/jira-cli/internal/render"
+	"github.com/kmoneil/jr/internal/registry"
+	"github.com/kmoneil/jr/internal/render"
 )
 
 // stdoutOwners registers the two shapes that write to stdout themselves, so the

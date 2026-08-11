@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // Version is the ADF schema version this package emits.

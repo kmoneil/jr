@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/registry"
-	"github.com/kmoneil/jira-cli/internal/render"
-	"github.com/kmoneil/jira-cli/internal/site"
+	"github.com/kmoneil/jr/internal/registry"
+	"github.com/kmoneil/jr/internal/render"
+	"github.com/kmoneil/jr/internal/site"
 )
 
 // TestTheRecordedDataCenterListingIsAConversationAServerHad is the half of the

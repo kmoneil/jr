@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kmoneil/jira-cli/internal/buildinfo"
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/buildinfo"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // Environment variables that relocate the three XDG roots, plus the override

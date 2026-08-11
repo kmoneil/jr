@@ -3,7 +3,7 @@ package auth
 import (
 	"strings"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // Environment variables the env provider reads.

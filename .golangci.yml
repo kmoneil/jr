@@ -50,4 +50,4 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/kmoneil/jira-cli
+        - github.com/kmoneil/jr

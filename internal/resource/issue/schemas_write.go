@@ -2,7 +2,7 @@
 
 package issue
 
-import "github.com/kmoneil/jira-cli/internal/render"
+import "github.com/kmoneil/jr/internal/render"
 
 // The mutating verbs' shapes. They are here rather than beside each verb
 // because they have far more in common than the verbs do: nearly all of them

@@ -16,9 +16,9 @@ package issue
 import (
 	"context"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/registry"
-	"github.com/kmoneil/jira-cli/internal/site"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/registry"
+	"github.com/kmoneil/jr/internal/site"
 )
 
 // resolvedAssigneeKey is where validation leaves the id it resolved.

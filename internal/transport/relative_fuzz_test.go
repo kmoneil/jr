@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/transport"
+	"github.com/kmoneil/jr/internal/transport"
 )
 
 // fuzzBase is the shape the guarantee is hardest to hold under: a site served

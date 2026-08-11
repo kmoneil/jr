@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/buildinfo"
-	"github.com/kmoneil/jira-cli/internal/cli"
-	"github.com/kmoneil/jira-cli/internal/registry"
+	"github.com/kmoneil/jr/internal/buildinfo"
+	"github.com/kmoneil/jr/internal/cli"
+	"github.com/kmoneil/jr/internal/registry"
 
 	// Every resource, so registry.Default holds them. The blank import is how
 	// the other lint tests reach it too; cli.Registry adds the built-ins on top.
-	_ "github.com/kmoneil/jira-cli/internal/commands"
+	_ "github.com/kmoneil/jr/internal/commands"
 )
 
 // commandReference is the generated browsable reference for every command.

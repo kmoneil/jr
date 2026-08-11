@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"github.com/kmoneil/jira-cli/internal/registry"
+	"github.com/kmoneil/jr/internal/registry"
 )
 
 // gate refuses a command whose declaration says it may not run here.

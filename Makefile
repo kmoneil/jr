@@ -1,5 +1,5 @@
 BINARY  := jr
-MODULE  := github.com/kmoneil/jira-cli
+MODULE  := github.com/kmoneil/jr
 PKG     := ./cmd/jr
 BIN     := bin
 

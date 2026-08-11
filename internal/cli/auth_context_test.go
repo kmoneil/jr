@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/exitcode"
-	"github.com/kmoneil/jira-cli/internal/render"
+	"github.com/kmoneil/jr/internal/exitcode"
+	"github.com/kmoneil/jr/internal/render"
 )
 
 // theToken is what these tests hunt for in any output that is not `auth token`.

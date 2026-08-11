@@ -14,7 +14,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // Context is one named site/project pairing.

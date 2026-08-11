@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/registry"
-	"github.com/kmoneil/jira-cli/internal/render"
-	"github.com/kmoneil/jira-cli/internal/site"
-	"github.com/kmoneil/jira-cli/internal/transport"
+	"github.com/kmoneil/jr/internal/registry"
+	"github.com/kmoneil/jr/internal/render"
+	"github.com/kmoneil/jr/internal/site"
+	"github.com/kmoneil/jr/internal/transport"
 )
 
 // recordedConn is replayConn plus the check that makes a recording worth

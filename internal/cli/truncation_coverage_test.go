@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/cli"
-	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jr/internal/cli"
+	"github.com/kmoneil/jr/internal/exitcode"
 
 	// Every command the binary ships, not only the built-ins.
-	_ "github.com/kmoneil/jira-cli/internal/commands"
+	_ "github.com/kmoneil/jr/internal/commands"
 )
 
 // truncationProofs names, for every command that declares exit 3, the test that

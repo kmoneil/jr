@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/exitcode"
 )
 
 func TestConstructorsCarryTheirExitStatus(t *testing.T) {

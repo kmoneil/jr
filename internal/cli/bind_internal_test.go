@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kmoneil/jira-cli/internal/registry"
+	"github.com/kmoneil/jr/internal/registry"
 )
 
 // TestHarvestTellsAnExplicitZeroFromAnAbsentFlag pins the mechanism the

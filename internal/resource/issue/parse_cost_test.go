@@ -8,8 +8,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/kmoneil/jira-cli/internal/render"
-	"github.com/kmoneil/jira-cli/internal/resource/issue"
+	"github.com/kmoneil/jr/internal/render"
+	"github.com/kmoneil/jr/internal/resource/issue"
 )
 
 // The parse side of §12.2.

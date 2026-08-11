@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // Flags holds parsed flag values for one invocation.

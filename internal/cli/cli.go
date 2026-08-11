@@ -15,10 +15,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/exitcode"
-	"github.com/kmoneil/jira-cli/internal/registry"
-	"github.com/kmoneil/jira-cli/internal/render"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/exitcode"
+	"github.com/kmoneil/jr/internal/registry"
+	"github.com/kmoneil/jr/internal/render"
 )
 
 // EnvFormat overrides the default output format for every command.

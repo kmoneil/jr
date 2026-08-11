@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/auth"
+	"github.com/kmoneil/jr/internal/auth"
 )
 
 func writeNetrc(t *testing.T, content string) string {

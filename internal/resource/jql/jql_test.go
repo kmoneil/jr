@@ -7,13 +7,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/idem"
-	"github.com/kmoneil/jira-cli/internal/registry"
-	"github.com/kmoneil/jira-cli/internal/render"
-	jqlcmd "github.com/kmoneil/jira-cli/internal/resource/jql"
-	"github.com/kmoneil/jira-cli/internal/site"
-	"github.com/kmoneil/jira-cli/internal/transport"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/idem"
+	"github.com/kmoneil/jr/internal/registry"
+	"github.com/kmoneil/jr/internal/render"
+	jqlcmd "github.com/kmoneil/jr/internal/resource/jql"
+	"github.com/kmoneil/jr/internal/site"
+	"github.com/kmoneil/jr/internal/transport"
 )
 
 const (

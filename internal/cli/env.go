@@ -6,10 +6,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/kmoneil/jira-cli/internal/auth"
-	"github.com/kmoneil/jira-cli/internal/buildinfo"
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/jctx"
+	"github.com/kmoneil/jr/internal/auth"
+	"github.com/kmoneil/jr/internal/buildinfo"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/jctx"
 )
 
 // maxTokenBytes bounds what --token-stdin will read. A token is short; anything

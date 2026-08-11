@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // Type is what a value in the output is, beyond being text.

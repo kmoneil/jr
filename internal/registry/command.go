@@ -7,11 +7,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/kmoneil/jira-cli/internal/exitcode"
-	"github.com/kmoneil/jira-cli/internal/idem"
-	"github.com/kmoneil/jira-cli/internal/render"
-	"github.com/kmoneil/jira-cli/internal/site"
-	"github.com/kmoneil/jira-cli/internal/transport"
+	"github.com/kmoneil/jr/internal/exitcode"
+	"github.com/kmoneil/jr/internal/idem"
+	"github.com/kmoneil/jr/internal/render"
+	"github.com/kmoneil/jr/internal/site"
+	"github.com/kmoneil/jr/internal/transport"
 )
 
 // FlagType is the declared type of a flag, used for the cobra binding, the MCP

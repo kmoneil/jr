@@ -3,7 +3,7 @@ package render
 import (
 	"strconv"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // diagnosticVersion is the schema version of the <error> and <warning>

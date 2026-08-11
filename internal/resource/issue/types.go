@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kmoneil/jira-cli/internal/adf"
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/render"
-	"github.com/kmoneil/jira-cli/internal/site"
+	"github.com/kmoneil/jr/internal/adf"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/render"
+	"github.com/kmoneil/jr/internal/site"
 )
 
 // Kinds and schema versions this resource emits. Bump a version in the same

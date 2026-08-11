@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kmoneil/jira-cli/internal/site"
-	"github.com/kmoneil/jira-cli/internal/transport"
+	"github.com/kmoneil/jr/internal/site"
+	"github.com/kmoneil/jr/internal/transport"
 )
 
 // TestTheProbeUnderAContextPathIsAConversationAServerHad is this package's

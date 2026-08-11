@@ -11,7 +11,7 @@ import (
 	"io"
 	"slices"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // Write encodes a result document to w. It validates the document first, so a

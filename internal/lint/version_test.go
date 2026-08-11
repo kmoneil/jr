@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/buildinfo"
+	"github.com/kmoneil/jr/internal/buildinfo"
 )
 
 // semver is the shape a version has to have, written here rather than imported

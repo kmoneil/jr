@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jr/internal/exitcode"
 )
 
 // Error is a structured, renderable failure.

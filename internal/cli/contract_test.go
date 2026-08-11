@@ -5,16 +5,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/buildinfo"
-	"github.com/kmoneil/jira-cli/internal/cli"
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/exitcode"
-	"github.com/kmoneil/jira-cli/internal/registry"
-	"github.com/kmoneil/jira-cli/internal/render"
+	"github.com/kmoneil/jr/internal/buildinfo"
+	"github.com/kmoneil/jr/internal/cli"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/exitcode"
+	"github.com/kmoneil/jr/internal/registry"
+	"github.com/kmoneil/jr/internal/render"
 
 	// The contract rules must hold for every command the binary ships, not
 	// only the built-ins, so the resources are linked in here too.
-	_ "github.com/kmoneil/jira-cli/internal/commands"
+	_ "github.com/kmoneil/jr/internal/commands"
 )
 
 // bannedFlags are spellings this project has decided never to ship. Each is a

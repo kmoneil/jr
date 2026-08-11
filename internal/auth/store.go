@@ -9,7 +9,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // storePerm is the only mode the credential file may have. A credential

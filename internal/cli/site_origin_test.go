@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jr/internal/exitcode"
 )
 
 // notJira answers everything with an HTML 404, which is what a site URL missing

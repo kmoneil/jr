@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/exitcode"
 )
 
 // conflictExit is what a reused key exits with: a precondition failed.

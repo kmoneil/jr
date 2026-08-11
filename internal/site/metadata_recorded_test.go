@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kmoneil/jira-cli/internal/site"
+	"github.com/kmoneil/jr/internal/site"
 )
 
 // TestTheRecordedCreateMetaIsAConversationAServerHad closes the last of the

@@ -3,8 +3,8 @@ package jql_test
 import (
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/jql"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/jql"
 )
 
 // TestEveryQueryCarriesAnOrderBy is the invariant this file exists for. Without

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/render"
-	"github.com/kmoneil/jira-cli/internal/resource/issue"
+	"github.com/kmoneil/jr/internal/render"
+	"github.com/kmoneil/jr/internal/resource/issue"
 )
 
 // costDump writes the four rendered payloads somewhere a token counter can read

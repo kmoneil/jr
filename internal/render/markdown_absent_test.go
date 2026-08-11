@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/render"
+	"github.com/kmoneil/jr/internal/render"
 )
 
 // TestMarkdownIsAbsentWithoutTheTag is the half of the pair that runs in every

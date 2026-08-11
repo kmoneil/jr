@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kmoneil/jira-cli/internal/site"
+	"github.com/kmoneil/jr/internal/site"
 )
 
 // Key is a parsed issue key.

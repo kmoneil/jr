@@ -15,17 +15,17 @@ package commands
 
 import (
 	// Each resource registers its commands from init.
-	_ "github.com/kmoneil/jira-cli/internal/resource/board"
-	_ "github.com/kmoneil/jira-cli/internal/resource/epic"
-	_ "github.com/kmoneil/jira-cli/internal/resource/field"
-	_ "github.com/kmoneil/jira-cli/internal/resource/issue"
-	_ "github.com/kmoneil/jira-cli/internal/resource/jql"
-	_ "github.com/kmoneil/jira-cli/internal/resource/meta"
-	_ "github.com/kmoneil/jira-cli/internal/resource/project"
-	_ "github.com/kmoneil/jira-cli/internal/resource/sprint"
-	_ "github.com/kmoneil/jira-cli/internal/resource/user"
+	_ "github.com/kmoneil/jr/internal/resource/board"
+	_ "github.com/kmoneil/jr/internal/resource/epic"
+	_ "github.com/kmoneil/jr/internal/resource/field"
+	_ "github.com/kmoneil/jr/internal/resource/issue"
+	_ "github.com/kmoneil/jr/internal/resource/jql"
+	_ "github.com/kmoneil/jr/internal/resource/meta"
+	_ "github.com/kmoneil/jr/internal/resource/project"
+	_ "github.com/kmoneil/jr/internal/resource/sprint"
+	_ "github.com/kmoneil/jr/internal/resource/user"
 
 	// The verbs that move issues between containers span two resources, so
 	// they live in workflow rather than in either one.
-	_ "github.com/kmoneil/jira-cli/internal/workflow"
+	_ "github.com/kmoneil/jr/internal/workflow"
 )

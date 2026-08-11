@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/adf"
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/adf"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files instead of comparing against them")

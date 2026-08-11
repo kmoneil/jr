@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kmoneil/jira-cli/internal/adf"
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/adf"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // TestPathologicalInputFinishes guards against a conversion that is quadratic

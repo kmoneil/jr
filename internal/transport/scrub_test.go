@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/transport"
+	"github.com/kmoneil/jr/internal/transport"
 )
 
 // realish is a response shaped like the ones a Cloud instance actually returns,

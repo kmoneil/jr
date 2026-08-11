@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // Format is an output encoding. All four are available on every command; the

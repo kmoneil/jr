@@ -3,8 +3,8 @@ package transport
 import (
 	"sync"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/exitcode"
 )
 
 // BudgetExceededCode is the error code for a request budget that ran out.

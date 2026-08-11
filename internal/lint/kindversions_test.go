@@ -6,12 +6,12 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/buildinfo"
-	"github.com/kmoneil/jira-cli/internal/cli"
+	"github.com/kmoneil/jr/internal/buildinfo"
+	"github.com/kmoneil/jr/internal/cli"
 
 	// Every resource, so registry.Default holds them. The blank imports are how
 	// the other lint tests reach it too; cli.Registry adds the built-ins on top.
-	_ "github.com/kmoneil/jira-cli/internal/commands"
+	_ "github.com/kmoneil/jr/internal/commands"
 )
 
 // versionedDocs are the documents that print a worked example of a result

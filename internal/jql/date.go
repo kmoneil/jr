@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // dateLayouts are the absolute forms Jira accepts, most specific first.

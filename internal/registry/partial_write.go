@@ -2,7 +2,7 @@
 
 package registry
 
-import "github.com/kmoneil/jira-cli/internal/render"
+import "github.com/kmoneil/jr/internal/render"
 
 // PartiallyApplied is what a mutating command returns when it did some of what
 // it was asked and then stopped.

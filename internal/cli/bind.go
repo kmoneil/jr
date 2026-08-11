@@ -8,8 +8,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/registry"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/registry"
 )
 
 // bindFlags declares a command's flags on its cobra command and returns a

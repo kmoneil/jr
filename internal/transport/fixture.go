@@ -12,7 +12,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // Deployment names which kind of Jira a fixture was recorded against. Behavior

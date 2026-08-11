@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jr/internal/exitcode"
 )
 
 // fullContext creates one with every setting populated, so a test can tell an

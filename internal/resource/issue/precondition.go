@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/site"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/site"
 )
 
 // Precondition names the version of an issue a caller was looking at when they

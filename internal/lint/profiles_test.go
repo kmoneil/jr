@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/buildinfo"
+	"github.com/kmoneil/jr/internal/buildinfo"
 )
 
 // The two files this test holds to each other. The Makefile is the authority on

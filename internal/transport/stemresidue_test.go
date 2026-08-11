@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/transport"
+	"github.com/kmoneil/jr/internal/transport"
 )
 
 // cassetteWith builds a one-interaction cassette from a body and headers.

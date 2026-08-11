@@ -8,7 +8,7 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // Mark is one inline mark on a text node: strong, em, link, and the rest.

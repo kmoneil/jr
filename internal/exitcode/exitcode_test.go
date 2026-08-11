@@ -3,7 +3,7 @@ package exitcode_test
 import (
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jr/internal/exitcode"
 )
 
 // TestCodesAreFrozen pins every code to its number and name.

@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-const module = "github.com/kmoneil/jira-cli"
+const module = "github.com/kmoneil/jr"
 
 type pkg struct {
 	ImportPath   string

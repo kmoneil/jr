@@ -3,7 +3,7 @@ package jql
 import (
 	"strings"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // DefaultSortField is the field results are ordered by when the caller names

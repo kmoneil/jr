@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/transport"
+	"github.com/kmoneil/jr/internal/transport"
 )
 
 // theToken is the credential every test in this file hunts for. If it appears

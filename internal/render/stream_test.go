@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/render"
+	"github.com/kmoneil/jr/internal/render"
 )
 
 func streamSpec() render.StreamSpec {

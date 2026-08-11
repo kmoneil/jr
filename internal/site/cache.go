@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // Cache is a TTL'd on-disk cache for one site's metadata: the deployment

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/site"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/site"
 )
 
 // PageToken is an opaque cursor a caller can pass back to resume a result set.

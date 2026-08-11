@@ -1,4 +1,4 @@
-module github.com/kmoneil/jira-cli
+module github.com/kmoneil/jr
 
 go 1.26.5
 

@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kmoneil/jira-cli/internal/site"
-	"github.com/kmoneil/jira-cli/internal/transport"
+	"github.com/kmoneil/jr/internal/site"
+	"github.com/kmoneil/jr/internal/transport"
 )
 
 // Environment variables that drive recording. There are no flags for this: a

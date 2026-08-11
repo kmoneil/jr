@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // lockPath is where a ledger's lock lives, spelled once so a test that asserts

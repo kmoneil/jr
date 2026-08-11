@@ -11,7 +11,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // Config is the contents of config.toml.

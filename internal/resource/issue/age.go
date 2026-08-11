@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/kmoneil/jira-cli/internal/registry"
-	"github.com/kmoneil/jira-cli/internal/render"
+	"github.com/kmoneil/jr/internal/registry"
+	"github.com/kmoneil/jr/internal/render"
 )
 
 // ageFlagName adds a human-readable age to the output.

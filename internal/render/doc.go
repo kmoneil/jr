@@ -1,7 +1,7 @@
 package render
 
 import (
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // Doc is a complete command result: a stable kind, a schema version for that

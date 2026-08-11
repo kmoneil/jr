@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/registry"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/registry"
 )
 
 // assigneeSentinels name no user.

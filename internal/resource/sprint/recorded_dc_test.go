@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/registry"
-	"github.com/kmoneil/jira-cli/internal/render"
-	"github.com/kmoneil/jira-cli/internal/site"
+	"github.com/kmoneil/jr/internal/registry"
+	"github.com/kmoneil/jr/internal/render"
+	"github.com/kmoneil/jr/internal/site"
 )
 
 // The Data Center half of recorded_test.go. recordedConn is declared there and

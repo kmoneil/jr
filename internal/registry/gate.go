@@ -1,7 +1,7 @@
 package registry
 
 import (
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // Gate refuses a command that declares itself mutating or destructive when the

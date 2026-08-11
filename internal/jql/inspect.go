@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // Fields returns every field name a query compares against, lowercased and

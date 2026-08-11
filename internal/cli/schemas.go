@@ -1,8 +1,8 @@
 package cli
 
 import (
-	"github.com/kmoneil/jira-cli/internal/auth"
-	"github.com/kmoneil/jira-cli/internal/render"
+	"github.com/kmoneil/jr/internal/auth"
+	"github.com/kmoneil/jr/internal/render"
 )
 
 // The built-in commands own five kinds between them. Their schemas live here

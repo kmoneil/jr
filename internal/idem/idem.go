@@ -27,7 +27,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // ledgerPerm is the mode the ledger is written at.

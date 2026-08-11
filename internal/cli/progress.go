@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kmoneil/jira-cli/internal/registry"
+	"github.com/kmoneil/jr/internal/registry"
 )
 
 // progressInterval bounds how often the line is rewritten. A counter updated

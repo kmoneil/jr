@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/transport"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/transport"
 )
 
 // Transition is one workflow move available on an issue right now.

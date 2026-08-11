@@ -20,8 +20,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/transport"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/transport"
 )
 
 // Kind is which flavour of Jira a site runs.

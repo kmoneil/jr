@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/transport"
+	"github.com/kmoneil/jr/internal/transport"
 )
 
 // TestARecordingKeepsOnlyTheHeadersSomethingReads is the guarantee that a

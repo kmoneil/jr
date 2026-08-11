@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kmoneil/jira-cli/internal/transport"
+	"github.com/kmoneil/jr/internal/transport"
 )
 
 // Every other test in this package injects a clock, a jitter source, and a

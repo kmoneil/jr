@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/buildinfo"
-	"github.com/kmoneil/jira-cli/internal/cli"
-	"github.com/kmoneil/jira-cli/internal/exitcode"
+	"github.com/kmoneil/jr/internal/buildinfo"
+	"github.com/kmoneil/jr/internal/cli"
+	"github.com/kmoneil/jr/internal/exitcode"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files instead of comparing against them")

@@ -5,9 +5,9 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/exitcode"
-	"github.com/kmoneil/jira-cli/internal/jql"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/exitcode"
+	"github.com/kmoneil/jr/internal/jql"
 )
 
 func render(t *testing.T, b *jql.Builder) string {

@@ -9,17 +9,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kmoneil/jira-cli/internal/cli"
-	"github.com/kmoneil/jira-cli/internal/exitcode"
-	"github.com/kmoneil/jira-cli/internal/registry"
+	"github.com/kmoneil/jr/internal/cli"
+	"github.com/kmoneil/jr/internal/exitcode"
+	"github.com/kmoneil/jr/internal/registry"
 
 	// Every resource, so the coverage check below can hold the source sweep to
 	// the command set the binary actually registers.
-	_ "github.com/kmoneil/jira-cli/internal/commands"
+	_ "github.com/kmoneil/jr/internal/commands"
 )
 
 // modulePath prefixes every import that resolves to a package in this tree.
-const modulePath = "github.com/kmoneil/jira-cli/"
+const modulePath = "github.com/kmoneil/jr/"
 
 // entryPoints are the fields of a registry.Command that hold code the CLI runs
 // on the caller's behalf, and whose failures are therefore that command's

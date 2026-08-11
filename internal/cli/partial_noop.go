@@ -2,7 +2,7 @@
 
 package cli
 
-import "github.com/kmoneil/jira-cli/internal/registry"
+import "github.com/kmoneil/jr/internal/registry"
 
 // writeAppliedSoFar is the reader build's half of the pair. Nothing here can
 // mutate Jira, so no command can apply half of anything, and the type the write

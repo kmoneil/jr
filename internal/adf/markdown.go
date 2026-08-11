@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kmoneil/jira-cli/internal/errs"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // ToMarkdown converts an ADF document to markdown.

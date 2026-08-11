@@ -12,17 +12,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kmoneil/jira-cli/internal/cli"
-	"github.com/kmoneil/jira-cli/internal/errs"
-	"github.com/kmoneil/jira-cli/internal/idem"
-	"github.com/kmoneil/jira-cli/internal/registry"
-	"github.com/kmoneil/jira-cli/internal/render"
-	"github.com/kmoneil/jira-cli/internal/site"
-	"github.com/kmoneil/jira-cli/internal/transport"
+	"github.com/kmoneil/jr/internal/cli"
+	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/idem"
+	"github.com/kmoneil/jr/internal/registry"
+	"github.com/kmoneil/jr/internal/render"
+	"github.com/kmoneil/jr/internal/site"
+	"github.com/kmoneil/jr/internal/transport"
 
 	// The rule holds for every command the binary ships, not only the
 	// built-ins, so the resources are linked in here too.
-	_ "github.com/kmoneil/jira-cli/internal/commands"
+	_ "github.com/kmoneil/jr/internal/commands"
 )
 
 // TestEveryFlagChangesWhatTheCommandDoes drives each flag on each command twice
