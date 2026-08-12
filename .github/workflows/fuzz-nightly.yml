@@ -1,0 +1,125 @@
+# The fuzz search, kept off the pull-request path on purpose.
+#
+# ci.yml runs 20 seconds a target on a pull request, which exercises the
+# machinery against the code that just changed. This is where discovery
+# actually happens: 10 minutes a target, every night, against a corpus that
+# carries over from the run before, because coverage compounds with cumulative
+# CPU time and not with the length of any one run.
+#
+# It is scheduled rather than required for the same reason it is long. A find
+# here is usually about code the last pull request never touched, and a
+# nondeterministic red on somebody's unrelated merge teaches people to press
+# re-run, which is how a real crasher gets waved through. So a find opens an
+# issue and keeps the input; it does not block a queue.
+name: fuzz-nightly
+
+on:
+  schedule:
+    # 07:17 UTC. Off the hour because every cron in the world runs on it, and
+    # a queued runner is a shorter fuzz run.
+    - cron: "17 7 * * *"
+  workflow_dispatch:
+    inputs:
+      fuzztime:
+        description: time budget per target
+        required: false
+        default: 10m
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "1.26"
+
+jobs:
+  packages:
+    name: list the packages with fuzz targets
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.list.outputs.packages }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: list
+        id: list
+        run: |
+          packages=$(make -s fuzz-packages | jq -R . | jq -sc .)
+          echo "packages=$packages" >> "$GITHUB_OUTPUT"
+          echo "$packages"
+
+  fuzz:
+    name: fuzz (${{ matrix.package }})
+    needs: packages
+    runs-on: ubuntu-latest
+    strategy:
+      # No fail-fast: each package is an independent hunt, and killing the
+      # other nine because one found something is throwing away the night.
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.packages.outputs.packages) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: locate the fuzz cache
+        id: gocache
+        run: echo "dir=$(go env GOCACHE)/fuzz" >> "$GITHUB_OUTPUT"
+      # The same key prefix ci.yml uses, deliberately. This runs on the default
+      # branch, and a cache written there is readable from every pull request,
+      # so what the night finds is what tomorrow's 20-second runs start from.
+      - name: restore the fuzz corpus
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.gocache.outputs.dir }}
+          key: fuzz-corpus-${{ matrix.package }}-${{ github.run_id }}
+          restore-keys: fuzz-corpus-${{ matrix.package }}-
+      - name: fuzz
+        run: make fuzz FUZZPKGS=./${{ matrix.package }} FUZZTIME=${{ inputs.fuzztime || '10m' }}
+      # The input Go wrote is the whole value of the run. It is committed by
+      # hand as an f.Add seed alongside the fix, so it has to survive the
+      # runner: an artifact, and an issue that says where to find it.
+      - name: upload the crasher
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: crasher-${{ strategy.job-index }}
+          path: ${{ matrix.package }}/testdata/fuzz/
+          if-no-files-found: warn
+
+  report:
+    name: report a find
+    needs: fuzz
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      # One issue per run rather than one per package, because a crasher in a
+      # shared helper lights up several at once and ten issues describing one
+      # bug is worse than one issue naming ten packages.
+      - name: open an issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "fuzz: the nightly sweep found something" \
+            --label fuzz \
+            --body "$(printf '%s\n' \
+              "The nightly fuzz sweep failed on ${{ github.sha }}." \
+              "" \
+              "Run: $RUN" \
+              "" \
+              "The failing input is attached to that run as an artifact. Commit it" \
+              "under the target's testdata/fuzz directory **and** add it as an" \
+              "\`f.Add\` seed in the same change, so the regression is visible in the" \
+              "test source and not only in a corpus file." \
+              "" \
+              "A red here is sometimes golang/go#75804 rather than a real find:" \
+              "scripts/fuzz-verdict.sh classifies it, and the job log says which" \
+              "verdict it reached.")"

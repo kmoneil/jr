@@ -1,8 +1,8 @@
 version: 2
 
 updates:
-  # Go modules. The list is deliberately short — four direct dependencies — so
-  # a bump here is a real event rather than noise, and grouping them would hide
+  # Go modules. The list is deliberately short, five direct dependencies, so a
+  # bump here is a real event rather than noise, and grouping them would hide
   # which one moved.
   - package-ecosystem: gomod
     directory: /
@@ -32,3 +32,15 @@ updates:
     labels:
       - dependencies
       - ci
+    # Grouped, unlike gomod above, and for the reason gomod is not: these move
+    # together. The first run opened four pull requests for four actions that
+    # do the same thing in the same file, and merging any one of them made the
+    # other three out of date, because the ruleset requires a branch to be
+    # current before it merges. Four rebases to change four version numbers.
+    #
+    # A module bump changes what ships and deserves its own review; an action
+    # bump changes what CI does, and CI either runs or it does not.
+    groups:
+      actions:
+        patterns:
+          - "*"

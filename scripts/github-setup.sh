@@ -46,6 +46,17 @@ gh repo view "$REPO" >/dev/null 2>&1 || {
 # .github/workflows/ci.yml, and a name that does not match a job silently
 # protects nothing — GitHub waits for a check that will never report. Keep this
 # list and that file in step.
+# The contexts a pull request has to report before it can merge. Every name
+# here is a job name in .github/workflows/ci.yml, and
+# internal/lint/requiredchecks_test.go holds the two lists together: a required
+# check no job reports sits pending forever and makes every pull request
+# unmergeable, including the one that would fix it.
+#
+# "fuzz" is the aggregate job rather than the sweep itself. The sweep is a
+# matrix over the packages holding fuzz targets, so its contexts are named
+# "fuzz (internal/jql)" and the set of them changes whenever a package gains
+# its first target. The aggregate has a fixed name and fails unless every leg
+# passed.
 CHECKS=(
 	"format, vet, lint"
 	"vulnerability scan"
