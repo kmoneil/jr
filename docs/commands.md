@@ -873,11 +873,12 @@ is where the answer stops being checkable.
 --since is required and bounds the candidate set, because a feed with no time
 bound is a sweep of every issue the credential can see.
 
-**What this cannot promise, and says rather than hides.** Comment authorship is
-not searchable in JQL on either deployment, so the comment half is computed over
-the candidate set the filters bounded: somebody who commented on an issue they
-never otherwise touched, outside the window, is invisible here and no number of
-requests would find them. The result records the bound it searched.
+**Where the comment half comes from.** Comment authorship is not searchable in
+JQL on either deployment, so comments are matched here rather than by the
+server, over the issues --since selected. That set is exact for a question about
+a window: adding a comment moves the issue's own updated timestamp, so an issue
+somebody commented on inside the window is inside the window, whatever else was
+or was not done to it.
 
 The servers also bound what they inline, differently and in different
 directions. Cloud returns the newest 20 comments of a longer thread and Data
@@ -885,6 +886,11 @@ Center returns all of them; both return the *oldest* 20 worklogs, which for a
 feed about recent work is the wrong twenty, so an issue with more than that
 costs one further request to read them properly. Anything still clipped is
 reported: the run exits 3 and the rows say which issue and which source.
+
+Exit 3 is sharper than it looks when --user is given. It means some events were
+not sent, so it also means this person may have events here that you cannot
+see — a comment of theirs can sit outside the twenty Cloud returned. An empty
+feed that exits 3 is not the same answer as an empty feed that exits 0.
 
 Examples:
 
