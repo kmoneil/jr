@@ -129,6 +129,11 @@ There is no next-page token, for the same reason `issue history` has none
 against Data Center: the result set was exhausted, and what is missing is inside
 a row.
 
+`issue activity` is the same shape one level up. Its rows are events rather than
+issues, so the clipped container is not in the document at all — the comments it
+could not read were never rendered — and the warning names `event` to say the
+feed is missing some of what it merged.
+
 ### `markdown` is presentation, and carries no promise
 
 A build with the `render` tag has a fifth format, `markdown`. **It is not part

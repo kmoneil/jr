@@ -211,6 +211,37 @@ Comment authorship is still not searchable — this fetches threads and looks
 rather than asking Jira a question it cannot answer. What it saves is the
 request per issue, not the reading.
 
+### Or ask for the events directly
+
+`issue activity` merges all of it into one time-ordered feed, newest first, in
+the request the page already costs:
+
+```console
+$ jr issue activity --since -7d --user ada
+at                    issue   kind        author         field   time-spent  from         to        body
+2026-08-11T14:02:11Z  ENG-412 comment     Ada Lovelace                                              rolled the runner back
+2026-08-11T13:58:04Z  ENG-412 transition  Ada Lovelace   status              In Progress  Blocked
+2026-08-10T09:14:00Z  ENG-388 worklog     Ada Lovelace           2h
+```
+
+`--kind` narrows it, and narrows the request with it, so a transition feed does
+not pay for comment bodies:
+
+```console
+$ jr issue activity --since -1d --kind transition --kind field
+```
+
+Two things it will not pretend about:
+
+- **The feed is bounded by the issues `--since` matched.** Somebody who
+  commented on an issue they never otherwise touched is not in it, because JQL
+  cannot search comment authorship and no number of requests changes that.
+- **Some of it may be clipped**, and then the run exits 3 rather than looking
+  whole. Cloud sends the newest twenty comments of a longer thread; both
+  deployments send the *oldest* twenty worklogs, which for a feed about recent
+  work is the wrong twenty, so an issue with more than that costs one extra
+  request to read properly and gets it.
+
 ## Reading an issue
 
 ```console

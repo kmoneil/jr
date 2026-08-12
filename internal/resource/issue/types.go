@@ -120,6 +120,19 @@ type Issue struct {
 	ThreadTotal   int
 	ThreadStartAt int
 
+	// Work is the worklog projection and Changes the changelog, populated the
+	// same way and on the same terms as Thread. Both deployments cap the
+	// worklog projection at 20 and return the *oldest* 20, so WorkTotal is the
+	// number that decides whether the recent work is even in here.
+	Work      []Worklog
+	HasWork   bool
+	WorkTotal int
+	// Changes is the whole changelog on both deployments, which is why it
+	// carries no total: nothing observed clips it. It arrives in opposite
+	// orders on the two deployments and is sorted by whoever consumes it.
+	Changes    []Change
+	HasChanges bool
+
 	// URL is where a person opens this issue, set by --url and empty
 	// otherwise.
 	//
@@ -421,7 +434,7 @@ func decodeDescription(raw json.RawMessage, mode BodyMode) (text, format string,
 // caller asked for beyond the default set, and thread says whether the caller
 // asked for the comment projection.
 func decodeIssues(
-	raw []json.RawMessage, extras []string, mode BodyMode, thread bool,
+	raw []json.RawMessage, extras []string, mode BodyMode, want Projections,
 ) ([]Issue, error) {
 	out := make([]Issue, 0, len(raw))
 	for i, data := range raw {
@@ -437,15 +450,118 @@ func decodeIssues(
 			return nil, err
 		}
 		issue.Extra = extraFields(data, extras)
-		if thread {
-			if err := attachThread(&issue, data, mode); err != nil {
-				return nil, err
-			}
+		if err := attachProjections(&issue, data, mode, want); err != nil {
+			return nil, err
 		}
 		out = append(out, issue)
 	}
 	return out, nil
 }
+
+// Projections says which of the three subresources a search was asked to
+// inline. Each is a field or an expand on the same request, so asking for none
+// costs nothing and asking for all three costs no extra round trip.
+type Projections struct {
+	Comments  bool
+	Worklogs  bool
+	Changelog bool
+}
+
+// attachProjections reads whichever subresources the request asked for.
+func attachProjections(
+	issue *Issue, data json.RawMessage, mode BodyMode, want Projections,
+) error {
+	if want.Comments {
+		if err := attachThread(issue, data, mode); err != nil {
+			return err
+		}
+	}
+	if want.Worklogs {
+		if err := attachWork(issue, data, mode); err != nil {
+			return err
+		}
+	}
+	if want.Changelog {
+		if err := attachChanges(issue, data); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// attachWork reads the worklog projection.
+//
+// Both deployments cap it at 20 and return the oldest 20, measured 2026-08-12,
+// so an issue with more work than that has its most recent entries missing here
+// and the total is what says so.
+func attachWork(issue *Issue, data json.RawMessage, mode BodyMode) error {
+	var envelope struct {
+		Fields struct {
+			Worklog *struct {
+				Worklogs []rawWorklog `json:"worklogs"`
+				Total    int          `json:"total"`
+			} `json:"worklog"`
+		} `json:"fields"`
+	}
+	if err := json.Unmarshal(data, &envelope); err != nil {
+		return errs.Remote("MALFORMED_WORKLOGS",
+			"Jira returned worklogs this tool cannot read").
+			WithDetail("issue %s", issue.Key).
+			Wrap(err)
+	}
+	p := envelope.Fields.Worklog
+	if p == nil {
+		return nil
+	}
+	issue.HasWork = true
+	issue.WorkTotal = p.Total
+	for _, raw := range p.Worklogs {
+		converted, err := raw.convert(mode)
+		if err != nil {
+			return err
+		}
+		issue.Work = append(issue.Work, converted)
+	}
+	return nil
+}
+
+// attachChanges reads the changelog an expand returns.
+//
+// It sits beside `fields` rather than inside it, which is why this decodes a
+// different part of the envelope from the other two.
+func attachChanges(issue *Issue, data json.RawMessage) error {
+	var envelope struct {
+		Changelog *struct {
+			Histories []rawHistory `json:"histories"`
+			Values    []rawHistory `json:"values"`
+		} `json:"changelog"`
+	}
+	if err := json.Unmarshal(data, &envelope); err != nil {
+		return errs.Remote("MALFORMED_HISTORY",
+			"Jira returned a changelog this tool cannot read").
+			WithDetail("issue %s", issue.Key).
+			Wrap(err)
+	}
+	if envelope.Changelog == nil {
+		return nil
+	}
+	issue.HasChanges = true
+	saves := envelope.Changelog.Histories
+	if len(saves) == 0 {
+		saves = envelope.Changelog.Values
+	}
+	for _, save := range saves {
+		changes, err := save.flatten()
+		if err != nil {
+			return err
+		}
+		issue.Changes = append(issue.Changes, changes...)
+	}
+	return nil
+}
+
+// WorkComplete reports whether every worklog arrived.
+func (i Issue) WorkComplete() bool { return len(i.Work) >= i.WorkTotal }
 
 // attachThread reads the comment projection a search returns when `comment` is
 // among the requested fields.

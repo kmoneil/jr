@@ -494,6 +494,8 @@ var companionFlags = map[string]map[string]string{
 // probeAltByFlag is the second value, wherever "other" is not one the flag
 // accepts.
 var probeAltByFlag = map[string]string{
+	"since":          "-3651d",
+	"kind":           "worklog",
 	"jql":            "labels = second",
 	"sort":           "created",
 	"created-after":  "-8d",
@@ -527,6 +529,12 @@ var probeAltByFlag = map[string]string{
 // probeByFlag is where a flag's value has to be shaped rather than merely
 // present: a date, a key, a JQL fragment.
 var probeByFlag = map[string]string{
+	// A required date flag, and far enough back to include the fixture's own
+	// timestamps. `issue activity` filters events by this as well as bounding
+	// the query with it, so a window that excludes the fixture leaves the feed
+	// empty and every other flag on the command reads as dead.
+	"since":          "-3650d",
+	"kind":           "comment",
 	"jql":            "labels = probe",
 	"sort":           "updated",
 	"created-after":  "-7d",
@@ -872,12 +880,22 @@ func sweepResponse(path string, kind site.Kind) string {
 // sweepIssue carries exactly the values a flag on a read command renders: a
 // timestamp for --age, a description for --raw-body, and a custom field for
 // --field and --no-context-fields.
+//
+// The comment thread is here for `issue activity`, whose bodies come from the
+// projection rather than from `description` — the same flag on the same fixture
+// had nothing to convert, and a flag with nothing to act on reads exactly like
+// a flag that does nothing.
 func sweepIssue(kind site.Kind) string {
 	return `{"id":"1","key":"ENG-1","fields":{"summary":"probe",
 		"status":{"name":"Open","statusCategory":{"key":"new","name":"To Do"}},
 		"created":"2026-01-01T00:00:00.000+0000",
 		"updated":"2026-01-01T00:00:00.000+0000",
 		"description":` + sweepBody(kind) + `,"labels":["probe"],
+		"comment":{"total":1,"startAt":0,"maxResults":1,"comments":[
+			{"id":"1","created":"2026-01-01T00:00:00.000+0000",
+			 "updated":"2026-01-01T00:00:00.000+0000",
+			 "author":{"name":"ada","accountId":"1","displayName":"Ada Lovelace"},
+			 "body":` + sweepBody(kind) + `}]},
 		"customfield_10042":7}}`
 }
 

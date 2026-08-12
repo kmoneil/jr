@@ -176,10 +176,10 @@ func TestAPagingFlagIsBoundedBeforeTheProbe(t *testing.T) {
 		}
 	}
 
-	// Four commands declare --page-size and one declares --page-token, in
+	// Five commands declare --page-size and one declares --page-token, in
 	// every profile: none of them is behind a tag.
-	if checked != 5 {
-		t.Errorf("checked %d paging flags, want 5; the declarations moved and "+
+	if checked != 6 {
+		t.Errorf("checked %d paging flags, want 6; the declarations moved and "+
 			"this test is now asserting something else", checked)
 	}
 
@@ -249,8 +249,8 @@ func TestAnOmittedPageSizeStillPagesAtTheDefault(t *testing.T) {
 			}
 		})
 	}
-	if checked != 4 {
-		t.Errorf("checked %d commands, want the 4 that declare --page-size", checked)
+	if checked != 5 {
+		t.Errorf("checked %d commands, want the 5 that declare --page-size", checked)
 	}
 }
 
@@ -279,12 +279,43 @@ func invocationWith(c *registry.Command, bad string) *registry.Invocation {
 			args = append(args, "1")
 		}
 	}
-	return &registry.Invocation{
+	inv := &registry.Invocation{
 		Jira:     unreachableSession{},
 		Args:     args,
 		Flags:    registry.NewFlags(),
 		Limit:    registry.Limit{N: registry.DefaultLimit},
 		Progress: registry.NoProgress,
+	}
+	fillRequiredFlags(c, inv.Flags)
+	return inv
+}
+
+// fillRequiredFlags supplies a plausible value for every flag a command
+// declares as required.
+//
+// Cobra enforces those before a command body ever runs, so a real invocation
+// cannot reach Validate without them. A harness that drives Validate directly
+// can, and then every test built on it measures the missing-flag refusal
+// instead of the thing it was written to measure: `issue activity --since` is
+// required, and without this the paging test, the reachable-exits test and the
+// raw-JQL sweep all reported that command refusing for a reason none of them
+// was asking about.
+func fillRequiredFlags(c *registry.Command, flags registry.Flags) {
+	for _, f := range c.Flags {
+		if !f.Required {
+			continue
+		}
+		switch f.Type {
+		case registry.TypeInt:
+			flags.SetInt(f.Name, 1)
+		case registry.TypeBool:
+			flags.SetBool(f.Name, true)
+		default:
+			// A relative date, which is the shape of every required string
+			// flag in the tree today and is harmless to any that is not: this
+			// only has to get past "you did not pass it".
+			flags.SetString(f.Name, "-1d")
+		}
 	}
 }
 

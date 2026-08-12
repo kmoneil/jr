@@ -9,6 +9,7 @@ contract	2	contract
 epic.get	1	epic.get
 epic.list	1	epic.list
 field.list	1	field.list
+issue.activity	1	issue.activity
 issue.attachment.download	1	issue.attachment.download
 issue.attachment.list	1	issue.attachment.list
 issue.comment.list	2	issue.comment.list

@@ -91,6 +91,12 @@ type ListOptions struct {
 	PageToken string
 	// Fields narrows what Jira returns.
 	Fields []string
+	// WithWorklogs and WithChangelog inline the other two subresources on the
+	// same request, for the activity feed. They are separate booleans rather
+	// than one because each costs response size and a caller asking for a
+	// transition feed should not pay for comment bodies.
+	WithWorklogs  bool
+	WithChangelog bool
 	// WithComments asks for each row's comment thread in the same request.
 	//
 	// It is a projection rather than a second call: `comment` goes into the
@@ -303,7 +309,7 @@ func (c *Client) readPage(
 	}
 	out.Requests++
 
-	issues, err := decodeIssues(page.Issues, ExtraFieldNames(opt.Fields), c.Body, opt.WithComments)
+	issues, err := decodeIssues(page.Issues, ExtraFieldNames(opt.Fields), c.Body, opt.projections())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -480,10 +486,25 @@ func renderQuery(opt ListOptions, token PageToken) (string, error) {
 // would have reintroduced by the back door exactly what the refusal keeps out
 // of the front.
 func requestFields(opt ListOptions) []string {
-	if !opt.WithComments {
-		return opt.Fields
+	out := opt.Fields
+	for _, p := range []struct {
+		want bool
+		name string
+	}{{opt.WithComments, "comment"}, {opt.WithWorklogs, "worklog"}} {
+		if p.want {
+			out = append(append([]string{}, out...), p.name)
+		}
 	}
-	return append(append([]string{}, opt.Fields...), "comment")
+	return out
+}
+
+// projections is what the decoder has to look for, derived from what the
+// request asked for so the two cannot disagree.
+func (o ListOptions) projections() Projections {
+	return Projections{
+		Comments: o.WithComments, Worklogs: o.WithWorklogs,
+		Changelog: o.WithChangelog,
+	}
 }
 
 func (c *Client) fetch(
@@ -499,6 +520,12 @@ func (c *Client) fetch(
 	query.Set("maxResults", strconv.Itoa(want))
 	if fields := requestFields(opt); len(fields) > 0 {
 		query.Set("fields", strings.Join(fields, ","))
+	}
+	if opt.WithChangelog {
+		// An expand rather than a field, and it works on the search on both
+		// deployments — which is what makes a feed over many issues cost one
+		// request per page rather than one per issue.
+		query.Set("expand", "changelog")
 	}
 	if param, value, ok := token.resumeValue(c.Site); ok {
 		query.Set(param, value)
@@ -586,7 +613,7 @@ func (c *Client) Get(ctx context.Context, key string, fields []string) (Issue, e
 		return Issue{}, err
 	}
 
-	issues, err := decodeIssues([]json.RawMessage{resp.Body}, ExtraFieldNames(fields), c.Body, false)
+	issues, err := decodeIssues([]json.RawMessage{resp.Body}, ExtraFieldNames(fields), c.Body, Projections{})
 	if err != nil {
 		return Issue{}, err
 	}

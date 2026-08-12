@@ -34,7 +34,7 @@ contains what.
 - **[contract](#contract)** — [`contract`](#jr-contract)
 - **[epic](#epic)** — [`epic add`](#jr-epic-add), [`epic get`](#jr-epic-get), [`epic list`](#jr-epic-list), [`epic remove`](#jr-epic-remove)
 - **[field](#field)** — [`field list`](#jr-field-list)
-- **[issue](#issue)** — [`issue assign`](#jr-issue-assign), [`issue attachment download`](#jr-issue-attachment-download), [`issue attachment list`](#jr-issue-attachment-list), [`issue attachment upload`](#jr-issue-attachment-upload), [`issue clone`](#jr-issue-clone), [`issue comment add`](#jr-issue-comment-add), [`issue comment delete`](#jr-issue-comment-delete), [`issue comment edit`](#jr-issue-comment-edit), [`issue comment list`](#jr-issue-comment-list), [`issue create`](#jr-issue-create), [`issue delete`](#jr-issue-delete), [`issue edit`](#jr-issue-edit), [`issue get`](#jr-issue-get), [`issue history`](#jr-issue-history), [`issue link add`](#jr-issue-link-add), [`issue link list`](#jr-issue-link-list), [`issue link remove`](#jr-issue-link-remove), [`issue list`](#jr-issue-list), [`issue move`](#jr-issue-move), [`issue watch`](#jr-issue-watch), [`issue worklog add`](#jr-issue-worklog-add), [`issue worklog delete`](#jr-issue-worklog-delete), [`issue worklog list`](#jr-issue-worklog-list)
+- **[issue](#issue)** — [`issue activity`](#jr-issue-activity), [`issue assign`](#jr-issue-assign), [`issue attachment download`](#jr-issue-attachment-download), [`issue attachment list`](#jr-issue-attachment-list), [`issue attachment upload`](#jr-issue-attachment-upload), [`issue clone`](#jr-issue-clone), [`issue comment add`](#jr-issue-comment-add), [`issue comment delete`](#jr-issue-comment-delete), [`issue comment edit`](#jr-issue-comment-edit), [`issue comment list`](#jr-issue-comment-list), [`issue create`](#jr-issue-create), [`issue delete`](#jr-issue-delete), [`issue edit`](#jr-issue-edit), [`issue get`](#jr-issue-get), [`issue history`](#jr-issue-history), [`issue link add`](#jr-issue-link-add), [`issue link list`](#jr-issue-link-list), [`issue link remove`](#jr-issue-link-remove), [`issue list`](#jr-issue-list), [`issue move`](#jr-issue-move), [`issue watch`](#jr-issue-watch), [`issue worklog add`](#jr-issue-worklog-add), [`issue worklog delete`](#jr-issue-worklog-delete), [`issue worklog list`](#jr-issue-worklog-list)
 - **[jql](#jql)** — [`jql explain`](#jr-jql-explain), [`jql validate`](#jr-jql-validate)
 - **[mcp](#mcp)** — [`mcp serve`](#jr-mcp-serve)
 - **[meta](#meta)** — [`meta createmeta`](#jr-meta-createmeta), [`meta transitions`](#jr-meta-transitions)
@@ -851,6 +851,66 @@ Default TSV columns: `id`, `name`, `type`, `custom`
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
 ## issue
+
+### `jr issue activity`
+
+List what happened across issues, as events rather than rows
+
+- **paginated** — bounded by `--limit`; a truncated result exits 3
+
+```
+jr issue activity [flags]
+```
+
+Merges four sources into one time-ordered feed: comments, transitions, other
+field changes, and worklogs. Newest first.
+
+This is the question the filters on `issue list` each answer part of.
+--involving finds issues somebody touched; --changed-by finds issues whose one
+named field they moved. Neither says what was done, and assembling that by hand
+is where the answer stops being checkable.
+
+--since is required and bounds the candidate set, because a feed with no time
+bound is a sweep of every issue the credential can see.
+
+**What this cannot promise, and says rather than hides.** Comment authorship is
+not searchable in JQL on either deployment, so the comment half is computed over
+the candidate set the filters bounded: somebody who commented on an issue they
+never otherwise touched, outside the window, is invisible here and no number of
+requests would find them. The result records the bound it searched.
+
+The servers also bound what they inline, differently and in different
+directions. Cloud returns the newest 20 comments of a longer thread and Data
+Center returns all of them; both return the *oldest* 20 worklogs, which for a
+feed about recent work is the wrong twenty, so an issue with more than that
+costs one further request to read them properly. Anything still clipped is
+reported: the run exits 3 and the rows say which issue and which source.
+
+Examples:
+
+```console
+jr issue activity --since -7d
+jr issue activity --since -7d --user ada
+jr issue activity --since -1d --kind transition --format json
+```
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--since` | `string` | — | only events at or after this date or offset, e.g. -7d; required, and it bounds the issues searched as well as the events reported (required) |
+| `--user` | `string` | — | only events by this person, by display name, email, or id; the word currentUser resolves to the caller |
+| `--kind` | `string` | — | only events of this kind: comment, transition, field, or worklog; repeat for several (repeatable) |
+| `--jql` | `string` | — | raw JQL narrowing the issues searched, combined with --since and always parenthesized |
+| `--raw-body` | `bool` | — | emit a Cloud body as the Atlassian Document Format document Jira sent it as, rather than converting it to markdown |
+| `--page-size` | `int` | — | issues per HTTP request, 1 to 100; transport tuning only |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
+
+| Emits | Schema | When |
+| --- | --- | --- |
+| `issue.activity` | v1 | always |
+
+Default TSV columns: `at`, `issue`, `kind`, `author`, `field`, `time-spent`, `from`, `to`, `body`
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
 ### `jr issue assign`
 

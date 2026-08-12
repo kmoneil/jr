@@ -170,7 +170,7 @@ Generated from the registry of the binary that printed this, so it is the truth
 about that binary and not about the project. A reader build lists no mutating
 commands because it contains none.
 
-64 commands, profile `full`, tags `tui, prompt, render, browser, clipboard, mcp, write, admin`.
+65 commands, profile `full`, tags `tui, prompt, render, browser, clipboard, mcp, write, admin`.
 
 | Command | | Does |
 | --- | --- | --- |
@@ -193,6 +193,7 @@ commands because it contains none.
 | `epic list` |  | List a board's epics |
 | `epic remove` | `M` | Take issues out of their epic |
 | `field list` |  | List every field this site has |
+| `issue activity` |  | List what happened across issues, as events rather than rows |
 | `issue assign` | `M` | Set or clear an issue's assignee |
 | `issue attachment download` |  | Download an attachment |
 | `issue attachment list` |  | List the files attached to an issue |

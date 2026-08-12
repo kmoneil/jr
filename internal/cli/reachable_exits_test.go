@@ -192,6 +192,16 @@ var namedInput = map[string]string{
 	"time": "1h",
 }
 
+// namedFlagInput is the same idea for a required *flag* whose value "1" is not.
+//
+// Every required flag used to take "1", which reaches Validate on a flag that
+// wants a number or a name and is refused on one that wants a date — and then
+// this probe reports the command as never having got near the layer it was
+// breaking, which is true and says nothing about the layer.
+var namedFlagInput = map[string]string{
+	"since": "-1d",
+}
+
 // extraArgs is the handful whose required input cannot be derived from a name.
 var extraArgs = map[string][]string{
 	// An edit naming no field is refused as a no-op, before anything resolves.
@@ -217,9 +227,14 @@ func probeArgs(t *testing.T, c *registry.Command, dir string) []string {
 		}
 	}
 	for _, f := range c.Flags {
-		if f.Required {
-			args = append(args, "--"+f.Name, "1")
+		if !f.Required {
+			continue
 		}
+		value := "1"
+		if named := namedFlagInput[f.Name]; named != "" {
+			value = named
+		}
+		args = append(args, "--"+f.Name, value)
 	}
 	if c.Destructive {
 		// Otherwise the confirmation gate answers first and nothing else runs.

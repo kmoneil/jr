@@ -53,6 +53,10 @@ var recordedFixtures = map[string][]string{
 		// almost certainly have made them agree, which is the one thing they
 		// do not do.
 		"with-comments-recorded.cloud.json",
+		// The activity feed, and its --kind variant, which is a separate
+		// recording because the flag narrows the request as well as the output.
+		"activity-recorded.cloud.json",
+		"activity-comments-recorded.cloud.json",
 		// The same two requests against both project styles. The symmetry is
 		// the claim — that the parent field needs no branch on style — so one
 		// of these quietly becoming hand-written would leave the claim

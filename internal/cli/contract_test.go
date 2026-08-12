@@ -113,6 +113,7 @@ func TestRawJQLIsRefusedWhereverItIsAccepted(t *testing.T) {
 			verdicts := map[string][]string{}
 			for _, c := range takesJQL {
 				flags := registry.NewFlags()
+				fillRequiredFlags(c, flags)
 				flags.SetString("jql", fragment)
 				err := c.Validate(t.Context(), &registry.Invocation{
 					Flags: flags, Limit: registry.Limit{N: registry.DefaultLimit},

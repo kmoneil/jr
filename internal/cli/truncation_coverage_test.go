@@ -54,7 +54,10 @@ var truncationProofs = map[string]string{
 	// Two paths to the same bound, so the proof drives both: Cloud stops
 	// mid-page inside the paging loop, and Data Center is bounded while writing
 	// a history it already holds whole.
-	"issue.history":      "internal/resource/issue/history_test.go:TestHistoryTruncatesAndSaysSo",
+	"issue.history": "internal/resource/issue/history_test.go:TestHistoryTruncatesAndSaysSo",
+	// Clipped inside a row rather than short of rows: a Cloud comment thread
+	// the projection capped, which no page token would resume.
+	"issue.activity":     "internal/resource/issue/activity_test.go:TestActivityTruncatesAndSaysSo",
 	"issue.comment.list": "internal/resource/issue/comment_test.go:TestCommentListTruncatesAndSaysSo",
 	"issue.link.list":    "internal/resource/issue/link_worklog_test.go:TestLinkListTruncatesAndSaysSo",
 	"issue.worklog.list": "internal/resource/issue/link_worklog_test.go:TestWorklogListTruncatesAndSaysSo",
