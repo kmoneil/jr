@@ -144,8 +144,10 @@ records the *replacement* createmeta endpoint. The two other passes worth doing:
   23 read verbs exit 0, the twenty-third being `field list` exiting 3 on an
   honestly truncated catalogue, and all ten write verbs exit 0. It also
   confirmed that the four fields in
-  `_plans/backlog/fields-a-data-center-never-populates.md` are absent there
-  too, so none of them is a 10.4 regression.
+  `_plans/backlog/done/fields-a-data-center-never-populates.md` are absent
+  there too, so none of them is a 10.4 regression. The two cassettes named
+  `unknown-status-recorded` and `comma-label-recorded` were recorded on this
+  line rather than on 10.4, and say so where they are asserted.
 - **11.3** — the current line. **Refuses HTTP Basic entirely**
   (`403 {"message":"Basic Authentication has been disabled on this instance."}`)
   so a personal access token is the only way in, and adds `maxResultWindow` to

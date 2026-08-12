@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kmoneil/jr/internal/errs"
 	"github.com/kmoneil/jr/internal/registry"
 	"github.com/kmoneil/jr/internal/render"
 	"github.com/kmoneil/jr/internal/site"
@@ -208,4 +209,112 @@ func TestTheRecordedDataCenterIssueIsAConversationAServerHad(t *testing.T) {
 	if display, _ := reporter.AttrValue("display"); display != "Ada Lovelace" {
 		t.Errorf("reporter display = %q, want Ada Lovelace", display)
 	}
+}
+
+// TestTheServerRefusesAnUnknownStatusAndNotAnUnknownLabel is the evidence
+// behind leaving a comma in a repeatable filter alone.
+//
+// `--status` and `--label` bind as string arrays, so neither splits on a comma
+// and `--status Done,Closed` asks for one status whose name contains one. That
+// is the right default — a status, a label, and a component may all legally
+// contain a comma, and splitting would make such a value unspellable — but the
+// argument for it rests on what happens next, and nothing had asked the server.
+//
+// It answers differently for the two fields, and the difference is the whole
+// point. Jira validates a status name against the ones that exist and refuses
+// an unknown one with its own wording, so the mistake arrives as a loud error a
+// round trip away. It does not validate a label, so an unknown one is legal JQL
+// that matches nothing and comes back complete, empty, and exit 0 — which is
+// indistinguishable from an honest answer, and is the shape this project exists
+// to refuse.
+//
+// Recorded against Jira Software Data Center 9.12.38 rather than the 10.4.0
+// every other recording here came from. Two lines behaving alike is a stronger
+// claim than one, and this is the LTS a lot of customers are still on.
+func TestTheServerRefusesAnUnknownStatusAndNotAnUnknownLabel(t *testing.T) {
+	cmd, ok := registry.Lookup("issue.list")
+	if !ok {
+		t.Fatal("issue list is not registered")
+	}
+
+	t.Run("an unknown status is refused by the server", func(t *testing.T) {
+		conn, replayer := recordedConn(t, "unknown-status-recorded.datacenter.json")
+		flags := registry.NewFlags()
+		flags.SetString("status", "NOSUCHSTATUS")
+
+		_, err := runRecordedList(t, cmd, conn, flags)
+		if err == nil {
+			t.Fatal("a status no project defines was accepted")
+		}
+		// The server's own sentence, carried rather than paraphrased: it names
+		// the value and the field, which is more than this tool knows.
+		detail := errs.Coerce(err).Detail
+		if !strings.Contains(detail, "'NOSUCHSTATUS' does not exist for the field 'status'") {
+			t.Errorf("detail = %q, want Jira's own wording about the status", detail)
+		}
+		if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+			t.Errorf("a recorded exchange was never requested: %v", unplayed)
+		}
+	})
+
+	t.Run("an unknown label is answered with nothing", func(t *testing.T) {
+		conn, replayer := recordedConn(t, "comma-label-recorded.datacenter.json")
+		flags := registry.NewFlags()
+		flags.SetString("label", "a,b")
+
+		out, err := runRecordedList(t, cmd, conn, flags)
+		if err != nil {
+			t.Fatalf("a label that matches nothing was an error: %v", err)
+		}
+		// A header and no rows, reported complete. The tool is not wrong here —
+		// the server was asked a question with no matches and answered it — and
+		// that is exactly why the comma cannot be split silently: this is what
+		// the mistake looks like.
+		if out != "key\tstatus\tassignee\tupdated\tsummary\n" {
+			t.Errorf("listing =\n%q\nwant a header and no rows", out)
+		}
+		if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+			t.Errorf("a recorded exchange was never requested: %v", unplayed)
+		}
+	})
+}
+
+// runRecordedList drives `issue list` against a recording, scoped to the
+// stub's project the way a context scopes it in production. That is the
+// invocation both cassettes above were recorded with.
+func runRecordedList(
+	t *testing.T, cmd *registry.Command, conn *transport.Client, flags registry.Flags,
+) (string, error) {
+	t.Helper()
+
+	inv := &registry.Invocation{
+		Jira: &stubSession{
+			doer: &stubDoer{body: catalogueJSON}, conn: conn, kind: site.DataCenter,
+		},
+		Flags: flags, Limit: registry.Limit{N: 50},
+		Stderr: io.Discard, Progress: registry.NoProgress,
+	}
+	if err := cmd.Validate(t.Context(), inv); err != nil {
+		return "", err
+	}
+
+	var buf strings.Builder
+	stream, err := render.NewStream(&buf, render.TSV, render.StreamSpec{
+		Kind: cmd.Kind(), Version: cmd.KindVersion(),
+		Name: cmd.CollectionName, Columns: cmd.ColumnsFor(inv),
+	})
+	if err != nil {
+		t.Fatalf("stream: %v", err)
+	}
+	result, err := cmd.Stream(t.Context(), inv, stream)
+	if err != nil {
+		return "", err
+	}
+	if err := stream.Close(result.Complete, result.NextPageToken); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	if !result.Complete {
+		t.Error("an exhausted listing was reported incomplete")
+	}
+	return buf.String(), nil
 }

@@ -29,6 +29,15 @@ internal/resource/project datacenter	internal/resource/project/testdata/statuses
 internal/resource/issue datacenter	internal/resource/issue/testdata/list-recorded.datacenter.json	issue list --project ENG --limit 5
 internal/resource/issue datacenter	internal/resource/issue/testdata/issue-recorded.datacenter.json	issue get ENG-1
 
+# The two halves of what a comma in a repeatable filter costs. Jira validates a
+# status name and refuses one it does not know, so `--status Done,Closed` is one
+# status with a comma in it and fails loudly. It does not validate a label, so
+# `--label a,b` is one label with a comma in it and comes back complete, empty,
+# and exit 0. Recorded because the argument for leaving both unsplit rests on
+# what the server does, and nothing had asked it.
+internal/resource/issue datacenter	internal/resource/issue/testdata/unknown-status-recorded.datacenter.json	issue list --project ENG --status NOSUCHSTATUS
+internal/resource/issue datacenter	internal/resource/issue/testdata/comma-label-recorded.datacenter.json	issue list --project ENG --label 'a,b'
+
 internal/resource/jql datacenter	internal/resource/jql/testdata/validate-recorded.datacenter.json	jql validate --jql 'project = ENG ORDER BY key DESC'
 internal/resource/jql datacenter	internal/resource/jql/testdata/invalid-recorded.datacenter.json	jql validate --jql 'project = NOSUCHPROJECT'
 
