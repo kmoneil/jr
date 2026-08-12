@@ -1,7 +1,10 @@
 package issue_test
 
 import (
+	"encoding/json"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -65,11 +68,15 @@ func TestAClearedFieldHasNoNewValueAtAll(t *testing.T) {
 // TestHistoryPagesBySaveAndNotByRow is the one thing the Cloud path does that
 // the shared offset helper could not.
 //
-// The offset counts saves and a row is one flattened item, so a loop advancing
-// by what it wrote would ask for startAt=3 after a first page of two saves and
-// three items — skipping a save and reporting the result complete. The cassette
-// answers startAt=2 and nothing else, so getting this wrong is a replay miss
-// rather than a subtly short answer.
+// The offset counts saves and a row is one flattened item. The recording is ten
+// saves across five pages of two, and one of those pages holds a save that moved
+// two fields at once, so it carries three rows for two saves. A loop advancing
+// by what it wrote would ask for startAt=9 where the server wants 8, skip a
+// save, and report the result complete.
+//
+// The cassette answers those five offsets and nothing else, so getting it wrong
+// is a replay miss rather than a subtly short answer — and the mismatched page
+// is real, made by one `issue edit` that set a summary and a priority together.
 func TestHistoryPagesBySaveAndNotByRow(t *testing.T) {
 	out, result, replayer := runHistory(t, site.Cloud, registry.Limit{All: true}, 2)
 
@@ -77,11 +84,36 @@ func TestHistoryPagesBySaveAndNotByRow(t *testing.T) {
 		t.Error("an exhausted history was reported incomplete")
 	}
 	if n := len(replayer.Unplayed()); n != 0 {
-		t.Errorf("%d interactions went unplayed; the second page was not asked for",
-			n)
+		t.Errorf("%d interactions went unplayed; a page was never asked for", n)
 	}
-	if rows := strings.Count(strings.TrimRight(out, "\n"), "\n"); rows != 4 {
-		t.Errorf("got %d rows, want the 4 items across 3 saves:\n%s", rows, out)
+	if rows := strings.Count(strings.TrimRight(out, "\n"), "\n"); rows != 11 {
+		t.Errorf("got %d rows, want the 11 items across 10 saves:\n%s", rows, out)
+	}
+}
+
+// TestCloudKeysTheChangelogDifferently is what the hand-written cassette this
+// replaced could only assume.
+//
+// Cloud serves a paged bean whose entries live under `values`; Data Center
+// nests them under `changelog.histories`. One decoder reads both, and it reads
+// them from a real recording of each now rather than from one recording and one
+// belief about the other.
+func TestCloudKeysTheChangelogDifferently(t *testing.T) {
+	body := firstResponseBody(t, "history-recorded.cloud.json")
+	if !strings.Contains(body, `"values"`) {
+		t.Error("the Cloud recording does not key its entries under values")
+	}
+	if strings.Contains(body, `"histories"`) {
+		t.Error("the Cloud recording keys entries the Data Center way; " +
+			"one of the two fixtures is not what it claims to be")
+	}
+	if !strings.Contains(body, `"accountId"`) {
+		t.Error("the Cloud recording does not identify its author by accountId")
+	}
+
+	dc := firstResponseBody(t, "history-recorded.datacenter.json")
+	if !strings.Contains(dc, `"histories"`) {
+		t.Error("the Data Center recording does not nest entries under histories")
 	}
 }
 
@@ -189,7 +221,7 @@ func runHistory(
 		t.Fatal("issue history is not registered")
 	}
 
-	fixture, key := "history.cloud.json", "ENG-101"
+	fixture, key := "history-recorded.cloud.json", "AGL-2"
 	if kind != site.Cloud {
 		fixture, key = "history-recorded.datacenter.json", "ENG-2"
 	}
@@ -229,12 +261,38 @@ func runHistory(
 	return buf.String(), result, replayer
 }
 
+// firstResponseBody returns the first recorded response in a cassette, for the
+// assertions that are about what the server actually sent rather than about
+// what this package made of it.
+func firstResponseBody(t *testing.T, fixture string) string {
+	t.Helper()
+
+	data, err := os.ReadFile(filepath.Join("testdata", fixture))
+	if err != nil {
+		t.Fatalf("reading %s: %v", fixture, err)
+	}
+	var cassette struct {
+		Interactions []struct {
+			Response struct {
+				Body string `json:"body"`
+			} `json:"response"`
+		} `json:"interactions"`
+	}
+	if err := json.Unmarshal(data, &cassette); err != nil {
+		t.Fatalf("parsing %s: %v", fixture, err)
+	}
+	if len(cassette.Interactions) == 0 {
+		t.Fatalf("%s records no interactions", fixture)
+	}
+	return cassette.Interactions[0].Response.Body
+}
+
 // historyDoc reads one page directly, for the assertions about rendering rather
 // than about paging.
 func historyDoc(t *testing.T, kind site.Kind) *render.Doc {
 	t.Helper()
 
-	fixture, key := "history.cloud.json", "ENG-101"
+	fixture, key := "history-recorded.cloud.json", "AGL-2"
 	if kind != site.Cloud {
 		fixture, key = "history-recorded.datacenter.json", "ENG-2"
 	}

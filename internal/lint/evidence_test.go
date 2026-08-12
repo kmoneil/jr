@@ -41,6 +41,11 @@ var recordedFixtures = map[string][]string{
 	"internal/resource/jql":  {"parse.cloud.json", "invalid.cloud.json"},
 	"internal/resource/issue": {
 		"list-recorded.cloud.json",
+		// Both halves of `issue history`, because the command is two
+		// implementations and the deployments disagree about the endpoint, the
+		// key the entries live under, and whether paging works at all. Either
+		// one becoming hand-written would leave half a claim evidenced.
+		"history-recorded.cloud.json",
 		// The same two requests against both project styles. The symmetry is
 		// the claim — that the parent field needs no branch on style — so one
 		// of these quietly becoming hand-written would leave the claim

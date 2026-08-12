@@ -1,0 +1,86 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/AGL-2/changelog",
+        "query": "maxResults=2\u0026startAt=0"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"self\":\"https://recorded.invalid/rest/api/3/issue/AGL-2/changelog?maxResults=2\u0026startAt=0\",\"nextPage\":\"https://recorded.invalid/rest/api/3/issue/AGL-2/changelog?maxResults=2\u0026startAt=2\",\"maxResults\":2,\"startAt\":0,\"total\":10,\"isLast\":false,\"values\":[{\"id\":\"10045\",\"author\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"created\":\"2026-08-10T08:47:22.508-0500\",\"items\":[{\"field\":\"IssueParentAssociation\",\"fieldtype\":\"jira\",\"from\":null,\"fromString\":null,\"to\":\"10018\",\"toString\":\"AGL-1\"}]},{\"id\":\"10046\",\"author\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"created\":\"2026-08-10T08:47:46.442-0500\",\"items\":[{\"field\":\"IssueParentAssociation\",\"fieldtype\":\"jira\",\"from\":\"10018\",\"fromString\":\"AGL-1\",\"to\":null,\"toString\":null}]}]}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/AGL-2/changelog",
+        "query": "maxResults=2\u0026startAt=2"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"self\":\"https://recorded.invalid/rest/api/3/issue/AGL-2/changelog?maxResults=2\u0026startAt=2\",\"nextPage\":\"https://recorded.invalid/rest/api/3/issue/AGL-2/changelog?maxResults=2\u0026startAt=4\",\"maxResults\":2,\"startAt\":2,\"total\":10,\"isLast\":false,\"values\":[{\"id\":\"10047\",\"author\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"created\":\"2026-08-10T08:48:03.250-0500\",\"items\":[{\"field\":\"Sprint\",\"fieldtype\":\"custom\",\"fieldId\":\"customfield_10020\",\"from\":\"\",\"fromString\":\"\",\"to\":\"1\",\"toString\":\"AGL Sprint 1\"}]},{\"id\":\"10049\",\"author\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"created\":\"2026-08-10T08:52:56.018-0500\",\"items\":[{\"field\":\"IssueParentAssociation\",\"fieldtype\":\"jira\",\"from\":null,\"fromString\":null,\"to\":\"10018\",\"toString\":\"AGL-1\"}]}]}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/AGL-2/changelog",
+        "query": "maxResults=2\u0026startAt=4"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"self\":\"https://recorded.invalid/rest/api/3/issue/AGL-2/changelog?maxResults=2\u0026startAt=4\",\"nextPage\":\"https://recorded.invalid/rest/api/3/issue/AGL-2/changelog?maxResults=2\u0026startAt=6\",\"maxResults\":2,\"startAt\":4,\"total\":10,\"isLast\":false,\"values\":[{\"id\":\"10050\",\"author\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"created\":\"2026-08-10T08:52:56.634-0500\",\"items\":[{\"field\":\"IssueParentAssociation\",\"fieldtype\":\"jira\",\"from\":\"10018\",\"fromString\":\"AGL-1\",\"to\":null,\"toString\":null}]},{\"id\":\"10066\",\"author\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"created\":\"2026-08-10T09:47:28.899-0500\",\"items\":[{\"field\":\"IssueParentAssociation\",\"fieldtype\":\"jira\",\"from\":null,\"fromString\":null,\"to\":\"10018\",\"toString\":\"AGL-1\"}]}]}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/AGL-2/changelog",
+        "query": "maxResults=2\u0026startAt=6"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"self\":\"https://recorded.invalid/rest/api/3/issue/AGL-2/changelog?maxResults=2\u0026startAt=6\",\"nextPage\":\"https://recorded.invalid/rest/api/3/issue/AGL-2/changelog?maxResults=2\u0026startAt=8\",\"maxResults\":2,\"startAt\":6,\"total\":10,\"isLast\":false,\"values\":[{\"id\":\"10068\",\"author\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"created\":\"2026-08-10T09:47:30.341-0500\",\"items\":[{\"field\":\"IssueParentAssociation\",\"fieldtype\":\"jira\",\"from\":\"10018\",\"fromString\":\"AGL-1\",\"to\":null,\"toString\":null}]},{\"id\":\"10070\",\"author\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"created\":\"2026-08-12T11:17:39.622-0500\",\"items\":[{\"field\":\"summary\",\"fieldtype\":\"jira\",\"fieldId\":\"summary\",\"from\":null,\"fromString\":\"First story\",\"to\":null,\"toString\":\"First story, retitled\"},{\"field\":\"priority\",\"fieldtype\":\"jira\",\"fieldId\":\"priority\",\"from\":\"3\",\"fromString\":\"Medium\",\"to\":\"2\",\"toString\":\"High\"}]}]}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/AGL-2/changelog",
+        "query": "maxResults=2\u0026startAt=8"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"self\":\"https://recorded.invalid/rest/api/3/issue/AGL-2/changelog?maxResults=2\u0026startAt=8\",\"maxResults\":2,\"startAt\":8,\"total\":10,\"isLast\":true,\"values\":[{\"id\":\"10071\",\"author\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"created\":\"2026-08-12T11:17:40.654-0500\",\"items\":[{\"field\":\"assignee\",\"fieldtype\":\"jira\",\"fieldId\":\"assignee\",\"from\":null,\"fromString\":null,\"to\":\"000000:00000000-0000-0000-0000-000000000000\",\"toString\":\"Ada Lovelace\",\"tmpFromAccountId\":null,\"tmpToAccountId\":\"000000:00000000-0000-0000-0000-000000000000\"}]},{\"id\":\"10072\",\"author\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"created\":\"2026-08-12T11:17:41.276-0500\",\"items\":[{\"field\":\"assignee\",\"fieldtype\":\"jira\",\"fieldId\":\"assignee\",\"from\":\"000000:00000000-0000-0000-0000-000000000000\",\"fromString\":\"Ada Lovelace\",\"to\":null,\"toString\":null,\"tmpFromAccountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"tmpToAccountId\":null}]}]}"
+      }
+    }
+  ]
+}
