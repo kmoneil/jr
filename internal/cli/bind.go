@@ -21,7 +21,7 @@ import (
 func bindFlags(cc *cobra.Command, rc *registry.Command) func(*cobra.Command) registry.Flags {
 	fs := cc.Flags()
 
-	for _, f := range rc.Flags {
+	for _, f := range rc.AllFlags() {
 		usage := f.Usage
 		if len(f.Enum) > 0 {
 			usage = fmt.Sprintf("%s (one of: %s)", usage, strings.Join(f.Enum, ", "))
@@ -43,16 +43,9 @@ func bindFlags(cc *cobra.Command, rc *registry.Command) func(*cobra.Command) reg
 		}
 	}
 
-	if rc.Paginated {
-		// --limit is a user intent, decoupled from the API page size. There is
-		// deliberately no offset flag: the upstream API is cursor-based.
-		def := fmt.Sprint(registry.DefaultLimit)
-		if rc.DefaultsToAll {
-			def = "all"
-		}
-		fs.String("limit", def,
-			`maximum results, or "all" to exhaust the result set`)
-	}
+	// --limit is a user intent, decoupled from the API page size, and it comes
+	// from rc.AllFlags() above like every other flag. There is deliberately no
+	// offset flag: the upstream API is cursor-based.
 
 	return func(cmd *cobra.Command) registry.Flags {
 		return harvest(cmd, rc)
@@ -62,7 +55,7 @@ func bindFlags(cc *cobra.Command, rc *registry.Command) func(*cobra.Command) reg
 func harvest(cmd *cobra.Command, rc *registry.Command) registry.Flags {
 	out := registry.NewFlags()
 	fs := cmd.Flags()
-	for _, f := range rc.Flags {
+	for _, f := range rc.AllFlags() {
 		switch f.Type {
 		case registry.TypeBool:
 			v, _ := fs.GetBool(f.Name)
@@ -108,7 +101,7 @@ func validateFlags(cmd *cobra.Command, rc *registry.Command) error {
 
 func validateRequired(cmd *cobra.Command, rc *registry.Command) error {
 	var missing []string
-	for _, f := range rc.Flags {
+	for _, f := range rc.AllFlags() {
 		if f.Required && !cmd.Flags().Changed(f.Name) {
 			missing = append(missing, "--"+f.Name)
 		}

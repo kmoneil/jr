@@ -125,20 +125,15 @@ func inputSchema(cmd *registry.Command) map[string]any {
 		}
 	}
 
-	for _, flag := range cmd.Flags {
+	// AllFlags carries --limit for a paginated command, with the default this
+	// command actually uses. Spelling it out here instead read DefaultLimit
+	// directly, so `jr schema` advertised "(default 50)" over MCP and answered
+	// with fifty of sixty-two commands, while the same tool on the CLI
+	// defaulted to "all" and answered with all of them.
+	for _, flag := range cmd.AllFlags() {
 		properties[flag.Name] = flagSchema(flag)
 		if flag.Required {
 			required = append(required, flag.Name)
-		}
-	}
-
-	if cmd.Paginated {
-		properties["limit"] = map[string]any{
-			"type": "string",
-			"description": fmt.Sprintf(
-				"maximum results, or \"all\" to exhaust the result set (default %d)",
-				registry.DefaultLimit,
-			),
 		}
 	}
 
@@ -206,7 +201,7 @@ func (s *Server) invocation(
 	if err != nil {
 		return nil, "", err
 	}
-	limit, err := resolveLimit(args)
+	limit, err := resolveLimit(cmd, args)
 	if err != nil {
 		return nil, "", err
 	}
@@ -253,11 +248,11 @@ func (s *Server) invocation(
 
 // rejectUnknownArguments refuses an argument the tool did not advertise.
 func rejectUnknownArguments(cmd *registry.Command, args map[string]any) error {
-	known := map[string]bool{FormatArgument: true, "limit": cmd.Paginated}
+	known := map[string]bool{FormatArgument: true}
 	for _, arg := range cmd.Args {
 		known[arg.Name] = true
 	}
-	for _, flag := range cmd.Flags {
+	for _, flag := range cmd.AllFlags() {
 		known[flag.Name] = true
 	}
 	for name := range args {
@@ -272,7 +267,7 @@ func rejectUnknownArguments(cmd *registry.Command, args map[string]any) error {
 
 func resolveFlags(cmd *registry.Command, args map[string]any) (registry.Flags, error) {
 	flags := registry.NewFlags()
-	for _, flag := range cmd.Flags {
+	for _, flag := range cmd.AllFlags() {
 		raw, ok := args[flag.Name]
 		if !ok {
 			continue
@@ -304,8 +299,19 @@ func resolvePositional(cmd *registry.Command, args map[string]any) ([]string, er
 	return out, nil
 }
 
-func resolveLimit(args map[string]any) (registry.Limit, error) {
-	limit := registry.Limit{N: registry.DefaultLimit}
+// resolveLimit reads the limit argument, defaulting the way the command's own
+// declaration does.
+//
+// It used to start from registry.DefaultLimit unconditionally, which ignored
+// DefaultsToAll and made `jr schema` over MCP return fifty of sixty-two
+// commands with complete="false": every sprint and user command invisible to
+// an agent introspecting the binary through the interface built for it. Parsing
+// the declared default is what keeps one answer for one question.
+func resolveLimit(cmd *registry.Command, args map[string]any) (registry.Limit, error) {
+	limit, err := registry.ParseLimit(cmd.LimitFlag().Default)
+	if err != nil {
+		return registry.Limit{}, err
+	}
 	raw, ok := args["limit"]
 	if !ok {
 		return limit, nil

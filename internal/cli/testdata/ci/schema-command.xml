@@ -17,7 +17,11 @@ it lists only what this build contains.]]></description>
     <args count="1">
       <arg name="command" required="false" variadic="false">dotted command name, e.g. issue.list</arg>
     </args>
-    <flags count="0"/>
+    <flags count="1">
+      <flag name="limit" type="string" required="false" repeatable="false" default="all">
+        <usage>maximum results, or "all" to exhaust the result set</usage>
+      </flag>
+    </flags>
     <exit-codes count="5">
       <exit-code code="0" name="OK">Success, result complete</exit-code>
       <exit-code code="1" name="ERROR">Generic runtime failure</exit-code>

@@ -247,8 +247,9 @@ func CommandDoc(c *Command) *render.Doc {
 	}
 	n.Child(render.ListEl("args", "arg", args...))
 
-	flags := make([]*render.Node, 0, len(c.Flags))
-	for _, f := range c.Flags {
+	all := c.AllFlags()
+	flags := make([]*render.Node, 0, len(all))
+	for _, f := range all {
 		flags = append(flags, flagNode(f))
 	}
 	n.Child(render.ListEl("flags", "flag", flags...))

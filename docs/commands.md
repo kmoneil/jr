@@ -299,6 +299,7 @@ jr board list --all-projects --limit all
 | `--type` | `scrum\|kanban\|simple` | — | only boards of this type |
 | `--name` | `string` | — | only boards whose name contains this text |
 | `--all-projects` | `bool` | — | every board on the site, ignoring the context's project |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -509,7 +510,7 @@ List every configured context
 - **paginated** — bounded by `--limit`; a truncated result exits 3
 
 ```
-jr context list
+jr context list [flags]
 ```
 
 The current context is marked. A context is a local setting; nothing here
@@ -520,6 +521,10 @@ Examples:
 ```console
 jr context list
 ```
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -743,6 +748,7 @@ jr epic list --board 42 --limit all --format json
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--done` | `true\|false` | — | only epics that are done (true) or not (false); omit for both |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -807,7 +813,7 @@ List every field this site has
 - **paginated** — bounded by `--limit`; a truncated result exits 3
 
 ```
-jr field list
+jr field list [flags]
 ```
 
 Returns the site's whole field catalogue: the id a request has to use, the name
@@ -830,6 +836,10 @@ jr field list
 jr field list --format json
 jr field list --refresh
 ```
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -959,7 +969,7 @@ List the files attached to an issue
 - **paginated** — bounded by `--limit`; a truncated result exits 3
 
 ```
-jr issue attachment list <key>
+jr issue attachment list <key> [flags]
 ```
 
 Returns an issue's attachments, oldest first.
@@ -982,6 +992,10 @@ jr issue attachment list ENG-101 --format json
 | Argument | Required | Description |
 | --- | --- | --- |
 | `key` | yes | issue key, e.g. ENG-101 |
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -1275,6 +1289,7 @@ jr issue comment list ENG-101 --raw-body
 | --- | --- | --- | --- |
 | `--page-size` | `int` | — | results per HTTP request, 1 to 100; transport tuning only |
 | `--raw-body` | `bool` | — | emit a Cloud body as the Atlassian Document Format document Jira sent it as, rather than converting it to markdown |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -1579,7 +1594,7 @@ List the issues linked to one issue
 - **paginated** — bounded by `--limit`; a truncated result exits 3
 
 ```
-jr issue link list <key>
+jr issue link list <key> [flags]
 ```
 
 Returns every link on an issue, each read from this issue's side.
@@ -1601,6 +1616,10 @@ jr issue link list ENG-101 --format json
 | Argument | Required | Description |
 | --- | --- | --- |
 | `key` | yes | issue key, e.g. ENG-101 |
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -1746,6 +1765,7 @@ jr issue list --changed-by currentUser --changed-after -1w
 | `--all-projects` | `bool` | — | search every project the credential can see, ignoring the context's; required to exhaust an unfiltered query |
 | `--page-size` | `int` | — | results per HTTP request, 1 to 100; transport tuning only |
 | `--page-token` | `string` | — | resume from a next-page-token returned by a previous run |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -1995,6 +2015,7 @@ jr issue worklog list ENG-101 --format json --limit all
 | --- | --- | --- | --- |
 | `--page-size` | `int` | — | results per HTTP request, 1 to 100; transport tuning only |
 | `--raw-body` | `bool` | — | emit a Cloud body as the Atlassian Document Format document Jira sent it as, rather than converting it to markdown |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -2191,6 +2212,7 @@ jr meta createmeta --project ENG --type Story --format json
 | --- | --- | --- | --- |
 | `--project` | `string` | — | project key; defaults to the context's project |
 | `--type`, `-t` | `string` | — | issue type name or id, e.g. Bug (required) |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -2207,7 +2229,7 @@ List the transitions available on an issue right now
 - **paginated** — bounded by `--limit`; a truncated result exits 3
 
 ```
-jr meta transitions <key>
+jr meta transitions <key> [flags]
 ```
 
 Returns what this issue can do next, given its current status and this
@@ -2233,6 +2255,10 @@ jr meta transitions ENG-101 --format json
 | --- | --- | --- |
 | `key` | yes | issue key, e.g. ENG-101 |
 
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
+
 | Emits | Schema | When |
 | --- | --- | --- |
 | `meta.transitions` | v2 | always |
@@ -2250,7 +2276,7 @@ List a project's components
 - **paginated** — bounded by `--limit`; a truncated result exits 3
 
 ```
-jr project components [key]
+jr project components [key] [flags]
 ```
 
 Returns the components of a project, ordered by name.
@@ -2267,6 +2293,10 @@ jr project components ENG
 | Argument | Required | Description |
 | --- | --- | --- |
 | `key` | no | project key; defaults to the context's project |
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -2313,7 +2343,7 @@ List the projects this credential can see
 - **paginated** — bounded by `--limit`; a truncated result exits 3
 
 ```
-jr project list
+jr project list [flags]
 ```
 
 Returns every project visible to the credential, ordered by key.
@@ -2332,6 +2362,10 @@ jr project list
 jr project list --format json --limit all
 ```
 
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
+
 | Emits | Schema | When |
 | --- | --- | --- |
 | `project.list` | v2 | always |
@@ -2347,7 +2381,7 @@ List the statuses each issue type can be in
 - **paginated** — bounded by `--limit`; a truncated result exits 3
 
 ```
-jr project statuses [key]
+jr project statuses [key] [flags]
 ```
 
 Returns, for every issue type in a project, the statuses its workflow allows.
@@ -2369,6 +2403,10 @@ jr project statuses ENG
 | --- | --- | --- |
 | `key` | no | project key; defaults to the context's project |
 
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
+
 | Emits | Schema | When |
 | --- | --- | --- |
 | `project.statuses` | v2 | always |
@@ -2384,7 +2422,7 @@ List a project's versions
 - **paginated** — bounded by `--limit`; a truncated result exits 3
 
 ```
-jr project versions [key]
+jr project versions [key] [flags]
 ```
 
 Returns the release versions of a project, newest first.
@@ -2407,6 +2445,10 @@ jr project versions ENG
 | --- | --- | --- |
 | `key` | no | project key; defaults to the context's project |
 
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
+
 | Emits | Schema | When |
 | --- | --- | --- |
 | `project.versions` | v1 | always |
@@ -2424,7 +2466,7 @@ Describe every command this build contains
 - **paginated** — bounded by `--limit`; a truncated result exits 3
 
 ```
-jr schema [command]
+jr schema [command] [flags]
 ```
 
 Prints the command surface as data: flags with types and enums, required
@@ -2447,6 +2489,10 @@ jr schema --format json
 | Argument | Required | Description |
 | --- | --- | --- |
 | `command` | no | dotted command name, e.g. issue.list |
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--limit` | `string` | `all` | maximum results, or "all" to exhaust the result set |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -2678,6 +2724,7 @@ jr sprint list --board 42 --limit all --format json
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--state` | `future\|active\|closed` | — | only sprints in this state; repeat for several (repeatable) |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -2778,7 +2825,7 @@ Search for users
 - **paginated** — bounded by `--limit`; a truncated result exits 3
 
 ```
-jr user list <query>
+jr user list <query> [flags]
 ```
 
 Searches for users matching a query, ordered by display name.
@@ -2810,6 +2857,10 @@ jr user list ada --format json
 | Argument | Required | Description |
 | --- | --- | --- |
 | `query` | yes | part of a name or email |
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
 
 | Emits | Schema | When |
 | --- | --- | --- |

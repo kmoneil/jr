@@ -5,6 +5,7 @@ import (
 	"io"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/kmoneil/jr/internal/exitcode"
@@ -382,14 +383,53 @@ func (c *Command) Emits(kind string, version int) bool {
 	return false
 }
 
-// Flag returns the named flag declared by this command.
+// Flag returns the named flag this command accepts, declared or implied.
 func (c *Command) Flag(name string) (Flag, bool) {
-	for _, f := range c.Flags {
+	for _, f := range c.AllFlags() {
 		if f.Name == name {
 			return f, true
 		}
 	}
 	return Flag{}, false
+}
+
+// AllFlags returns the flags this command accepts: the declared ones, plus the
+// ones a declaration implies. Paginated implies --limit.
+//
+// It exists because --limit used to be synthesised from Paginated at each
+// consumer that remembered to. The cobra binder and the MCP input schema did;
+// `jr schema` and the command reference it generates did not, so nine commands
+// documented --page-size and --page-token and denied the existence of the flag
+// that decides whether a result set is complete. The MCP copy also read
+// DefaultLimit directly and never DefaultsToAll, so `jr schema` over MCP
+// answered with fifty of sixty-two commands and complete="false", which is the
+// exact failure DefaultsToAll was added to prevent, reintroduced by a second
+// copy of the default.
+//
+// One derivation, four consumers. A flag nobody writes down twice cannot be
+// written down differently.
+func (c *Command) AllFlags() []Flag {
+	if !c.Paginated {
+		return c.Flags
+	}
+	return append(slices.Clip(c.Flags), c.LimitFlag())
+}
+
+// LimitFlag is the --limit flag every paginated command carries.
+//
+// It is derived rather than declared because its default depends on
+// DefaultsToAll, which is a property of the command rather than of the flag.
+func (c *Command) LimitFlag() Flag {
+	def := strconv.Itoa(DefaultLimit)
+	if c.DefaultsToAll {
+		def = "all"
+	}
+	return Flag{
+		Name:    "limit",
+		Type:    TypeString,
+		Default: def,
+		Usage:   `maximum results, or "all" to exhaust the result set`,
+	}
 }
 
 // AllExitCodes returns the declared exit codes plus the universal ones, in

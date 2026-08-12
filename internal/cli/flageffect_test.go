@@ -180,6 +180,18 @@ func TestTheFlagSweepCanFail(t *testing.T) {
 // out of the sweep. `notAFilter` on issue list works the same way, and it is
 // what let `--order` sit for months behind the words "meaningless without
 // --sort", which was a classification standing in for an assertion.
+//
+// It reads Command.Flags rather than Command.AllFlags, so the one derived flag
+// (--limit, which Paginated implies) is outside its accounting. That is a gap,
+// and it is written here rather than left to be discovered: driving
+// --limit needs a fixture that returns more rows than the bound, and this
+// harness answers most collections with none, so 16 of 18 paginated commands
+// would have to be exempted as "the response was empty" rather than driven.
+// Sixteen classifications standing in for an assertion is the thing the
+// paragraph above is about. The flag's effect is asserted directly instead, by
+// TestCompleteResultIsSilent and the truncation goldens, and the accounting is
+// picked up in TestEveryBoundFlagIsDeclared, which compares the bound surface
+// against the declared one. See _plans/backlog/drive-limit-in-the-flag-sweep.md.
 func TestTheFlagSweepAccountsForEveryFlag(t *testing.T) {
 	named := map[string]bool{}
 	for name := range flagWithNoObservableEffect {
@@ -621,7 +633,7 @@ func drive(
 		Jira:     sweepSession{rt: rt, kind: kind},
 		Args:     args,
 		Flags:    flags,
-		Limit:    registry.Limit{N: registry.DefaultLimit},
+		Limit:    sweepLimit(t, c, flags),
 		Format:   render.XML,
 		Stderr:   io.Discard,
 		Progress: registry.NoProgress,
@@ -640,6 +652,31 @@ func drive(
 		"output: " + out.String(),
 		"failed: " + failure,
 	}, "\n"))
+}
+
+// sweepLimit resolves --limit the way the CLI layer does, from the flag if the
+// probe set one and from the command's declared default otherwise.
+//
+// The harness used to hardcode DefaultLimit here, which made --limit the one
+// declared flag that could not move the fingerprint: the probe set a value in
+// registry.Flags and the invocation was built from a constant, so the flag was
+// read by nothing this sweep could see. It only became visible when --limit
+// stopped being synthesised at the binder and started being declared like
+// every other flag, which is the same fix in the other direction.
+func sweepLimit(t *testing.T, c *registry.Command, flags registry.Flags) registry.Limit {
+	t.Helper()
+	if !c.Paginated {
+		return registry.Limit{N: registry.DefaultLimit}
+	}
+	text := c.LimitFlag().Default
+	if v := flags.String("limit"); v != "" {
+		text = v
+	}
+	limit, err := registry.ParseLimit(text)
+	if err != nil {
+		t.Fatalf("the probe value %q for --limit does not parse: %v", text, err)
+	}
+	return limit
 }
 
 // nowish matches a timestamp in the shapes this tool sends and receives.

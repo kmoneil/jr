@@ -297,7 +297,7 @@ func commandBadges(c *registry.Command) string {
 // usageTail renders the argument spec for the usage line.
 func usageTail(c *registry.Command) string {
 	spec := c.ArgSpec()
-	if len(c.Flags) == 0 {
+	if len(c.AllFlags()) == 0 {
 		return spec
 	}
 	return strings.TrimSpace(spec + " [flags]")
@@ -319,12 +319,18 @@ func writeArgs(b *strings.Builder, c *registry.Command) {
 }
 
 // writeFlags writes the flag table.
+//
+// It reads AllFlags rather than Flags, so a paginated command's --limit appears
+// in the table. It used to read Flags, which is how the reference printed
+// "bounded by --limit" in the pagination bullet directly above a table that did
+// not list --limit, on all nine paginated commands.
 func writeFlags(b *strings.Builder, c *registry.Command) {
-	if len(c.Flags) == 0 {
+	all := c.AllFlags()
+	if len(all) == 0 {
 		return
 	}
 	b.WriteString("\n| Flag | Type | Default | Description |\n| --- | --- | --- | --- |\n")
-	for _, f := range c.Flags {
+	for _, f := range all {
 		fmt.Fprintf(b, "| %s | %s | %s | %s |\n",
 			flagName(f), flagType(f), flagDefault(f), flagUsage(f))
 	}
