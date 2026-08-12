@@ -54,20 +54,27 @@ Supply the token with --token-stdin or --token-file, never as a flag value: a
 token on the command line lands in the shell history and in the process list,
 where anyone on the machine can read it.
 
+**With a terminal on stdin, this asks.** The prompt does not echo, and what you
+type at it never reaches the shell history either, which is the property a flag
+value cannot have. That is the whole interactive path:
+
+    ` + buildinfo.App + ` auth login --site <host> --email <you>
+    API token for <host>:
+
+For a script, pipe it or point at a file instead:
+
     printf '%s' "$TOKEN" | ` + buildinfo.App + ` auth login --site <host> --token-stdin
     ` + buildinfo.App + ` auth login --site <host> --token-file ~/.secrets/jira
 
-This command never prompts. If stdin is a terminal it refuses rather than
-waiting, because a headless build has no human to wait for. To type a token by
-hand, have the shell read it and pipe the result:
+The agent, reader, and ci builds have no prompt compiled in, so there a terminal
+on stdin is refused rather than waited on: nobody is there to ask, and a command
+that waits with no reader is indistinguishable from a hang. Those builds take
+the token by pipe or by file, as every script should:
 
-    printf 'API token: '; read -rs TOKEN; echo
     printf '%s' "$TOKEN" | ` + buildinfo.App + ` auth login --site <host> --token-stdin
-    unset TOKEN
 
-read -s does not echo, and what is typed at a read prompt never reaches the
-shell history — which is the property a flag value cannot have. Trailing
-whitespace is trimmed either way, so a stray newline is not a wrong token.
+Trailing whitespace is trimmed on every path, so a stray newline from an editor
+or an echo is not a wrong token.
 
 You do not have to log in at all: set ` + auth.EnvToken + `, plus ` + auth.EnvEmail + ` on
 Cloud, and every command uses it.
@@ -182,7 +189,15 @@ func (a *app) credentialFrom(inv *registry.Invocation) (auth.Credential, error) 
 	tokenFile := inv.Flags.String("token-file")
 	fromStdin := inv.Flags.Bool("token-stdin")
 	switch {
-	case !fromStdin && tokenFile == "":
+	case !fromStdin && tokenFile == "" && (!canPrompt || !isTerminal(a.stdin)):
+		// No source named, and no human to ask. A build that *can* ask falls
+		// through to readToken, which prompts — that is the plain
+		// `auth login --site X --email Y` a person types, and having it refuse
+		// with a shell pipeline to copy was the whole complaint.
+		//
+		// The terminal check matters as much as the tag: with stdin redirected
+		// and no flag, reading it anyway would consume input the caller never
+		// offered and make --token-stdin mean nothing.
 		return auth.Credential{}, errs.Usage("NO_TOKEN_SOURCE", "no token source given").
 			WithRemedy("%s", tokenSourceRemedy)
 	case fromStdin && tokenFile != "" && tokenFile != "-":
@@ -193,7 +208,7 @@ func (a *app) credentialFrom(inv *registry.Invocation) (auth.Credential, error) 
 			WithRemedy("pass one of them, or --token-file - for stdin")
 	}
 
-	token, err := a.readToken(tokenFile)
+	token, err := a.readToken(tokenFile, inv.Flags.String("site"))
 	if err != nil {
 		return auth.Credential{}, err
 	}

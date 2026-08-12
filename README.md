@@ -601,11 +601,9 @@ It reports who you authenticated as. `--no-verify` skips the check, for
 preparing a configuration offline.
 
 ```console
-# 1. Type it. The shell reads it, so nothing echoes and nothing is recorded.
-$ printf 'API token: '; read -rs TOKEN; echo
-$ printf '%s' "$TOKEN" | jr auth login --site acme.atlassian.net \
-      --email ada@example.com --token-stdin
-$ unset TOKEN
+# 1. Type it. jr asks, with echo off, and nothing is recorded anywhere.
+$ jr auth login --site acme.atlassian.net --email ada@example.com
+API token for acme.atlassian.net:
 
 # 2. Pipe it, from a secret manager or anywhere else.
 $ pass show jira/token | jr auth login --site acme.atlassian.net \
@@ -623,14 +621,17 @@ $ export JIRA_API_TOKEN=...                              # Data Center PAT
 machine acme.atlassian.net login ada@example.com password ...
 ```
 
-`jr auth login` never prompts. If stdin is a terminal it refuses and lists these
-options rather than waiting for input nobody knew to type. A headless build has
-no human to wait for.
+The prompt is the human path and it is not the only one: a script never sees a
+terminal, so forms 2 to 5 are unchanged and unaffected. What you type at the
+prompt does not echo and does not enter the shell history, which is the property
+a flag value cannot have and the reason there is no `--token` flag to reach for.
 
-That refusal is why the first form hands the reading to the shell rather than
-asking for it back. `read -s` does not echo, and what is typed at a `read`
-prompt never enters the history, so a human gets the interactive login they
-wanted, and the tool keeps the invariant that nothing ever blocks on input.
+**The agent, reader, and ci builds do not prompt.** They have no interactive
+prompt compiled in, so a terminal on stdin is refused with these options listed
+rather than waited on: there is nobody there to answer, and a command waiting
+with no reader is indistinguishable from a hang. That is the invariant intact —
+nothing blocks silently, and nothing blocks where no human is.
+
 Trailing whitespace is trimmed from a token however it arrives, so a stray
 newline is not a wrong token.
 

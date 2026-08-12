@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 
+	"golang.org/x/term"
+
 	"github.com/kmoneil/jr/internal/auth"
 	"github.com/kmoneil/jr/internal/buildinfo"
 	"github.com/kmoneil/jr/internal/errs"
@@ -110,16 +112,42 @@ func (a *app) siteFor(flagValue string) (string, error) {
 
 // isTerminal reports whether v is an interactive terminal rather than a pipe or
 // a file. It takes any so the same check covers stdin and stderr.
+//
+// It asks the terminal driver rather than reading the file mode. `ModeCharDevice`
+// was the old test and it is true of `/dev/null`, which is a character device
+// and is nobody: `auth login --token-stdin < /dev/null` was refused with "stdin
+// is a terminal", which is both wrong and unactionable, and the same false
+// positive would now send a human build off to prompt on something that cannot
+// answer. Measured before adding the dependency to every profile: the agent
+// binary is the same size with it as without.
 func isTerminal(v any) bool {
 	f, ok := v.(*os.File)
 	if !ok {
 		return false
 	}
-	info, err := f.Stat()
-	if err != nil {
-		return false
+	return term.IsTerminal(int(f.Fd()))
+}
+
+// promptForToken asks the person at the terminal, in a build that has one.
+//
+// The site is named in the prompt because a credential is per-site and getting
+// them crossed is a failure that surfaces two commands later as something that
+// looks unrelated.
+func (a *app) promptForToken(site string) (auth.Secret, error) {
+	label := "API token"
+	if site != "" {
+		label += " for " + site
 	}
-	return info.Mode()&os.ModeCharDevice != 0
+	secret, err := promptSecret(label)
+	if err != nil {
+		return "", err
+	}
+	trimmed := strings.TrimSpace(string(secret))
+	if trimmed == "" {
+		return "", errs.Usage("EMPTY_TOKEN", "no token was typed").
+			WithRemedy("%s", tokenSourceRemedy)
+	}
+	return auth.Secret(trimmed), nil
 }
 
 // tokenSourceRemedy lists every way to supply a credential, because "it did
@@ -137,7 +165,7 @@ const tokenSourceRemedy = "pipe it in: printf '%s' \"$TOKEN\" | " +
 // read it. Trailing whitespace is trimmed, since `echo` adds a newline and a
 // token carrying one fails authentication in a way that looks like a wrong
 // token.
-func (a *app) readToken(path string) (auth.Secret, error) {
+func (a *app) readToken(path, site string) (auth.Secret, error) {
 	source := a.stdin
 	name := "stdin"
 
@@ -158,15 +186,24 @@ func (a *app) readToken(path string) (auth.Secret, error) {
 			WithRemedy("%s", tokenSourceRemedy)
 	}
 
-	// Reading from a terminal would block until the caller pressed Ctrl-D,
-	// with no prompt and no output — which reads as the command hanging. A
-	// headless-first tool never waits on a human, so this refuses instead and
-	// says what to do.
+	// A terminal on stdin is a person, and what to do about that depends on
+	// whether this build has one to talk to.
+	//
+	// Reading it directly would block until they pressed Ctrl-D, with no prompt
+	// and no output, which is indistinguishable from a hang. That is the whole
+	// reason for the rule, so a build that can *ask* satisfies it by asking:
+	// the wait is visible, it is bounded by a keystroke, and the token still
+	// never reaches the process list or the shell history. A build without the
+	// prompt tag has nobody there and keeps refusing.
 	if isTerminal(source) {
-		return "", errs.Usage("NO_TOKEN_SOURCE",
-			"--token-stdin was given but stdin is a terminal, not a pipe or a file").
-			WithDetail("this command never prompts: it would have waited forever").
-			WithRemedy("%s", tokenSourceRemedy)
+		if !canPrompt {
+			return "", errs.Usage("NO_TOKEN_SOURCE",
+				"stdin is a terminal, not a pipe or a file, and this build cannot prompt").
+				WithDetail("the agent, reader, and ci builds have no interactive "+
+					"prompt compiled in, so there is nobody to ask").
+				WithRemedy("%s", tokenSourceRemedy)
+		}
+		return a.promptForToken(site)
 	}
 
 	data, err := io.ReadAll(io.LimitReader(source, maxTokenBytes+1))

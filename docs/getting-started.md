@@ -70,49 +70,36 @@ wrong and no permission change helps. Username and password is for an instance
 older than 8.14, which has no personal access tokens to offer, or one that has
 Basic switched back on: `--user` rather than `--email` in the next step.
 
-Now get it into this shell without typing it as an argument. Let the shell read
-it — `-s` means it does not echo, and what you type at a `read` prompt does not
-enter your shell history:
-
-```console
-$ printf 'API token: '; read -rs TOKEN; echo
-API token:
-```
-
-Paste the token, press enter, and nothing appears on screen. That is correct.
-
-The rest of this guide uses `$TOKEN`. If you would rather keep the token in a
-file or a password manager, that works too — see [step 3](#3-log-in).
+Keep it on the clipboard for a moment; the next step asks for it.
 
 ## 3. Log in
 
-Two flags matter: `--site` is your Jira host, and the token arrives on **stdin**.
+One flag matters: `--site` is your Jira host. `jr` asks for the token.
 
 **Cloud:**
 
 ```console
-$ printf '%s' "$TOKEN" | jr auth login \
-    --site your-company.atlassian.net \
-    --email you@company.com \
-    --token-stdin
+$ jr auth login --site your-company.atlassian.net --email you@company.com
+API token for your-company.atlassian.net:
 ```
+
+Paste the token and press enter. Nothing appears on screen — the prompt does not
+echo, and what you type at it does not enter your shell history either, which is
+why the token is never a flag value.
 
 **Data Center, with a personal access token:**
 
 ```console
-$ printf '%s' "$TOKEN" | jr auth login \
-    --site jira.company.com \
-    --token-stdin
+$ jr auth login --site jira.company.com
+API token for jira.company.com:
 ```
 
 **Data Center, with a username and password** — only against an instance that
 still accepts it:
 
 ```console
-$ printf '%s' "$PASSWORD" | jr auth login \
-    --site jira.company.com \
-    --user your.username \
-    --token-stdin
+$ jr auth login --site jira.company.com --user your.username
+API token for jira.company.com:
 ```
 
 If that comes back `AUTH_SCHEME_REFUSED`, exit 4, the instance is a Jira 11 with
@@ -124,51 +111,25 @@ inferred from whether a user was given.
 
 If your Jira lives under a path, include it: `--site jira.company.com/jira`.
 
-When you are done, `unset TOKEN` — the shell has no further use for it, and the
-credential is now in the store.
-
 ### Other ways to supply the token
 
-`--token-stdin` reads whatever is piped at it, so anything that can print a
-token works:
+Nothing about the prompt is compulsory, and a script never sees one. `jr` takes
+a token from a pipe or a file, and those are what to use anywhere a person is
+not sitting there:
 
 ```console
 $ pass show jira/token | jr auth login --site ... --token-stdin
 $ jr auth login --site ... --token-file ~/.secrets/jira
 ```
 
-**`jr auth login` never prompts.** If stdin is a terminal it refuses and lists
-the alternatives rather than waiting — a command that waits with no prompt and
-no output is indistinguishable from a hang, and a headless build has no human to
-wait for. That is why the token is read by _the shell_ above and piped in, which
-gets you the interactive login without the tool ever blocking on input.
+Or skip logging in altogether: set `JIRA_API_TOKEN`, plus `JIRA_EMAIL` on Cloud,
+and every command uses it with no stored credential at all.
 
-Three things happen, and it is worth knowing all three:
-
-1. **The credential is checked before it is stored.** `jr` probes the site and
-   fetches your account. A typo in the host, a missing path, or a bad token is
-   refused here rather than surfacing three commands later as something that
-   looks unrelated. `--no-verify` skips it, for preparing a config offline.
-2. **The token goes to the credential store**, a separate file under your state
-   directory at mode 0600 — never into `config.toml`, which is meant to be
-   hand-edited and kept in a dotfiles repo.
-3. **A context is created for you**, if you had none. That is the thing that
-   gives the next command somewhere to point.
-
-### Or skip logging in entirely
-
-Set the environment and every command works with no login step:
-
-```console
-$ export JIRA_SITE=your-company.atlassian.net
-$ export JIRA_API_TOKEN=...
-$ export JIRA_EMAIL=you@company.com     # Cloud only
-```
-
-This is usually what you want in CI. `jr` also reads `.netrc`, shared with
-`curl` and `git`. Sources are tried in order: environment, then the credential
-store, then `.netrc` — the environment first so CI can override a disk config
-without editing it.
+**The agent, reader, and ci builds do not prompt.** They have no interactive
+prompt compiled in, so a terminal on stdin is refused with the alternatives
+listed rather than waited on — there is nobody there to answer, and a command
+waiting with no reader is indistinguishable from a hang. Use a pipe or a file
+in those builds.
 
 ## 4. Prove it works
 

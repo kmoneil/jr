@@ -15,7 +15,7 @@ converts a class of runtime bugs into link errors.
 | ----------- | ------------------------------------------------- | --------------------------- |
 | `write`     | All mutating commands                             | the 21 mutating verbs       |
 | `mcp`       | `jr mcp serve`                                    | `jr mcp serve`              |
-| `prompt`    | Interactive prompts, the setup wizard, completion | `jr completion`             |
+| `prompt`    | Interactive prompts, the setup wizard, completion | `jr completion`. Also the no-echo token prompt inside `auth login`, which is in every build and only asks here |
 | `admin`     | Project, board, and sprint administration         | `jr sprint close`           |
 | `tui`       | `jr ui`, interactive tables                       | **nothing**, no `jr ui` yet |
 | `render`    | Human-readable rendering for a terminal           | `--format markdown`         |
