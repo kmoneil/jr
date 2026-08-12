@@ -9,6 +9,52 @@ with no human. Here that is not a bug to fix; it is a state that cannot be
 constructed, because a headless binary has no prompt package linked. Compile-out
 converts a class of runtime bugs into link errors.
 
+## What decides authority, and what does not
+
+**`jr` is a human's command-line tool, and its authority is exactly the
+credential it holds.** There is no permission model above that: a personal
+access token or a logged-in account can do whatever that account can do, and
+every command in the binary can do it. That is the whole of the answer, and it
+is worth stating plainly because two things in this tool look like they say
+otherwise.
+
+`--readonly`, `JIRA_READONLY`, and a context created `--readonly` are a **latch
+within an invocation, not a boundary**. Anything that can run `jr` twice can run
+`jr context edit <name> --unset readonly` and then write, and that is by design:
+`context edit` is `LocalState`, which works in every build, because a binary that
+could not be configured could not be used. Use them to avoid your own mistakes.
+Do not use them to constrain something that does not want to be constrained.
+
+**The build is the real line.** A reader binary does not refuse to write; it does
+not contain the verbs. No flag, context, or environment variable puts them back.
+That is what the profiles below are for, and it is the only limit in this tool
+that survives an adversarial caller — as far as that caller cannot run
+`make build` or reach the credential itself.
+
+So, for handing work to an agent:
+
+| You want                              | Use                                              |
+| ------------------------------------- | ------------------------------------------------ |
+| It cannot change Jira                 | `jr-reader` or `jr-ci`, which contain no writes   |
+| It cannot see your credential         | not the CLI — see below                          |
+| Different authority per project       | not available; see `_plans` for the policy design |
+
+An agent that runs `jr` itself holds your credential, because the credential is
+in the filesystem `jr` reads. Nothing in this binary changes that. Constraining
+such an agent means not giving it the credential, which means it must talk to
+something that holds one instead — a server it connects to and does not start,
+running as another user. `jr mcp serve` is that shape today only in part: it
+speaks stdio, so its client spawns it, with the same user and the same files.
+
+What the MCP server *does* guarantee is narrower and worth knowing: **the
+administrative surface is not on the wire.** A peer cannot call `auth_login`,
+`auth_logout`, `auth_token`, or any `context` writer. It cannot repoint the
+server, replace its credential, or read the credential out. The reading
+siblings — `auth status`, `context list`, `context show` — remain, because they
+report and reveal nothing. That is a description of the interface rather than a
+security boundary: it holds against a peer that only speaks MCP, and not against
+one that can also run `jr`.
+
 ## Tags
 
 | Tag         | Intends to gate                                   | Gates today                 |

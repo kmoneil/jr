@@ -377,10 +377,8 @@ func (s *Server) callTool(ctx context.Context, params json.RawMessage) (any, *rp
 	if !servableAsTool(cmd) {
 		return nil, &rpcError{
 			Code: codeInvalidParams,
-			Message: fmt.Sprintf(
-				"%q cannot be called as a tool: it writes the stream this server "+
-					"speaks on", call.Name,
-			),
+			Message: fmt.Sprintf("%q cannot be called as a tool: %s",
+				call.Name, notServableReason(cmd)),
 		}
 	}
 

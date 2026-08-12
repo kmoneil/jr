@@ -68,7 +68,58 @@ func Tools(reg *registry.Registry) []Tool {
 // the command's own Validate, which runs on this path and finds `inv.Stdout`
 // nil — a tool call has no stdout to hand out. Hiding the whole command would
 // remove a working tool to prevent a call that already fails cleanly.
-func servableAsTool(cmd *registry.Command) bool { return !cmd.OwnsStdout }
+// Two further classes are off the wire, and for a different reason from
+// OwnsStdout: they are not operations on Jira at all.
+//
+// `LocalState` commands — `auth login`, `auth logout`, and the four `context`
+// writers — change what this server *is*: which site it talks to, and with
+// whose credential. A peer that can call them can widen its own authority,
+// which makes any limit placed on it a default rather than a boundary. That is
+// administrative, and the human does it with the CLI before the server starts.
+//
+// `auth token` is off for the sharper version of the same reason: it exists to
+// print the credential. Serving it hands the secret to whatever is on the other
+// end of the pipe, and no policy above that layer can matter afterwards.
+//
+// The *reading* siblings stay — `auth status`, `context list`, `context show`.
+// They report where the server is pointed and reveal nothing, and an agent that
+// cannot tell which site it is talking to is one that guesses.
+//
+// This is a description of the interface, not a security boundary. Authority at
+// the CLI is exactly the credential, and a peer that can reach the credential
+// or run its own `jr` is unaffected by anything decided here. See
+// docs/build-profiles.md.
+func servableAsTool(cmd *registry.Command) bool {
+	switch {
+	case cmd.OwnsStdout, cmd.LocalState:
+		return false
+	case cmd.Name() == revealsCredential:
+		return false
+	}
+	return true
+}
+
+// revealsCredential is the one command whose whole purpose is to print the
+// secret. Named rather than derived, because there is no declaration for "this
+// output is the credential" and inventing one for a single command would be a
+// field nothing else could ever set truthfully.
+const revealsCredential = "auth.token"
+
+// notServableReason says why a command is not a tool, because the two reasons
+// need different things from the caller: one is a protocol constraint and the
+// other is where the interface ends.
+func notServableReason(cmd *registry.Command) string {
+	switch {
+	case cmd.OwnsStdout:
+		return "it writes the stream this server speaks on"
+	case cmd.Name() == revealsCredential:
+		return "it prints the credential, which this server holds and does not disclose"
+	case cmd.LocalState:
+		return "it changes which site and credential this server uses, " +
+			"which is done with the CLI before the server starts"
+	}
+	return "it cannot be called as a tool"
+}
 
 // commandToTool converts issue.list to issue_list.
 //
