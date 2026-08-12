@@ -81,6 +81,34 @@ permission rules:
 - **Running `jr auth token`**, which prints the credential from any build. It is
   the same secret as the file below by a different door, so denying one without
   the other denies nothing.
+
+**Allowlist, never blocklist.** A deny list of dangerous verbs is wrong the
+moment a new one ships, and it is already wrong today: blocking `issue create`
+leaves `issue clone --project X`, `issue move`, `issue link add`, and
+`issue comment add`, all of which write. Permit what the agent needs by name and
+refuse the rest. In Claude Code that is a permission rule in settings the agent
+cannot edit, and the shape is:
+
+```jsonc
+// allow, by exact subcommand
+"Bash(jr issue list:*)", "Bash(jr issue get:*)",
+"Bash(jr issue history:*)", "Bash(jr issue activity:*)",
+"Bash(jr issue comment list:*)",
+
+// and refuse everything else that could reach Jira or the credential
+"deny": ["Bash(jr:*)", "Bash(curl:*)", "Read(**/credentials.toml)"]
+```
+
+Add `Bash(jr issue comment add:*)` and you have an agent that may read and
+comment and do nothing else — which is the "comments only" case, available
+today, with no policy engine. The enforcement is the harness, evaluated before
+the command runs, which is the property that matters: it is outside the
+principal it constrains.
+
+Two things this does not survive. An agent that writes a shell script and runs
+*that* may slip a command matcher, depending on how the harness matches. And a
+harness whose settings the agent can write is not an enforcement point at all —
+check where those rules live before relying on them.
 - **Reading `$XDG_STATE_HOME/jr/credentials.toml`**
   (`~/.local/state/jr/credentials.toml`). It is mode 0600 and refused on read if
   it is wider, which stops *other users* reading it and does nothing about a
@@ -172,6 +200,35 @@ make build-all     # all four
 | `agent`  | No TTY assumptions, no interactivity, no browser, no clipboard. Cannot block on input. |
 | `reader` | **Physically cannot mutate Jira.** The mutating commands are not in the binary.        |
 | `ci`     | Query only, smallest possible.                                                         |
+
+### What each is for, and what it does not do
+
+**The intended pairing is one scoped credential per profile, not one credential
+shared between them.** A profile is the second of two independent limits: the
+token says what the account may do, and the binary says what this client can ask
+for. Either alone leaves a single failure; together, two things have to be wrong
+before something unintended reaches Jira. Reading the table below as "this is
+how I constrain something holding my personal token" is the misuse it is
+easiest to fall into, and step 2 above says why that does not hold.
+
+| Profile | Use it for | Pair it with | It does **not** |
+| --- | --- | --- | --- |
+| `full` | A person at a terminal | Your own account | Constrain you in any way, and it is not meant to |
+| `agent` | Unattended automation that must write | A token scoped to what that automation writes | Reduce authority at all — it holds everything `full` does, minus interactivity |
+| `reader` | Anything that should only ever read: an agent, a dashboard, a report | A read-scoped token, or a read-only account | Stop the holder reading your credential, or repointing its own config |
+| `ci` | A pipeline that queries and nothing else | A CI-specific token, rotated with the pipeline | Contain an MCP server — `mcp serve` is absent, which is the point |
+
+Three limits apply to **all four** and are worth stating once:
+
+- **Local authority is identical across profiles.** Contexts and credentials can
+  be created, edited, deleted, and repointed from any of them, and
+  `auth token` prints the credential from any of them.
+- **A profile is only a control where you choose what is installed.** In an
+  image you build, it is strong: the caller has no alternative binary. On a
+  workstation where `jr` is also on the `PATH`, the caller picks.
+- **`agent` is a portability profile, not a permission one.** It exists so a
+  process with no terminal cannot hang or open a browser. It is not a smaller
+  authority than `full` and must not be chosen as though it were.
 
 `make size` asserts the reader build stays under 12 MB. It guards against a
 terminal, display-server, or `os/exec` dependency creeping in. It is **not** a
