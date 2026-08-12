@@ -124,7 +124,7 @@ jobs:
           cd dist
           sha256sum *.tar.gz > checksums.txt
           cat checksums.txt
-      - uses: actions/attest-build-provenance@v2
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-path: dist/*.tar.gz
       - name: create the release
