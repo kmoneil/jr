@@ -120,7 +120,9 @@ endpoint carries. A hand-written fixture asserts both halves of an exchange, so
 it can invent a field the server never sends — and the code then comes to
 depend on it. Four published fields got there that way and are structurally
 empty on every Data Center: `has-screen` on a transition, `project` on a board,
-`private` on a project, `lead` on a component.
+`private` on a project, `lead` on a component. Fixed on 2026-08-11 by omitting
+what the server did not send, which cost three schema versions; the fixtures
+that invented them no longer do.
 
 Most of what it prints is ordinary data dependence — an issue with no links has
 no `issuelinks` — so it is an operator tool rather than a gate. When something

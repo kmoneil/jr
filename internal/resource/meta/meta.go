@@ -27,7 +27,7 @@ import (
 // commit that changes the corresponding golden file.
 const (
 	KindTransitions    = "meta.transitions"
-	VersionTransitions = 1
+	VersionTransitions = 2
 	KindCreateMeta     = "meta.createmeta"
 	VersionCreateMeta  = 1
 )
@@ -47,7 +47,11 @@ func TransitionSchema() *render.Schema {
 		Attrs: []render.Field{
 			// The id is what gets sent back, which is why it is the identity.
 			{Name: "id", Type: render.TypeString},
-			{Name: "has-screen", Type: render.TypeBool},
+			// Absent when the server did not say, which on Data Center is
+			// every transition: it sends no hasScreen under any expand. The
+			// attribute was unconditional and therefore rendered false there,
+			// which is a claim about a form nobody made.
+			{Name: "has-screen", Type: render.TypeBool, Optional: true},
 		},
 		Children: []render.Child{
 			{Schema: render.Leaf("name", render.TypeString)},
@@ -211,8 +215,13 @@ func runTransitions(
 // destination rather than alongside it, because it describes that status.
 func TransitionNode(t site.Transition) *render.Node {
 	n := render.El("transition").
-		Attr("id", t.ID).
-		Attr("has-screen", strconv.FormatBool(t.HasScreen))
+		Attr("id", t.ID)
+	// Omitted rather than defaulted: Data Center sends no hasScreen at all, and
+	// has-screen="false" there told a consumer there was no form to fill in
+	// when the tool had not been told either way.
+	if t.HasScreen != nil {
+		n.Attr("has-screen", strconv.FormatBool(*t.HasScreen))
+	}
 
 	n.Leaf("name", t.Name)
 	n.Child(render.El("to").

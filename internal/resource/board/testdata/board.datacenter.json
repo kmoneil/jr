@@ -14,7 +14,7 @@
             "application/json"
           ]
         },
-        "body": "{\"id\":99,\"self\":\"https://jira.acme.invalid/rest/agile/1.0/board/99\",\"name\":\"ENG Scrum\",\"type\":\"scrum\",\"location\":{\"projectId\":10069,\"projectKey\":\"ENG\",\"projectName\":\"Engineering\",\"projectTypeKey\":\"software\"}}"
+        "body": "{\"id\":99,\"self\":\"https://jira.acme.invalid/rest/agile/1.0/board/99\",\"name\":\"ENG Scrum\",\"type\":\"scrum\"}"
       }
     }
   ]

@@ -1000,6 +1000,43 @@ Jira's own `self` is the REST endpoint, which returns JSON, so this is built
 from the deployment's `baseUrl`. A site that reports no `baseUrl` makes `--url`
 exit 1 with `NO_BASE_URL` rather than producing a link built from a guess.
 
+**A field the server did not send is absent, not defaulted.** An optional
+attribute can be missing because this deployment has no such value, and "false"
+and "not said" are answers a consumer has to be able to tell apart. Two
+attributes were unconditional until 2026-08-11 and printed a default instead:
+
+| Kind                                | Field        | Absent when                                                                    |
+| ----------------------------------- | ------------ | ------------------------------------------------------------------------------ |
+| `meta.transitions` v2               | `has-screen` | The server sent no `hasScreen`, which on Data Center is every transition        |
+| `project.list` v2, `project.get` v2 | `private`    | The server sent no `isPrivate`, which on Data Center is every project           |
+
+Both rendered `false` there, on the strength of a field the response does not
+contain. A consumer branching on `has-screen="false"` skipped a form Jira would
+have shown, and `private="false"` was an assertion about who can see a project
+that nobody had asked the server.
+
+Two more were already absent, and were documented as meaning something they do
+not. Their shape is unchanged; what changed is the reading:
+
+| Kind                       | Field                     | What absent means                                                                                                                                                     |
+| -------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `board.list`, `board.get`  | `project`, `project-name` | The server did not place the board. Data Center sends no `location` on any board, so this is absent there for every board, including one plainly on a project. It does **not** mean "not on a project" |
+| `project.components`       | `lead`                    | The server sent no lead. Data Center sends `assignee` and `realAssignee` on a component and never `lead`, so this is absent there for every component                  |
+
+None of the four is recoverable by asking differently. `has-screen` is absent
+under `expand=transitions.fields`, `expand=transitions`, `expand=hasScreen`, and
+no expand at all; a board carries no `location` under `expand=location`,
+`includeLocation=true`, `expand=projects`, or on `/board/{id}`; `isPrivate` is
+absent with and without `expand=lead,description`. Verified against Jira
+Software Data Center 9.12.38 and 10.4.0, which is both lines a customer is
+likely to be on, and neither is a regression in one release.
+
+The columns stay in the default sets on both deployments, so `project` on
+`board list` and `lead` on `project components` are **empty cells** on Data
+Center rather than missing columns. A TSV whose columns move between sites is
+one no script can `cut` a field out of, and TSV has no way to say "absent"
+anyway. To tell absent from empty, read a format with an envelope.
+
 **The schema is checked on every document this tool writes.** That is the only
 reason to trust it. `render.Write` validates before it emits a byte, so a
 payload that does not match its published shape fails with `SCHEMA_VIOLATION`

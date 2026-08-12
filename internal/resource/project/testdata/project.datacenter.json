@@ -14,7 +14,7 @@
             "application/json"
           ]
         },
-        "body": "{\"id\": \"10069\", \"key\": \"ENG\", \"name\": \"Engineering\", \"projectTypeKey\": \"software\", \"isPrivate\": false, \"lead\": {\"displayName\": \"Ada Lovelace\"}}"
+        "body": "{\"id\": \"10069\", \"key\": \"ENG\", \"name\": \"Engineering\", \"projectTypeKey\": \"software\", \"lead\": {\"displayName\": \"Ada Lovelace\"}}"
       }
     }
   ]

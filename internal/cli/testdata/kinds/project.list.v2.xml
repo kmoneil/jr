@@ -1,0 +1,25 @@
+      <element name="project">
+        <attributes count="4">
+          <attribute name="key" type="string" optional="false"/>
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="style" type="string" optional="true"/>
+          <attribute name="private" type="bool" optional="true"/>
+        </attributes>
+        <elements count="3">
+          <element name="name" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="type" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="lead" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

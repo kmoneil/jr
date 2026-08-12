@@ -107,6 +107,41 @@ func TestTransitionsEmitTheWorkflow(t *testing.T) {
 	}
 }
 
+// TestHasScreenIsWrittenOnlyWhenTheServerSaid is both halves of the
+// optionality, because only one of them is interesting on its own.
+//
+// Omitting it when nil is the fix: the attribute was written unconditionally,
+// so a Data Center transition, which never carries a hasScreen, published
+// has-screen="false" and told a caller there was no form to fill in. Writing it
+// when the server did say is what stops that fix from becoming a worse bug — an
+// attribute dropped everywhere would satisfy the absence check perfectly.
+func TestHasScreenIsWrittenOnlyWhenTheServerSaid(t *testing.T) {
+	yes, no := true, false
+	for _, tc := range []struct {
+		name string
+		from *bool
+		want string // the attribute value, or "" for absent
+	}{
+		{"the server said yes", &yes, "true"},
+		{"the server said no", &no, "false"},
+		{"the server did not say", nil, ""},
+	} {
+		node := meta.TransitionNode(site.Transition{
+			ID: "11", Name: "Start Progress", HasScreen: tc.from,
+		})
+		got, present := node.AttrValue("has-screen")
+		switch {
+		case tc.want == "" && present:
+			t.Errorf("%s: has-screen = %q, want the attribute absent",
+				tc.name, got)
+		case tc.want != "" && !present:
+			t.Errorf("%s: no has-screen, want %q", tc.name, tc.want)
+		case tc.want != "" && got != tc.want:
+			t.Errorf("%s: has-screen = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
 // TestTransitionColumnsResolve keeps the default TSV projection honest: a
 // column whose path finds nothing renders as an empty cell rather than
 // failing, so nothing else would catch it.

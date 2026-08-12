@@ -2235,7 +2235,7 @@ jr meta transitions ENG-101 --format json
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `meta.transitions` | v1 | always |
+| `meta.transitions` | v2 | always |
 
 Default TSV columns: `id`, `name`, `to`, `category`
 
@@ -2302,7 +2302,7 @@ jr project get --format json
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `project.get` | v1 | always |
+| `project.get` | v2 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
@@ -2334,7 +2334,7 @@ jr project list --format json --limit all
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `project.list` | v1 | always |
+| `project.list` | v2 | always |
 
 Default TSV columns: `key`, `name`, `type`, `lead`
 

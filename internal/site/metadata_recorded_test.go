@@ -93,6 +93,19 @@ func TestTheRecordedTransitionsAreAConversationAServerHad(t *testing.T) {
 	if move.To.Category != site.CategoryInProgress {
 		t.Errorf("category = %q, want %q", move.To.Category, site.CategoryInProgress)
 	}
+
+	// The recording is also the evidence for hasScreen being unanswerable here.
+	// This response was fetched with expand=transitions.fields, and 9.12.38 and
+	// 10.4.0 both omit hasScreen under that and under every other expand tried.
+	// A plain bool decoded that silence into false on every transition, which
+	// tells a caller there is no form to fill in.
+	for _, item := range transitions.Items {
+		if item.HasScreen != nil {
+			t.Errorf("transition %s reported has-screen=%v, and Data Center "+
+				"sent no hasScreen to report", item.ID, *item.HasScreen)
+		}
+	}
+
 	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
 		t.Errorf("a recorded exchange was never requested: %v", unplayed)
 	}

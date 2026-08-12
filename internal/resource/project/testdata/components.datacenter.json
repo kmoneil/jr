@@ -14,7 +14,7 @@
             "application/json"
           ]
         },
-        "body": "[{\"id\": \"10002\", \"name\": \"transport\", \"description\": \"the HTTP path\", \"assigneeType\": \"COMPONENT_LEAD\", \"lead\": {\"displayName\": \"Ada Lovelace\"}}, {\"id\": \"10001\", \"name\": \"render\", \"assigneeType\": \"PROJECT_LEAD\"}]"
+        "body": "[{\"id\": \"10002\", \"name\": \"transport\", \"description\": \"the HTTP path\", \"assigneeType\": \"COMPONENT_LEAD\"}, {\"id\": \"10001\", \"name\": \"render\", \"assigneeType\": \"PROJECT_LEAD\"}]"
       }
     }
   ]

@@ -21,6 +21,13 @@ var deployments = []site.Kind{site.Cloud, site.DataCenter}
 // TestListConvergesAcrossDeployments is why both fixtures exist. Cloud pages
 // the listing and Data Center answers it whole — two different conversations a
 // caller must not be able to tell apart.
+//
+// The project column is excluded from the comparison, and that exclusion is the
+// finding rather than a concession. Data Center sends no location on any board,
+// so it cannot name the project a board is on and Cloud can; the two outputs
+// genuinely differ there, and it is the servers that differ. This test used to
+// compare the whole row and pass, because the Data Center fixture had a
+// location its author wrote and no Data Center has ever sent.
 func TestListConvergesAcrossDeployments(t *testing.T) {
 	got := map[site.Kind]string{}
 	for _, kind := range deployments {
@@ -33,10 +40,49 @@ func TestListConvergesAcrossDeployments(t *testing.T) {
 		}
 		got[kind] = out
 	}
-	if got[site.Cloud] != got[site.DataCenter] {
-		t.Errorf("the deployments disagree:\ncloud:\n%s\ndata center:\n%s",
-			got[site.Cloud], got[site.DataCenter])
+
+	cloud, dc := withoutProject(got[site.Cloud]), withoutProject(got[site.DataCenter])
+	if cloud != dc {
+		t.Errorf("the deployments disagree:\ncloud:\n%s\ndata center:\n%s", cloud, dc)
 	}
+
+	// The excluded column, asserted rather than waved past: filled on Cloud,
+	// empty on every Data Center row. A Cloud regression that emptied it would
+	// otherwise now be invisible here.
+	if !strings.Contains(got[site.Cloud], "\tENG\n") {
+		t.Errorf("cloud named no project:\n%s", got[site.Cloud])
+	}
+	for _, line := range strings.Split(strings.TrimRight(got[site.DataCenter], "\n"), "\n")[1:] {
+		if cells := strings.Split(line, "\t"); cells[len(cells)-1] != "" {
+			t.Errorf("data center named a project it was never sent: %q", line)
+		}
+	}
+}
+
+// withoutProject drops the project column, found by name in the header so that
+// adding a column ahead of it does not silently start excluding a different one.
+func withoutProject(tsv string) string {
+	lines := strings.Split(strings.TrimRight(tsv, "\n"), "\n")
+	drop := -1
+	for i, header := range strings.Split(lines[0], "\t") {
+		if header == "project" {
+			drop = i
+		}
+	}
+	if drop < 0 {
+		return tsv
+	}
+
+	var out strings.Builder
+	for _, line := range lines {
+		cells := strings.Split(line, "\t")
+		if drop < len(cells) {
+			cells = append(cells[:drop:drop], cells[drop+1:]...)
+		}
+		out.WriteString(strings.Join(cells, "\t"))
+		out.WriteByte('\n')
+	}
+	return out.String()
 }
 
 // TestBoardsSortNumerically is the issue-key lesson applied to board ids: 99
@@ -143,12 +189,19 @@ func TestGetWithNoBoardAnywhereSaysSo(t *testing.T) {
 	}
 }
 
-// TestABoardOnAPersonHasNoProject covers what Data Center allows and Cloud does
-// not. An absent project key is reported as absent, not as an empty string that
-// looks like an answer.
+// TestABoardOnAPersonHasNoProject covers a location that names a person rather
+// than a project. An absent project key is reported as absent, not as an empty
+// string that looks like an answer.
+//
+// It is a Cloud fixture because Cloud is the deployment that sends a location
+// at all: the recorded Cloud boards carry one, and no Data Center probed sends
+// one for any board, so the same file labelled datacenter was describing a
+// response that deployment cannot produce. The comment it used to carry said
+// this was what "Data Center allows and Cloud does not", which had the
+// deployments the wrong way round.
 func TestABoardOnAPersonHasNoProject(t *testing.T) {
-	conn, _ := replayConn(t, "userboard.datacenter.json")
-	client := &board.Client{Transport: conn, Site: site.Info{Kind: site.DataCenter}}
+	conn, _ := replayConn(t, "userboard.cloud.json")
+	client := &board.Client{Transport: conn, Site: site.Info{Kind: site.Cloud}}
 
 	got, err := client.Get(t.Context(), "5")
 	if err != nil {

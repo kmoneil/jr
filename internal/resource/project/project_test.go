@@ -83,6 +83,50 @@ func TestGetDefaultsToTheContextProject(t *testing.T) {
 	}
 }
 
+// TestPrivateIsReportedWhereTheServerSaysAndOnlyThere is both halves of the
+// optionality, because only one of them is interesting on its own.
+//
+// Absence on Data Center is the fix: `private` was written unconditionally, so
+// a server that sends no `isPrivate` had `private="false"` published on its
+// behalf. Presence on Cloud is what stops that fix from becoming a worse bug —
+// a `Private` that were nil everywhere would satisfy the Data Center assertion
+// perfectly and quietly drop a field Cloud does answer.
+func TestPrivateIsReportedWhereTheServerSaysAndOnlyThere(t *testing.T) {
+	cmd, ok := registry.Lookup("project.get")
+	if !ok {
+		t.Fatal("project get is not registered")
+	}
+
+	for _, tc := range []struct {
+		kind site.Kind
+		want string // the attribute value, or "" for absent
+	}{
+		{site.Cloud, "false"},
+		{site.DataCenter, ""},
+	} {
+		conn, _ := replayConn(t, "project."+string(tc.kind)+".json")
+		doc, err := cmd.Run(t.Context(), &registry.Invocation{
+			Jira: &stubSession{conn: conn, kind: tc.kind},
+			Args: []string{"ENG"}, Flags: registry.NewFlags(),
+			Stderr: io.Discard, Progress: registry.NoProgress,
+		})
+		if err != nil {
+			t.Fatalf("%s: %v", tc.kind, err)
+		}
+		got, present := doc.Record.AttrValue("private")
+		switch {
+		case tc.want == "" && present:
+			t.Errorf("%s reported private=%q, and the response says neither",
+				tc.kind, got)
+		case tc.want != "" && !present:
+			t.Errorf("%s reported no private, and the response says %q",
+				tc.kind, tc.want)
+		case tc.want != "" && got != tc.want:
+			t.Errorf("%s private = %q, want %q", tc.kind, got, tc.want)
+		}
+	}
+}
+
 // TestVersionsAreNewestFirstAndUndatedLast covers the ordering decision. An
 // absent release date is not the beginning of time, so an undated version sorts
 // after the dated ones rather than before them.
@@ -169,23 +213,38 @@ func TestStatusesCarryTheirCategory(t *testing.T) {
 
 // TestComponentsReportHowTheyAssign covers the field worth knowing before
 // filing: a component can hand an issue to somebody nobody chose.
+//
+// The lead is asserted on Cloud and asserted absent on Data Center, because
+// that is where each is true. Data Center sends no lead on a component at all —
+// it sends assignee and realAssignee, which answer a different question — and
+// the Data Center fixture used to carry one anyway, so this test read a lead
+// off a server that never sends one.
 func TestComponentsReportHowTheyAssign(t *testing.T) {
-	conn, _ := replayConn(t, "components.datacenter.json")
-	client := &project.Client{Transport: conn, Site: site.Info{Kind: site.DataCenter}}
+	for _, tc := range []struct {
+		kind site.Kind
+		lead string
+	}{
+		{site.Cloud, "Ada Lovelace"},
+		{site.DataCenter, ""},
+	} {
+		conn, _ := replayConn(t, "components."+string(tc.kind)+".json")
+		client := &project.Client{Transport: conn, Site: site.Info{Kind: tc.kind}}
 
-	components, err := client.Components(t.Context(), "ENG")
-	if err != nil {
-		t.Fatalf("components: %v", err)
-	}
-	// Ordered by name, so two runs agree.
-	if len(components) != 2 || components[0].Name != "render" {
-		t.Fatalf("components = %+v, want them ordered by name", components)
-	}
-	if components[0].AssigneeType != "PROJECT_LEAD" {
-		t.Errorf("assignee type = %q", components[0].AssigneeType)
-	}
-	if components[1].Lead != "Ada Lovelace" {
-		t.Errorf("lead = %q", components[1].Lead)
+		components, err := client.Components(t.Context(), "ENG")
+		if err != nil {
+			t.Fatalf("%s: components: %v", tc.kind, err)
+		}
+		// Ordered by name, so two runs agree.
+		if len(components) != 2 || components[0].Name != "render" {
+			t.Fatalf("%s: components = %+v, want them ordered by name",
+				tc.kind, components)
+		}
+		if components[0].AssigneeType != "PROJECT_LEAD" {
+			t.Errorf("%s: assignee type = %q", tc.kind, components[0].AssigneeType)
+		}
+		if components[1].Lead != tc.lead {
+			t.Errorf("%s: lead = %q, want %q", tc.kind, components[1].Lead, tc.lead)
+		}
 	}
 }
 
@@ -339,6 +398,22 @@ func (s *stubSession) RequireBoard() (string, error) {
 }
 func (s *stubSession) CheckWritable(string) error { return nil }
 
+// neverFilledByTheServer names a column one deployment cannot populate, keyed
+// by command, deployment, and header, with the reason it cannot.
+//
+// The guard below exists because a column blank on every row is usually this
+// tool declaring one it never fills. The other cause is the server: Data Center
+// sends no lead on a component, only assignee and realAssignee, which are who
+// issues land on rather than who owns the component and are not substituted for
+// one another. The column stays in the set on both deployments, because a TSV
+// whose columns move between sites is one no script can cut a field out of.
+//
+// An entry here is a claim about a server, so it is only ever added with a
+// recording behind it, and the guard fails if the column starts being filled.
+var neverFilledByTheServer = map[string]string{
+	"project.components/datacenter/lead": "Data Center sends assignee and realAssignee on a component, never lead",
+}
+
 // TestTheThreePerProjectListingsRunAsCommands exercises the wrappers, which the
 // client-level tests above do not reach.
 func TestTheThreePerProjectListingsRunAsCommands(t *testing.T) {
@@ -423,9 +498,14 @@ func TestTheThreePerProjectListingsRunAsCommands(t *testing.T) {
 							break
 						}
 					}
-					if !filled {
+					why, excused := neverFilledByTheServer[tc.command+"/"+string(kind)+"/"+header]
+					switch {
+					case !filled && !excused:
 						t.Errorf("column %q is empty on every row:\n%s",
 							header, buf.String())
+					case filled && excused:
+						t.Errorf("column %q was filled after all, so the "+
+							"exemption saying %q is stale", header, why)
 					}
 				}
 			})

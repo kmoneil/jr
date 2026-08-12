@@ -1,5 +1,5 @@
 {
-  "deployment": "datacenter",
+  "deployment": "cloud",
   "source": "constructed",
   "interactions": [
     {

@@ -28,6 +28,37 @@ const transitionsJSON = `{"expand":"transitions","transitions":[
 	 "to":{"id":"1","name":"Open","statusCategory":{"key":"new","name":"To Do"}}}
 ]}`
 
+// dataCenterTransitionsJSON is what a real Jira Software Data Center answers:
+// the same shape, with no hasScreen on any transition. Probed on 9.12.38 and
+// 10.4.0 under every expand there is — none, transitions.fields, transitions,
+// hasScreen — and absent from all of them.
+const dataCenterTransitionsJSON = `{"expand":"transitions","transitions":[
+	{"id":"11","name":"Start Progress",
+	 "to":{"id":"3","name":"In Progress",
+	       "statusCategory":{"key":"indeterminate","name":"In Progress"}}}
+]}`
+
+// TestAnUnsentHasScreenStaysUnsent is the regression test for a bool that
+// decoded a missing field into a claim.
+//
+// HasScreen was a plain bool, so every Data Center transition reported
+// has-screen="false" — and a consumer branching on that skips a form Jira
+// would have shown. Nil is the third answer the type has to be able to hold.
+func TestAnUnsentHasScreenStaysUnsent(t *testing.T) {
+	doer := &stubDoer{body: dataCenterTransitionsJSON}
+	got, err := site.FetchTransitions(
+		t.Context(), doer, site.Info{Kind: site.DataCenter}, "ENG-101")
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+	if len(got.Items) != 1 {
+		t.Fatalf("got %d transitions, want 1", len(got.Items))
+	}
+	if screen := got.Items[0].HasScreen; screen != nil {
+		t.Errorf("HasScreen = %v, want nil for a server that did not say", *screen)
+	}
+}
+
 // TestFetchTransitionsUsesTheDeploymentsAPIVersion covers the one branch this
 // function has between the two deployments.
 //
@@ -84,7 +115,9 @@ func TestFetchTransitionsNormalizes(t *testing.T) {
 	if closeIssue.To.Category != site.CategoryDone {
 		t.Errorf("category = %q, want %q", closeIssue.To.Category, site.CategoryDone)
 	}
-	if !closeIssue.HasScreen {
+	if closeIssue.HasScreen == nil {
+		t.Error("a server that sent hasScreen was reported as not having said")
+	} else if !*closeIssue.HasScreen {
 		t.Error("a transition with a screen was reported without one")
 	}
 	// Required fields come first, so "what must I supply" is answerable from

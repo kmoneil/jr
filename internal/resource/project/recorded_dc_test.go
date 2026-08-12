@@ -112,7 +112,7 @@ func TestTheRecordedDataCenterListingIsAConversationAServerHad(t *testing.T) {
 // key. What the recording adds over project.datacenter.json is that the absent
 // fields are absent because Data Center does not send them, not because the
 // fixture's author left them out: a real 10.4.0 project payload carries no
-// `style`, and reporting one would be an invention.
+// `style` and no `isPrivate`, and reporting either would be an invention.
 func TestTheRecordedDataCenterProjectIsAConversationAServerHad(t *testing.T) {
 	cmd, ok := registry.Lookup("project.get")
 	if !ok {
@@ -138,6 +138,13 @@ func TestTheRecordedDataCenterProjectIsAConversationAServerHad(t *testing.T) {
 	if _, ok := doc.Record.AttrValue("style"); ok {
 		t.Error("a style was reported for a Data Center project, which has none")
 	}
+	// private used to render as false here on the strength of a field the
+	// response does not contain, which is an assertion about who can see the
+	// project made out of the server's silence.
+	if _, ok := doc.Record.AttrValue("private"); ok {
+		t.Error("a Data Center project was reported private or public, and " +
+			"the response says neither")
+	}
 	for _, want := range []struct{ child, text string }{
 		{"name", "Engineering"},
 		{"type", "software"},
@@ -158,10 +165,11 @@ func TestTheRecordedDataCenterProjectIsAConversationAServerHad(t *testing.T) {
 }
 
 // TestTheRecordedDataCenterComponentsAreAConversationAServerHad covers
-// `project components`. components.datacenter.json gives every component a
-// lead, which is the tidy case; a real one has an assignee and no lead at all,
-// so the lead cell here is empty and asserted empty rather than filled in with
-// the assignee, which is a different person for a different reason.
+// `project components`. The lead cell here is empty and asserted empty rather
+// than filled in with the assignee, which is a different person for a different
+// reason. components.datacenter.json gave every component a lead until
+// 2026-08-11, which made this recording look like the unlucky case rather than
+// the only case: no Data Center sends a component lead.
 func TestTheRecordedDataCenterComponentsAreAConversationAServerHad(t *testing.T) {
 	got := streamRecorded(t, "project.components",
 		"components-recorded.datacenter.json", []string{"ENG"}, render.TSV)

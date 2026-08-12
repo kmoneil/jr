@@ -25,9 +25,9 @@ import (
 // Kinds and schema versions this resource emits.
 const (
 	KindList       = "project.list"
-	VersionList    = 1
+	VersionList    = 2
 	KindGet        = "project.get"
-	VersionGet     = 1
+	VersionGet     = 2
 	KindComponents = "project.components"
 	VersionComp    = 1
 	KindVersions   = "project.versions"
@@ -61,7 +61,11 @@ func Schema() *render.Schema {
 			// reported rather than normalized away, because what a project
 			// permits differs between them.
 			{Name: "style", Type: render.TypeString, Optional: true},
-			{Name: "private", Type: render.TypeBool},
+			// Absent when the server did not say, which on Data Center is every
+			// project: it sends no isPrivate, with or without expand. The
+			// attribute was unconditional and therefore asserted private="false"
+			// of a project nobody had asked the server about.
+			{Name: "private", Type: render.TypeBool, Optional: true},
 		},
 		Children: []render.Child{
 			{Schema: render.Leaf("name", render.TypeString)},
@@ -78,6 +82,8 @@ func ComponentSchema() *render.Schema {
 		Attrs:   []render.Field{{Name: "id", Type: render.TypeString}},
 		Children: []render.Child{
 			{Schema: render.Leaf("name", render.TypeString)},
+			// Absent when the server sent no lead. Data Center never sends one
+			// on a component, so this is empty there whatever the truth is.
 			{Schema: render.Leaf("lead", render.TypeString), Optional: true},
 			// How Jira picks an assignee for issues in this component. It is
 			// reported because it is the reason an issue can acquire an
@@ -162,10 +168,13 @@ type Project struct {
 	// Style is "classic" or "next-gen" on Cloud, and empty on Data Center,
 	// which has no such distinction. It is reported rather than normalized
 	// away, because what a project permits differs between them.
-	Style   string
-	Lead    string
-	Simple  bool
-	Private bool
+	Style  string
+	Lead   string
+	Simple bool
+	// Private is nil when the server did not say. Data Center never does, on
+	// any version probed and with or without expand, so a plain bool reported
+	// every project there as public on the strength of a missing field.
+	Private *bool
 }
 
 type rawProject struct {
@@ -175,8 +184,10 @@ type rawProject struct {
 	ProjectType string `json:"projectTypeKey"`
 	Style       string `json:"style"`
 	Simplified  bool   `json:"simplified"`
-	IsPrivate   bool   `json:"isPrivate"`
-	Lead        *struct {
+	// A pointer so an absent isPrivate stays absent rather than decoding to
+	// false, which is a claim Data Center never makes.
+	IsPrivate *bool `json:"isPrivate"`
+	Lead      *struct {
 		DisplayName string `json:"displayName"`
 		Name        string `json:"name"`
 	} `json:"lead"`
@@ -198,11 +209,17 @@ func (r rawProject) convert() Project {
 
 // Node renders one project.
 func (p Project) Node() *render.Node {
-	return render.El("project").
+	n := render.El("project").
 		Attr("key", p.Key).
 		Attr("id", p.ID).
-		AttrIf("style", p.Style).
-		Attr("private", strconv.FormatBool(p.Private)).
+		AttrIf("style", p.Style)
+	// Omitted rather than defaulted: Data Center sends no isPrivate, and
+	// private="false" there is an assertion about visibility built out of a
+	// field the server never wrote.
+	if p.Private != nil {
+		n.Attr("private", strconv.FormatBool(*p.Private))
+	}
+	return n.
 		Leaf("name", p.Name).
 		LeafIf("type", p.Type).
 		LeafIf("lead", p.Lead)

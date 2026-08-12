@@ -22,7 +22,11 @@ type Component struct {
 	ID          string
 	Name        string
 	Description string
-	Lead        string
+	// Lead is empty when the server sent no lead, which on Data Center is
+	// every component: it sends assignee and realAssignee instead, and those
+	// are who issues land on rather than who owns the component. Neither is
+	// substituted for the other, so the column stays empty there.
+	Lead string
 	// AssigneeType is how Jira picks an assignee for issues in this component,
 	// e.g. PROJECT_LEAD or COMPONENT_LEAD. It is reported because it is the
 	// reason an issue can acquire an assignee nobody chose.

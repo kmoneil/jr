@@ -15,16 +15,17 @@ import (
 // answer it.
 //
 // boards.datacenter.json is worth keeping — three boards out of numeric order,
-// every one of them located on a project, a shape chosen to catch a text sort —
-// but its author wrote both halves of the exchange, so it establishes that a
-// response is handled and never that Jira accepts the request. The replayer
-// matches on path and query, so a rendered row here means /rest/agile/1.0/board
-// with startAt and maxResults is what a 10.4.0 instance answered, rather than
-// what this code assumed it would.
+// a shape chosen to catch a text sort — but its author wrote both halves of the
+// exchange, so it establishes that a response is handled and never that Jira
+// accepts the request. The replayer matches on path and query, so a rendered
+// row here means /rest/agile/1.0/board with startAt and maxResults is what a
+// 10.4.0 instance answered, rather than what this code assumed it would.
 //
-// The recording also carries what the constructed fixture chose not to: a board
-// with no location at all. Data Center returns one for a board on a person, and
-// the empty project column below is the server's answer, not a stub's.
+// The empty project column below is the server's answer and not a stub's, and
+// it is empty for the reason the constructed fixture got wrong: Data Center
+// sends no location on any board, including this one, which is plainly on ENG.
+// That fixture gave all three boards a location until 2026-08-11 and made the
+// absence here look like a board on a person.
 func TestTheRecordedDataCenterListingIsAConversationAServerHad(t *testing.T) {
 	cmd, ok := registry.Lookup("board.list")
 	if !ok {
@@ -77,9 +78,8 @@ func TestTheRecordedDataCenterListingIsAConversationAServerHad(t *testing.T) {
 // construction cannot tell you which one the server honours. This one can.
 //
 // It asserts no project element, because the recorded board carries no
-// location. That is the honest reading of the response rather than an invented
-// key, and it is the same absence userboard.datacenter.json was hand-written to
-// describe — now with a server behind it.
+// location — as no board on this deployment does, whichever project it is on.
+// That is the honest reading of the response rather than an invented key.
 func TestTheRecordedDataCenterBoardIsAConversationAServerHad(t *testing.T) {
 	cmd, ok := registry.Lookup("board.get")
 	if !ok {

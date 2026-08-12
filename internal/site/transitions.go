@@ -20,7 +20,13 @@ type Transition struct {
 	// HasScreen reports whether Jira would show a form. A transition with a
 	// screen may have required fields, which is why the flag is carried rather
 	// than inferred from the field list being empty.
-	HasScreen bool `json:"hasScreen"`
+	//
+	// Nil means the server did not say, which on Data Center is always: 9.12.38
+	// and 10.4.0 both omit hasScreen under every expand tried — none,
+	// transitions.fields, transitions, hasScreen. A plain bool reported every
+	// transition there as screenless, and a consumer branching on that skips a
+	// form Jira would have shown.
+	HasScreen *bool `json:"hasScreen,omitempty"`
 	// Fields are the fields this transition accepts, required ones first.
 	Fields []MetaField `json:"fields,omitempty"`
 }
@@ -56,7 +62,9 @@ type rawTransitions struct {
 				Name string `json:"name"`
 			} `json:"statusCategory"`
 		} `json:"to"`
-		HasScreen bool                       `json:"hasScreen"`
+		// A pointer so an absent hasScreen stays absent rather than decoding to
+		// false, which is a claim Data Center never makes.
+		HasScreen *bool                      `json:"hasScreen"`
 		Fields    map[string]json.RawMessage `json:"fields"`
 	} `json:"transitions"`
 }

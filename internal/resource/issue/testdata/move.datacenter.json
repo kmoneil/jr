@@ -15,7 +15,7 @@
             "application/json"
           ]
         },
-        "body": "{\"transitions\": [{\"id\": \"11\", \"name\": \"Start Progress\", \"hasScreen\": false, \"to\": {\"id\": \"3\", \"name\": \"In Progress\", \"statusCategory\": {\"key\": \"indeterminate\", \"name\": \"In Progress\"}}}, {\"id\": \"2\", \"name\": \"Close Issue\", \"hasScreen\": true, \"to\": {\"id\": \"6\", \"name\": \"Closed\", \"statusCategory\": {\"key\": \"done\", \"name\": \"Done\"}}}]}"
+        "body": "{\"transitions\": [{\"id\": \"11\", \"name\": \"Start Progress\", \"to\": {\"id\": \"3\", \"name\": \"In Progress\", \"statusCategory\": {\"key\": \"indeterminate\", \"name\": \"In Progress\"}}}, {\"id\": \"2\", \"name\": \"Close Issue\", \"to\": {\"id\": \"6\", \"name\": \"Closed\", \"statusCategory\": {\"key\": \"done\", \"name\": \"Done\"}}}]}"
       }
     },
     {

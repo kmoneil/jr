@@ -57,8 +57,9 @@ func Schema() *render.Schema {
 		},
 		Children: []render.Child{
 			{Schema: render.Leaf("name", render.TypeString)},
-			// Absent for a board located on a person rather than a project,
-			// which Data Center allows.
+			// Absent when the server did not place the board. That covers a
+			// board located on a person rather than a project, and it covers
+			// every board on Data Center, which sends no location at all.
 			{Schema: render.Leaf("project", render.TypeString), Optional: true},
 			{Schema: render.Leaf("project-name", render.TypeString), Optional: true},
 		},
@@ -87,9 +88,15 @@ type Board struct {
 	// exists only for a scrum board, and asking a kanban board for one is a
 	// 400 rather than an empty list.
 	Type string
-	// Project is the key of the project the board is located on. It is empty
-	// for a board located on a user rather than a project, which Data Center
-	// allows — an absent key means "not on a project", not "unknown".
+	// Project is the key of the project the board is located on, and is empty
+	// when the server did not place the board.
+	//
+	// That absence used to be documented as "not on a project", which was read
+	// off a Cloud fixture. Data Center sends no location on any board, under
+	// none, expand=location, includeLocation=true, expand=projects, and not on
+	// /board/{id} either, so on that deployment the field is empty for every
+	// board including the ones plainly on a project. An empty key therefore
+	// means "not said", and nothing may read it as "not on a project".
 	Project     string
 	ProjectName string
 }
@@ -109,8 +116,9 @@ type rawBoard struct {
 	ID   json.Number `json:"id"`
 	Name string      `json:"name"`
 	Type string      `json:"type"`
-	// Location is absent on a board the credential can see but not place, so
-	// it is a pointer and its absence is reported as an empty project.
+	// Location is absent on a board the credential can see but not place, and
+	// on every board Data Center serves. It is a pointer, and its absence is
+	// reported as an empty project rather than as a project of "".
 	Location *struct {
 		ProjectKey  string `json:"projectKey"`
 		ProjectName string `json:"projectName"`
