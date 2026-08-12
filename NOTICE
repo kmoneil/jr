@@ -27,12 +27,25 @@ spelled out.
     github.com/spf13/pflag                BSD-3-Clause
                                           Copyright (c) 2012 Alex Ogier
                                           Copyright (c) 2012 The Go Authors
+    golang.org/x/term                     BSD-3-Clause
+                                          Copyright 2009 The Go Authors
     gopkg.in/yaml.v3                      MIT and Apache-2.0
+    golang.org/x/sys                      BSD-3-Clause
+                                          Copyright 2009 The Go Authors
+                                          (indirect, reached through x/term)
     github.com/inconshreveable/mousetrap  Apache-2.0
-                                          (indirect, reached through cobra)
+                                          (indirect, reached through cobra, and
+                                          linked only in a Windows build)
 
-Four direct dependencies and one indirect. Each licence text is in the module's
+Five direct dependencies and two indirect. Each licence text is in the module's
 own source, which `go mod download` fetches and `go.sum` pins.
+
+This list is asserted rather than maintained by hand:
+`internal/lint/notice_test.go` links every shipped profile, on every platform
+this builds for, and fails when a module reaches the binary without appearing
+above. It was written because golang.org/x/term did not: it is imported with no
+build tag, every profile links it, and its BSD-3-Clause notice was missing from
+the one file whose whole job is to travel with the binary.
 
 gopkg.in/yaml.v3 carries a NOTICE of its own. Section 4(d) of the Apache License
 requires it to travel with the work, so it is reproduced here in full:

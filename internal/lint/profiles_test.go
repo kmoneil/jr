@@ -542,3 +542,62 @@ func TestTheReadmeSurfaceCountMatchesTheBinaries(t *testing.T) {
 		}
 	}
 }
+
+// readmeSkillLine matches the line `jr skill` prints about itself, as the
+// README quotes it:
+//
+//	43 commands, profile `reader`, tags `mcp`.
+//
+// The profile name is captured because the transcript names which binary it
+// came from, and that is what makes the number checkable.
+var readmeSkillLine = regexp.MustCompile(
+	"(?m)^(\\d+)\\s+commands?,\\s+profile\\s+`([a-z]+)`,\\s+tags\\s+`([^`]*)`\\.",
+)
+
+// TestTheReadmeSkillTranscriptMatchesTheBinary runs the command the README
+// shows and compares the whole line, not only the number.
+//
+// TestTheReadmeSurfaceCountMatchesTheBinaries reads the surface by the shape
+// "N commands in the full build, M in the reader", and this sentence is not
+// that shape. So the README carried `41 commands, profile reader` against a
+// real 43 for two releases, in a transcript that reads exactly like evidence
+// because it is a copy of real output. A quoted transcript is a claim about
+// what a command prints, and the cheapest way to check one is to run it.
+//
+// The tag list is compared too. It is where the profile's identity actually
+// lives, and a build that gained a tag would otherwise be a wrong transcript
+// with a right number.
+func TestTheReadmeSkillTranscriptMatchesTheBinary(t *testing.T) {
+	body := strings.Join(readLines(t, readmePath), "\n")
+	found := readmeSkillLine.FindAllStringSubmatch(body, -1)
+	if len(found) == 0 {
+		t.Skip("no `jr skill` transcript in the README to check")
+	}
+
+	profiles := profilesFromMakefile(t)
+	bin := t.TempDir()
+
+	for _, m := range found {
+		quoted, name := m[0], m[2]
+
+		i := slices.IndexFunc(profiles, func(p profile) bool { return p.name == name })
+		if i < 0 {
+			t.Errorf("%s quotes profile %q, which the Makefile does not ship: %v",
+				readmePath, name, profiles)
+			continue
+		}
+
+		// The skill is in every profile including ci, which is the point of the
+		// sentence beside this transcript, so every profile can answer.
+		out := askBinary(t, buildProfile(t, bin, profiles[i]), profiles[i], "skill")
+		actual := readmeSkillLine.FindString(out)
+		if actual == "" {
+			t.Fatalf("`jr skill` for the %s profile no longer prints the line this "+
+				"test reads; the transcript in %s is now unchecked", name, readmePath)
+		}
+		if actual != quoted {
+			t.Errorf("%s quotes %q and the %s build prints %q",
+				readmePath, quoted, name, actual)
+		}
+	}
+}
