@@ -26,9 +26,19 @@ jobs:
           make fmt-check
       - name: vet
         run: make vet
-      - uses: golangci/golangci-lint-action@v6
+      # v8 is the first action release that runs golangci-lint v2, which
+      # `.golangci.yml` declares with `version: "2"`.
+      #
+      # The version is pinned rather than `latest`, and it is the version this
+      # repository lints with locally, because golangci-lint refuses a module
+      # whose Go directive is newer than the Go it was itself built with:
+      # `latest` resolved to a binary built with go1.24 and every run failed
+      # with "the Go language version (go1.24) used to build golangci-lint is
+      # lower than the targeted Go version". A linter that floats is also a
+      # linter that can fail a pull request that changed nothing.
+      - uses: golangci/golangci-lint-action@v8
         with:
-          version: latest
+          version: v2.12.2
       # A second pass with no build tags, because the config turns all eight on
       # and `unused` then cannot see a symbol that is live under `write` and
       # dead without it. Called by name rather than folded into the step above
@@ -74,6 +84,15 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+      # internal/lint runs gocognit as a subprocess and fails rather than skips
+      # when it is absent, on the argument that a complexity gate which did not
+      # run reads exactly like one that passed. That argument only holds if CI
+      # installs the tool, so this step is part of the gate and not a
+      # convenience. Pinned to the version this repository lints with locally,
+      # because the scores are the tool's and a float would fail a pull request
+      # that changed nothing.
+      - name: gocognit
+        run: go install github.com/uudashr/gocognit/cmd/gocognit@v1.2.1
       # -race because the request budget is shared across concurrent
       # pagination, and a counter that undercounts would silently exceed the
       # limit it exists to enforce.
