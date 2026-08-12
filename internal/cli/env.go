@@ -90,6 +90,19 @@ func (a *app) chain() auth.Chain {
 
 // normalizeSite canonicalizes a --site value.
 func (a *app) normalizeSite(site string) (string, error) {
+	// A command that names its own site is the authority on where the request
+	// went, and the error decoration has to agree with it.
+	//
+	// `--site` is declared twice: once as a persistent flag, and once on each
+	// auth command, where it is required. Cobra binds the command-local one, so
+	// the value lands in the invocation's flags and never in a.site — and
+	// explainSite, reading a.site, saw nothing, fell through to the context,
+	// and told a caller who had typed `--site` that their site "came from
+	// context X". Against a context naming a different host entirely, which is
+	// a diagnostic pointing at the wrong file.
+	if trimmed := strings.TrimSpace(site); trimmed != "" {
+		a.site = trimmed
+	}
 	return jctx.NormalizeSite(site)
 }
 
@@ -97,7 +110,7 @@ func (a *app) normalizeSite(site string) (string, error) {
 // whatever the context and environment settle on.
 func (a *app) siteFor(flagValue string) (string, error) {
 	if strings.TrimSpace(flagValue) != "" {
-		return jctx.NormalizeSite(flagValue)
+		return a.normalizeSite(flagValue)
 	}
 	cfg, err := a.config()
 	if err != nil {

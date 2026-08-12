@@ -695,3 +695,31 @@ func TestContextListTruncatesAndSaysSo(t *testing.T) {
 		t.Errorf("emitted %d rows under --limit 1, want 1:\n%s", rows, got.stdout)
 	}
 }
+
+// TestAnExplicitSiteIsNotBlamedOnAContext covers a diagnostic that pointed at
+// the wrong file.
+//
+// `--site` is declared twice: as a persistent flag and again on each auth
+// command, where it is required. Cobra binds the command-local one, so the
+// value never reached a.site, and explainSite fell through to the context and
+// reported that the site "came from context X" — against a context naming a
+// different host entirely. Somebody following that would edit a context that
+// had nothing to do with their request.
+func TestAnExplicitSiteIsNotBlamedOnAContext(t *testing.T) {
+	env := session(t)
+	mustRun(t, env, "context", "create", "other", "--site", "elsewhere.invalid")
+
+	got := runWithStdin(t, env, strings.NewReader("tok"),
+		"auth", "login", "--site", "nothing-here.invalid", "--token-stdin")
+
+	if strings.Contains(got.stderr, "came from context") {
+		t.Errorf("an explicit --site was blamed on a context:\n%s", got.stderr)
+	}
+	if !strings.Contains(got.stderr, "came from --site") {
+		t.Errorf("the failure does not say where the site came from:\n%s", got.stderr)
+	}
+	// And the context that had nothing to do with it is not named at all.
+	if strings.Contains(got.stderr, "elsewhere.invalid") {
+		t.Errorf("an unrelated context's site appears in the failure:\n%s", got.stderr)
+	}
+}
