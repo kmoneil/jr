@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -56,7 +57,7 @@ func TestEveryFlagChangesWhatTheCommandDoes(t *testing.T) {
 		if why := commandNotDriven(c); why != "" {
 			continue
 		}
-		for _, f := range c.Flags {
+		for _, f := range c.AllFlags() {
 			name := c.Name() + "/--" + f.Name
 			if _, ok := flagWithNoObservableEffect[name]; ok {
 				exempt++
@@ -201,7 +202,7 @@ func TestTheFlagSweepAccountsForEveryFlag(t *testing.T) {
 	var unreachable int
 	for _, c := range cli.Registry().All() {
 		why := commandNotDriven(c)
-		for _, f := range c.Flags {
+		for _, f := range c.AllFlags() {
 			name := c.Name() + "/--" + f.Name
 			if why != "" {
 				unreachable++
@@ -210,14 +211,14 @@ func TestTheFlagSweepAccountsForEveryFlag(t *testing.T) {
 		}
 		// A command with no flags is not a gap in a flag sweep, whether or not
 		// this harness could drive it.
-		if why == "" || len(c.Flags) == 0 {
+		if why == "" || len(c.AllFlags()) == 0 {
 			continue
 		}
 		if commandNotSwept[c.Name()] == "" {
 			t.Errorf("%s has %d flags the sweep never drives (%s) and is not "+
 				"in commandNotSwept; add it with the reason and with where "+
 				"those flags are covered instead, or teach the harness to "+
-				"drive it", c.Name(), len(c.Flags), why)
+				"drive it", c.Name(), len(c.AllFlags()), why)
 		}
 	}
 	for name := range commandNotSwept {
@@ -375,6 +376,12 @@ var argByCommand = map[string]string{
 	"epic.add/epic":                "ENG-9",
 	"issue.link.add/to":            "ENG-9",
 	"user.get/user":                "probe",
+	// Three commands whose positional is called `key` and means a *project*
+	// key. The generic case answers an issue key, which they refuse locally,
+	// so every flag on them was measured against a refusal.
+	"project.components/key": "ENG",
+	"project.statuses/key":   "ENG",
+	"project.versions/key":   "ENG",
 }
 
 // flagWithNoObservableEffect names the flags that move nothing this harness can
@@ -426,6 +433,14 @@ var commandNotSwept = map[string]string{
 	"auth.token": "prints the credential; TestAuthStatusNeverRevealsTheToken " +
 		"and TestTokenIsNotAcceptedOnTheCommandLine",
 	"context.create": "writes config.toml; TestContextLifecycle",
+	// Both are paginated and neither reaches Jira, so their one flag is
+	// --limit and a recorded request cannot show it working. Both prove it
+	// end to end instead, through cli.Main, which is the stronger form: the
+	// real exit code and the real stderr, which is the pair a script checks.
+	"context.list": "reads config.toml rather than Jira; " +
+		"TestContextListTruncatesAndSaysSo drives --limit past the row count",
+	"schema": "describes the binary rather than a site; " +
+		"TestSchemaIsCompleteWithNoFlags drives --limit against the command list",
 	"context.delete": "writes config.toml; TestContextErrors",
 	"context.edit": "writes config.toml, and every flag on it is covered one " +
 		"at a time by TestEditingOneSettingLeavesTheRestAlone, " +
@@ -494,6 +509,10 @@ var companionFlags = map[string]map[string]string{
 // probeAltByFlag is the second value, wherever "other" is not one the flag
 // accepts.
 var probeAltByFlag = map[string]string{
+	// One row against a fixture that answers with two, which is the only way a
+	// bound is observable at all: `--limit 50` and `--limit 1` against an empty
+	// collection produce the same request and the same document.
+	"limit":          "1",
 	"since":          "-3651d",
 	"kind":           "worklog",
 	"jql":            "labels = second",
@@ -594,7 +613,7 @@ func drive(
 
 	rt := &recordingTransport{kind: kind}
 	flags := registry.NewFlags()
-	for _, f := range c.Flags {
+	for _, f := range c.AllFlags() {
 		// A mutating command previews rather than pretends to write: the
 		// dry-run document *is* the request it would have sent, which is a
 		// sharper observable than a fabricated 200.
@@ -822,59 +841,152 @@ func (rt *recordingTransport) RoundTrip(r *http.Request) (*http.Response, error)
 func sweepResponse(path string, kind site.Kind) string {
 	switch {
 	case strings.HasSuffix(path, "/field"):
-		return `[{"id":"customfield_10042","name":"Story Points","custom":true,
-			"searchable":true,"orderable":true,"navigable":true,
-			"clauseNames":["Story Points"],"schema":{"type":"number"}}]`
-	case strings.Contains(path, "/user/"), strings.HasSuffix(path, "/user"):
-		return `[{"accountId":"5b10a2844c20165700ede21g","name":"probe",
-			"displayName":"Probe","emailAddress":"probe@example.invalid",
-			"active":true}]`
+		return `[` + sweepField("customfield_10042", "Story Points") + `,` +
+			sweepField("customfield_10043", "Sprint Goal") + `]`
+	case strings.Contains(path, "/user/"), strings.HasSuffix(path, "/user"),
+		strings.Contains(path, "/user/search"):
+		return `[` + sweepUser("5b10a2844c20165700ede21g", "Probe") + `,` +
+			sweepUser("5b10a2844c20165700ede21h", "Second Probe") + `]`
+	// Before /issue/, which would otherwise answer a changelog request with an
+	// issue, and before /search, which `project/search` contains.
+	case strings.HasSuffix(path, "/changelog"):
+		return sweepPage(`"values"`, sweepHistory("10001", "In Progress"),
+			sweepHistory("10002", "Done"))
+	case strings.Contains(path, "/project/search"):
+		return sweepPage(`"values"`, sweepProject("ENG", "Engineering"),
+			sweepProject("OPS", "Operations"))
 	case strings.Contains(path, "/search"):
-		return `{"startAt":0,"maxResults":50,"total":1,"isLast":true,"issues":[` +
-			sweepIssue(kind) + `]}`
+		return `{"startAt":0,"maxResults":50,"total":2,"isLast":true,"issues":[` +
+			sweepIssueKeyed(kind, "1", "ENG-2") + `,` +
+			sweepIssueKeyed(kind, "2", "ENG-1") + `]}`
 	case strings.HasSuffix(path, "/comment"):
-		return `{"startAt":0,"maxResults":50,"total":1,"comments":[{"id":"10000",
-			"body":` + sweepBody(kind) + `,"created":"2026-01-01T00:00:00.000+0000",
-			"updated":"2026-01-01T00:00:00.000+0000",
-			"author":{"name":"probe","displayName":"Probe"}}]}`
+		return `{"startAt":0,"maxResults":50,"total":2,"comments":[` +
+			sweepComment("10000", kind) + `,` + sweepComment("10001", kind) + `]}`
 	case strings.HasSuffix(path, "/worklog"):
-		return `{"startAt":0,"maxResults":50,"total":1,"worklogs":[{"id":"10000",
-			"comment":` + sweepBody(kind) + `,"started":"2026-01-01T00:00:00.000+0000",
-			"created":"2026-01-01T00:00:00.000+0000",
-			"timeSpentSeconds":3600,
-			"author":{"name":"probe","displayName":"Probe"}}]}`
+		return `{"startAt":0,"maxResults":50,"total":2,"worklogs":[` +
+			sweepWorklog("10000", kind) + `,` + sweepWorklog("10001", kind) + `]}`
 	case strings.Contains(path, "/issueLinkType"):
 		return `{"issueLinkTypes":[{"id":"10000","name":"Blocks",
-			"inward":"is blocked by","outward":"blocks"}]}`
+			"inward":"is blocked by","outward":"blocks"},
+			{"id":"10001","name":"Relates","inward":"relates to",
+			"outward":"relates to"}]}`
 	case strings.HasSuffix(path, "/myself"):
 		return `{"accountId":"5b10a2844c20165700ede21g","name":"probe",
 			"displayName":"Probe","emailAddress":"probe@example.invalid",
 			"active":true,"timeZone":"UTC"}`
+	// The two agile listings before the single-object routes they contain.
+	case strings.HasSuffix(path, "/sprint"):
+		return sweepPage(`"values"`, sweepSprint(1, "future"), sweepSprint(3, "future"))
+	case strings.HasSuffix(path, "/epic"):
+		return sweepPage(`"values"`,
+			`{"id":10,"key":"ENG-10","name":"First epic","summary":"First epic","done":false}`,
+			`{"id":11,"key":"ENG-11","name":"Second epic","summary":"Second epic","done":false}`)
 	case strings.HasSuffix(path, "/sprint/2"):
-		// Sprint 2 is the running one. Two of them, because a verb's
+		// Sprint 2 is the running one. Two states, because a verb's
 		// precondition is part of what the harness has to satisfy: `sprint
 		// start` refuses anything but a future sprint and `sprint close`
 		// refuses anything but an active one, so one state cannot drive both
 		// and the flags on whichever lost would read as dead.
-		return `{"id":2,"name":"Sprint 2","state":"active","originBoardId":1,
-			"startDate":"2026-01-01T00:00:00.000Z",
-			"endDate":"2026-01-15T00:00:00.000Z"}`
+		return sweepSprint(2, "active")
 	case strings.Contains(path, "/sprint"):
-		return `{"id":1,"name":"Sprint 1","state":"future","originBoardId":1,
-			"startDate":"2026-01-01T00:00:00.000Z",
-			"endDate":"2026-01-15T00:00:00.000Z"}`
+		return sweepSprint(1, "future")
+	case strings.HasSuffix(path, "/board"):
+		return sweepPage(`"values"`,
+			`{"id":1,"name":"First board","type":"scrum"}`,
+			`{"id":2,"name":"Second board","type":"kanban"}`)
+	case strings.Contains(path, "/board/"):
+		return `{"id":1,"name":"First board","type":"scrum"}`
 	case strings.HasSuffix(path, "/transitions"):
 		return `{"transitions":[{"id":"31","name":"Done","hasScreen":false,
-			"to":{"name":"Done","statusCategory":{"key":"done","name":"Done"}}}]}`
+			"to":{"name":"Done","statusCategory":{"key":"done","name":"Done"}}},
+			{"id":"41","name":"Blocked","hasScreen":false,
+			"to":{"name":"Blocked","statusCategory":{"key":"indeterminate","name":"In Progress"}}}]}`
+	// The type list first: `meta createmeta` resolves the name it was given
+	// against it before asking for that type's fields, so a fixture without a
+	// type called "probe" refuses at the first request and every flag on the
+	// command is measured against that refusal.
+	case strings.HasSuffix(path, "/issuetypes"):
+		return sweepPage(`"values"`,
+			`{"id":"10001","name":"probe","subtask":false}`,
+			`{"id":"10002","name":"Bug","subtask":false}`)
+	case strings.Contains(path, "/issuetypes/"):
+		return sweepPage(`"values"`,
+			`{"fieldId":"summary","required":true,"name":"Summary","schema":{"type":"string"}}`,
+			`{"fieldId":"description","required":false,"name":"Description","schema":{"type":"string"}}`)
+	case strings.Contains(path, "createmeta"):
+		return `{"projects":[{"key":"ENG","issuetypes":[{"id":"10001","name":"Task",
+			"fields":{"summary":{"required":true,"name":"Summary","schema":{"type":"string"}},
+			"description":{"required":false,"name":"Description","schema":{"type":"string"}}}}]}],
+			"fields":[{"fieldId":"summary","required":true,"name":"Summary",
+			"schema":{"type":"string"}},{"fieldId":"description","required":false,
+			"name":"Description","schema":{"type":"string"}}]}`
+	case strings.Contains(path, "/statuses"):
+		return `[{"id":"10001","name":"Task","statuses":[
+			{"id":"1","name":"To Do","statusCategory":{"key":"new","name":"To Do"}},
+			{"id":"3","name":"Done","statusCategory":{"key":"done","name":"Done"}}]},
+			{"id":"10002","name":"Bug","statuses":[
+			{"id":"1","name":"To Do","statusCategory":{"key":"new","name":"To Do"}}]}]`
+	case strings.Contains(path, "/versions"):
+		return `[{"id":"1","name":"1.0","archived":false,"released":true},
+			{"id":"2","name":"2.0","archived":false,"released":false}]`
+	case strings.Contains(path, "/components"):
+		return `[{"id":"1","name":"api"},{"id":"2","name":"cli"}]`
 	case strings.Contains(path, "/issue/"):
 		return sweepIssue(kind)
-	case strings.Contains(path, "/statuses"),
-		strings.Contains(path, "/versions"),
-		strings.Contains(path, "/components"):
-		return "[]"
 	default:
 		return "{}"
 	}
+}
+
+// sweepPage wraps rows in the paged envelope the agile and project endpoints
+// use. The count is the row count, so a bound below it genuinely truncates.
+func sweepPage(key string, rows ...string) string {
+	return `{"startAt":0,"maxResults":50,"total":` + strconv.Itoa(len(rows)) +
+		`,"isLast":true,` + key + `:[` + strings.Join(rows, ",") + `]}`
+}
+
+func sweepField(id, name string) string {
+	return `{"id":"` + id + `","name":"` + name + `","custom":true,
+		"searchable":true,"orderable":true,"navigable":true,
+		"clauseNames":["` + name + `"],"schema":{"type":"number"}}`
+}
+
+func sweepUser(id, display string) string {
+	return `{"accountId":"` + id + `","name":"probe","displayName":"` + display + `",
+		"emailAddress":"probe@example.invalid","active":true}`
+}
+
+func sweepProject(key, name string) string {
+	return `{"id":"1","key":"` + key + `","name":"` + name + `","projectTypeKey":"software",
+		"style":"classic","lead":{"accountId":"1","displayName":"Probe"}}`
+}
+
+func sweepSprint(id int, state string) string {
+	return `{"id":` + strconv.Itoa(id) + `,"name":"Sprint ` + strconv.Itoa(id) +
+		`","state":"` + state + `","originBoardId":1,
+		"startDate":"2026-01-01T00:00:00.000Z",
+		"endDate":"2026-01-15T00:00:00.000Z"}`
+}
+
+func sweepHistory(id, to string) string {
+	return `{"id":"` + id + `","created":"2026-01-01T00:00:00.000+0000",
+		"author":{"name":"probe","accountId":"1","displayName":"Probe"},
+		"items":[{"field":"status","fieldtype":"jira","fromString":"To Do",
+		"toString":"` + to + `"}]}`
+}
+
+func sweepComment(id string, kind site.Kind) string {
+	return `{"id":"` + id + `","body":` + sweepBody(kind) + `,
+		"created":"2026-01-01T00:00:00.000+0000",
+		"updated":"2026-01-01T00:00:00.000+0000",
+		"author":{"name":"probe","displayName":"Probe"}}`
+}
+
+func sweepWorklog(id string, kind site.Kind) string {
+	return `{"id":"` + id + `","comment":` + sweepBody(kind) + `,
+		"started":"2026-01-01T00:00:00.000+0000",
+		"created":"2026-01-01T00:00:00.000+0000","timeSpentSeconds":3600,
+		"author":{"name":"probe","displayName":"Probe"}}`
 }
 
 // sweepIssue carries exactly the values a flag on a read command renders: a
@@ -885,12 +997,34 @@ func sweepResponse(path string, kind site.Kind) string {
 // projection rather than from `description` — the same flag on the same fixture
 // had nothing to convert, and a flag with nothing to act on reads exactly like
 // a flag that does nothing.
-func sweepIssue(kind site.Kind) string {
-	return `{"id":"1","key":"ENG-1","fields":{"summary":"probe",
+func sweepIssue(kind site.Kind) string { return sweepIssueKeyed(kind, "1", "ENG-1") }
+
+// sweepIssueKeyed is the same row with an identity, because two rows on one
+// page must not share a key: the keyset ordering check refuses "ENG-1 followed
+// ENG-1", correctly, and a fixture that trips it measures the check rather
+// than the flag under test.
+func sweepIssueKeyed(kind site.Kind, id, key string) string {
+	return `{"id":"` + id + `","key":"` + key + `","fields":{"summary":"probe",
 		"status":{"name":"Open","statusCategory":{"key":"new","name":"To Do"}},
 		"created":"2026-01-01T00:00:00.000+0000",
 		"updated":"2026-01-01T00:00:00.000+0000",
 		"description":` + sweepBody(kind) + `,"labels":["probe"],
+		"attachment":[
+			{"id":"10000","filename":"first.txt","size":12,"mimeType":"text/plain",
+			 "created":"2026-01-01T00:00:00.000+0000",
+			 "author":{"name":"probe","displayName":"Probe"}},
+			{"id":"10001","filename":"second.txt","size":34,"mimeType":"text/plain",
+			 "created":"2026-01-01T00:00:00.000+0000",
+			 "author":{"name":"probe","displayName":"Probe"}}],
+		"issuelinks":[
+			{"id":"20000","type":{"id":"10000","name":"Blocks",
+			 "inward":"is blocked by","outward":"blocks"},
+			 "outwardIssue":{"key":"ENG-2","fields":{"summary":"second",
+			  "status":{"name":"To Do","statusCategory":{"key":"new","name":"To Do"}}}}},
+			{"id":"20001","type":{"id":"10001","name":"Relates",
+			 "inward":"relates to","outward":"relates to"},
+			 "inwardIssue":{"key":"ENG-3","fields":{"summary":"third",
+			  "status":{"name":"To Do","statusCategory":{"key":"new","name":"To Do"}}}}}],
 		"comment":{"total":1,"startAt":0,"maxResults":1,"comments":[
 			{"id":"1","created":"2026-01-01T00:00:00.000+0000",
 			 "updated":"2026-01-01T00:00:00.000+0000",

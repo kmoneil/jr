@@ -2,6 +2,7 @@ package issue
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"strconv"
 	"strings"
@@ -401,7 +402,7 @@ func runActivity(
 	}
 	want := activityFilter(inv)
 
-	var clipped bool
+	var clipped, atLimit bool
 	result, err := client.ListStream(ctx, ListOptions{
 		Query: QueryOptions{
 			Project:      inv.Jira.Project(),
@@ -424,24 +425,43 @@ func runActivity(
 			clipped = true
 		}
 		sortEvents(events)
-		nodes := make([]*render.Node, 0, len(events))
-		for _, e := range events {
-			nodes = append(nodes, e.Node())
-		}
-		if err := out.Write(nodes...); err != nil {
+		// Bounded by --limit like any other collection. The issue search is
+		// deliberately unbounded — every candidate has to be read before its
+		// events can be merged and sorted — so this is the only place the
+		// caller's limit can apply, and without it the flag was declared,
+		// bound, and dropped.
+		bounded, err := writeRows(inv, out, events,
+			func(e Event) *render.Node { return e.Node() })
+		if err != nil {
 			return err
+		}
+		if bounded {
+			atLimit = true
+			return errStopPaging
 		}
 		inv.Progress.Update(out.Count(), total)
 		return nil
 	})
-	if err != nil {
+	if err != nil && !errors.Is(err, errStopPaging) {
 		return registry.StreamResult{}, err
 	}
-	if clipped {
+	switch {
+	case atLimit:
+		// Bounded by the caller. There is no resume token: an event feed is
+		// merged and sorted from three projections across a page of issues,
+		// and an offset into the result would not describe a place any request
+		// can start from.
+		return registry.StreamResult{Complete: false}, nil
+	case clipped:
 		return registry.StreamResult{Complete: false, PartialElement: "event"}, nil
 	}
 	return registry.StreamResult{Complete: result.Complete}, nil
 }
+
+// errStopPaging ends the page loop once the caller's limit is reached, so a
+// bounded feed stops fetching rather than reading every candidate and throwing
+// the rest away.
+var errStopPaging = errors.New("stop paging")
 
 // eventsForPage turns one page of issues into the events the caller asked for,
 // topping up the worklogs that the projection cut off.
