@@ -15,6 +15,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/kmoneil/jr/internal/auth"
+	"github.com/kmoneil/jr/internal/buildinfo"
 	"github.com/kmoneil/jr/internal/errs"
 	"github.com/kmoneil/jr/internal/exitcode"
 	"github.com/kmoneil/jr/internal/registry"
@@ -145,7 +147,7 @@ func (a *app) fail(err error) exitcode.Code {
 	if errors.Is(err, context.Canceled) {
 		err = errs.Runtime("CANCELED", "canceled").Wrap(err)
 	}
-	e := a.explainSite(errs.Coerce(err))
+	e := a.explainCredential(a.explainSite(errs.Coerce(err)))
 	format := a.errorFormat()
 	if werr := render.WriteError(a.stderr, e, format); werr != nil {
 		// The error renderer itself failed. Fall back to a plain line rather
@@ -169,6 +171,60 @@ var siteErrors = map[string]bool{
 	"MALFORMED_SERVER_INFO": true,
 	"UNKNOWN_DEPLOYMENT":    true,
 	"OFF_SITE_URL":          true,
+}
+
+// credentialErrors are the failures where which credential was used is the
+// thing a caller needs and cannot see.
+var credentialErrors = map[string]bool{
+	"UNAUTHORIZED":          true,
+	"AUTH_SCHEME_REFUSED":   true,
+	"AUTHENTICATION_DENIED": true,
+}
+
+// explainCredential adds where the credential came from to a failure about it.
+//
+// Three things can supply one, in precedence order — the environment, this
+// tool's store, and .netrc — and the environment winning is the whole reason
+// this is needed. A caller who has just run `auth login` successfully has a
+// working credential in the store and can still be sending a different one from
+// JIRA_API_TOKEN, which is not site-scoped and goes to whatever site is
+// pointed at. The stock remedy for a 401 is "run `jr auth login`", which they
+// did, seconds ago, and it changed nothing.
+//
+// A decoration, never a replacement: the refusal is still Jira's.
+func (a *app) explainCredential(e *errs.Error) *errs.Error {
+	if e == nil || !credentialErrors[e.Code] {
+		return e
+	}
+	site, err := a.siteFor("")
+	if err != nil {
+		return e
+	}
+	cred, found, err := a.chain().Lookup(site)
+	if err != nil || !found {
+		return e
+	}
+
+	origin := "the credential came from " + cred.Source
+	if strings.Contains(e.Detail, origin) {
+		return e
+	}
+	if e.Detail == "" {
+		e = e.WithDetail("%s", origin)
+	} else {
+		e = e.WithDetail("%s; %s", e.Detail, origin)
+	}
+
+	// The environment is the one that surprises people, because it wins over a
+	// credential they deliberately stored and it is not scoped to a site.
+	if cred.Source == auth.EnvToken {
+		return e.WithRemedy("%s overrides the credential store and is not tied "+
+			"to a site, so it is sent to whatever site you point at. Unset it "+
+			"to use the one `%s auth login` stored, or run `%s auth status` to "+
+			"see which credential a site would use",
+			auth.EnvToken, buildinfo.App, buildinfo.App)
+	}
+	return e
 }
 
 // explainSite adds where the site came from to a failure about reaching it.

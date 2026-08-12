@@ -1,6 +1,9 @@
 package cli_test
 
 import (
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -721,5 +724,79 @@ func TestAnExplicitSiteIsNotBlamedOnAContext(t *testing.T) {
 	// And the context that had nothing to do with it is not named at all.
 	if strings.Contains(got.stderr, "elsewhere.invalid") {
 		t.Errorf("an unrelated context's site appears in the failure:\n%s", got.stderr)
+	}
+}
+
+// TestABasicCredentialAgainstDataCenterExplainsItself covers the commonest way
+// to get a Data Center login wrong, and the one where the stock advice is
+// actively misleading.
+//
+// Pairing --email with a personal access token makes jr send Basic. The token is
+// good; Data Center wants it as a bearer token. A bare 401 says "Jira rejected
+// the credentials" and suggests the token has expired, which sends somebody to
+// regenerate a credential that already works.
+func TestABasicCredentialAgainstDataCenterExplainsItself(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/serverInfo") {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"deploymentType":"Server","version":"9.12.0"}`)
+			return
+		}
+		// Every other request is the credential check, and it refuses.
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer server.Close()
+
+	env := session(t)
+	got := runWithStdin(t, env, strings.NewReader("a-personal-access-token"),
+		"auth", "login", "--site", server.URL,
+		"--email", "ada@example.invalid", "--token-stdin")
+
+	if got.exit != exitcode.Auth {
+		t.Fatalf("exit = %v, want %v\n%s", got.exit, exitcode.Auth, got.stderr)
+	}
+	if !strings.Contains(got.stderr, "sent as Basic") {
+		t.Errorf("the failure does not say how the credential was sent:\n%s", got.stderr)
+	}
+	if !strings.Contains(got.stderr, "without --email") {
+		t.Errorf("the remedy does not name the flag to drop:\n%s", got.stderr)
+	}
+	// The stock advice is what made this worth fixing: it points at a token
+	// that is not the problem.
+	if strings.Contains(got.stderr, "has not expired") {
+		t.Errorf("the failure still blames the token:\n%s", got.stderr)
+	}
+}
+
+// TestAFailedRequestNamesWhereTheCredentialCameFrom is the other half of the
+// same misleading remedy.
+//
+// The environment wins over the credential store and is not tied to a site, so
+// somebody who has just run `auth login` successfully can still be sending a
+// different token — one left over from another Jira — to the site they are
+// pointing at. The stock advice for a 401 is "run `jr auth login`", which they
+// did, seconds ago, and which changes nothing.
+func TestAFailedRequestNamesWhereTheCredentialCameFrom(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = io.WriteString(w, `{"errorMessages":[],"errors":{}}`)
+	}))
+	defer server.Close()
+
+	env := session(t)
+	mustRun(t, env, "context", "create", "probe", "--site", server.URL)
+	env["JIRA_API_TOKEN"] = "a-token-for-somewhere-else"
+
+	got := run(t, env, "issue", "list", "--project", "ENG")
+
+	if !strings.Contains(got.stderr, "the credential came from JIRA_API_TOKEN") {
+		t.Errorf("the failure does not say which credential was sent:\n%s", got.stderr)
+	}
+	if !strings.Contains(got.stderr, "overrides the credential store") {
+		t.Errorf("the remedy does not explain the precedence:\n%s", got.stderr)
+	}
+	// The token itself must not appear, decoration or not.
+	if strings.Contains(got.stderr, "a-token-for-somewhere-else") {
+		t.Errorf("the credential leaked into the failure:\n%s", got.stderr)
 	}
 }

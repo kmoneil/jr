@@ -157,7 +157,14 @@ Common causes, in the order they are worth checking:
 - **A stale environment variable is winning.** The environment is tried _before_
   the credential store, deliberately, so CI can override a disk config. That
   also means a forgotten `export JIRA_API_TOKEN=` in your shell silently beats
-  the credential you just stored. `jr auth status` names the source.
+  the credential you just stored — and because the environment is not tied to a
+  site, it is sent to whichever one you point at. The failure says so itself
+  now: the detail names where the credential came from, and the remedy names
+  the precedence. `jr auth status` answers the same question before you hit it.
+- **`--email` against Data Center.** Pairing an email with a personal access
+  token makes `jr` send Basic, and Data Center wants a bearer token. The token
+  is fine; the scheme is wrong. `auth login` now says so when it happens, rather
+  than reporting a credential Jira rejected and suggesting it expired.
 - **Basic auth is disabled.** Jira Data Center 11 turns HTTP Basic off by
   default and refuses the first request of every run. It has its own code —
   `AUTH_SCHEME_REFUSED`, below — and its own fix, a personal access token.

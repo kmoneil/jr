@@ -302,5 +302,45 @@ func (a *app) verifyCredential(
 	if err != nil {
 		return site.Account{}, err
 	}
-	return site.Whoami(ctx, client, info)
+	account, err := site.Whoami(ctx, client, info)
+	if err != nil {
+		return site.Account{}, explainScheme(err, info, cred)
+	}
+	return account, nil
+}
+
+// explainScheme names the likeliest cause of a rejected credential when the
+// deployment and the scheme disagree.
+//
+// A bare 401 says "Jira rejected the credentials" and offers "check that the
+// token has not expired", which is the wrong advice for the commonest way to
+// get this wrong: pairing --email with a Data Center personal access token. The
+// token is fine. It was sent as Basic because an email was given, and Data
+// Center wants it as a bearer token.
+//
+// By this point both halves are known — the probe has already said which
+// deployment this is, and the scheme was chosen here — so the guess costs
+// nothing and is not a guess. It only ever *adds* to the detail: the underlying
+// refusal is still what it was.
+func explainScheme(err error, info site.Info, cred auth.Credential) error {
+	e := errs.Coerce(err)
+	if e.Code != "UNAUTHORIZED" || info.Kind == site.Cloud || cred.Scheme != auth.Basic {
+		return err
+	}
+	return e.
+		WithDetail("%s", joinScheme(e.Detail,
+			"this is a "+string(info.Kind)+" instance and the credential was "+
+				"sent as Basic, because a user or an email was given")).
+		WithRemedy("a Data Center personal access token is a bearer token: " +
+			"run the same command without --email or --user. Pair --user with " +
+			"a password only on an instance that still accepts Basic")
+}
+
+// joinScheme appends the explanation to whatever detail the failure already
+// carried, so the endpoint that refused is not lost.
+func joinScheme(detail, added string) string {
+	if detail == "" {
+		return added
+	}
+	return detail + "; " + added
 }
