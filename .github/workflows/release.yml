@@ -1,0 +1,147 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "1.26"
+
+jobs:
+  # The tag is the release. Everything CI checks on a branch is checked again
+  # here rather than trusted from the commit's earlier run: a tag can be placed
+  # on any commit, including one that never had a green run, and the version it
+  # stamps is what every binary and every User-Agent will carry.
+  verify:
+    name: full gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # scripts/version.sh runs `git describe`, so the tag and its history
+          # have to be present. A shallow clone reports 0.0.0-untagged and the
+          # release would ship binaries that do not know their own version.
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: install the tools make ci expects
+        run: |
+          go install mvdan.cc/gofumpt@latest
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - name: make ci
+        run: make ci
+      - name: the binary agrees with the tag
+        # The one check that only a tagged build can make. scripts/version.sh
+        # refuses a non-semver tag, and this refuses a semver tag the binary
+        # disagrees with — a release whose `jr version` does not match the tag
+        # people fetched is unpinnable in the way the whole contract exists to
+        # prevent.
+        run: |
+          want="${GITHUB_REF_NAME#v}"
+          got=$(bin/jr version --format tsv | awk -F'\t' '$1=="@release"{print $2}')
+          printf 'tag %s, binary reports %s\n' "$want" "$got"
+          [ "$want" = "$got" ] || { echo "the binary does not report the tag"; exit 1; }
+
+  build:
+    name: ${{ matrix.profile }} ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        # Every profile on every platform, because the profiles are the product
+        # rather than a build convenience: somebody choosing jr-reader for an
+        # agent needs it for their own machine, not only for linux/amd64.
+        profile: [full, agent, reader, ci]
+        goos: [linux, darwin]
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        # Through the Makefile rather than a bare `go build`, so the tags and
+        # the ldflags come from the one place that defines them. Cross-compiling
+        # is GOOS/GOARCH in the environment and nothing else; there is no cgo
+        # here.
+        run: |
+          case "${{ matrix.profile }}" in
+            full)   make build        && src=bin/jr ;;
+            agent)  make build-agent  && src=bin/jr-agent ;;
+            reader) make build-reader && src=bin/jr-reader ;;
+            ci)     make build-ci     && src=bin/jr-ci ;;
+          esac
+          version="${GITHUB_REF_NAME#v}"
+          name="jr-${{ matrix.profile }}_${version}_${{ matrix.goos }}_${{ matrix.goarch }}"
+          mkdir -p "dist/$name"
+          cp "$src" "dist/$name/jr"
+          cp LICENSE NOTICE README.md "dist/$name/"
+          tar -C dist -czf "dist/$name.tar.gz" "$name"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jr-${{ matrix.profile }}-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  publish:
+    name: publish the release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      # For build provenance: a consumer can verify these archives came from
+      # this workflow, on this repository, at this commit.
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: checksums
+        run: |
+          cd dist
+          sha256sum *.tar.gz > checksums.txt
+          cat checksums.txt
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*.tar.gz
+      - name: create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # Notes from CHANGELOG.md rather than generated from commits: the
+        # changelog is written for somebody deciding whether to upgrade, and a
+        # commit list is written for somebody who already has.
+        run: |
+          # No regex: the version contains dots, and escaping them through
+          # YAML into a shell into awk is three chances to be wrong. A heading
+          # either contains this version or it does not.
+          notes=$(awk -v v="${GITHUB_REF_NAME#v}" '
+            /^## / { inside = (index($0, v) > 0); next }
+            inside { print }
+          ' CHANGELOG.md)
+          if [ -z "$(printf '%s' "$notes" | tr -d '[:space:]')" ]; then
+            echo "CHANGELOG.md has no section for ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+          printf '%s\n' "$notes" > notes.md
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file notes.md \
+            dist/*.tar.gz dist/checksums.txt

@@ -1,0 +1,34 @@
+version: 2
+
+updates:
+  # Go modules. The list is deliberately short — four direct dependencies — so
+  # a bump here is a real event rather than noise, and grouping them would hide
+  # which one moved.
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 4
+    commit-message:
+      # Conventional Commits, because the pre-commit hook checks the header
+      # shape and a PR whose commit cannot land is a PR nobody can merge.
+      prefix: "chore(deps)"
+    labels:
+      - dependencies
+
+  # The workflows pin actions by major version, so this is what moves them.
+  # Kept separate from gomod on purpose: an action bump changes what CI does,
+  # a module bump changes what ships, and reviewing them together invites
+  # waving through the half you did not read.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 4
+    commit-message:
+      prefix: "ci(deps)"
+    labels:
+      - dependencies
+      - ci
