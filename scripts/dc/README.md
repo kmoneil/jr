@@ -82,6 +82,17 @@ is. Nobody at Atlassian has said either way.
    from step 3. Data Center takes it as a bearer token, which is what `jr`
    sends.
 
+**`dc-down` does not remove `profile/token`, and step 3 reuses it.** The
+compose volumes go, the database goes, and the token file stays: it is on the
+host filesystem, not in the volume. `seed.sh` finds it non-empty, prints
+`token exists`, and skips minting one, so step 4 authenticates the new instance
+with a credential the old database issued. The failure is `UNAUTHORIZED` from
+`jr auth login` at the very end of a run that otherwise reported every step
+succeeding, which reads as a login bug rather than as a stale file. `rm -f
+scripts/dc/profile/token` and re-run `scripts/dc/seed.sh`, which is idempotent
+and takes seconds. Only `dc-up` after a `dc-down` hits this; a first clone has
+no token to go stale.
+
 **Use fictional identifiers from the first keystroke.** That is the cheap half
 of the scrubbing problem: if nothing real ever enters the instance, no mapping
 from a real identifier to a fictional one has to exist — and a mapping is
