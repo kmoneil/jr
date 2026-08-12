@@ -50,6 +50,7 @@ project.list	List the projects this credential can see	false	false	project.list
 project.statuses	List the statuses each issue type can be in	false	false	project.statuses
 project.versions	List a project's versions	false	false	project.versions
 schema	Describe every command this build contains	false	false	schema.commands
+skill	Print the agent skill for this build	false	false	skill
 sprint.add	Move issues into a sprint	true	false	sprint.add
 sprint.create	Create a future sprint on a board	true	false	sprint.create
 sprint.get	Fetch one sprint	false	false	sprint.get

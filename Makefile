@@ -264,6 +264,16 @@ dc-record:
 dc-down:
 	@docker compose -f scripts/dc/docker-compose.yml down -v
 
+## skill: regenerate the shipped agent skill from the binary
+.PHONY: skill
+skill:
+	go test -tags "$(TAGS_FULL)" ./internal/lint/ \
+		-run '^TestTheShippedSkillIsCurrent$$' -update-skill -count=1
+	@echo
+	@echo "skills/jr rewritten from the binary."
+	@echo "The inventory it carries is the full build's; generate your own with"
+	@echo "  $(BIN)/$(BINARY)-reader skill > wherever/SKILL.md"
+
 ## docs: regenerate docs/commands.md from the registry
 .PHONY: docs
 docs:

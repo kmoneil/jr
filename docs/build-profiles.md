@@ -95,14 +95,23 @@ document that nothing checks eventually becomes.
 
 | Profile  | Commands | Not present                           |
 | -------- | -------- | ------------------------------------- |
-| `full`   | 62       | none                                  |
-| `agent`  | 60       | `completion`, `sprint close`          |
-| `reader` | 40       | the above, plus the 20 mutating verbs |
-| `ci`     | 39       | the above, plus `mcp serve`           |
+| `full`   | 63       | none                                  |
+| `agent`  | 61       | `completion`, `sprint close`          |
+| `reader` | 41       | the above, plus the 20 mutating verbs |
+| `ci`     | 40       | the above, plus `mcp serve`           |
 
 `make test-profiles` runs the whole suite under every shipped tag set, and the
 contract tests inside it assert the surface directly: no mutating command
 survives in a build without `write`.
+
+`jr skill` is in all four on purpose, and is worth stating because the reflex
+would be to gate it behind `mcp`. It prints the agent skill: the instructions a
+caller needs that the declarations cannot carry, with a command inventory
+generated from the registry of the binary that printed it. The build that most
+needs to explain itself is the smallest one, and a skill that shipped only with
+`mcp` would be absent from `ci`, which is the profile an unattended job runs.
+Because it is generated per build, a reader binary's skill lists no mutating
+commands rather than describing commands it does not contain.
 
 ## Enforcement
 

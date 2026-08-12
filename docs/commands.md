@@ -40,6 +40,7 @@ contains what.
 - **[meta](#meta)** — [`meta createmeta`](#jr-meta-createmeta), [`meta transitions`](#jr-meta-transitions)
 - **[project](#project)** — [`project components`](#jr-project-components), [`project get`](#jr-project-get), [`project list`](#jr-project-list), [`project statuses`](#jr-project-statuses), [`project versions`](#jr-project-versions)
 - **[schema](#schema)** — [`schema`](#jr-schema)
+- **[skill](#skill)** — [`skill`](#jr-skill)
 - **[sprint](#sprint)** — [`sprint add`](#jr-sprint-add), [`sprint close`](#jr-sprint-close), [`sprint create`](#jr-sprint-create), [`sprint get`](#jr-sprint-get), [`sprint list`](#jr-sprint-list), [`sprint start`](#jr-sprint-start)
 - **[user](#user)** — [`user get`](#jr-user-get), [`user list`](#jr-user-list), [`user me`](#jr-user-me)
 - **[version](#version)** — [`version`](#jr-version)
@@ -2500,6 +2501,51 @@ jr schema --format json
 | `schema.command` | v1 | a command name is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `5` NOT_FOUND
+
+## skill
+
+### `jr skill`
+
+Print the agent skill for this build
+
+```
+jr skill [reference]
+```
+
+Writes the instructions an agent needs to drive this tool correctly, as
+Markdown, to stdout.
+
+With no argument it prints the skill itself. With a name it prints one
+reference: workflows, failures, or gotchas.
+
+It is generated against the registry of the binary that runs it, so the command
+inventory it carries is what this build contains rather than what the project
+has. A reader build's skill lists no mutating commands, because a reader build
+holds none.
+
+Install it wherever the agent reads skills from:
+
+    jr skill > .claude/skills/jr/SKILL.md
+
+The Markdown is the output, so nothing else is written to stdout: there is no
+result envelope, and --format does not apply. It is deliberately in every
+profile, including the smallest, because a build made for an agent is the one
+that most needs to explain itself.
+
+Examples:
+
+```console
+jr skill
+jr skill workflows
+```
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `reference` | no | one of: failures, gotchas, workflows |
+
+Emits no result document: this command owns stdout.
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE
 
 ## sprint
 

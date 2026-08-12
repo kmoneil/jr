@@ -46,13 +46,14 @@ as it was. No script downstream will ever mistake that page for the whole result
 set, and the same is true of every command, in every format, on every path.
 
 > **Status: pre-release, and deliberately untagged.** The command surface is
-> complete and tested: 62 commands in the full build, 40 in the reader. Every
+> complete and tested: 63 commands in the full build, 41 in the reader. Every
 > build reports itself as `0.0.0-untagged+<sha>` until there is a release worth
 > pinning. See [Not yet implemented](#not-yet-implemented) for what is knowingly
 > absent.
 
 **Jump to:** [Quickstart](#quickstart) · [Why this exists](#why-this-exists) ·
 [Commands](#what-works-today) · [A short tour](#a-short-tour) · [MCP](#mcp) ·
+[Agent skill](#the-agent-skill) ·
 [Docs](#documentation) · [Build profiles](#build-profiles) ·
 [Development](#development) · [Security](#security) · [License](#license)
 
@@ -160,8 +161,8 @@ Then see the [quickstart](#quickstart) above, or
 
 ## What works today
 
-Everything below is built, tested, and asserted by the suite: 62 commands in
-the full build, 40 in the reader.
+Everything below is built, tested, and asserted by the suite: 63 commands in
+the full build, 41 in the reader.
 
 ```
 jr auth      login logout status token
@@ -179,7 +180,7 @@ jr jql       validate explain
 jr field     list
 jr meta      transitions createmeta
 jr mcp       serve
-jr version | schema | contract
+jr version | schema | contract | skill
 ```
 
 Global: `--format tsv|xml|json|yaml`, plus `markdown` in a build with the
@@ -215,7 +216,7 @@ not shipped at all.
 - `--no-color`, and the `clipboard` tag. Nothing emits ANSI and nothing copies,
   so both flags would be flags that do nothing.
 
-Everything else described in this README is built. 62 commands in the full
+Everything else described in this README is built. 63 commands in the full
 build, and `internal/lint` asserts both that number and the tag table above
 against the binaries rather than against this sentence. If a tag here is said to gate nothing and
 starts gating something, the build fails until this list is corrected.
@@ -747,6 +748,43 @@ $ jr mcp serve <<< '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 The protocol is spoken directly rather than through an SDK: what is needed is
 JSON-RPC 2.0 over stdio with three methods, and the profiles this ships in are
 the ones meant to carry the least. The wire format is asserted by test.
+
+## The agent skill
+
+```
+jr skill                  # the instructions an agent needs, as Markdown
+jr skill workflows        # one reference: workflows, failures, or gotchas
+```
+
+`jr schema` says what exists. It cannot say which of five near-synonymous
+filters answers the question that was asked, what to do with exit 3, or that a
+refusal is information rather than an obstacle to route around. That last one is
+why this ships at all: a model's default is to find a way past a blocker, and
+`UNCONSTRAINED_QUERY` "solved" with `--jql 'project is not empty'` is the
+whole-instance sweep the refusal exists to prevent.
+
+**It describes the binary that printed it.** The command inventory is generated
+from that build's registry, so a reader build's skill lists no mutating commands
+because a reader build holds none:
+
+```console
+$ bin/jr-reader skill | grep 'commands, profile'
+41 commands, profile `reader`, tags `mcp`.
+```
+
+Install it by symlinking the copy in this repository, which `make skill`
+regenerates and a test refuses to let go stale:
+
+```console
+$ ln -s "$PWD/skills/jr" ~/.claude/skills/jr
+```
+
+Or generate it from the binary, for a host that reads a skill directory, an
+`AGENTS.md`, or anything else that takes Markdown. The full instructions, both
+ways, are in [recipes.md](docs/recipes.md#installing-the-skill).
+
+It is in every profile including `ci`, because the build that most needs to
+explain itself is the smallest one.
 
 ## Documentation
 
