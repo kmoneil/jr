@@ -14,46 +14,80 @@ converts a class of runtime bugs into link errors.
 **`jr` is a human's command-line tool, and its authority is exactly the
 credential it holds.** There is no permission model above that: a personal
 access token or a logged-in account can do whatever that account can do, and
-every command in the binary can do it. That is the whole of the answer, and it
-is worth stating plainly because two things in this tool look like they say
-otherwise.
+every command in the binary can do it.
 
-`--readonly`, `JIRA_READONLY`, and a context created `--readonly` are a **latch
-within an invocation, not a boundary**. Anything that can run `jr` twice can run
-`jr context edit <name> --unset readonly` and then write, and that is by design:
-`context edit` is `LocalState`, which works in every build, because a binary that
-could not be configured could not be used. Use them to avoid your own mistakes.
-Do not use them to constrain something that does not want to be constrained.
+So if something other than you is going to run it, decide the authority at the
+credential, and work down this list only as far as you have to.
 
-**The build is the real line.** A reader binary does not refuse to write; it does
-not contain the verbs. No flag, context, or environment variable puts them back.
-That is what the profiles below are for, and it is the only limit in this tool
-that survives an adversarial caller — as far as that caller cannot run
-`make build` or reach the credential itself.
+### 1. Least privilege at the credential — always try this first
 
-So, for handing work to an agent:
+The only limit that survives everything, because it is enforced by Jira rather
+than by anything on your machine. Nothing below is a substitute for it; each is
+a weaker fallback for when it is genuinely unavailable.
 
-| You want                              | Use                                              |
-| ------------------------------------- | ------------------------------------------------ |
-| It cannot change Jira                 | `jr-reader` or `jr-ci`, which contain no writes   |
-| It cannot see your credential         | not the CLI — see below                          |
-| Different authority per project       | not available; see `_plans` for the policy design |
+- **Cloud:** an API token with scopes, or an OAuth app with only what it needs.
+- **Data Center:** there are no scopes on a personal access token — it inherits
+  every permission the account has — so least privilege means **a second Jira
+  account** with the project permissions you intend, and a token minted from it.
 
-An agent that runs `jr` itself holds your credential, because the credential is
-in the filesystem `jr` reads. Nothing in this binary changes that. Constraining
-such an agent means not giving it the credential, which means it must talk to
-something that holds one instead — a server it connects to and does not start,
-running as another user. `jr mcp serve` is that shape today only in part: it
-speaks stdio, so its client spawns it, with the same user and the same files.
+If you find yourself deciding not to do this because it is inconvenient, the
+rest of this section is what you are accepting instead, and it is weaker.
 
-What the MCP server *does* guarantee is narrower and worth knowing: **the
-administrative surface is not on the wire.** A peer cannot call `auth_login`,
-`auth_logout`, `auth_token`, or any `context` writer. It cannot repoint the
-server, replace its credential, or read the credential out. The reading
-siblings — `auth status`, `context list`, `context show` — remain, because they
-report and reveal nothing. That is a description of the interface rather than a
-security boundary: it holds against a peer that only speaks MCP, and not against
-one that can also run `jr`.
+### 2. If you will not scope the credential: constrain the binary
+
+A reader binary does not refuse to write; it does not contain the verbs. No
+flag, context, or environment variable puts them back.
+
+| You want                        | Use                                        |
+| ------------------------------- | ------------------------------------------ |
+| It cannot change Jira           | `jr-reader` or `jr-ci`                     |
+| It cannot see your credential   | not the CLI — see 3                        |
+| Different authority per project | not available; see `_plans` for the design |
+
+`--readonly`, `JIRA_READONLY`, and a context created `--readonly` are **not** in
+that table on purpose. They are a latch within an invocation, not a boundary:
+anything that can run `jr` twice can run `jr context edit <name> --unset
+readonly` and then write, and that is by design, because a binary that could not
+be configured could not be used. Use them against your own mistakes.
+
+### 3. If the agent runs on the same machine, deny it explicitly
+
+**An agent that can run `jr` holds your credential**, because the credential is
+in the filesystem `jr` reads. Giving it a reader binary does not help if a full
+one is on the path, and neither helps if it can read the store and use the token
+directly. On a shared machine you have to deny it, in the agent's own sandbox or
+permission rules:
+
+- **Executing `jr`** — and any other Jira client, and `curl` or equivalent
+  against your Jira host. Whatever mechanism your agent harness offers for
+  denying a command, this is what it is for.
+- **Writing `$XDG_CONFIG_HOME/jr/config.toml`** (`~/.config/jr/config.toml`).
+  It is mode 0644 and is meant to be hand-edited and kept in a dotfiles
+  repository — so an agent that can write it can repoint every later invocation
+  at another site, or at another credential, without running anything.
+- **Reading `$XDG_STATE_HOME/jr/credentials.toml`**
+  (`~/.local/state/jr/credentials.toml`). It is mode 0600 and refused on read if
+  it is wider, which stops *other users* reading it and does nothing about a
+  process running as you. Denying read is the control that matters; denying
+  write only stops replacement.
+
+If you cannot deny those, assume the agent has your full Jira authority,
+because it does.
+
+### 4. What the MCP server does and does not give you
+
+`jr mcp serve` keeps the **administrative surface off the wire**: a peer cannot
+call `auth_login`, `auth_logout`, `auth_token`, or any `context` writer, so it
+cannot repoint the server, replace its credential, or read the credential out.
+Each is refused by name with the reason. The reading siblings — `auth status`,
+`context list`, `context show` — remain, because they report and reveal nothing.
+
+That is a description of the interface, and it holds **only against a peer that
+speaks nothing but MCP**. The server currently speaks stdio, which means its
+client spawns it, with the same user and the same files — so today it is a
+tidier interface rather than a boundary. A boundary needs a server the agent
+connects to and does not start, running as a user whose credential it cannot
+read. That work is carded and not built.
 
 ## Tags
 
