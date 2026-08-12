@@ -20,12 +20,21 @@ steps below are in this order.
 3. **Every schema version moved in this release is listed under Output
    contract** in that section, with its kind. A consumer pins `kind` and `v`
    from the document, so that list is the part of the notes with consequences.
+4. **The section is dated the day you tag.** The heading carries a date and the
+   workflow does not check it, so a changelog prepared on one day and tagged the
+   next publishes notes dated wrong.
+5. **The README's status banner still says something true.** It reads
+   "pre-release, and deliberately untagged" and names `0.0.0-untagged+<sha>` as
+   what every build reports. That is the one sentence in the documentation that
+   a tag falsifies, and it is a paragraph a first-time reader reaches before
+   anything else.
 
 ## Cutting it
 
 ```console
 $ git switch main && git pull
-$ $EDITOR CHANGELOG.md          # move Unreleased into the new version
+$ $EDITOR CHANGELOG.md          # move Unreleased into the new version, dated today
+$ $EDITOR README.md             # the status banner, on the first release
 $ git switch -c docs/changelog-0-1-0
 $ git commit -am "docs(changelog): prepare 0.1.0"
 $ gh pr create --fill && gh pr merge --squash

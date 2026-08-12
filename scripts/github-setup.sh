@@ -70,6 +70,14 @@ ruleset=$(
     conditions: {ref_name: {include: ["~DEFAULT_BRANCH"], exclude: []}},
     rules: [
       # No direct pushes: everything arrives by pull request.
+      #
+      # Zero approvals required, decided 2026-08-12 and not an oversight:
+      # GitHub does not let an author approve their own pull request, so on a
+      # single-maintainer repository a requirement of 1 locks the only
+      # maintainer out of their own main branch. The pull request itself is
+      # what is being required here, because it is what makes the checks run
+      # and the change readable before it lands. Raise this to 1 on the day
+      # there is a second maintainer, not before.
       {type: "pull_request", parameters: {
         required_approving_review_count: 0,
         dismiss_stale_reviews_on_push: true,

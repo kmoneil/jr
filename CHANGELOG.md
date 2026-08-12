@@ -18,11 +18,23 @@ accident.
 
 ## [Unreleased]
 
-Everything to date. This project has not been tagged, so nothing below has ever
-been published and no consumer has pinned any of it. The first release will
-collapse this section rather than enumerate two hundred commits of a private
-tree: what a first-time reader needs is what the tool does, which is the README,
-not how it got here.
+Nothing yet.
+
+## [0.1.0] - 2026-08-12
+
+First release, and the first build anybody can pin.
+
+Everything to date is collapsed into this one entry rather than enumerated.
+Nothing below was ever published, so no consumer pinned any of it, and the
+kinds that moved through eight schema versions in a private tree moved with
+nobody downstream. What a first-time reader needs is what the tool does, which
+is the README, not how it got here.
+
+From here the sections mean what they say: a change listed under **Output
+contract** is a change somebody's script can see.
+
+The entries below are the last of the private tree, kept because they are
+recent enough to be worth reading.
 
 ### Added
 
@@ -49,4 +61,5 @@ not how it got here.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/commits/main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.1.0...main
+[0.1.0]: https://github.com/kmoneil/jr/releases/tag/v0.1.0
