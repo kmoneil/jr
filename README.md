@@ -234,7 +234,7 @@ are in a hurry.
 
 ```console
 $ jr issue get ENG-101
-<result kind="issue.get" v="7">
+<result kind="issue.get" v="8">
   <issue key="ENG-101" type="Story" priority="High" project="ENG" parent="ENG-1"
          precondition="eyJkIjoiY2xvdWQiLCJrIjoiRU5HLTEwMSIsInUiOiIyMDI2LTA4LTA0VDExOjMyOjA3LjQxMloifQ">
     <summary>...</summary>

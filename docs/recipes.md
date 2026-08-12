@@ -157,7 +157,8 @@ Two limits worth knowing rather than discovering:
 
 - **Comment authorship is not searchable.** JQL has no field for it, so nothing
   here answers "issues I commented on". `--involving` says so rather than
-  quietly approximating it.
+  quietly approximating it. What you can do is fetch the threads and look, in
+  the request the listing already costs — see below.
 - **`CHANGED` names one field at a time.** There is no way to ask whether _any_
   field changed, so `--changed-field` defaults to `status` and anything else has
   to be named.
@@ -166,6 +167,49 @@ Every user-valued flag takes a display name, an email, an account id, or the
 word `currentUser`. A name that resolves to nobody is refused rather than sent —
 because `assignee = "Ada Lovelace"` against Cloud matches nothing and comes back
 complete, empty, and successful, which is indistinguishable from a real answer.
+
+### Building the whole picture of somebody's week
+
+Three sources, and none of them subsumes the others. What is mine, what I
+changed, and what I said.
+
+```console
+# What changed on an issue, and who changed it
+$ jr issue history ENG-101
+
+# The issues, with every comment thread, in one request per page
+$ jr issue list --involving ada --updated-after -7d --with-comments --format json
+```
+
+`--with-comments` is the one to understand before relying on it, because the two
+deployments answer differently and the row says which you got:
+
+```console
+$ jr issue list --project ENG --with-comments
+key      status  assignee  updated               summary       comments  comments-total
+ENG-3    To Do             2026-08-12T16:32:09Z  Second story  20        25
+```
+
+`20` of `25` means the server did not send the rest. Data Center inlines the
+whole thread; **Cloud caps it at twenty and sends the _newest_ twenty**, so the
+five oldest comments on that issue are not in the response, the structured
+formats carry `start-at="5"` saying so, and the run exits 3. Read that one
+thread properly with `jr issue comment list ENG-3 --limit all`.
+
+So a scan for "issues this person commented on" is exact on Data Center and, on
+Cloud, exact only for issues with twenty comments or fewer. The counts are in
+the output precisely so a script can tell which rows it has to check the hard
+way:
+
+```console
+$ jr issue list --project ENG --with-comments --format tsv \
+    | awk -F'\t' 'NR>1 && $6 != $7 { print $1 }'
+ENG-3
+```
+
+Comment authorship is still not searchable — this fetches threads and looks
+rather than asking Jira a question it cannot answer. What it saves is the
+request per issue, not the reading.
 
 ## Reading an issue
 

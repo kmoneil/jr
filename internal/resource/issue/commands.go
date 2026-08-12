@@ -101,6 +101,15 @@ func Schema() *render.Schema {
 				render.Leaf("component", render.TypeString)), Optional: true},
 			{Schema: render.ListSchema("fix-versions", "fix-version",
 				render.Leaf("fix-version", render.TypeString)), Optional: true},
+			// Present only with --with-comments, on either command.
+			//
+			// This lived on GetSchema alone until `issue list --with-comments`
+			// existed, and the reason was exact rather than cautious: a row
+			// could not carry a thread, so declaring that it could was a lie
+			// `make golden` caught. A row can now, and the two kinds share this
+			// shape for the same reason they share every other part of it — a
+			// listed issue and a fetched one parse identically.
+			{Schema: commentsSchema(), Optional: true},
 		},
 		Extra: &render.Extra{
 			Named: "the id of a field requested with --field, e.g. customfield_10042",
@@ -136,13 +145,6 @@ func GetSchema() *render.Schema {
 		// anything.
 		Name: "precondition", Type: render.TypeString, Optional: true,
 	})
-	s.Children = append(s.Children, render.Child{
-		// Present only with --with-comments, which is why it is optional. It
-		// carries `complete` as well as `count`: the thread is paged, so a
-		// bounded one is the normal case and the container is the only place in
-		// a record that can say so.
-		Schema: commentsSchema(), Optional: true,
-	})
 	return s
 }
 
@@ -154,9 +156,21 @@ func GetSchema() *render.Schema {
 // a value that is always true.
 func commentsSchema() *render.Schema {
 	s := render.ListSchema("comments", "comment", CommentSchema())
-	s.Attrs = append(s.Attrs, render.Field{
-		Name: render.CompleteAttr, Type: render.TypeBool,
-	})
+	s.Attrs = append(s.Attrs,
+		// The server's count of the whole thread, beside `count`, which is how
+		// many arrived. Two numbers rather than one because `complete` says
+		// whether they agree and never says by how much, and a caller deciding
+		// whether to spend a second request on `issue comment list` needs the
+		// size of what it would fetch.
+		render.Field{Name: "total", Type: render.TypeInt},
+		render.Field{Name: render.CompleteAttr, Type: render.TypeBool},
+		// Where in the thread the first returned comment sits. Present only
+		// when it is not zero, which in practice means a Cloud search
+		// projection: that caps at twenty and returns the *newest* twenty, so
+		// a 25-comment issue arrives as comments 6 to 25. Data Center returns
+		// the thread from the oldest and omits this.
+		render.Field{Name: "start-at", Type: render.TypeInt, Optional: true},
+	)
 	return s
 }
 
@@ -347,6 +361,13 @@ to status and everything else has to be asked for.`),
 			urlFlag(),
 			ageFlag(),
 			{
+				Name: withCommentsFlag, Type: registry.TypeBool,
+				Usage: "include each issue's comment thread, in the request " +
+					"the page already costs; what arrives differs by " +
+					"deployment, so read the count and start-at a row reports " +
+					"rather than assuming you have the whole conversation",
+			},
+			{
 				Name: "all-projects", Type: registry.TypeBool,
 				Usage: "search every project the credential can see, ignoring " +
 					"the context's; required to exhaust an unfiltered query",
@@ -397,22 +418,27 @@ func runList(
 	}
 	client := &Client{Transport: conn, Site: info}
 
+	// A thread the server clipped makes the whole run incomplete. The caller
+	// asked for the comments; some of them are missing; "complete" would be
+	// false in the only sense the word has here. It is recorded across pages
+	// rather than per row because the envelope has one attribute and TSV has
+	// none at all — exit 3 and the stderr warning are what a script sees, and
+	// the per-row `count` against `total` says which rows to look at.
+	var clipped bool
+
 	result, err := client.ListStream(ctx, ListOptions{
-		Query:     query,
-		Limit:     inv.Limit,
-		PageSize:  inv.Flags.Int("page-size"),
-		PageToken: inv.Flags.String("page-token"),
-		Fields:    RequestedFields(resolvedFields(inv)),
+		Query:        query,
+		Limit:        inv.Limit,
+		PageSize:     inv.Flags.Int("page-size"),
+		PageToken:    inv.Flags.String("page-token"),
+		Fields:       RequestedFields(resolvedFields(inv)),
+		WithComments: inv.Flags.Bool(withCommentsFlag),
 	}, func(page []Issue, total int) error {
-		if inv.Flags.Bool(urlFlagName) {
-			if err := stampURLs(page, info); err != nil {
-				return err
-			}
+		if anyThreadClipped(page) {
+			clipped = true
 		}
-		if inv.Flags.Bool(ageFlagName) {
-			// One instant for the whole page, so two rows a slow page apart
-			// are not reported as different ages for that reason alone.
-			stampAges(page, time.Now())
+		if err := stampPage(inv, info, page); err != nil {
+			return err
 		}
 		nodes := make([]*render.Node, 0, len(page))
 		for _, i := range page {
@@ -430,10 +456,46 @@ func runList(
 		return registry.StreamResult{}, err
 	}
 
+	if clipped {
+		// No token, deliberately. A resume token continues the *result set*,
+		// and the result set was exhausted — what is missing is inside a row,
+		// and the way to get it is `issue comment list` on that key. Close
+		// refuses complete plus a token; this is the other pairing, incomplete
+		// with nothing to resume, which the contract already documents from
+		// `issue history` against Data Center.
+		return registry.StreamResult{Complete: false, PartialElement: "comments"}, nil
+	}
 	return registry.StreamResult{
 		Complete:      result.Complete,
 		NextPageToken: result.NextPageToken,
 	}, nil
+}
+
+// anyThreadClipped reports whether the server sent part of a comment thread on
+// any row of this page.
+func anyThreadClipped(page []Issue) bool {
+	for _, i := range page {
+		if i.HasThread && !i.ThreadComplete() {
+			return true
+		}
+	}
+	return false
+}
+
+// stampPage applies the two flags that derive a column from what already
+// arrived rather than asking Jira for more.
+func stampPage(inv *registry.Invocation, info site.Info, page []Issue) error {
+	if inv.Flags.Bool(urlFlagName) {
+		if err := stampURLs(page, info); err != nil {
+			return err
+		}
+	}
+	if inv.Flags.Bool(ageFlagName) {
+		// One instant for the whole page, so two rows a slow page apart are
+		// not reported as different ages for that reason alone.
+		stampAges(page, time.Now())
+	}
+	return nil
 }
 
 // RequestedFields returns what to ask Jira for.
@@ -788,7 +850,25 @@ func listColumnsFor(inv *registry.Invocation) []render.Column {
 	if inv.Flags.Bool(ageFlagName) {
 		cols = append(cols, ageColumn())
 	}
+	if inv.Flags.Bool(withCommentsFlag) {
+		cols = append(cols, threadColumns()...)
+	}
 	return cols
+}
+
+// threadColumns are what --with-comments adds to TSV.
+//
+// A thread is not a column: twenty comment bodies in one cell is the defect
+// UNRENDERABLE_FIELD refuses, so the bodies live in the structured formats and
+// the default format carries the two numbers that let a script decide whether
+// it has the whole conversation. They are separate columns rather than one
+// "20/25" cell because a column holds a value, not a notation somebody has to
+// parse.
+func threadColumns() []render.Column {
+	return []render.Column{
+		{Header: "comments", Path: "comments@count"},
+		{Header: "comments-total", Path: "comments@total"},
+	}
 }
 
 // DefaultFields is what `issue list` asks Jira for.
@@ -1333,6 +1413,7 @@ func attachComments(ctx context.Context, c *Client, doc *render.Doc, key string)
 		items = append(items, comment.Node())
 	}
 	container := render.ListEl("comments", "comment", items...)
+	container.Attr("total", strconv.Itoa(page.Total))
 
 	// Total is the server's count of the whole thread, so it decides this
 	// rather than a full page doing so: exactly `commentCap` comments is a

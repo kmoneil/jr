@@ -2655,6 +2655,11 @@ var notAFilter = map[string]string{
 	"changed-field":     "it selects what --changed-by asks about and filters nothing",
 	"url":               "it adds a column, not a condition",
 	"age":               "same: it renders a timestamp the row already carries",
+	// It makes each row bigger and the set no smaller, which is the opposite
+	// of what the guard is for. Offering it as a way past an unbounded query
+	// would be the worst possible advice: a whole-instance sweep that also
+	// drags every comment thread back with it.
+	"with-comments": "it widens each row rather than narrowing the set",
 }
 
 // TestAnyFilterSatisfiesTheGuard covers what counts as constraining, one flag

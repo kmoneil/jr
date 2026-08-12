@@ -84,6 +84,51 @@ now also look inside a record.** Only containers that can genuinely be bounded
 declare it; `labels` and `components` arrive whole with the issue and do not,
 so a value that is always true is not something to check.
 
+### And inside a row of a collection
+
+`issue list --with-comments` brings each row's thread back in the request the
+page already costs. That makes the same container appear in a listing, and it
+makes a collection able to be incomplete for a second reason: every row arrived
+and part of one row did not.
+
+```xml
+<issues count="2" complete="false">
+  <issue key="ENG-3">
+    ...
+    <comments count="20" total="25" complete="false" start-at="5">
+```
+
+Three attributes, and each answers a question the others cannot:
+
+- `count` is how many comments arrived.
+- `total` is how many the server says the thread has. A caller deciding whether
+  to spend a request on `issue comment list` needs the size of what it would
+  fetch, and `complete` only ever says whether the two agree.
+- `start-at` is where in the thread the first returned comment sits. It is
+  **written only when it is not zero**, and it is not decoration: Data Center
+  inlines the whole thread from the oldest comment, and Cloud caps the
+  projection at twenty and returns the **newest** twenty. A 25-comment issue
+  therefore arrives from Cloud as comments 6 to 25. `count` and `complete`
+  together cannot distinguish that from the first twenty, so without this a
+  consumer would be reassembling a conversation from a fragment whose position
+  in it is unstated.
+
+The run exits 3 and writes the truncation warning, as any incomplete result
+does. **The warning names the element rather than offering `--limit`**, because
+raising a bound that was never reached would fetch no further comment:
+
+```
+code    RESULT_TRUNCATED
+kind    issue.list
+element comments
+remedy  every row is here and one of them holds part of a paged subresource;
+        read that subresource with the command that pages it
+```
+
+There is no next-page token, for the same reason `issue history` has none
+against Data Center: the result set was exhausted, and what is missing is inside
+a row.
+
 ### `markdown` is presentation, and carries no promise
 
 A build with the `render` tag has a fifth format, `markdown`. **It is not part
@@ -216,7 +261,7 @@ Every successful XML response:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<result kind="issue.list" v="5">
+<result kind="issue.list" v="6">
   <issues count="3" complete="true">
     <issue key="ENG-101">
       <summary>Retry logic drops the last error</summary>
@@ -242,7 +287,7 @@ the XML tree:
 ```json
 {
   "kind": "issue.list",
-  "v": 5,
+  "v": 6,
   "count": 3,
   "complete": true,
   "issues": [ … ]
@@ -458,7 +503,7 @@ container's `count` is derived from its children and cannot disagree with them.
 
 ### The reporter is reported
 
-`issue.list` v5 and `issue.get` v7 carry a `reporter` element, on the same terms
+`issue.list` v6 and `issue.get` v8 carry a `reporter` element, on the same terms
 as `assignee`: always present, and empty when the server discloses nobody.
 
 It was asked for on every request from the first version of this tool — it is in
@@ -814,7 +859,7 @@ refuses the write if the issue has changed since the caller read it. Without it
 two callers editing one issue both exit 0 and the earlier write is lost, with
 nothing truncated, nothing in error, and nothing to say it happened.
 
-`issue.get` v7 carries a `precondition` attribute, which is what the flag takes.
+`issue.get` v8 carries a `precondition` attribute, which is what the flag takes.
 It is opaque: what it holds is the millisecond timestamp Jira served, and the
 `updated` element is RFC 3339 to the second, so conditioning on the published
 value would leave a whole second in which another edit is invisible. It also

@@ -92,3 +92,4 @@ internal/site datacenter	internal/site/testdata/transitions-recorded.datacenter.
 internal/resource/issue datacenter	internal/resource/issue/testdata/create-twice-recorded.datacenter.json	!scripts/dc/record-refusals.sh, which runs two identical `issue create --project ENG --type Bug --summary "a summary"` and concatenates them
 internal/resource/issue datacenter	internal/resource/issue/testdata/delete-parent-recorded.datacenter.json	!scripts/dc/record-refusals.sh, which creates a Task, gives it a Sub-task, and runs: jr issue delete <parent> --yes
 internal/resource/issue datacenter	internal/resource/issue/testdata/history-recorded.datacenter.json	issue history ENG-2 --limit all
+internal/resource/issue datacenter	internal/resource/issue/testdata/with-comments-recorded.datacenter.json	issue list --project ENG --limit all --with-comments --page-size 50

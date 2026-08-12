@@ -47,7 +47,7 @@ func (a *app) stream(ctx context.Context, rc *registry.Command, inv *registry.In
 	// A truncated result is data plus a structured warning plus exit 3. TSV
 	// carries no envelope, so the warning and the code are the whole signal.
 	if err := render.WriteStreamTruncation(a.stderr, spec.Kind, out.Count(),
-		result.NextPageToken, format); err != nil {
+		result.NextPageToken, result.PartialElement, format); err != nil {
 		return err
 	}
 	a.exit = exitcode.Partial

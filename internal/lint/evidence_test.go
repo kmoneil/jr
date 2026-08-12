@@ -46,6 +46,13 @@ var recordedFixtures = map[string][]string{
 		// key the entries live under, and whether paging works at all. Either
 		// one becoming hand-written would leave half a claim evidenced.
 		"history-recorded.cloud.json",
+		// Both halves of `issue list --with-comments`, for a sharper reason
+		// than symmetry: the deployments return different *parts* of a thread.
+		// Data Center inlines all of it from the oldest comment and Cloud caps
+		// at twenty and sends the newest twenty. A hand-written pair would
+		// almost certainly have made them agree, which is the one thing they
+		// do not do.
+		"with-comments-recorded.cloud.json",
 		// The same two requests against both project styles. The symmetry is
 		// the claim — that the parent field needs no branch on style — so one
 		// of these quietly becoming hand-written would leave the claim

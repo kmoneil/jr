@@ -91,6 +91,14 @@ type ListOptions struct {
 	PageToken string
 	// Fields narrows what Jira returns.
 	Fields []string
+	// WithComments asks for each row's comment thread in the same request.
+	//
+	// It is a projection rather than a second call: `comment` goes into the
+	// same `fields` list every other column comes from, so a page of fifty
+	// issues costs the one request it already cost. What it does cost is
+	// response size, and the two deployments bound that differently — see
+	// Issue.ThreadStartAt.
+	WithComments bool
 }
 
 // ListResult is a page-spanning result plus everything needed to say honestly
@@ -295,7 +303,7 @@ func (c *Client) readPage(
 	}
 	out.Requests++
 
-	issues, err := decodeIssues(page.Issues, ExtraFieldNames(opt.Fields), c.Body)
+	issues, err := decodeIssues(page.Issues, ExtraFieldNames(opt.Fields), c.Body, opt.WithComments)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -463,6 +471,21 @@ func renderQuery(opt ListOptions, token PageToken) (string, error) {
 	return BuildQuery(q)
 }
 
+// requestFields is what one page asks Jira for.
+//
+// `comment` is added here rather than in ListOptions.Fields, which holds the
+// fields a caller named and is what ExtraFieldNames turns into columns. Putting
+// it there would make the thread render as an extra column, which is the
+// 196 KB-in-one-cell defect UNRENDERABLE_FIELD exists to refuse — the flag
+// would have reintroduced by the back door exactly what the refusal keeps out
+// of the front.
+func requestFields(opt ListOptions) []string {
+	if !opt.WithComments {
+		return opt.Fields
+	}
+	return append(append([]string{}, opt.Fields...), "comment")
+}
+
 func (c *Client) fetch(
 	ctx context.Context, opt ListOptions, token PageToken, want int,
 ) (*searchResponse, error) {
@@ -474,8 +497,8 @@ func (c *Client) fetch(
 	query := url.Values{}
 	query.Set("jql", jqlText)
 	query.Set("maxResults", strconv.Itoa(want))
-	if len(opt.Fields) > 0 {
-		query.Set("fields", strings.Join(opt.Fields, ","))
+	if fields := requestFields(opt); len(fields) > 0 {
+		query.Set("fields", strings.Join(fields, ","))
 	}
 	if param, value, ok := token.resumeValue(c.Site); ok {
 		query.Set(param, value)
@@ -563,7 +586,7 @@ func (c *Client) Get(ctx context.Context, key string, fields []string) (Issue, e
 		return Issue{}, err
 	}
 
-	issues, err := decodeIssues([]json.RawMessage{resp.Body}, ExtraFieldNames(fields), c.Body)
+	issues, err := decodeIssues([]json.RawMessage{resp.Body}, ExtraFieldNames(fields), c.Body, false)
 	if err != nil {
 		return Issue{}, err
 	}

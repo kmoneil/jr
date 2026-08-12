@@ -243,13 +243,21 @@ func (s *Stream) flush() error {
 // The rows have already gone to stdout, so this is the only place the caller
 // learns the set was not exhausted — which is exactly the arrangement §3.1
 // describes for TSV, and why streaming is possible at all.
-func WriteStreamTruncation(w io.Writer, kind string, count int, token string, f Format) error {
-	return writeDiagnostic(w, truncationNodeFor(kind, count, token), f)
+//
+// partialElement names the container inside a row that was clipped, for the
+// case where the rows are all present and something within one of them is not.
+// A buffered document is inspected for that; a streamed one cannot be, because
+// the rows it would inspect are already bytes on stdout. So the command that
+// knew says so, and empty means the ordinary case: the rows themselves ran out.
+func WriteStreamTruncation(
+	w io.Writer, kind string, count int, token, partialElement string, f Format,
+) error {
+	return writeDiagnostic(w, truncationNodeFor(kind, count, token, partialElement), f)
 }
 
 // truncationNodeFor builds the warning without needing the document, since a
 // streamed collection no longer has one by the time this is called.
-func truncationNodeFor(kind string, count int, token string) *Node {
+func truncationNodeFor(kind string, count int, token, partialElement string) *Node {
 	return truncationNode(&Doc{
 		Kind: kind,
 		Collection: &Collection{
@@ -257,5 +265,5 @@ func truncationNodeFor(kind string, count int, token string) *Node {
 			Items:         make([]*Node, count),
 			NextPageToken: token,
 		},
-	})
+	}, partialElement)
 }

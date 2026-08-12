@@ -34,7 +34,7 @@ func errorNode(e *errs.Error) *Node {
 // emitted for every format, not only TSV: the XML and JSON envelopes also carry
 // complete="false", but the exit code and the stderr warning are what a script
 // checks.
-func truncationNode(d *Doc) *Node {
+func truncationNode(d *Doc, partialElement string) *Node {
 	if d.Collection == nil {
 		return recordTruncationNode(d)
 	}
@@ -45,12 +45,66 @@ func truncationNode(d *Doc) *Node {
 		Leaf("kind", d.Kind).
 		Leaf("count", strconv.Itoa(len(c.Items)))
 	n.LeafIf("next-page-token", c.NextPageToken)
+
+	// A collection can be short for two different reasons and they have
+	// different fixes. Usually the rows ran out against a bound, and raising it
+	// gets the rest. But every row can be present and a *container inside* one
+	// be clipped — `issue list --with-comments` against Cloud, which inlines
+	// twenty comments of a longer thread — and there `--limit all` changes
+	// nothing at all. Offering it would be the dead end with a helpful tone
+	// that the sweep guard's own rule warns about, so the element is named
+	// instead, exactly as a partial record's warning names it.
+	//
+	// A buffered document is asked; a streamed one is told, because its rows
+	// were bytes on stdout before this ran.
+	if partial := incompleteItem(c.Items); partial != nil {
+		n.Leaf("element", partial.Name)
+		if count, ok := partial.AttrValue("count"); ok {
+			n.Leaf("count", count)
+		}
+		if total, ok := partial.AttrValue("total"); ok {
+			n.Leaf("total", total)
+		}
+		n.Leaf("remedy", partialSubresourceRemedy)
+		return n
+	}
+	if partialElement != "" {
+		n.Leaf("element", partialElement)
+		n.Leaf("remedy", partialSubresourceRemedy)
+		return n
+	}
+
 	if c.NextPageToken != "" {
 		n.Leaf("remedy", "resume with --page-token, or raise --limit")
 	} else {
 		n.Leaf("remedy", "raise --limit, or use --limit all")
 	}
 	return n
+}
+
+// partialSubresourceRemedy is what to do when the rows are all present and
+// something inside one of them is not. Deliberately generic: naming the exact
+// command would mean the renderer knowing which resource it is rendering, and
+// the element name is enough to find the verb that pages it.
+const partialSubresourceRemedy = "every row is here and one of them holds part " +
+	"of a paged subresource; read that subresource with the command that pages it"
+
+// incompleteItem finds the first container inside a collection's rows that says
+// it is partial. Nil when the rows themselves are what ran short.
+//
+// The nil check is not defensive: a streamed collection's items are nil
+// placeholders that exist to be counted, because the real rows were written and
+// released one page at a time.
+func incompleteItem(items []*Node) *Node {
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		if found := item.incompleteContainer(); found != nil {
+			return found
+		}
+	}
+	return nil
 }
 
 // recordTruncationNode is the same warning for a record whose contents are

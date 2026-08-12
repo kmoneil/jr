@@ -22,9 +22,9 @@ import (
 // commit that changes the corresponding golden file.
 const (
 	KindList    = "issue.list"
-	VersionList = 5
+	VersionList = 6
 	KindGet     = "issue.get"
-	VersionGet  = 7
+	VersionGet  = 8
 )
 
 // Body formats a description can arrive in.
@@ -101,6 +101,24 @@ type Issue struct {
 	// has no native shape for. They are carried through rather than dropped:
 	// a field that was fetched and then discarded is a flag that did nothing.
 	Extra []ExtraField
+
+	// Thread is the comment thread, set only by --with-comments and nil
+	// otherwise. HasThread is what distinguishes "not asked for" from "asked
+	// for and empty", which a nil slice cannot: an issue nobody has commented
+	// on is a fact, and it is not the same fact as a listing that did not
+	// fetch comments at all.
+	Thread    []Comment
+	HasThread bool
+	// ThreadTotal is the server's count of the whole thread and ThreadStartAt
+	// the offset of the first comment returned.
+	//
+	// Both are needed because the deployments inline different parts of the
+	// thread. Data Center returns all of it from the oldest; Cloud caps at 20
+	// and returns the *newest* 20, so a 25-comment issue arrives as comments 6
+	// to 25 with ThreadStartAt 5. A count and a completeness flag together
+	// cannot say which end you are holding — measured 2026-08-12 against both.
+	ThreadTotal   int
+	ThreadStartAt int
 
 	// URL is where a person opens this issue, set by --url and empty
 	// otherwise.
@@ -400,8 +418,11 @@ func decodeDescription(raw json.RawMessage, mode BodyMode) (text, format string,
 }
 
 // decodeIssues converts a page of raw issues. extras names the fields the
-// caller asked for beyond the default set.
-func decodeIssues(raw []json.RawMessage, extras []string, mode BodyMode) ([]Issue, error) {
+// caller asked for beyond the default set, and thread says whether the caller
+// asked for the comment projection.
+func decodeIssues(
+	raw []json.RawMessage, extras []string, mode BodyMode, thread bool,
+) ([]Issue, error) {
 	out := make([]Issue, 0, len(raw))
 	for i, data := range raw {
 		var r rawIssue
@@ -416,9 +437,71 @@ func decodeIssues(raw []json.RawMessage, extras []string, mode BodyMode) ([]Issu
 			return nil, err
 		}
 		issue.Extra = extraFields(data, extras)
+		if thread {
+			if err := attachThread(&issue, data, mode); err != nil {
+				return nil, err
+			}
+		}
 		out = append(out, issue)
 	}
 	return out, nil
+}
+
+// attachThread reads the comment projection a search returns when `comment` is
+// among the requested fields.
+//
+// The issue is decoded a second time for the same reason extraFields does it:
+// two struct fields sharing a JSON tag makes encoding/json ignore both, which
+// would silently empty every typed field on the issue.
+//
+// A field the server did not send leaves HasThread false rather than producing
+// an empty thread. Asking for comments and being told nothing is a condition
+// the caller should be able to see, and it is not the same as an issue nobody
+// has commented on.
+func attachThread(issue *Issue, data json.RawMessage, mode BodyMode) error {
+	var envelope struct {
+		Fields struct {
+			Comment *struct {
+				Comments   []rawComment `json:"comments"`
+				Total      int          `json:"total"`
+				StartAt    int          `json:"startAt"`
+				MaxResults int          `json:"maxResults"`
+			} `json:"comment"`
+		} `json:"fields"`
+	}
+	if err := json.Unmarshal(data, &envelope); err != nil {
+		return errs.Remote("MALFORMED_COMMENTS",
+			"Jira returned a comment thread this tool cannot read").
+			WithDetail("issue %s", issue.Key).
+			Wrap(err)
+	}
+	projection := envelope.Fields.Comment
+	if projection == nil {
+		return nil
+	}
+
+	issue.HasThread = true
+	issue.ThreadTotal = projection.Total
+	issue.ThreadStartAt = projection.StartAt
+	for _, raw := range projection.Comments {
+		converted, err := raw.convert(mode)
+		if err != nil {
+			return err
+		}
+		issue.Thread = append(issue.Thread, converted)
+	}
+	return nil
+}
+
+// ThreadComplete reports whether the whole thread arrived.
+//
+// It reads the server's own total rather than comparing against a page size:
+// exactly as many comments as the cap is a complete thread and not a truncated
+// one, and deciding from a full page would report every such issue as partial
+// forever. That was settled once for `issue get --with-comments`; the search
+// projection reaches the same question by a different route.
+func (i Issue) ThreadComplete() bool {
+	return len(i.Thread) >= i.ThreadTotal
 }
 
 // extraFields pulls the requested non-default fields out of the raw payload.
@@ -572,6 +655,33 @@ func (i Issue) Node() *render.Node {
 	// TSV column path is just the id.
 	for _, f := range i.Extra {
 		n.Leaf(f.ID, f.Value)
+	}
+
+	if i.HasThread {
+		n.Child(i.threadNode())
+	}
+	return n
+}
+
+// threadNode is the comment container a row carries under --with-comments.
+//
+// It is the same element `issue get --with-comments` emits, with one attribute
+// that record has no use for: `start-at`. Cloud inlines the *newest* twenty
+// comments in a search projection, so a 25-comment issue arrives as comments 6
+// to 25, and `count` with `complete` cannot distinguish that from the first
+// twenty. The offset is written only when it is non-zero, because on Data
+// Center, and on `issue get`, it always is zero and an attribute that is always
+// the same value is noise on every row.
+func (i Issue) threadNode() *render.Node {
+	items := make([]*render.Node, 0, len(i.Thread))
+	for _, c := range i.Thread {
+		items = append(items, c.Node())
+	}
+	n := render.ListEl("comments", "comment", items...)
+	n.Attr("total", strconv.Itoa(i.ThreadTotal))
+	n.Attr(render.CompleteAttr, strconv.FormatBool(i.ThreadComplete()))
+	if i.ThreadStartAt > 0 {
+		n.Attr("start-at", strconv.Itoa(i.ThreadStartAt))
 	}
 	return n
 }

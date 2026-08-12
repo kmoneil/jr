@@ -201,6 +201,15 @@ type StreamResult struct {
 	Complete bool
 	// NextPageToken resumes a truncated result set.
 	NextPageToken string
+	// PartialElement names a container inside a row that was clipped, for the
+	// case where every row arrived and something within one of them did not.
+	//
+	// A buffered document can be inspected for this; a streamed one cannot,
+	// because its rows reached stdout a page at a time and are gone by the
+	// time the warning is built. So the command that knew says so, and the
+	// warning names the element rather than offering `--limit all`, which
+	// would not fetch a single further comment.
+	PartialElement string
 }
 
 // Progress reports how far a long operation has got.

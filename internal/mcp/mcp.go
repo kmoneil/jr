@@ -452,7 +452,7 @@ func streamInto(ctx context.Context, out *strings.Builder, cmd *registry.Command
 	// whole format exists to prevent.
 	var warning strings.Builder
 	if err := render.WriteStreamTruncation(&warning, cmd.Kind(),
-		stream.Count(), result.NextPageToken, format); err != nil {
+		stream.Count(), result.NextPageToken, result.PartialElement, format); err != nil {
 		return err
 	}
 	out.WriteString("\n")

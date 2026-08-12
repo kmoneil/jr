@@ -75,7 +75,7 @@ func WriteTruncationWarning(w io.Writer, d *Doc, f Format) error {
 	if d == nil || d.IsComplete() {
 		return nil
 	}
-	return writeDiagnostic(w, truncationNode(d), f)
+	return writeDiagnostic(w, truncationNode(d, ""), f)
 }
 
 func writeDiagnostic(w io.Writer, n *Node, f Format) error {

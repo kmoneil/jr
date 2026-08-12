@@ -1530,7 +1530,7 @@ jr issue get ENG-101 --url
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.get` | v7 | always |
+| `issue.get` | v8 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
@@ -1822,6 +1822,7 @@ jr issue list --changed-by currentUser --changed-after -1w
 | `--no-context-fields` | `bool` | — | ignore the field set stored in the context, and ask only for the fields named by --field |
 | `--url` | `bool` | — | include the browse URL, built from the site's own base URL; a bare URL, which most terminals make clickable |
 | `--age` | `bool` | — | include an age column: how long since the issue was last updated, coarsely, e.g. 3 hours or 14 days |
+| `--with-comments` | `bool` | — | include each issue's comment thread, in the request the page already costs; what arrives differs by deployment, so read the count and start-at a row reports rather than assuming you have the whole conversation |
 | `--all-projects` | `bool` | — | search every project the credential can see, ignoring the context's; required to exhaust an unfiltered query |
 | `--page-size` | `int` | — | results per HTTP request, 1 to 100; transport tuning only |
 | `--page-token` | `string` | — | resume from a next-page-token returned by a previous run |
@@ -1829,7 +1830,7 @@ jr issue list --changed-by currentUser --changed-after -1w
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.list` | v5 | always |
+| `issue.list` | v6 | always |
 
 Default TSV columns: `key`, `status`, `assignee`, `updated`, `summary`
 
