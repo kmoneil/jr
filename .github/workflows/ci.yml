@@ -139,7 +139,7 @@ jobs:
         id: gocache
         run: echo "dir=$(go env GOCACHE)/fuzz" >> "$GITHUB_OUTPUT"
       - name: restore the fuzz corpus
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ steps.gocache.outputs.dir }}
           # The key rotates every run so a run that finds new inputs saves
