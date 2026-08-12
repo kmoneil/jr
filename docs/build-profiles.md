@@ -44,6 +44,19 @@ flag, context, or environment variable puts them back.
 | It cannot see your credential   | not the CLI — see 3                        |
 | Different authority per project | not available; see `_plans` for the design |
 
+**A profile subtracts Jira authority and no local authority.** All four builds
+carry the same `context create/edit/delete/use` and `auth login/logout`, and all
+four choose their paths from `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, and
+`JIRA_CONFIG_FILE` — deliberately, because a binary that could not be configured
+could not be used. So a `jr-ci` handed to an agent cannot change Jira, and can
+still rewrite that agent's contexts, store a different credential, point itself
+at another config file, and **print the credential with `auth token`**, which is
+in every build and exists to reveal it. After that it does not need `jr` at all.
+
+The binary is therefore a ceiling on what reaches Jira *through that binary*. It
+is not a ceiling on the credential, and the credential is what grants
+everything — which is why step 3 below is not optional on a shared machine.
+
 `--readonly`, `JIRA_READONLY`, and a context created `--readonly` are **not** in
 that table on purpose. They are a latch within an invocation, not a boundary:
 anything that can run `jr` twice can run `jr context edit <name> --unset
@@ -65,6 +78,9 @@ permission rules:
   It is mode 0644 and is meant to be hand-edited and kept in a dotfiles
   repository — so an agent that can write it can repoint every later invocation
   at another site, or at another credential, without running anything.
+- **Running `jr auth token`**, which prints the credential from any build. It is
+  the same secret as the file below by a different door, so denying one without
+  the other denies nothing.
 - **Reading `$XDG_STATE_HOME/jr/credentials.toml`**
   (`~/.local/state/jr/credentials.toml`). It is mode 0600 and refused on read if
   it is wider, which stops *other users* reading it and does nothing about a
