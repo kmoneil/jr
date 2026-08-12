@@ -34,6 +34,15 @@ func Formats() []Format {
 	return out
 }
 
+// Presentational reports whether a format is presentation rather than contract.
+//
+// Four formats are versioned and will not change shape without a major bump.
+// `markdown`, where the build has it, is explicitly outside that promise and may
+// change in any release. A caller listing formats to a human needs to be able to
+// say which is which, and asking here means the answer cannot drift from the
+// registration: a build without the tag has no such format to report.
+func Presentational(f Format) bool { return f == presentationalFormat }
+
 // FormatNames returns every supported format as strings, for flag enums and
 // schema output.
 func FormatNames() []string {

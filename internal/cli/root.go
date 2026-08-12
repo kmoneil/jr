@@ -73,9 +73,7 @@ and go to stderr.`),
 		return usageError(cmd, "%s", err.Error())
 	})
 
-	root.PersistentFlags().StringVar(&a.requestedFormat, "format", "",
-		fmt.Sprintf("output format: %s (default: tsv for lists, xml for records)",
-			strings.Join(render.FormatNames(), "|")))
+	root.PersistentFlags().StringVar(&a.requestedFormat, "format", "", formatUsage())
 	root.PersistentFlags().BoolVar(&a.describe, "describe", false,
 		"print this command's schema instead of running it")
 	root.PersistentFlags().StringVar(&a.contextName, "context", "",
@@ -354,4 +352,38 @@ func describeArity(minArgs, maxArgs int) string {
 	default:
 		return fmt.Sprintf("between %d and %d arguments", minArgs, maxArgs)
 	}
+}
+
+// formatUsage describes --format, and names markdown as the one for reading
+// where the build has it.
+//
+// Discoverability is the whole point of the extra clause. `markdown` exists so
+// a person does not have to read XML, and a person who does not know it is
+// there reads XML — the format list alone says every name is equivalent, and
+// they are not: four are a versioned contract and one is presentation that may
+// change in any release. Saying which is which is also the warning, so the
+// sentence does two jobs and neither of them is a footnote nobody reaches.
+//
+// Built from the names this binary actually has, so a build without the
+// `render` tag neither lists markdown nor mentions it — advertising a format
+// that would be refused is the drift the whole self-describing surface exists
+// to prevent.
+func formatUsage() string {
+	names := render.FormatNames()
+	usage := fmt.Sprintf("output format: %s (default: tsv for lists, xml for records",
+		strings.Join(names, "|"))
+	if name, ok := presentationalName(); ok {
+		usage += "; " + name + " is for reading and is not a versioned contract"
+	}
+	return usage + "). " + EnvFormat + " sets it for every command"
+}
+
+// presentationalName is the presentation format this build has, if any.
+func presentationalName() (string, bool) {
+	for _, f := range render.Formats() {
+		if render.Presentational(f) {
+			return string(f), true
+		}
+	}
+	return "", false
 }

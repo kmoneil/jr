@@ -379,3 +379,8 @@ var markdownCellEscaper = strings.NewReplacer(
 	"\n", "<br>",
 	"\r", "",
 )
+
+// presentationalFormat is the format that is presentation rather than contract.
+// It sits beside the registration so the two cannot disagree about which format
+// carries no version promise.
+const presentationalFormat = Markdown

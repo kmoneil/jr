@@ -36,7 +36,7 @@ Flags:
       --contract             dump the machine-readable output contract for every kind
       --debug                trace HTTP requests to stderr; credentials are redacted in the transport
       --describe             print this command's schema instead of running it
-      --format string        output format: tsv|xml|json|yaml (default: tsv for lists, xml for records)
+      --format string        output format: tsv|xml|json|yaml (default: tsv for lists, xml for records). JIRA_FORMAT sets it for every command
   -h, --help                 help for jr
       --max-requests int     cap total HTTP calls for this invocation; 0 means no cap
       --project string       project key, overriding the context's
