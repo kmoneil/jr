@@ -14,6 +14,21 @@ import (
 // Each is parsed with time.Parse, which validates ranges: 2020-13-45 is
 // rejected here rather than being passed through as a literal that quietly
 // matches nothing.
+//
+// **A minute is the finest bound JQL can express, and that is a property of
+// Jira rather than of this list.** Measured 2026-08-12 against Cloud and
+// against Data Center 9.12: `updated >= "2026-08-12 18:13"` parses and
+// `updated >= "2026-08-12 18:13:30"` is refused as invalid on both, as is
+// RFC 3339. Neither operator can bisect a minute either — with three issues
+// updated at :19, :23 and :27, both `>= "…18:13"` and `> "…18:13"` returned
+// all three, and `>= "…18:14"` returned none.
+//
+// Anything building a cursor on a date field has to know that: a poller that
+// resumes at the minute it last saw re-reads part of it, and one that resumes
+// at the next minute skips whatever landed after its last read. Ties make the
+// same point from the other side — two issues edited concurrently were stamped
+// with the identical `updated` — so a timestamp is not a cursor at any
+// precision, and the resume point has to be a (timestamp, key) pair.
 var dateLayouts = []string{
 	"2006-01-02 15:04",
 	"2006/01/02 15:04",
