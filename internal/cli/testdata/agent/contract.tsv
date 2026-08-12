@@ -25,6 +25,7 @@ issue.create	1	issue.create
 issue.delete	1	issue.delete
 issue.edit	2	issue.edit
 issue.get	7	issue.get
+issue.history	1	issue.history
 issue.link.add	1	issue.link.add
 issue.link.list	1	issue.link.list
 issue.link.remove	1	issue.link.remove

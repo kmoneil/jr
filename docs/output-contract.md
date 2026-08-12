@@ -301,6 +301,19 @@ cannot miss it.
 A result that is complete carries no next-page token. Setting both is rejected
 before a byte is written.
 
+**A truncation is not always something a second request would fix.** Usually it
+is the caller's `--limit` or `--max-requests`, and resuming gets the rest.
+`issue history` against Data Center has a third cause: that deployment has no
+paged changelog route at all — `/rest/api/2/issue/{key}/changelog` answers 404 —
+and serves the whole history alongside the issue under `expand=changelog`. It
+also ignores `startAt` and `maxResults` there, returning the same entries again
+rather than the next ones, so where the server reports holding more entries than
+it sent, the result says `complete="false"` and exits 3 with **no token and no
+way to ask for the remainder**. A consumer that treats exit 3 as "call again
+with the token" has to tolerate there being no token, which it must anyway:
+`complete="false"` is a statement about the answer and never a promise about
+what a further request would do.
+
 ## Documents and mixed content
 
 Long text is emitted as a child element, never an attribute, and never escaped

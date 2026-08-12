@@ -170,7 +170,7 @@ Generated from the registry of the binary that printed this, so it is the truth
 about that binary and not about the project. A reader build lists no mutating
 commands because it contains none.
 
-63 commands, profile `full`, tags `tui, prompt, render, browser, clipboard, mcp, write, admin`.
+64 commands, profile `full`, tags `tui, prompt, render, browser, clipboard, mcp, write, admin`.
 
 | Command | | Does |
 | --- | --- | --- |
@@ -206,6 +206,7 @@ commands because it contains none.
 | `issue delete` | `M D` | Delete an issue |
 | `issue edit` | `M` | Change fields on an issue |
 | `issue get` |  | Fetch one issue in full |
+| `issue history` |  | List what changed on an issue, and who changed it |
 | `issue link add` | `M` | Link two issues |
 | `issue link list` |  | List the issues linked to one issue |
 | `issue link remove` | `M D` | Remove a link between two issues |

@@ -30,6 +30,7 @@ issue.create	Create an issue	true	false	issue.create
 issue.delete	Delete an issue	true	true	issue.delete
 issue.edit	Change fields on an issue	true	false	issue.edit
 issue.get	Fetch one issue in full	false	false	issue.get
+issue.history	List what changed on an issue, and who changed it	false	false	issue.history
 issue.link.add	Link two issues	true	false	issue.link.add
 issue.link.list	List the issues linked to one issue	false	false	issue.link.list
 issue.link.remove	Remove a link between two issues	true	true	issue.link.remove

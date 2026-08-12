@@ -50,7 +50,11 @@ var truncationProofs = map[string]string{
 
 	// Paged subresources. These stop when the limit is reached rather than
 	// trimming afterwards, so the proof has to drive the paging.
-	"issue.list":         "internal/resource/issue/issue_test.go:TestLimitTruncatesAndSaysSo",
+	"issue.list": "internal/resource/issue/issue_test.go:TestLimitTruncatesAndSaysSo",
+	// Two paths to the same bound, so the proof drives both: Cloud stops
+	// mid-page inside the paging loop, and Data Center is bounded while writing
+	// a history it already holds whole.
+	"issue.history":      "internal/resource/issue/history_test.go:TestHistoryTruncatesAndSaysSo",
 	"issue.comment.list": "internal/resource/issue/comment_test.go:TestCommentListTruncatesAndSaysSo",
 	"issue.link.list":    "internal/resource/issue/link_worklog_test.go:TestLinkListTruncatesAndSaysSo",
 	"issue.worklog.list": "internal/resource/issue/link_worklog_test.go:TestWorklogListTruncatesAndSaysSo",

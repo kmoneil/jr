@@ -46,7 +46,7 @@ as it was. No script downstream will ever mistake that page for the whole result
 set, and the same is true of every command, in every format, on every path.
 
 > **Status: pre-release, and deliberately untagged.** The command surface is
-> complete and tested: 63 commands in the full build, 41 in the reader. Every
+> complete and tested: 64 commands in the full build, 42 in the reader. Every
 > build reports itself as `0.0.0-untagged+<sha>` until there is a release worth
 > pinning. See [Not yet implemented](#not-yet-implemented) for what is knowingly
 > absent.
@@ -161,8 +161,8 @@ Then see the [quickstart](#quickstart) above, or
 
 ## What works today
 
-Everything below is built, tested, and asserted by the suite: 63 commands in
-the full build, 41 in the reader.
+Everything below is built, tested, and asserted by the suite: 64 commands in
+the full build, 42 in the reader.
 
 ```
 jr auth      login logout status token
@@ -216,7 +216,7 @@ not shipped at all.
 - `--no-color`, and the `clipboard` tag. Nothing emits ANSI and nothing copies,
   so both flags would be flags that do nothing.
 
-Everything else described in this README is built. 63 commands in the full
+Everything else described in this README is built. 64 commands in the full
 build, and `internal/lint` asserts both that number and the tag table above
 against the binaries rather than against this sentence. If a tag here is said to gate nothing and
 starts gating something, the build fails until this list is corrected.

@@ -477,8 +477,13 @@ const readmePath = "../../README.md"
 //
 // The "in the reader" half is optional, because the third occurrence does not
 // carry it.
+// Whitespace-tolerant at every join, not only the one that happened to wrap
+// when this was written. The `\s+` after "full" was there because that is where
+// the line broke in one of the three sentences; a third sentence broke between
+// "in" and "the" instead and was invisible to this for as long as it existed.
+// A gate that reads a document has to read it the way it is typeset.
 var readmeCount = regexp.MustCompile(
-	`(\d+) commands? in the full\s+build(?:, (\d+) in the reader)?`,
+	`(\d+)\s+commands?\s+in\s+the\s+full\s+build(?:,\s+(\d+)\s+in\s+the\s+reader)?`,
 )
 
 // TestTheReadmeSurfaceCountMatchesTheBinaries holds the README to the same

@@ -34,7 +34,7 @@ contains what.
 - **[contract](#contract)** — [`contract`](#jr-contract)
 - **[epic](#epic)** — [`epic add`](#jr-epic-add), [`epic get`](#jr-epic-get), [`epic list`](#jr-epic-list), [`epic remove`](#jr-epic-remove)
 - **[field](#field)** — [`field list`](#jr-field-list)
-- **[issue](#issue)** — [`issue assign`](#jr-issue-assign), [`issue attachment download`](#jr-issue-attachment-download), [`issue attachment list`](#jr-issue-attachment-list), [`issue attachment upload`](#jr-issue-attachment-upload), [`issue clone`](#jr-issue-clone), [`issue comment add`](#jr-issue-comment-add), [`issue comment delete`](#jr-issue-comment-delete), [`issue comment edit`](#jr-issue-comment-edit), [`issue comment list`](#jr-issue-comment-list), [`issue create`](#jr-issue-create), [`issue delete`](#jr-issue-delete), [`issue edit`](#jr-issue-edit), [`issue get`](#jr-issue-get), [`issue link add`](#jr-issue-link-add), [`issue link list`](#jr-issue-link-list), [`issue link remove`](#jr-issue-link-remove), [`issue list`](#jr-issue-list), [`issue move`](#jr-issue-move), [`issue watch`](#jr-issue-watch), [`issue worklog add`](#jr-issue-worklog-add), [`issue worklog delete`](#jr-issue-worklog-delete), [`issue worklog list`](#jr-issue-worklog-list)
+- **[issue](#issue)** — [`issue assign`](#jr-issue-assign), [`issue attachment download`](#jr-issue-attachment-download), [`issue attachment list`](#jr-issue-attachment-list), [`issue attachment upload`](#jr-issue-attachment-upload), [`issue clone`](#jr-issue-clone), [`issue comment add`](#jr-issue-comment-add), [`issue comment delete`](#jr-issue-comment-delete), [`issue comment edit`](#jr-issue-comment-edit), [`issue comment list`](#jr-issue-comment-list), [`issue create`](#jr-issue-create), [`issue delete`](#jr-issue-delete), [`issue edit`](#jr-issue-edit), [`issue get`](#jr-issue-get), [`issue history`](#jr-issue-history), [`issue link add`](#jr-issue-link-add), [`issue link list`](#jr-issue-link-list), [`issue link remove`](#jr-issue-link-remove), [`issue list`](#jr-issue-list), [`issue move`](#jr-issue-move), [`issue watch`](#jr-issue-watch), [`issue worklog add`](#jr-issue-worklog-add), [`issue worklog delete`](#jr-issue-worklog-delete), [`issue worklog list`](#jr-issue-worklog-list)
 - **[jql](#jql)** — [`jql explain`](#jr-jql-explain), [`jql validate`](#jr-jql-validate)
 - **[mcp](#mcp)** — [`mcp serve`](#jr-mcp-serve)
 - **[meta](#meta)** — [`meta createmeta`](#jr-meta-createmeta), [`meta transitions`](#jr-meta-transitions)
@@ -1531,6 +1531,65 @@ jr issue get ENG-101 --url
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.get` | v7 | always |
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
+
+### `jr issue history`
+
+List what changed on an issue, and who changed it
+
+- **paginated** — bounded by `--limit`; a truncated result exits 3
+
+```
+jr issue history <key> [flags]
+```
+
+Returns an issue's recorded changes, oldest first: who moved which field, when,
+and what it moved between.
+
+This is the question `issue get` cannot answer. An issue reports what it is
+now; the changelog is the only record of how it got there, and the only one
+that survives a change being reverted — two edits that end where they started
+leave the issue looking untouched and leave two entries here.
+
+One row is one field. Jira records a save as an entry holding however many
+fields moved at once, and each of those becomes its own row carrying the same
+change id and timestamp, so a consumer can group them again. A column set has
+to name one field, so nesting them would leave the default format with nothing
+honest to project.
+
+The two deployments differ, and the result says which one answered. Cloud
+serves a paged changelog and this pages through it. Data Center has no such
+endpoint — it answers 404 — and returns the whole history alongside the issue
+instead, so there the entire changelog arrives in one request or not at all. A
+Data Center history longer than that one response can carry is reported
+incomplete rather than silently cut.
+
+Comment authorship is not recorded here. Jira writes a field transition to the
+changelog and a comment is not a field transition, so "what did this person do
+to this issue" needs this and `issue comment list` both.
+
+Examples:
+
+```console
+jr issue history ENG-101
+jr issue history ENG-101 --format json --limit all
+```
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `key` | yes | issue key, e.g. ENG-101 |
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--page-size` | `int` | — | results per HTTP request, 1 to 100; transport tuning only, and Cloud only — Data Center serves the whole changelog in one response and has nothing to page |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
+
+| Emits | Schema | When |
+| --- | --- | --- |
+| `issue.history` | v1 | always |
+
+Default TSV columns: `created`, `author`, `field`, `from`, `to`
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 

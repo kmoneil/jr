@@ -1,0 +1,39 @@
+{
+  "deployment": "cloud",
+  "source": "constructed",
+  "note": "Hand-written, and it is the only cassette for this command that is. The Data Center half is a real recording (history-recorded.datacenter.json, made by scripts/dc/record.sh against the local rig). Cloud could not be recorded in the session that built the command because no Cloud credential was available to it, not because a recording is impossible: the sandbox can produce one and this file should be replaced by it. Two things here are therefore belief rather than evidence, and both are the ones a constructed cassette gets quietly wrong: that Cloud serves /rest/api/3/issue/{key}/changelog as a paged bean keyed `values` rather than `histories`, and that its author object identifies by accountId. The paging shape is what the test that reads this file actually exercises: page one holds two saves and three items, so a loop advancing by rows rather than by saves would ask for startAt=3 and skip a save.",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/ENG-101/changelog",
+        "query": "maxResults=2&startAt=0"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"self\": \"https://example.atlassian.net/rest/api/3/issue/10001/changelog\", \"maxResults\": 2, \"startAt\": 0, \"total\": 3, \"isLast\": false, \"values\": [{\"id\": \"10121\", \"author\": {\"accountId\": \"557058:aaaa\", \"displayName\": \"Ada Lovelace\", \"active\": true}, \"created\": \"2026-08-01T09:15:00.000+0000\", \"items\": [{\"field\": \"assignee\", \"fieldtype\": \"jira\", \"fieldId\": \"assignee\", \"from\": \"557058:aaaa\", \"fromString\": \"Ada Lovelace\", \"to\": \"557058:bbbb\", \"toString\": \"Grace Hopper\"}]}, {\"id\": \"10122\", \"author\": {\"accountId\": \"557058:aaaa\", \"displayName\": \"Ada Lovelace\", \"active\": true}, \"created\": \"2026-08-01T10:02:00.000+0000\", \"items\": [{\"field\": \"priority\", \"fieldtype\": \"jira\", \"fieldId\": \"priority\", \"from\": \"3\", \"fromString\": \"Medium\", \"to\": \"2\", \"toString\": \"High\"}, {\"field\": \"labels\", \"fieldtype\": \"jira\", \"fieldId\": \"labels\", \"from\": null, \"fromString\": \"\", \"to\": null, \"toString\": \"pagination\"}]}]}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/ENG-101/changelog",
+        "query": "maxResults=2&startAt=2"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"self\": \"https://example.atlassian.net/rest/api/3/issue/10001/changelog\", \"maxResults\": 2, \"startAt\": 2, \"total\": 3, \"isLast\": true, \"values\": [{\"id\": \"10123\", \"author\": {\"accountId\": \"557058:bbbb\", \"displayName\": \"Grace Hopper\", \"active\": true}, \"created\": \"2026-08-02T08:30:00.000+0000\", \"items\": [{\"field\": \"assignee\", \"fieldtype\": \"jira\", \"fieldId\": \"assignee\", \"from\": \"557058:bbbb\", \"fromString\": \"Grace Hopper\", \"to\": null, \"toString\": null}]}]}"
+      }
+    }
+  ]
+}

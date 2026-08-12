@@ -19,6 +19,7 @@ issue.attachment.download	Download an attachment	false	false	issue.attachment.do
 issue.attachment.list	List the files attached to an issue	false	false	issue.attachment.list
 issue.comment.list	List an issue's comments	false	false	issue.comment.list
 issue.get	Fetch one issue in full	false	false	issue.get
+issue.history	List what changed on an issue, and who changed it	false	false	issue.history
 issue.link.list	List the issues linked to one issue	false	false	issue.link.list
 issue.list	List issues matching a query	false	false	issue.list
 issue.worklog.list	List the work logged against an issue	false	false	issue.worklog.list

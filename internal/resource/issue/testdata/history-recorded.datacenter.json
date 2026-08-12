@@ -1,0 +1,22 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/issue/ENG-2",
+        "query": "expand=changelog\u0026fields=summary"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10001\",\"self\":\"http://recorded.invalid/rest/api/2/issue/10001\",\"key\":\"ENG-2\",\"fields\":{\"summary\":\"Page a search by keyset, resumably\"},\"changelog\":{\"startAt\":0,\"maxResults\":5,\"total\":5,\"histories\":[{\"id\":\"10121\",\"author\":{\"self\":\"http://recorded.invalid/rest/api/2/user?username=ada\",\"name\":\"ada\",\"key\":\"JIRAUSER10000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"Etc/UTC\"},\"created\":\"2026-08-12T15:38:36.754+0000\",\"items\":[{\"field\":\"assignee\",\"fieldtype\":\"jira\",\"from\":\"JIRAUSER10000\",\"fromString\":\"Ada Lovelace\",\"to\":\"JIRAUSER10100\",\"toString\":\"Grace Hopper\"}]},{\"id\":\"10122\",\"author\":{\"self\":\"http://recorded.invalid/rest/api/2/user?username=ada\",\"name\":\"ada\",\"key\":\"JIRAUSER10000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"Etc/UTC\"},\"created\":\"2026-08-12T15:38:36.804+0000\",\"items\":[{\"field\":\"summary\",\"fieldtype\":\"jira\",\"from\":null,\"fromString\":\"Page a search by keyset\",\"to\":null,\"toString\":\"Page a search by keyset, resumably\"}]},{\"id\":\"10123\",\"author\":{\"self\":\"http://recorded.invalid/rest/api/2/user?username=ada\",\"name\":\"ada\",\"key\":\"JIRAUSER10000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"Etc/UTC\"},\"created\":\"2026-08-12T15:38:36.835+0000\",\"items\":[{\"field\":\"priority\",\"fieldtype\":\"jira\",\"from\":\"3\",\"fromString\":\"Medium\",\"to\":\"2\",\"toString\":\"High\"},{\"field\":\"labels\",\"fieldtype\":\"jira\",\"from\":null,\"fromString\":\"pagination\",\"to\":null,\"toString\":\"keyset pagination\"}]},{\"id\":\"10124\",\"author\":{\"self\":\"http://recorded.invalid/rest/api/2/user?username=ada\",\"name\":\"ada\",\"key\":\"JIRAUSER10000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"Etc/UTC\"},\"created\":\"2026-08-12T15:38:36.889+0000\",\"items\":[{\"field\":\"status\",\"fieldtype\":\"jira\",\"from\":\"10000\",\"fromString\":\"To Do\",\"to\":\"10000\",\"toString\":\"To Do\"}]},{\"id\":\"10125\",\"author\":{\"self\":\"http://recorded.invalid/rest/api/2/user?username=ada\",\"name\":\"ada\",\"key\":\"JIRAUSER10000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"Etc/UTC\"},\"created\":\"2026-08-12T15:38:36.953+0000\",\"items\":[{\"field\":\"assignee\",\"fieldtype\":\"jira\",\"from\":\"JIRAUSER10100\",\"fromString\":\"Grace Hopper\",\"to\":null,\"toString\":null}]}]}}"
+      }
+    }
+  ]
+}
