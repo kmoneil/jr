@@ -168,7 +168,15 @@ func TestNoScrubPairIsCommitted(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("walk %s: %v", root, err)
+		// A path that cannot be read is a path that cannot be scanned, and this
+		// is a scanner: failing is correct, and saying only "no such file"
+		// sends the reader looking for a bug in the test. The usual cause is a
+		// symlink pointing somewhere this machine does not have — one to a
+		// macOS path inside a Linux container, for instance — which is
+		// untracked, harmless to the repository, and fatal to a walk.
+		t.Fatalf("could not scan every file under %s, so this guarantee does "+
+			"not hold: %v\n\nA dangling symlink is the usual cause. Remove it, "+
+			"or move it outside the tree.", root, err)
 	}
 
 	if examined < examinedFloor {
