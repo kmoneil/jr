@@ -1521,7 +1521,7 @@ jr issue get ENG-101 --url
 
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
-| `--field` | `string` | — | extra field to include, by id or name, e.g. customfield_10042 or 'Story Points'; added to the default set and to the context's, repeat for several (repeatable) |
+| `--field` | `string` | — | extra field to include, by id or name, e.g. customfield_10042 or 'Story Points'; added to the default set and to the context's, repeat for several; a subresource such as comment or worklog is refused, naming the command that reads it (repeatable) |
 | `--no-context-fields` | `bool` | — | ignore the field set stored in the context, and ask only for the fields named by --field |
 | `--raw-body` | `bool` | — | emit a Cloud body as the Atlassian Document Format document Jira sent it as, rather than converting it to markdown |
 | `--url` | `bool` | — | include the browse URL, built from the site's own base URL; a bare URL, which most terminals make clickable |
@@ -1759,7 +1759,7 @@ jr issue list --changed-by currentUser --changed-after -1w
 | `--worklog-before` | `string` | — | only issues with work logged on or before this date |
 | `--sort`, `-s` | `string` | — | field to sort by, e.g. updated; results are ordered by issue key when this is not given, which is close to creation order and not update order |
 | `--order`, `-o` | `asc\|desc` | — | sort direction; applies to --sort, or to the issue key ordering when there is no --sort (default desc for the key, asc for a named field) |
-| `--field` | `string` | — | extra field to include, by id or name, e.g. customfield_10042 or 'Story Points'; added to the default set and to the context's, repeat for several (repeatable) |
+| `--field` | `string` | — | extra field to include, by id or name, e.g. customfield_10042 or 'Story Points'; added to the default set and to the context's, repeat for several; a subresource such as comment or worklog is refused, naming the command that reads it (repeatable) |
 | `--no-context-fields` | `bool` | — | ignore the field set stored in the context, and ask only for the fields named by --field |
 | `--url` | `bool` | — | include the browse URL, built from the site's own base URL; a bare URL, which most terminals make clickable |
 | `--age` | `bool` | — | include an age column: how long since the issue was last updated, coarsely, e.g. 3 hours or 14 days |

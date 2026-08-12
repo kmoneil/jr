@@ -342,13 +342,7 @@ to status and everything else has to be asked for.`),
 					"ordering when there is no --sort " +
 					"(default desc for the key, asc for a named field)",
 			},
-			{
-				Name: "field", Type: registry.TypeString, Repeatable: true,
-				Usage: "extra field to include, by id or name, e.g. " +
-					"customfield_10042 or 'Story Points'; " +
-					"added to the default set and to the context's, " +
-					"repeat for several",
-			},
+			fieldFlag(),
 			contextFieldsFlag(),
 			urlFlag(),
 			ageFlag(),
@@ -487,6 +481,20 @@ const resolvedFieldsKey = "issue.fields"
 // native set this tool always asks for — summary, status, assignee — and a flag
 // that reads as though it drops those is a flag that gets used by mistake once.
 const noContextFieldsFlag = "no-context-fields"
+
+// fieldFlag is --field itself, declared once for the same reason its opt-out
+// is. It was written out twice, identically, in `issue list` and `issue get`,
+// which is one place for the two to drift apart and no benefit.
+func fieldFlag() registry.Flag {
+	return registry.Flag{
+		Name: "field", Type: registry.TypeString, Repeatable: true,
+		Usage: "extra field to include, by id or name, e.g. " +
+			"customfield_10042 or 'Story Points'; " +
+			"added to the default set and to the context's, " +
+			"repeat for several; a subresource such as comment or worklog is " +
+			"refused, naming the command that reads it",
+	}
+}
 
 // contextFieldsFlag is the opt-out, declared once because both commands that
 // take --field need the same question answered the same way.
@@ -1202,18 +1210,16 @@ parses both identically. It simply has more of it filled in.`),
 		Args: []registry.Arg{{
 			Name: "key", Usage: "issue key, e.g. ENG-101", Required: true,
 		}},
-		Flags: []registry.Flag{{
-			Name: "field", Type: registry.TypeString, Repeatable: true,
-			Usage: "extra field to include, by id or name, e.g. " +
-				"customfield_10042 or 'Story Points'; " +
-				"added to the default set and to the context's, " +
-				"repeat for several",
-		}, contextFieldsFlag(), rawBodyFlag(), urlFlag(), ageFlag(), {
-			Name: withCommentsFlag, Type: registry.TypeBool,
-			Usage: "include the comment thread, oldest first; costs a second " +
-				"request, and a thread longer than " +
-				strconv.Itoa(commentCap) + " is reported incomplete with exit 3",
-		}},
+		Flags: []registry.Flag{
+			fieldFlag(),
+			contextFieldsFlag(), rawBodyFlag(), urlFlag(), ageFlag(),
+			{
+				Name: withCommentsFlag, Type: registry.TypeBool,
+				Usage: "include the comment thread, oldest first; costs a second " +
+					"request, and a thread longer than " +
+					strconv.Itoa(commentCap) + " is reported incomplete with exit 3",
+			},
+		},
 		NeedsJira: true,
 		Outputs:   []registry.Output{{Kind: KindGet, Version: VersionGet}},
 		ExitCodes: []exitcode.Code{

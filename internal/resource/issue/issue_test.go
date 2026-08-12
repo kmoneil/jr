@@ -1459,6 +1459,83 @@ func TestFieldNamesAreValidated(t *testing.T) {
 	}
 }
 
+// subresourceCatalogue is the shapes a real instance reports, taken from
+// `/rest/api/2/field` on the Data Center rig rather than invented. The pairs
+// that matter are the ones the schema cannot tell apart: `issuelinks` and
+// `subtasks` are both `array` of `issuelinks`, and only one of them has a
+// value a column can hold.
+func subresourceCatalogue() *site.Catalogue {
+	return &site.Catalogue{Fields: []site.Field{
+		{ID: "comment", Name: "Comment", Type: "comments-page"},
+		{ID: "worklog", Name: "Log Work", Type: "array", Items: "worklog"},
+		{ID: "attachment", Name: "Attachment", Type: "array", Items: "attachment"},
+		{ID: "issuelinks", Name: "Linked Issues", Type: "array", Items: "issuelinks"},
+		{ID: "subtasks", Name: "Sub-tasks", Type: "array", Items: "issuelinks"},
+		{ID: "timetracking", Name: "Time Tracking", Type: "timetracking"},
+		{ID: "progress", Name: "Progress", Type: "progress"},
+		{ID: "votes", Name: "Votes", Type: "votes"},
+		{ID: "watches", Name: "Watchers", Type: "watches"},
+		{ID: "labels", Name: "Labels", Type: "array", Items: "string"},
+		{ID: "fixVersions", Name: "Fix versions", Type: "array", Items: "version"},
+		{ID: "duedate", Name: "Due Date", Type: "date"},
+		{ID: "customfield_10042", Name: "Story Points", Custom: true, Type: "number"},
+		{ID: "customfield_10500", Name: "Anything", Custom: true, Type: "any"},
+	}}
+}
+
+// TestASubresourceIsNotAColumn is the defect this test was written for:
+// `--field comment` resolved, was fetched, and printed the whole serialized
+// object into a TSV cell — 196 KB across five rows, gravatar URLs included.
+//
+// scalarize reduces a structure by looking for `value`, `name`, `displayName`
+// or `key` and falls back to the raw JSON when a map holds none of them, so
+// every field here used to dump. The flag either affects the output or does not
+// exist, and printing a response body into a column is neither.
+func TestASubresourceIsNotAColumn(t *testing.T) {
+	// Each of these is refused, and the four with a command that reads them
+	// properly have to name it: a caller who typed --field comment wanted the
+	// comments, and a refusal that does not say where they are is a dead end.
+	for field, verb := range map[string]string{
+		"comment":      "issue get <key> --with-comments",
+		"worklog":      "issue worklog list <key>",
+		"attachment":   "issue attachment list <key>",
+		"issuelinks":   "issue link list <key>",
+		"timetracking": "",
+		"progress":     "",
+		"votes":        "",
+		"watches":      "",
+	} {
+		_, err := issue.ResolveFields(subresourceCatalogue(), []string{field})
+		if err == nil {
+			t.Errorf("--field %s was accepted", field)
+			continue
+		}
+		e := errs.Coerce(err)
+		if e.Code != "UNRENDERABLE_FIELD" {
+			t.Errorf("--field %s: code = %q, want UNRENDERABLE_FIELD", field, e.Code)
+		}
+		if errs.ExitOf(err) != exitcode.Usage {
+			t.Errorf("--field %s: exit = %v, want %v", field, errs.ExitOf(err), exitcode.Usage)
+		}
+		if verb != "" && !strings.Contains(e.Remedy, verb) {
+			t.Errorf("--field %s: remedy %q does not name %q", field, e.Remedy, verb)
+		}
+	}
+
+	// And these keep working. subtasks shares an element type with issuelinks
+	// and scalarizes to a list of keys, which is a column somebody has today;
+	// `any` is what the server says when it will not say, and refusing it would
+	// take out five real custom fields on a stock instance.
+	for _, ok := range []string{
+		"subtasks", "labels", "fixVersions", "duedate",
+		"customfield_10042", "customfield_10500",
+	} {
+		if _, err := issue.ResolveFields(subresourceCatalogue(), []string{ok}); err != nil {
+			t.Errorf("--field %s was refused: %v", ok, err)
+		}
+	}
+}
+
 // TestAmbiguousFieldNameIsRefused covers two custom fields sharing a name,
 // which Jira permits. They are different fields with different values, so
 // picking one would report the wrong column for every issue.
@@ -1752,6 +1829,63 @@ func TestAnUnknownFieldIsRefusedBeforeAnyOutput(t *testing.T) {
 		t.Errorf("the refusal does not suggest the near match: %q", detail)
 	}
 }
+
+// TestASubresourceIsRefusedBeforeAnyOutput is the same §5.2 row for a field
+// that resolves. `--field comment` used to resolve, be requested, come back,
+// and print its whole serialized object into a cell, so the refusal has to
+// reach the caller from Validate for the same reason an unknown name does:
+// `issue list` streams, and a refusal from the body arrives after the header.
+//
+// Both commands take the flag from one declaration and both are driven here,
+// because a shared declaration is not shared wiring.
+func TestASubresourceIsRefusedBeforeAnyOutput(t *testing.T) {
+	for _, tc := range []struct {
+		command string
+		args    []string
+	}{
+		{"issue.list", nil},
+		{"issue.get", []string{"ENG-101"}},
+	} {
+		cmd, ok := registry.Lookup(tc.command)
+		if !ok {
+			t.Fatalf("%s is not registered", tc.command)
+		}
+
+		session := &stubSession{doer: &stubDoer{body: subresourceCatalogueJSON}}
+		inv := &registry.Invocation{
+			Jira: session, Args: tc.args, Flags: registry.NewFlags(),
+		}
+		inv.Flags.SetString("field", "Comment")
+
+		err := cmd.Validate(t.Context(), inv)
+		if err == nil {
+			t.Errorf("%s: --field Comment reached the request", tc.command)
+			continue
+		}
+		e := errs.Coerce(err)
+		if e.Code != "UNRENDERABLE_FIELD" {
+			t.Errorf("%s: code = %q, want UNRENDERABLE_FIELD", tc.command, e.Code)
+		}
+		if errs.ExitOf(err) != exitcode.Usage {
+			t.Errorf("%s: exit = %v, want %v", tc.command, errs.ExitOf(err), exitcode.Usage)
+		}
+		// The caller asked for the comments. The refusal is only useful if it
+		// says where they actually are.
+		if !strings.Contains(e.Remedy, "--with-comments") {
+			t.Errorf("%s: remedy %q does not say where to read them", tc.command, e.Remedy)
+		}
+	}
+}
+
+// subresourceCatalogueJSON is /field with a subresource in it, in the shape the
+// Data Center rig reports rather than a shape convenient for the test.
+const subresourceCatalogueJSON = `[
+	{"id":"summary","name":"Summary","custom":false,"schema":{"type":"string"}},
+	{"id":"comment","name":"Comment","custom":false,
+	 "schema":{"type":"comments-page"}},
+	{"id":"customfield_10042","name":"Story Points","custom":true,
+	 "schema":{"type":"number"}}
+]`
 
 // TestNoFieldFlagCostsNoRequest keeps the catalogue from taxing every
 // invocation. A caller who never asked for an extra field must not pay for the

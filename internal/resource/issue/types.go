@@ -633,7 +633,7 @@ func ResolveFields(catalogue *site.Catalogue, requested []string) ([]string, err
 		if err != nil {
 			return nil, err
 		}
-		if err := checkRenderable(name, field.ID); err != nil {
+		if err := checkRenderable(name, field); err != nil {
 			return nil, err
 		}
 		out = append(out, field.ID)
@@ -641,24 +641,106 @@ func ResolveFields(catalogue *site.Catalogue, requested []string) ([]string, err
 	return out, nil
 }
 
-// checkRenderable refuses an id this tool cannot turn into output.
+// subresourceTypes are the schema types whose value is a structure with no
+// scalar form, mapped to the command that reads one properly. An empty string
+// means there is no such command and the field simply has no column.
 //
-// Both cases are about the id rather than what the caller typed: the id is what
-// becomes an element name, so it is the id that has to be a legal name and the
-// id that can collide with one an issue already uses.
-func checkRenderable(input, id string) error {
+// `scalarize` reduces a structure by looking for `value`, `name`, `displayName`,
+// or `key`, and falls back to the raw JSON when a map holds none of them. Every
+// type here holds none of them, so every one of them used to print its whole
+// serialized object into a cell: `--field comment` on five issues came to 196 KB
+// with the gravatar URLs in it.
+var subresourceTypes = map[string]string{
+	"comments-page": "jr issue get <key> --with-comments",
+	"timetracking":  "",
+	"progress":      "",
+	"votes":         "",
+	"watches":       "",
+}
+
+// subresourceItems are the array element types with the same problem. An array
+// scalarizes each element and joins them, so `labels` (items `string`),
+// `components` (items `component`) and `fixVersions` (items `version`) all
+// produce something a column can hold. These do not.
+var subresourceItems = map[string]string{
+	"attachment": "jr issue attachment list <key>",
+	"worklog":    "jr issue worklog list <key>",
+}
+
+// subresourceIDs are the fields the catalogue cannot distinguish by schema.
+//
+// `issuelinks` and `subtasks` are both `array` of `issuelinks` and are not the
+// same shape: a subtask element carries `key` and scalarizes to `ENG-6, ENG-7`,
+// which is a useful column, and a link element carries a nested `type` and
+// `outwardIssue` and scalarizes to JSON. Refusing by element type would take
+// `--field subtasks` away from every caller who has it working today, so this
+// one is named by id, and the reason is here rather than in a card.
+var subresourceIDs = map[string]string{
+	"issuelinks": "jr issue link list <key>",
+}
+
+// checkRenderable refuses a field this tool cannot turn into output.
+//
+// Two of the three cases are about the id rather than what the caller typed:
+// the id is what becomes an element name, so it is the id that has to be a
+// legal name and the id that can collide with one an issue already uses. The
+// third is about the field's schema, and it is a deny list on purpose. A type
+// nobody here has seen goes through `scalarize` like any other and prints
+// badly at worst; an allow list missing a type refuses a field that works
+// today, on every site whose custom types were not in front of whoever wrote
+// the list. The cost of that choice is that an unfamiliar structure still
+// reaches the JSON fallback, which is narrowed here and not closed. Closing it
+// needs a renderer per subresource.
+func checkRenderable(input string, f site.Field) error {
 	switch {
-	case !fieldID.MatchString(id):
+	case !fieldID.MatchString(f.ID):
 		return errs.Usage("INVALID_FIELD",
-			"%q resolves to %q, which cannot be an element name", input, id).
+			"%q resolves to %q, which cannot be an element name", input, f.ID).
 			WithDetail("an id must start with a letter and hold only letters, " +
 				"digits, and underscores").
 			WithRemedy("this field cannot be rendered; report it")
-	case reservedNames[id] && !nativeFields[id]:
+	case reservedNames[f.ID] && !nativeFields[f.ID]:
 		return errs.Usage("INVALID_FIELD",
-			"%q collides with a field this tool already reports", id)
+			"%q collides with a field this tool already reports", f.ID)
+	}
+	if verb, ok := subresource(f); ok {
+		err := errs.Usage("UNRENDERABLE_FIELD",
+			"%q is a %s, which has no value a column can hold", input, describe(f))
+		if verb == "" {
+			return err.WithRemedy("this field has no single value; drop it from --field")
+		}
+		return err.WithRemedy("read it with `%s` instead", verb)
 	}
 	return nil
+}
+
+// subresource reports whether a field is one of the structures above, and the
+// command that reads it.
+func subresource(f site.Field) (string, bool) {
+	if verb, ok := subresourceIDs[f.ID]; ok {
+		return verb, true
+	}
+	if verb, ok := subresourceTypes[f.Type]; ok {
+		return verb, true
+	}
+	if f.Type == "array" {
+		if verb, ok := subresourceItems[f.Items]; ok {
+			return verb, true
+		}
+	}
+	return "", false
+}
+
+// describe names a field's shape the way the catalogue does, so the refusal
+// says what was wrong with the field rather than what was wrong with the flag.
+func describe(f site.Field) string {
+	if f.Type == "array" && f.Items != "" {
+		return "list of " + f.Items + " objects"
+	}
+	if f.Type == "" {
+		return "structure"
+	}
+	return f.Type + " structure"
 }
 
 // ExtraFieldNames returns the resolved ids that are not already reported
