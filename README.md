@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/jr.png" alt="jr" width="160">
+![jr](docs/assets/jr.png)
 
 # jr
 
@@ -226,6 +226,9 @@ The rest of this page is the interesting half: what each promise looks like in
 practice, and the failure it exists to prevent. Skim the bold sentences if you
 are in a hurry.
 
+<details>
+<summary><strong>Reading one issue.</strong> XML by default, because one issue is a record, and the markup is named rather than converted.</summary>
+
 ### Reading one issue
 
 ```console
@@ -278,6 +281,11 @@ default, it carries no schema version, it may change in any release, and the
 agent, reader, and ci profiles do not have it. Do not parse it; that is what
 `tsv`, `json`, and `xml` are for.
 
+</details>
+
+<details>
+<summary><strong>Streaming.</strong> Rows reach stdout as each page arrives, and a streamed result is byte-identical to a buffered one.</summary>
+
 ### Streaming
 
 Rows reach stdout as each page arrives, so output starts immediately instead of
@@ -300,6 +308,11 @@ is byte-identical to buffered.
 Progress goes to stderr **only when stderr is a terminal**. Piped or redirected,
 nothing is emitted, so a machine sees the same bytes whether or not someone is
 watching.
+
+</details>
+
+<details>
+<summary><strong>Fields.</strong> <code>--field</code> adds to the default set rather than replacing it, and what you ask for reaches the output.</summary>
 
 ### Fields
 
@@ -344,6 +357,11 @@ field renamed in Jira fails `issue get` and `issue list` until the context is
 corrected. The error says so and names the fix. And every read consults the
 field catalogue, which is one request per TTL rather than per command, but is
 not free on a cold cache.
+
+</details>
+
+<details>
+<summary><strong>Who touched an issue.</strong> Who an issue belongs to is a different question from who worked on it, and the difference returns a plausible answer.</summary>
 
 ### Who touched an issue
 
@@ -393,6 +411,11 @@ Every one of these takes a display name, an email, an id, or the word
 "Ada Lovelace"` against Cloud matches nothing and comes back complete, empty,
 and successful, which is indistinguishable from "you are watching nothing".
 
+</details>
+
+<details>
+<summary><strong>Opening one in a browser.</strong> A bare URL and never a terminal hyperlink, because a data column never carries an escape sequence.</summary>
+
 ### Opening one in a browser
 
 `--url` appends the browse link, on `issue list` and `issue get`:
@@ -425,6 +448,11 @@ reaches stdout, rather than a link assembled from a guess.
 
 Jira's own `self` on an issue is not this. It is the REST endpoint, and it
 opens JSON.
+
+</details>
+
+<details>
+<summary><strong>Not overwriting somebody else's edit.</strong> A lost write errors nothing and exits 0 twice, so reads hand out a precondition and writes take it back.</summary>
 
 ### Not overwriting somebody else's edit
 
@@ -463,6 +491,11 @@ compare it against itself microseconds earlier, detecting nothing and costing a
 request. The baseline has to come from whoever did the reading. Adding it bumped
 `issue.get` to v5 and `issue.edit`, `issue.move`, and `issue.assign` to v2;
 `issue.list` is untouched, because a row nobody read is not a baseline.
+
+</details>
+
+<details>
+<summary><strong>Pagination.</strong> Keyset before offsets, an <code>ORDER BY</code> on every query, and no offset flag at all.</summary>
 
 ### Pagination
 
@@ -512,6 +545,11 @@ Which deployment a site is gets **detected, not declared**: probed once from
 `/rest/api/2/serverInfo` and cached for a day under `$XDG_CACHE_HOME`. A value
 frozen into config goes stale the moment the server is upgraded, and the failure
 then looks like an endpoint that used to work returning 404.
+
+</details>
+
+<details>
+<summary><strong>Contexts and credentials.</strong> Five ways in, no flag that takes a token as its value, and read-only as a one-way latch.</summary>
 
 ### Contexts and credentials
 
@@ -608,6 +646,11 @@ machine.
 way out and it is greppable. `jr auth token` is the single place a secret is the
 requested output.
 
+</details>
+
+<details>
+<summary><strong>JQL.</strong> Built and never concatenated, with one renderer owning the only place a string is quoted.</summary>
+
 ### JQL
 
 `internal/jql` is complete and is what every resource will build queries with.
@@ -642,6 +685,11 @@ during development: a byte that is not valid UTF-8 was being silently replaced
 with U+FFFD, which would have queried for something other than what the caller
 asked for. It is now a structured refusal.
 
+</details>
+
+<details>
+<summary><strong>Transport.</strong> The only package that imports <code>net/http</code>, and redaction happens where the event is built rather than where it is printed.</summary>
+
 ### Transport
 
 `internal/transport` is the only path to Jira, and the only package that
@@ -666,6 +714,8 @@ the retry budget exits 8 or 9, never 0.
 Recorded fixtures replay against both Cloud and Data Center, and an unmatched
 request is an error. A fixture test that fell through to the network would be
 green in CI, where there are no credentials, while exercising nothing.
+
+</details>
 
 ## MCP
 
@@ -885,3 +935,20 @@ like one recorded from a server.
 None of that makes the code correct. It makes the claims checkable, which is the
 part you cannot verify by reading a diff, and it is the standard this project
 should be held to no matter who or what typed it.
+
+---
+
+<div align="center">
+
+**[Getting started](docs/getting-started.md)** ·
+[Recipes](docs/recipes.md) ·
+[Commands](docs/commands.md) ·
+[Output contract](docs/output-contract.md) ·
+[Troubleshooting](docs/troubleshooting.md) ·
+[Security](SECURITY.md)
+
+Apache 2.0 · Built by Kevin O'Neil
+
+_It won’t fake results just to look good._
+
+</div>
