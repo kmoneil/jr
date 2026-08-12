@@ -22,16 +22,15 @@ var (
 
 // notRequired is every job in ci.yml that no required check names, with the
 // reason it does not need one.
+//
+// All three entries are the fuzz sweep, which runs on a push to main and in
+// fuzz-nightly.yml but not on a pull request. Requiring any of them would
+// require a context that only ever reports "skipped", and a check that cannot
+// fail reads as coverage while providing none.
 var notRequired = map[string]string{
-	// The matrix legs report as "fuzz (internal/jql)" and the set of them
-	// changes the day a package gains its first fuzz target. A required check
-	// names a context exactly, so the legs are gated through the aggregate
-	// `fuzz` job, which fails unless every one of them succeeded.
-	"fuzz (${{ matrix.package }})": "gated through the aggregate `fuzz` job",
-	// Discovery feeds the matrix and has no verdict of its own. Its failure
-	// reaches the ruleset as the aggregate job's failure, which reads its
-	// result explicitly rather than inheriting it.
-	"list the packages with fuzz targets": "an input to the matrix, not a check",
+	"fuzz":                                "runs after a merge and nightly, never on a pull request",
+	"fuzz (${{ matrix.package }})":        "a leg of that sweep",
+	"list the packages with fuzz targets": "an input to that sweep's matrix, not a check",
 }
 
 // TestEveryRequiredCheckIsAJobThatRuns holds the ruleset's context list to the

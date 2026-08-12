@@ -52,16 +52,16 @@ gh repo view "$REPO" >/dev/null 2>&1 || {
 # check no job reports sits pending forever and makes every pull request
 # unmergeable, including the one that would fix it.
 #
-# "fuzz" is the aggregate job rather than the sweep itself. The sweep is a
-# matrix over the packages holding fuzz targets, so its contexts are named
-# "fuzz (internal/jql)" and the set of them changes whenever a package gains
-# its first target. The aggregate has a fixed name and fails unless every leg
-# passed.
+# The fuzz sweep is deliberately absent. It runs after a merge and in the
+# nightly, not on a pull request, so requiring it here would require a context
+# that only ever reports "skipped". Every check below is deterministic: the
+# same commit gets the same verdict, which is the property that makes a red one
+# worth reading. The regression half of fuzzing is inside the test legs, where
+# `go test` runs the seed corpus and every committed crasher.
 CHECKS=(
 	"format, vet, lint"
 	"vulnerability scan"
 	"output contract is unchanged"
-	"fuzz"
 	"build profiles and size budget"
 	"test (tags=none)"
 	"test (tags=mcp)"
