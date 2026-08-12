@@ -136,8 +136,8 @@ person at a terminal, they are good at it, and their users are happy. Keeping
 the promises above means refusing things that work perfectly well for that
 audience, such as an offset-shaped pagination flag or a partial result that
 exits zero. Arriving in somebody else's project to take those away would be a
-poor way to treat their users. Promising it on day one, in a tool nobody depends on yet,
-is just the contract.
+poor way to treat their users. Promising it on day one, in a tool nobody
+depends on yet, is just the contract.
 
 So: different audience, different bargain. Want a rich interactive Jira
 experience? Use those. Writing a script, or pointing an agent at Jira, and need
@@ -218,8 +218,9 @@ not shipped at all.
 
 Everything else described in this README is built. 65 commands in the full
 build, and `internal/lint` asserts both that number and the tag table above
-against the binaries rather than against this sentence. If a tag here is said to gate nothing and
-starts gating something, the build fails until this list is corrected.
+against the binaries rather than against this sentence. If a tag here is said
+to gate nothing and starts gating something, the build fails until this list is
+corrected.
 
 ## A short tour
 
@@ -770,7 +771,7 @@ because a reader build holds none:
 
 ```console
 $ bin/jr-reader skill | grep 'commands, profile'
-41 commands, profile `reader`, tags `mcp`.
+43 commands, profile `reader`, tags `mcp`.
 ```
 
 Install it by symlinking the copy in this repository, which `make skill`
@@ -868,7 +869,7 @@ that only lists wins is not one.
 
 [Apache License 2.0](LICENSE). Copyright 2026 Kevin O'Neil.
 
-Nothing is vendored, and [NOTICE](NOTICE) lists the four direct dependencies a
+Nothing is vendored, and [NOTICE](NOTICE) lists the five direct dependencies a
 binary links, with their licences and the one upstream NOTICE that has to travel
 with them.
 
