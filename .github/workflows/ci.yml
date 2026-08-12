@@ -16,8 +16,8 @@ jobs:
     name: format, vet, lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: gofumpt
@@ -27,7 +27,9 @@ jobs:
       - name: vet
         run: make vet
       # v8 is the first action release that runs golangci-lint v2, which
-      # `.golangci.yml` declares with `version: "2"`.
+      # `.golangci.yml` declares with `version: "2"`, and v9 is the first that
+      # runs on Node 24. v8 is a node20 action, so it kept the deprecation
+      # warning this bump exists to clear.
       #
       # The version is pinned rather than `latest`, and it is the version this
       # repository lints with locally, because golangci-lint refuses a module
@@ -36,7 +38,7 @@ jobs:
       # with "the Go language version (go1.24) used to build golangci-lint is
       # lower than the targeted Go version". A linter that floats is also a
       # linter that can fail a pull request that changed nothing.
-      - uses: golangci/golangci-lint-action@v8
+      - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12.2
       # A second pass with no build tags, because the config turns all eight on
@@ -53,8 +55,8 @@ jobs:
     name: vulnerability scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           # go.mod pins a patch version, so a runner on an older 1.26 fetches
           # the toolchain it asks for. That is the point: the scan reports the
@@ -80,8 +82,8 @@ jobs:
           - "mcp,write"
           - "tui,prompt,render,browser,clipboard,mcp,write,admin"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
       # internal/lint runs gocognit as a subprocess and fails rather than skips
@@ -103,8 +105,8 @@ jobs:
     name: output contract is unchanged
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
       # The golden files are the public output contract. A diff here is a diff
@@ -126,8 +128,8 @@ jobs:
     name: fuzz
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
       # Go keeps the generated corpus in $GOCACHE/fuzz. Without this, every CI
@@ -139,7 +141,7 @@ jobs:
         id: gocache
         run: echo "dir=$(go env GOCACHE)/fuzz" >> "$GITHUB_OUTPUT"
       - name: restore the fuzz corpus
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ steps.gocache.outputs.dir }}
           # The key rotates every run so a run that finds new inputs saves
@@ -155,7 +157,7 @@ jobs:
         run: make fuzz FUZZTIME=60s
       - name: upload any crashers
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fuzz-corpus
           path: internal/**/testdata/fuzz/
@@ -164,8 +166,8 @@ jobs:
     name: build profiles and size budget
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: build every profile
