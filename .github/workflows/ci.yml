@@ -90,7 +90,7 @@ jobs:
           - ""
           - "mcp"
           - "mcp,write"
-          - "tui,prompt,render,browser,clipboard,mcp,write,admin"
+          - "prompt,render,mcp,write,admin"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7

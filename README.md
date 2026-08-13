@@ -227,20 +227,24 @@ parseable.
 Nothing below is stubbed or partially wired. A flag that would silently no-op is
 not shipped at all.
 
-- `jr ui`, and the `tui` tag that would gate it. The TUI is a consumer of this
-  tool, not the product, so it is the lowest priority there is.
-- OAuth, mTLS, and a system-keyring credential provider, with the `browser` tag
-  that would gate the first. The provider interface is in place; a keyring
-  implementation shells out, so it will arrive behind its own build tag rather
-  than in the reader profile.
-- `--no-color`, and the `clipboard` tag. Nothing emits ANSI and nothing copies,
-  so both flags would be flags that do nothing.
+- `jr ui`. The TUI is a consumer of this tool, not the product, so it is the
+  lowest priority there is.
+- OAuth, mTLS, and a system-keyring credential provider. The provider interface
+  is in place; a keyring implementation shells out, so it will arrive behind its
+  own build tag rather than in the reader profile.
+- `--no-color`. Nothing emits ANSI, so it would be a flag that does nothing.
+
+The `tui`, `browser`, and `clipboard` tags used to be declared for the first
+three, and were dropped on 2026-08-13 having never gated anything: they came
+from the spec's tag table, written before any code was, and no build ever
+carried a feature behind them. A tag that names a capability no build can
+perform is the one thing this tool promises not to do, and each of them is a
+two-line file on the day somebody needs it.
 
 Everything else described in this README is built. 65 commands in the full
-build, and `internal/lint` asserts both that number and the tag table above
-against the binaries rather than against this sentence. If a tag here is said
-to gate nothing and starts gating something, the build fails until this list is
-corrected.
+build, and `internal/lint` asserts that number against the binaries rather than
+against this sentence. Every tag the build declares now gates real code, and
+`internal/lint/tags_test.go` fails the day one stops.
 
 ## A short tour
 
@@ -838,7 +842,7 @@ build does not refuse to write; it does not contain the code that could.
 | Build               | Profile | What you get                                       |
 | ------------------- | ------- | -------------------------------------------------- |
 | `make build`        | full    | Everything, including the human-facing extras      |
-| `make build-agent`  | agent   | No TTY, no interactivity, no browser, no clipboard |
+| `make build-agent`  | agent   | No TTY, no interactivity, cannot block on input    |
 | `make build-reader` | reader  | Physically cannot mutate Jira                      |
 | `make build-ci`     | ci      | Query only, smallest possible                      |
 

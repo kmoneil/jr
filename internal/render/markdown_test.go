@@ -173,7 +173,7 @@ func TestMarkdownRendersDiagnostics(t *testing.T) {
 // not contain: a list item with attributes *and* text.
 //
 // Found by running `jr version --format markdown`, not by a test. The version
-// document lists eight tags as `<tag name="tui">Interactive terminal UI</tag>`,
+// document listed eight tags as `<tag name="tui">Interactive terminal UI</tag>`,
 // and the first version of this writer sent anything with attributes to the
 // record renderer — which produced eight headings each holding a one-row table,
 // and dropped every description, because the description is the node's text and

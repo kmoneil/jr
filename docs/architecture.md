@@ -19,7 +19,6 @@ internal/
   commands/                # links every resource in, so their inits run
   resource/                # one isolated package per Jira resource
   workflow/                # operations spanning more than one resource
-  tui/                     # build tag: tui
   mcp/                     # build tag: mcp
   lint/                    # architecture tests
 pkg/jira/                  # public Go library, no CLI concepts
@@ -34,7 +33,7 @@ either.
 `resource/*` may import `registry`, `transport`, `auth`, `site`, `jql`, `adf`,
 `render`, `errs`.
 
-**Nothing may import `resource/*`** except `cmd`, `tui`, `mcp`, `workflow`, and
+**Nothing may import `resource/*`** except `cmd`, `mcp`, `workflow`, and
 `internal/commands`, which exists only to blank-import resources so their init
 functions run, and is what lets the contract tests see the full command surface.
 
@@ -109,8 +108,8 @@ real import graph from `go list`, so a build-tagged file cannot hide an import:
 - **Only `transport` speaks HTTP.** Nothing else imports `net/http`, so header
   redaction cannot be bypassed by a package that builds its own client.
 - **Foundation packages stay leaves.** `exitcode`, `errs`, `render`,
-  `buildinfo`, `jql`, and `adf` never reach up into `cli`, `resource`, `tui`,
-  `mcp`, or `workflow`.
+  `buildinfo`, `jql`, and `adf` never reach up into `cli`, `resource`, `mcp`,
+  or `workflow`.
 - **`pkg/jira` has no CLI concepts.** No flags, no exit codes, no output
   formats, no cobra.
 

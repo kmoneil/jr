@@ -23,11 +23,17 @@ import (
 // list, and shipping the feature *without* gating it also fails, because the
 // tag is still listed as gating nothing while the profile that excludes it now
 // contains the code.
-var notYetGating = map[string]string{
-	"tui":       "internal/tui is a package doc and nothing else; there is no `jr ui`",
-	"browser":   "there is no OAuth browser flow yet",
-	"clipboard": "nothing copies to the clipboard yet",
-}
+//
+// It is empty, and that is the intended resting state rather than an
+// achievement. It emptied on 2026-08-13 by deletion rather than by delivery:
+// `tui`, `browser`, and `clipboard` were declared for a terminal UI, an OAuth
+// browser flow, and a copy verb, none of which was ever built. They came from
+// the spec's tag table, which was written before the code, so they were
+// speculative on the day they arrived and stayed that way. A capability named
+// in `jr version` that no build can perform is the one thing this tool promises
+// not to do, so the tags went and the features can bring their own back the day
+// somebody asks for them.
+var notYetGating = map[string]string{}
 
 // TestEveryTagEitherGatesCodeOrSaysWhyNot is the audit §8 asks for.
 //

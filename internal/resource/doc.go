@@ -6,6 +6,6 @@
 // other. Adding a resource means adding a directory and registering it — no
 // edits to existing resources.
 //
-// Nothing may import a resource package except cmd, tui, mcp, and workflow.
+// Nothing may import a resource package except cmd, mcp, and workflow.
 // The rule is enforced by the import-graph test in internal/lint.
 package resource
