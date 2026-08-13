@@ -122,15 +122,33 @@ else
 fi
 
 say "== merge behaviour =="
-# Squash only, and the commit message comes from the pull request title and body
-# rather than from a list of "fix review" commits.
+# Squash only. The subject comes from the pull request title, and the body from
+# the commits on the branch.
+#
+# It was PR_BODY, and PR_BODY is wrong for two reasons that only show up in
+# `git log`. GitHub re-wraps the description at about 70 columns, on top of
+# whatever wrapping it already has, so prose written at 72 or 76 arrives
+# double-wrapped with breaks mid-sentence: "merging it is the / signal to / cut
+# one." And a pull request description is markdown, read on a page that renders
+# it, so its headings, tables, and checklists land in the commit as literal
+# `## What was wrong` and `| --- | --- |`.
+#
+# COMMIT_MESSAGES takes what was written on the branch instead, which is prose
+# wrapped once, by hand, for the tool that displays it. The two documents have
+# different readers and can now be written for them: the pull request explains
+# the change to a reviewer looking at a diff, and the commit explains it to
+# somebody running `git log` two years from now with no diff in front of them.
+#
+# The seven commits merged before this was noticed keep their mangled bodies.
+# `main` is public and protected, and rewriting published history to tidy the
+# typography would be a worse thing than the typography.
 run gh api -X PATCH "repos/$REPO" \
 	-F allow_squash_merge=true \
 	-F allow_merge_commit=false \
 	-F allow_rebase_merge=true \
 	-F delete_branch_on_merge=true \
 	-F squash_merge_commit_title=PR_TITLE \
-	-F squash_merge_commit_message=PR_BODY \
+	-F squash_merge_commit_message=COMMIT_MESSAGES \
 	>/dev/null
 
 say "== security features =="
