@@ -20,7 +20,7 @@ accident.
 
 Nothing yet.
 
-## [0.1.0] - 2026-08-12
+## [0.1.0] - 2026-08-13
 
 First release, and the first build anybody can pin.
 

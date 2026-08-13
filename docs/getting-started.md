@@ -6,7 +6,7 @@ an API token.
 This guide assumes you have used a terminal and have a Jira account. It assumes
 nothing about Jira's API, JQL, or how `jr` is put together.
 
-- [1. Build it](#1-build-it)
+- [1. Get it](#1-get-it)
 - [2. Get a token](#2-get-a-token)
 - [3. Log in](#3-log-in)
 - [4. Prove it works](#4-prove-it-works)
@@ -15,9 +15,20 @@ nothing about Jira's API, JQL, or how `jr` is put together.
 - [7. Read the output](#7-read-the-output)
 - [Where to go next](#where-to-go-next)
 
-## 1. Build it
+## 1. Get it
 
-There is no release binary yet, so build from source. You need Go 1.26.
+Download a release archive:
+
+```console
+$ gh release download --repo kmoneil/jr --pattern 'jr-full_*_darwin_arm64.tar.gz'
+$ tar xzf jr-full_*_darwin_arm64.tar.gz
+$ install jr-full_*/jr ~/.local/bin/jr
+```
+
+Substitute `linux` or `amd64` as needed, and see
+[the README](../README.md#install) for verifying the download.
+
+Or build from source, which needs Go 1.26:
 
 ```console
 $ git clone https://github.com/kmoneil/jr && cd jr
@@ -30,14 +41,16 @@ guide says `jr`.
 ```console
 $ jr version
 <result kind="version" v="1">
-  <version app="jr" release="0.0.0-untagged+960aa0c" profile="full" ...>
-    <display>jr 0.0.0-untagged+960aa0c (full; tags=tui,prompt,render,...)</display>
+  <version app="jr" release="0.1.0" profile="full" ...>
+    <display>jr 0.1.0 (full; tags=tui,prompt,render,...)</display>
 ```
 
-If that prints a document naming a release and a profile, you are ready. The
-release reads `0.0.0-untagged` until there is a tagged build; that is expected.
+If that prints a document naming a release and a profile, you are ready. A
+build from a source tree with no tag reads `0.0.0-untagged+<sha>` instead,
+which is expected and is what `scripts/version.sh` produces when `git describe`
+has nothing to describe.
 
-> **Which build?** `make build` gives you everything. There are smaller ones —
+> **Which build?** The full build gives you everything. There are smaller ones —
 > `make build-reader` produces a binary that physically cannot change anything
 > in Jira, which is a useful thing to hand to a script you are not sure about.
 > See [build-profiles.md](build-profiles.md). Start with the full build.

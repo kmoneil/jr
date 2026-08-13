@@ -23,29 +23,27 @@ steps below are in this order.
 4. **The section is dated the day you tag.** The heading carries a date and the
    workflow does not check it, so a changelog prepared on one day and tagged the
    next publishes notes dated wrong.
-5. **The README says nothing a tag has just made false.** There are three
-   places, and on the first release all three change:
+5. **Nothing in the docs claims a version in prose.** This was four places
+   before 0.1.0: a `status-pre--release` badge, a status banner naming
+   `0.0.0-untagged`, an Install section saying there was no release binary, and
+   the same in `docs/getting-started.md`. All four are gone, and their
+   replacements were deliberately written so that no later release has to touch
+   them:
 
-   | Where | What it says today |
-   | --- | --- |
-   | The badge row | `status-pre--release` |
-   | The status banner | "pre-release, and deliberately untagged", and every build reports `0.0.0-untagged+<sha>` |
-   | **Install** | "No release binary yet, and that is deliberate" |
+   - the badge reads the latest release from GitHub, so it updates itself;
+   - the banner says the tool is pinnable without saying at what version;
+   - both install paths use `gh release download --pattern`, which needs no
+     version number at all.
 
-   Install is the one with a reader waiting on it: from the first tag there are
-   sixteen archives, `checksums.txt`, and an attestation, and somebody who
-   arrives wanting the tool should not be told to install Go first. Build from
-   source stays, below the download.
-
-   Nothing asserts these three, because a sentence about a release cannot be
-   checked against a repository that has not made one. They are here instead.
+   So this step is a check rather than an edit. Nothing asserts it, because a
+   sentence about a release cannot be checked against a repository until the
+   release exists, and by then the sentence has already shipped.
 
 ## Cutting it
 
 ```console
 $ git switch main && git pull
 $ $EDITOR CHANGELOG.md          # move Unreleased into the new version, dated today
-$ $EDITOR README.md             # the status banner, on the first release
 $ git switch -c docs/changelog-0-1-0
 $ git commit -am "docs(changelog): prepare 0.1.0"
 $ gh pr create --fill && gh pr merge --squash
