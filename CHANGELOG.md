@@ -20,6 +20,71 @@ accident.
 
 Nothing yet.
 
+## [0.1.1] - 2026-08-13
+
+A code sweep of every package, and seven changes out of it. Six are places
+where this tool said something that was not so; the seventh is the fuzzer that
+should have been guarding the escaping rules all along.
+
+Nothing changed shape. No kind moved a schema version, no default column set
+gained a field, and no exit code or error `code` changed meaning, so a script
+written against 0.1.0 parses 0.1.1 identically. What changes is that three
+conditions which used to report success now report the failure they always
+were.
+
+### Fixed
+
+- **A paged sub-resource reported a clipped result as complete** when the
+  server sent no `total`. It decoded to zero, and the first non-empty page
+  satisfied the loop's `startAt >= total`, so `jr issue comment list` on a
+  three-comment thread emitted two rows, `complete="true"`, and exit 0. The
+  same arithmetic governed `issue worklog list` and `issue history`. An absent
+  count is not a count of nothing: the listing keeps asking, and the empty page
+  it gets is the answer.
+- **The same absent `total` decided completeness** for `issue get
+  --with-comments`, for the projections behind `issue list --with-comments`,
+  and for the worklog top-up in `issue activity`. None of those can page to
+  resolve it, so an unknown thread length is now `complete="false"` and exit 3
+  rather than a claim.
+- **A buffered response larger than 64 MiB was truncated silently.** The read
+  stopped at the cap and returned no error, so the caller was handed part of an
+  answer presented as the whole of one. In practice it surfaced as `Jira
+  returned a search result this tool cannot read`, blaming the server for
+  something this client did. It is refused now, and the recorder refuses rather
+  than writing a cassette that lost its tail.
+- **Two differently named elements in one page were emitted as TSV and refused
+  as XML.** The check compared against counters the same function advanced
+  afterwards, so a whole batch went unexamined and the same document was
+  accepted or rejected by `--format`.
+- **A refused collection still emitted a closing document**: a bare TSV header,
+  or an envelope reading `count="0" complete="true"` for a result that had just
+  been rejected. No command reached it, because the CLI returns the error
+  first, but a refusal now latches in the stream rather than depending on every
+  caller remembering to.
+- **The progress line counted "issues" whatever it was counting**, so `jr
+  project list` reported "12 issues" on a terminal, and nine listings reported
+  a ratio of `n / n` at the moment `--limit` had cut the result short and exit
+  3 was about to say otherwise. Both are stderr on a terminal only, and neither
+  is visible to a script.
+
+### Output contract
+
+- **`RESPONSE_TOO_LARGE` is new.** Exit 1, not retryable: a response too large
+  once is too large again, so advertising a retry would spend a caller's budget
+  on a certainty. It replaces a decode failure blamed on Jira, and it fires
+  only where this tool previously truncated in silence.
+- No kind moved. `jr contract` reports the same schema versions 0.1.0 did.
+
+### Internal
+
+- The output contract's own escapers have fuzz targets: the TSV cell round
+  trip; its composition with `JoinList`, which is the rule that keeps a status
+  named `Ready, Set` from becoming two statuses; and the refusal of anything
+  XML 1.0 cannot carry, held to a definition written independently of the one
+  it guards. 20 targets to 23.
+- `internal/adf`'s recursion is bounded by `encoding/json` and now has a test
+  saying so, because it is a bound this package depends on and does not own.
+
 ## [0.1.0] - 2026-08-13
 
 First release, and the first build anybody can pin.
@@ -61,5 +126,6 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.1.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.1.1...main
+[0.1.1]: https://github.com/kmoneil/jr/releases/tag/v0.1.1
 [0.1.0]: https://github.com/kmoneil/jr/releases/tag/v0.1.0
