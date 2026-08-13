@@ -397,9 +397,10 @@ Prints the Authorization header value a request to this site would carry.
 
 This deliberately reveals a secret. It exists so a script can hand the
 credential to curl or another client without re-implementing the credential
-lookup:
+lookup. The value is one field of a document, so take that field:
 
-    curl -H "Authorization: $(` + buildinfo.App + ` auth token)" ...
+    header=$(` + buildinfo.App + ` auth token --format tsv | awk -F'\t' '$1=="authorization"{print $2}')
+    curl -H "Authorization: $header" ...
 
 Everywhere else in this tool a credential is redacted. Here it is the requested
 output, and it goes to stdout like any other result — so redirect it
