@@ -66,7 +66,7 @@ CHECKS=(
 	"test (tags=none)"
 	"test (tags=mcp)"
 	"test (tags=mcp,write)"
-	"test (tags=tui,prompt,render,browser,clipboard,mcp,write,admin)"
+	"test (tags=prompt,render,mcp,write,admin)"
 )
 
 say "== ruleset on main =="
