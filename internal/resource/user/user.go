@@ -202,7 +202,11 @@ func runList(
 			return registry.StreamResult{}, err
 		}
 	}
-	inv.Progress.Update(out.Count(), out.Count())
+	// No total, because there is none to have: the bound reached the server as
+	// maxResults, so nothing here knows how many users matched. Zero is how
+	// Update is told that, and it renders a bare count rather than a ratio
+	// against a number that is only the count again.
+	inv.Progress.Update(out.Count(), 0)
 	// The search decides this, not a comparison here. The bound reaches the
 	// server as maxResults, so a check against len(page.Users) would be testing
 	// a number the request already enforced and could never fail.
