@@ -108,6 +108,29 @@ func promptExchangeWith(t *testing.T, flags, input string) (before, after string
 	}
 	before = seen.String()
 
+	// The prompt arriving is not the same event as echo being off, and this
+	// harness can see only the first.
+	//
+	// The program writes "API token for ...: " and then calls
+	// term.ReadPassword, which is what clears ECHO. Between those two the
+	// terminal still echoes, and a test that types the instant the prompt
+	// bytes appear can land inside that window: the token comes back on the
+	// transcript, the assertion below fires, and it is the harness that was
+	// too quick rather than the program that failed. It happened on CI at
+	// 11:47 and never once in six local runs, which is what that class of bug
+	// looks like.
+	//
+	// Nothing observable says "the ioctl has landed". The pty belongs to
+	// script(1), so the test cannot read its termios, and a byte sent to
+	// detect echo would be consumed as part of the token. So this waits a
+	// fixed interval instead, and it is chosen against what the assertion is
+	// really about: whether echo is off by the time a *person* could type. A
+	// person is three orders of magnitude slower than this.
+	//
+	// The assertion keeps its teeth. A build that never disabled echo echoes
+	// the token after this wait exactly as it would without it.
+	time.Sleep(500 * time.Millisecond)
+
 	if _, err := io.WriteString(stdin, input); err != nil {
 		t.Fatalf("type: %v", err)
 	}
