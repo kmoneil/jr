@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/jql"
 	"github.com/kmoneil/jr/internal/registry"
 	"github.com/kmoneil/jr/internal/render"
 	"github.com/kmoneil/jr/internal/site"
@@ -216,9 +217,11 @@ func TestTheRecordedDataCenterIssueIsAConversationAServerHad(t *testing.T) {
 //
 // `--status` and `--label` bind as string arrays, so neither splits on a comma
 // and `--status Done,Closed` asks for one status whose name contains one. That
-// is the right default — a status, a label, and a component may all legally
-// contain a comma, and splitting would make such a value unspellable — but the
-// argument for it rests on what happens next, and nothing had asked the server.
+// is the right default, and the reason is no longer a supposition: a label
+// containing a comma was created on Jira Cloud on 2026-08-13 and read back as
+// one label, so splitting would make a value the server genuinely stores
+// unaskable. The argument still rests on what happens next, which is what the
+// two cassettes below asked the server.
 //
 // It answers differently for the two fields, and the difference is the whole
 // point. Jira validates a status name against the ones that exist and refuses
@@ -277,6 +280,36 @@ func TestTheServerRefusesAnUnknownStatusAndNotAnUnknownLabel(t *testing.T) {
 			t.Errorf("a recorded exchange was never requested: %v", unplayed)
 		}
 	})
+}
+
+// TestACommaInALabelIsPartOfTheLabel is what a future "fix" for the case above
+// would break, so it is asserted rather than left to the comment.
+//
+// The obvious remedy for `--label a,b` answering emptily is to split on the
+// comma and ask for two labels. It was the middle option on the card and it is
+// wrong: `a,b` is a label Jira accepts and stores, measured against Cloud on
+// 2026-08-13 by creating an issue with it and reading it back as one label. A
+// tool that split would have no spelling for that label at all, which is the
+// silent alteration §5.2 forbids, and it would do so to guess at an intent the
+// caller can state exactly by repeating the flag.
+//
+// So this pins both ends: one value reaches JQL, and one value comes back out
+// of the TSV writer with its comma escaped rather than read as a separator.
+func TestACommaInALabelIsPartOfTheLabel(t *testing.T) {
+	built := jql.New().In("labels", "a,b").String()
+	if built != `labels = "a,b"` {
+		t.Errorf("built %s, want one label and not two", built)
+	}
+
+	one := render.JoinList([]string{"a,b"})
+	two := render.JoinList([]string{"a", "b"})
+	if one == two {
+		t.Errorf("one label %q and two labels %q render identically, so a "+
+			"consumer splitting the cell reads the one as two", one, two)
+	}
+	if one != `a\,b` {
+		t.Errorf("JoinList = %q, want the comma escaped", one)
+	}
 }
 
 // runRecordedList drives `issue list` against a recording, scoped to the

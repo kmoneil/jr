@@ -211,9 +211,15 @@ the set and never orders it, so "everything touched today, newest first" is
 
 Every list filter has both directions: --status and --not-status, --type and
 --not-type, --label and --not-label. Each repeats, so --not-status Done
---not-status Closed sends status NOT IN (Done, Closed). None of them splits on
-commas, because a status or a label may contain one: --not-status Done,Closed
-names a single status with a comma in it, which is not a status any project has.
+--not-status Closed sends status NOT IN (Done, Closed).
+
+None of them splits on commas. --label a,b asks for one label whose name
+contains a comma, which Jira genuinely stores, so splitting it would make that
+label unaskable. What differs is what the server does with the mistake, and it
+differs by field: Jira validates a status and an issue type, so a comma typo
+there comes back as a 400 naming the value. It does not validate a label at
+all, so --label a,b is a legal question with a truthful and usually empty
+answer. Repeat the flag rather than joining values with a comma.
 
 --assignee and --reporter ask who an issue belongs to. --involving,
 --was-assignee, --worklog-author, and --changed-by ask who touched it, which is
@@ -240,27 +246,29 @@ to status and everything else has to be asked for.`),
 			},
 			{
 				Name: "status", Type: registry.TypeString, Repeatable: true,
-				Usage: "status to match; repeat for several",
+				Usage: "status to match; repeat for several, never comma-joined",
 			},
 			{
 				Name: "not-status", Type: registry.TypeString, Repeatable: true,
-				Usage: "status to exclude; repeat for several",
+				Usage: "status to exclude; repeat for several, never comma-joined",
 			},
 			{
 				Name: "label", Type: registry.TypeString, Repeatable: true,
-				Usage: "label to match; repeat for several",
+				Usage: "label to match; repeat for several. A comma is part of the " +
+					"label, and no server checks a label exists",
 			},
 			{
 				Name: "not-label", Type: registry.TypeString, Repeatable: true,
-				Usage: "label to exclude; repeat for several",
+				Usage: "label to exclude; repeat for several. A comma is part of the " +
+					"label, and no server checks a label exists",
 			},
 			{
 				Name: "type", Short: "t", Type: registry.TypeString, Repeatable: true,
-				Usage: "issue type to match; repeat for several",
+				Usage: "issue type to match; repeat for several, never comma-joined",
 			},
 			{
 				Name: "not-type", Type: registry.TypeString, Repeatable: true,
-				Usage: "issue type to exclude; repeat for several",
+				Usage: "issue type to exclude; repeat for several, never comma-joined",
 			},
 			{
 				Name: "assignee", Short: "a", Type: registry.TypeString,

@@ -1836,9 +1836,15 @@ the set and never orders it, so "everything touched today, newest first" is
 
 Every list filter has both directions: --status and --not-status, --type and
 --not-type, --label and --not-label. Each repeats, so --not-status Done
---not-status Closed sends status NOT IN (Done, Closed). None of them splits on
-commas, because a status or a label may contain one: --not-status Done,Closed
-names a single status with a comma in it, which is not a status any project has.
+--not-status Closed sends status NOT IN (Done, Closed).
+
+None of them splits on commas. --label a,b asks for one label whose name
+contains a comma, which Jira genuinely stores, so splitting it would make that
+label unaskable. What differs is what the server does with the mistake, and it
+differs by field: Jira validates a status and an issue type, so a comma typo
+there comes back as a 400 naming the value. It does not validate a label at
+all, so --label a,b is a legal question with a truthful and usually empty
+answer. Repeat the flag rather than joining values with a comma.
 
 --assignee and --reporter ask who an issue belongs to. --involving,
 --was-assignee, --worklog-author, and --changed-by ask who touched it, which is
@@ -1865,12 +1871,12 @@ jr issue list --changed-by currentUser --changed-after -1w
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--jql` | `string` | — | raw JQL, combined with the other filters and always parenthesized |
-| `--status` | `string` | — | status to match; repeat for several (repeatable) |
-| `--not-status` | `string` | — | status to exclude; repeat for several (repeatable) |
-| `--label` | `string` | — | label to match; repeat for several (repeatable) |
-| `--not-label` | `string` | — | label to exclude; repeat for several (repeatable) |
-| `--type`, `-t` | `string` | — | issue type to match; repeat for several (repeatable) |
-| `--not-type` | `string` | — | issue type to exclude; repeat for several (repeatable) |
+| `--status` | `string` | — | status to match; repeat for several, never comma-joined (repeatable) |
+| `--not-status` | `string` | — | status to exclude; repeat for several, never comma-joined (repeatable) |
+| `--label` | `string` | — | label to match; repeat for several. A comma is part of the label, and no server checks a label exists (repeatable) |
+| `--not-label` | `string` | — | label to exclude; repeat for several. A comma is part of the label, and no server checks a label exists (repeatable) |
+| `--type`, `-t` | `string` | — | issue type to match; repeat for several, never comma-joined (repeatable) |
+| `--not-type` | `string` | — | issue type to exclude; repeat for several, never comma-joined (repeatable) |
 | `--assignee`, `-a` | `string` | — | assignee, by display name, email, or id; the word currentUser resolves to the caller |
 | `--reporter` | `string` | — | reporter, by display name, email, or id; the word currentUser resolves to the caller |
 | `--creator` | `string` | — | who filed the issue, which unlike the reporter cannot be changed afterwards |
