@@ -53,6 +53,14 @@ still rewrite that agent's contexts, store a different credential, point itself
 at another config file, and **print the credential with `auth token`**, which is
 in every build and exists to reveal it. After that it does not need `jr` at all.
 
+That `auth token` is in every build is a decision, taken 2026-08-13, and not an
+oversight waiting on a tag. Gating it would close one door in a room with an
+open wall: anything that can run `jr` as you can read the credential file
+directly, so a build without the command is not a build that keeps the secret.
+The deployment where it *does* matter is one where the caller cannot read that
+file, and there the command is removed by how the binary is deployed rather than
+by which tag it was compiled with.
+
 The binary is therefore a ceiling on what reaches Jira *through that binary*. It
 is not a ceiling on the credential, and the credential is what grants
 everything — which is why step 3 below is not optional on a shared machine.
