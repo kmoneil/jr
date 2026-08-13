@@ -218,8 +218,17 @@ contains a comma, which Jira genuinely stores, so splitting it would make that
 label unaskable. What differs is what the server does with the mistake, and it
 differs by field: Jira validates a status and an issue type, so a comma typo
 there comes back as a 400 naming the value. It does not validate a label at
-all, so --label a,b is a legal question with a truthful and usually empty
-answer. Repeat the flag rather than joining values with a comma.
+all. Repeat the flag rather than joining values with a comma.
+
+A label filter is checked here instead, because a label nothing carries is a
+legal question and an empty answer to it looks exactly like an empty answer to
+a correct one. A label no issue on this site carries produces the warning
+UNKNOWN_LABEL on stderr, and the query still runs and still exits 0: asking
+about a label nobody uses is allowed, and not being able to tell that is what
+was not. It costs one request per label, it is not cached, and a site that
+cannot answer is left alone rather than guessed at. It says nothing about
+whether a label that does exist will match here: this query may be scoped to
+one project and a label lives site-wide.
 
 --assignee and --reporter ask who an issue belongs to. --involving,
 --was-assignee, --worklog-author, and --changed-by ask who touched it, which is
@@ -254,13 +263,13 @@ to status and everything else has to be asked for.`),
 			},
 			{
 				Name: "label", Type: registry.TypeString, Repeatable: true,
-				Usage: "label to match; repeat for several. A comma is part of the " +
-					"label, and no server checks a label exists",
+				Usage: "label to match; repeat for several. A comma is part of " +
+					"the label, and one no issue carries is warned about",
 			},
 			{
 				Name: "not-label", Type: registry.TypeString, Repeatable: true,
-				Usage: "label to exclude; repeat for several. A comma is part of the " +
-					"label, and no server checks a label exists",
+				Usage: "label to exclude; repeat for several. A comma is part of " +
+					"the label, and one no issue carries is warned about",
 			},
 			{
 				Name: "type", Short: "t", Type: registry.TypeString, Repeatable: true,
@@ -619,7 +628,15 @@ func validateList(ctx context.Context, inv *registry.Invocation) error {
 	if err := validateBrowseURL(ctx, inv); err != nil {
 		return err
 	}
-	return validateFields(ctx, inv)
+	if err := validateFields(ctx, inv); err != nil {
+		return err
+	}
+
+	// Last, and after every refusal above it. This one spends requests and
+	// cannot fail the command, so an invocation that was going to be refused
+	// is refused without paying for a diagnostic nobody will read.
+	warnUnknownLabels(ctx, inv)
+	return nil
 }
 
 // requirePageSize refuses a --page-size that can never work, before a session

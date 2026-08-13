@@ -243,13 +243,21 @@ func TestValuesAreNeverSyntax(t *testing.T) {
 }
 
 // FuzzValuesRoundTrip is the property behind the table above: for any input,
-// rendering it as a value and lexing the result yields one string token holding
-// the original.
+// rendering it as a value and reading it back yields the original.
+//
+// It reads the value back with jql.Unquote rather than by lexing here, because
+// Unquote is what every caller outside this package uses to read a value Jira
+// rendered, and the label suggestion endpoint answers in this same spelling. A
+// property asserted against a hand-rolled equivalent of the function under
+// test is a property the function does not have.
 func FuzzValuesRoundTrip(f *testing.F) {
 	for _, seed := range []string{
 		"", "plain", `"`, `\`, `\"`, "a\nb", "a\tb", `" OR 1=1`,
 		"unicode é", "🙂", `))((`, "'", `''`, "EMPTY",
 		"\xc4", "\xff\xfe", "valid\xc4invalid",
+		// Labels Jira stores and hands back quoted, measured on both
+		// deployments 2026-08-13.
+		"a,b", `back\slash`, "brac[ket]", `q"uote`, "uni-café",
 	} {
 		f.Add(seed)
 	}
@@ -274,18 +282,62 @@ func FuzzValuesRoundTrip(f *testing.F) {
 		}
 		rendered := strings.TrimPrefix(got, prefix)
 
-		tokens, err := jql.Tokenize(rendered)
+		read, err := jql.Unquote(rendered)
 		if err != nil {
-			t.Fatalf("render(%q) produced unlexable JQL %s: %v", value, rendered, err)
+			t.Fatalf("render(%q) produced %s, which Unquote refuses: %v",
+				value, rendered, err)
 		}
-		if len(tokens) != 1 || tokens[0].Kind != jql.TokString {
-			t.Fatalf("render(%q) produced %d token(s), want one string: %s",
-				value, len(tokens), rendered)
-		}
-		if tokens[0].Text != value {
-			t.Fatalf("round trip lost data\n got %q\nwant %q", tokens[0].Text, value)
+		if read != value {
+			t.Fatalf("round trip lost data\n got %q\nwant %q", read, value)
 		}
 	})
+}
+
+// TestUnquoteReadsWhatJiraRenders covers the spellings the label suggestion
+// endpoint answers with. Jira quotes a value only when it has to, so both
+// halves of that rule have to be read: `retry` arrives bare and `a,b` arrives
+// as five characters with the quotes in them.
+func TestUnquoteReadsWhatJiraRenders(t *testing.T) {
+	for _, tc := range []struct{ rendered, want string }{
+		{`retry`, "retry"},
+		{`zz-000`, "zz-000"},
+		{`uni-café`, "uni-café"},
+		{`2026`, "2026"},
+		{`"a,b"`, "a,b"},
+		{`"brac[ket]"`, "brac[ket]"},
+		{`"back\\slash"`, `back\slash`},
+		{`"q\"uote"`, `q"uote`},
+		{`"spaced out"`, "spaced out"},
+		{`""`, ""},
+	} {
+		got, err := jql.Unquote(tc.rendered)
+		if err != nil {
+			t.Errorf("Unquote(%s): %v", tc.rendered, err)
+			continue
+		}
+		if got != tc.want {
+			t.Errorf("Unquote(%s) = %q, want %q", tc.rendered, got, tc.want)
+		}
+	}
+}
+
+// TestUnquoteRefusesWhatIsNotOneValue is the guard that keeps a caller from
+// comparing against half of something. Reading `a,b` bare would answer "a",
+// which is a label that may well exist while the one asked about does not.
+func TestUnquoteRefusesWhatIsNotOneValue(t *testing.T) {
+	for _, rendered := range []string{
+		`a,b`,        // three tokens, which is why Jira quotes this one
+		`a b`,        // two
+		``,           // none
+		`"unclosed`,  // a lex error
+		`=`,          // an operator is not a value
+		`(`,          // nor is a parenthesis
+		`"bad\qesc"`, // an escape JQL does not define
+	} {
+		if got, err := jql.Unquote(rendered); err == nil {
+			t.Errorf("Unquote(%q) = %q, want a refusal", rendered, got)
+		}
+	}
 }
 
 func TestRenderRejectsMalformedExpressions(t *testing.T) {

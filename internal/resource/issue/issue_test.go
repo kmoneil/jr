@@ -1985,9 +1985,18 @@ func (s *stubSession) Metadata(context.Context) (*site.Metadata, error) {
 		if kind == "" {
 			kind = site.Cloud
 		}
-		var client site.Doer = s.doer
-		if s.metaClient != nil {
+		// A nil *stubDoer is not a nil site.Doer: the interface holds a typed
+		// nil, so a lookup this test did not think about reaches Do and
+		// dereferences it. That was every test here until validation grew a
+		// second metadata call, and the failure is a segfault in the harness
+		// rather than a missing stub. An empty document is what a site with
+		// nothing to say answers.
+		var client site.Doer = &stubDoer{body: "{}"}
+		switch {
+		case s.metaClient != nil:
 			client = s.metaClient
+		case s.doer != nil:
+			client = s.doer
 		}
 		s.meta = &site.Metadata{Client: client, Info: site.Info{Kind: kind}}
 	}

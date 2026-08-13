@@ -420,6 +420,42 @@ func quote(s string) (string, error) {
 	return b.String(), nil
 }
 
+// Unquote reads one rendered JQL value back into the string it stands for.
+//
+// It is the inverse of quote, and it lives beside it for the reason quote is
+// the only place a value is quoted: an escape rule with two implementations is
+// an escape rule that will eventually disagree with itself. Tokenize already
+// knows every escape JQL defines, so this is a parse and not a second reading
+// of the same grammar.
+//
+// The input is a value Jira rendered, not one a caller typed. The label
+// suggestion endpoint answers in JQL's own spelling, a bare word where the
+// value needs no quoting and a quoted literal where it does, so the label
+// `a,b` comes back as the five characters "a,b" and `back\slash` as
+// "back\\slash". Comparing that to what the caller typed without reading the
+// quoting first would report every awkward label as unknown.
+//
+// Anything that is not exactly one value is refused rather than interpreted.
+// Two tokens mean the string was never a single value, and a caller that
+// guessed otherwise would be comparing against half of one.
+func Unquote(s string) (string, error) {
+	tokens, err := Tokenize(s)
+	if err != nil {
+		return "", err
+	}
+	if len(tokens) != 1 {
+		return "", errs.Usage("JQL_SYNTAX",
+			"%q is %d values, not one", s, len(tokens))
+	}
+	switch tokens[0].Kind {
+	case TokString, TokIdent, TokNumber:
+		return tokens[0].Text, nil
+	default:
+		return "", errs.Usage("JQL_SYNTAX",
+			"%q is %s, not a value", s, tokens[0].Kind)
+	}
+}
+
 // isSimpleIdent reports whether s can be written bare: a letter or underscore
 // followed by letters, digits, or underscores.
 func isSimpleIdent(s string) bool {

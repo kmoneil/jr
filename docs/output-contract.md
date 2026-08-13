@@ -391,6 +391,35 @@ with the token" has to tolerate there being no token, which it must anyway:
 `complete="false"` is a statement about the answer and never a promise about
 what a further request would do.
 
+## Warnings
+
+A warning is a structured document on stderr carrying a `code` and a `message`,
+in whatever format the invocation asked for. It never changes the exit code and
+never reaches stdout. There are three, and each exists because something true
+about the answer cannot be read off the answer itself.
+
+| Code               | Emitted by                                      | What it says                                                                                                                                                                                                                        |
+| ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RESULT_TRUNCATED` | any collection                                  | The result is not exhaustive. It accompanies exit 3 and `complete="false"`, and carries the resume token where one exists.                                                                                                            |
+| `POSSIBLE_DUPLICATE` | `issue create`, `issue clone`                 | An identical request succeeded within the last 60 seconds and this one carried no idempotency key.                                                                                                                                   |
+| `UNKNOWN_LABEL`    | `issue list`, from `--label` and `--not-label`   | No issue on this site carries that label. The query still runs and still exits 0.                                                                                                                                                    |
+
+`UNKNOWN_LABEL` exists because an empty answer to a mistyped label and an empty
+answer to a correct one are the same bytes: `--label retyr` returns a header, no
+rows, `complete="true"`, and exit 0, and so does `--label retry` on a day
+nothing carries it. Asking about a label nobody uses is a legal question with a
+correct answer, so it is not refused; not being able to tell the two apart is
+what was wrong, and one line on stderr is the whole of the fix.
+
+What it does **not** say is that a label it stayed quiet about will match. The
+check is site-wide and the query may be scoped to a project, so a label alive
+somewhere else is not reported. It costs one request per distinct label plus
+one more only when it is about to warn, those requests count against
+`--max-requests` like any other, and nothing is cached: a label exists exactly
+as long as an issue carries it. Where the check cannot be made at all, whether
+the route is absent, the site reports no labels, or the request failed, nothing
+is said rather than something guessed.
+
 ## Documents and mixed content
 
 Long text is emitted as a child element, never an attribute, and never escaped
@@ -1055,6 +1084,11 @@ diffing two runs must not see a difference that means nothing.
   output.
 - Changing an exit code's meaning, an error `code` string, or a `kind`:
   **major**.
+- Adding a warning `code`: **minor**, and it bumps no kind version. A warning is
+  a separate document on stderr, so no existing consumer is reading for one it
+  has never seen, and a command that gains a warning emits the same result it
+  did before. Changing what an existing warning code means is **major**, for the
+  reason an error code is.
 - `jr contract` (or `jr --contract`) dumps the machine-readable schema for every
   kind this build can emit, so a consumer can pin and verify.
 

@@ -707,10 +707,19 @@ does not constrain the project, and a regex says it does. Dates are
 validated, so `--created 2020-13-45` is exit 2 with `month 13 is out of range`
 rather than an empty result set that reads like "no matching issues".
 
+Reading a value back is the same package's job. `jql.Unquote` is the inverse of
+that renderer, and it exists because Jira answers in JQL's own spelling: ask its
+label endpoint about `a,b` and it replies with a quoted literal, and about
+`back\slash` with the backslash doubled. Comparing that to what somebody typed
+would report every value needing quotes as missing.
+
 Four fuzzers back it up: `make fuzz`. The value round-trip one found a real bug
 during development: a byte that is not valid UTF-8 was being silently replaced
 with U+FFFD, which would have queried for something other than what the caller
-asked for. It is now a structured refusal.
+asked for. It is now a structured refusal. That fuzzer reads its own output back
+through `jql.Unquote` rather than through a copy of it, because a property
+asserted against a reimplementation of the thing under test is a property the
+thing does not have.
 
 </details>
 
