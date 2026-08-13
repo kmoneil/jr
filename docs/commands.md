@@ -1843,8 +1843,17 @@ contains a comma, which Jira genuinely stores, so splitting it would make that
 label unaskable. What differs is what the server does with the mistake, and it
 differs by field: Jira validates a status and an issue type, so a comma typo
 there comes back as a 400 naming the value. It does not validate a label at
-all, so --label a,b is a legal question with a truthful and usually empty
-answer. Repeat the flag rather than joining values with a comma.
+all. Repeat the flag rather than joining values with a comma.
+
+A label filter is checked here instead, because a label nothing carries is a
+legal question and an empty answer to it looks exactly like an empty answer to
+a correct one. A label no issue on this site carries produces the warning
+UNKNOWN_LABEL on stderr, and the query still runs and still exits 0: asking
+about a label nobody uses is allowed, and not being able to tell that is what
+was not. It costs one request per label, it is not cached, and a site that
+cannot answer is left alone rather than guessed at. It says nothing about
+whether a label that does exist will match here: this query may be scoped to
+one project and a label lives site-wide.
 
 --assignee and --reporter ask who an issue belongs to. --involving,
 --was-assignee, --worklog-author, and --changed-by ask who touched it, which is
@@ -1873,8 +1882,8 @@ jr issue list --changed-by currentUser --changed-after -1w
 | `--jql` | `string` | — | raw JQL, combined with the other filters and always parenthesized |
 | `--status` | `string` | — | status to match; repeat for several, never comma-joined (repeatable) |
 | `--not-status` | `string` | — | status to exclude; repeat for several, never comma-joined (repeatable) |
-| `--label` | `string` | — | label to match; repeat for several. A comma is part of the label, and no server checks a label exists (repeatable) |
-| `--not-label` | `string` | — | label to exclude; repeat for several. A comma is part of the label, and no server checks a label exists (repeatable) |
+| `--label` | `string` | — | label to match; repeat for several. A comma is part of the label, and one no issue carries is warned about (repeatable) |
+| `--not-label` | `string` | — | label to exclude; repeat for several. A comma is part of the label, and one no issue carries is warned about (repeatable) |
 | `--type`, `-t` | `string` | — | issue type to match; repeat for several, never comma-joined (repeatable) |
 | `--not-type` | `string` | — | issue type to exclude; repeat for several, never comma-joined (repeatable) |
 | `--assignee`, `-a` | `string` | — | assignee, by display name, email, or id; the word currentUser resolves to the caller |

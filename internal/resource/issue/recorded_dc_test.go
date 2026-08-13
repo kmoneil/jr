@@ -245,7 +245,7 @@ func TestTheServerRefusesAnUnknownStatusAndNotAnUnknownLabel(t *testing.T) {
 		flags := registry.NewFlags()
 		flags.SetString("status", "NOSUCHSTATUS")
 
-		_, err := runRecordedList(t, cmd, conn, flags)
+		_, _, err := runRecordedList(t, cmd, conn, flags)
 		if err == nil {
 			t.Fatal("a status no project defines was accepted")
 		}
@@ -265,7 +265,7 @@ func TestTheServerRefusesAnUnknownStatusAndNotAnUnknownLabel(t *testing.T) {
 		flags := registry.NewFlags()
 		flags.SetString("label", "a,b")
 
-		out, err := runRecordedList(t, cmd, conn, flags)
+		out, diagnostics, err := runRecordedList(t, cmd, conn, flags)
 		if err != nil {
 			t.Fatalf("a label that matches nothing was an error: %v", err)
 		}
@@ -275,6 +275,39 @@ func TestTheServerRefusesAnUnknownStatusAndNotAnUnknownLabel(t *testing.T) {
 		// the mistake looks like.
 		if out != "key\tstatus\tassignee\tupdated\tsummary\n" {
 			t.Errorf("listing =\n%q\nwant a header and no rows", out)
+		}
+		// And stderr is what makes the two distinguishable. Both halves are
+		// asserted because they are one claim: stdout says the query was
+		// answered honestly, stderr says nothing carries the label, and either
+		// one alone is the state this card was written about.
+		if !strings.Contains(diagnostics, "UNKNOWN_LABEL") {
+			t.Errorf("stderr =\n%q\nwant UNKNOWN_LABEL", diagnostics)
+		}
+		if !strings.Contains(diagnostics, `"a,b"`) {
+			t.Errorf("stderr =\n%q\nwant the label it is about", diagnostics)
+		}
+		if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+			t.Errorf("a recorded exchange was never requested: %v", unplayed)
+		}
+	})
+
+	// The control. A check that warns about everything and a check that warns
+	// about the right thing produce the same recording of the first case, and
+	// this is the recording that tells them apart.
+	t.Run("a label something carries is not warned about", func(t *testing.T) {
+		conn, replayer := recordedConn(t, "known-label-recorded.datacenter.json")
+		flags := registry.NewFlags()
+		flags.SetString("label", "pagination")
+
+		out, diagnostics, err := runRecordedList(t, cmd, conn, flags)
+		if err != nil {
+			t.Fatalf("a label an issue carries was an error: %v", err)
+		}
+		if diagnostics != "" {
+			t.Errorf("stderr =\n%q\nwant nothing said about a label that exists", diagnostics)
+		}
+		if !strings.Contains(out, "ENG-") {
+			t.Errorf("listing =\n%q\nwant the issue carrying the label", out)
 		}
 		if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
 			t.Errorf("a recorded exchange was never requested: %v", unplayed)
@@ -314,21 +347,35 @@ func TestACommaInALabelIsPartOfTheLabel(t *testing.T) {
 
 // runRecordedList drives `issue list` against a recording, scoped to the
 // stub's project the way a context scopes it in production. That is the
-// invocation both cassettes above were recorded with.
+// invocation both cassettes above were recorded with. It returns what reached
+// stdout and what reached stderr, because one of these listings says something
+// on each.
+//
+// Metadata reads the recording too. In production a metadata lookup rides the
+// same connection as the query, since site.Metadata is built with the client
+// Connect returned, so pointing it at a stub while the query replays would
+// test a shape this tool does not have, and the label lookup would answer from
+// a field catalogue.
 func runRecordedList(
 	t *testing.T, cmd *registry.Command, conn *transport.Client, flags registry.Flags,
-) (string, error) {
+) (stdout, stderr string, err error) {
 	t.Helper()
 
+	var diagnostics strings.Builder
 	inv := &registry.Invocation{
 		Jira: &stubSession{
-			doer: &stubDoer{body: catalogueJSON}, conn: conn, kind: site.DataCenter,
+			doer: &stubDoer{body: catalogueJSON}, metaClient: conn,
+			conn: conn, kind: site.DataCenter,
 		},
 		Flags: flags, Limit: registry.Limit{N: 50},
-		Stderr: io.Discard, Progress: registry.NoProgress,
+		// A warning is written in the invocation's format, and an unset one is
+		// not a format: render refuses it and the diagnostic is dropped. The
+		// recorded run was a listing, so it was TSV.
+		Format: render.TSV,
+		Stderr: &diagnostics, Progress: registry.NoProgress,
 	}
 	if err := cmd.Validate(t.Context(), inv); err != nil {
-		return "", err
+		return "", diagnostics.String(), err
 	}
 
 	var buf strings.Builder
@@ -341,7 +388,7 @@ func runRecordedList(
 	}
 	result, err := cmd.Stream(t.Context(), inv, stream)
 	if err != nil {
-		return "", err
+		return "", diagnostics.String(), err
 	}
 	if err := stream.Close(result.Complete, result.NextPageToken); err != nil {
 		t.Fatalf("close: %v", err)
@@ -349,5 +396,5 @@ func runRecordedList(
 	if !result.Complete {
 		t.Error("an exhausted listing was reported incomplete")
 	}
-	return buf.String(), nil
+	return buf.String(), diagnostics.String(), nil
 }

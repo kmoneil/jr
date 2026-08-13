@@ -5,6 +5,38 @@
     {
       "request": {
         "method": "GET",
+        "path": "/rest/api/2/jql/autocompletedata/suggestions",
+        "query": "fieldName=labels\u0026fieldValue=a%2Cb"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"results\":[]}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/jql/autocompletedata/suggestions",
+        "query": "fieldName=labels\u0026fieldValue="
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"results\":[{\"value\":\"truncation\",\"displayName\":\"truncation\"},{\"value\":\"contract\",\"displayName\":\"contract\"},{\"value\":\"pagination\",\"displayName\":\"pagination\"}]}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
         "path": "/rest/api/2/search",
         "query": "fields=summary%2Cstatus%2Cassignee%2Creporter%2Cpriority%2Cissuetype%2Cproject%2Ccreated%2Cupdated%2Clabels\u0026jql=project+%3D+%22ENG%22+AND+labels+%3D+%22a%2Cb%22+ORDER+BY+issuekey+DESC\u0026maxResults=50"
       },

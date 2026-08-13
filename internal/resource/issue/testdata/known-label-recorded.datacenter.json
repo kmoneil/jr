@@ -1,0 +1,38 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/jql/autocompletedata/suggestions",
+        "query": "fieldName=labels\u0026fieldValue=pagination"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"results\":[{\"value\":\"pagination\",\"displayName\":\"\u003cb\u003epagination\u003c/b\u003e\"}]}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/search",
+        "query": "fields=summary%2Cstatus%2Cassignee%2Creporter%2Cpriority%2Cissuetype%2Cproject%2Ccreated%2Cupdated%2Clabels\u0026jql=project+%3D+%22ENG%22+AND+labels+%3D+%22pagination%22+ORDER+BY+issuekey+DESC\u0026maxResults=50"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"expand\":\"names,schema\",\"startAt\":0,\"maxResults\":50,\"total\":1,\"issues\":[{\"expand\":\"operations,versionedRepresentations,editmeta,changelog,renderedFields\",\"id\":\"10001\",\"self\":\"http://recorded.invalid/rest/api/2/issue/10001\",\"key\":\"ENG-2\",\"fields\":{\"summary\":\"Page a search by keyset\",\"issuetype\":{\"self\":\"http://recorded.invalid/rest/api/2/issuetype/10001\",\"id\":\"10001\",\"description\":\"Created by Jira Software - do not edit or delete. Issue type for a user story.\",\"iconUrl\":\"http://recorded.invalid/images/icons/issuetypes/story.svg\",\"name\":\"Story\",\"subtask\":false},\"created\":\"2026-08-13T20:19:34.000+0000\",\"project\":{\"self\":\"http://recorded.invalid/rest/api/2/project/10000\",\"id\":\"10000\",\"key\":\"ENG\",\"name\":\"Engineering\",\"projectTypeKey\":\"software\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"}},\"reporter\":{\"self\":\"http://recorded.invalid/rest/api/2/user?username=ada\",\"name\":\"ada\",\"key\":\"JIRAUSER10000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"Etc/UTC\"},\"assignee\":{\"self\":\"http://recorded.invalid/rest/api/2/user?username=ada\",\"name\":\"ada\",\"key\":\"JIRAUSER10000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"Etc/UTC\"},\"priority\":{\"self\":\"http://recorded.invalid/rest/api/2/priority/3\",\"iconUrl\":\"http://recorded.invalid/images/icons/priorities/medium.svg\",\"name\":\"Medium\",\"id\":\"3\"},\"updated\":\"2026-08-13T20:19:34.000+0000\",\"labels\":[\"pagination\"],\"status\":{\"self\":\"http://recorded.invalid/rest/api/2/status/10000\",\"description\":\"\",\"iconUrl\":\"http://recorded.invalid/\",\"name\":\"To Do\",\"id\":\"10000\",\"statusCategory\":{\"self\":\"http://recorded.invalid/rest/api/2/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"default\",\"name\":\"To Do\"}}}}]}"
+      }
+    }
+  ]
+}

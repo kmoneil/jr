@@ -528,15 +528,6 @@ func warnIfRecent(inv *registry.Invocation, ledger *idem.Ledger, siteURL, derive
 		"an identical create produced "+made.Key+" moments ago")
 }
 
-// warn emits a structured diagnostic on stderr. stdout carries the result and
-// nothing else, so this can never reach it.
-func warn(inv *registry.Invocation, code, message string) {
-	if inv.Stderr == nil {
-		return
-	}
-	_ = render.WriteWarning(inv.Stderr, code, message, inv.Format)
-}
-
 func editCommand() *registry.Command {
 	return &registry.Command{
 		Path:    []string{"issue", "edit"},

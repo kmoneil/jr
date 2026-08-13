@@ -57,6 +57,27 @@ the rest. A repeated flag is also the only way to name several values: nothing
 splits on commas, so `--status 'To Do,In Progress'` asks for one status with a
 comma in its name.
 
+A mistyped value fails differently by field, and it is worth knowing which one
+is quiet. Jira validates a status and an issue type, so `--status Dnoe` comes
+back as an error naming the value. It does not validate a label, so
+`--label regresion` is a legal query with a truthful, empty answer, the same
+answer a correct label gets on a day nothing carries it. `jr` checks the label
+itself and says so on stderr, without refusing the query:
+
+```console
+$ jr issue list --label regresion
+<warning v="1">
+  <code>UNKNOWN_LABEL</code>
+  <message>no issue on this site carries the label "regresion"</message>
+</warning>
+key	status	assignee	updated	summary
+```
+
+The rows still go to stdout, the exit is still 0, and a script that reads only
+stdout is unaffected. The check is site-wide: it catches a label nothing
+anywhere carries, and stays quiet about one that exists in a project this query
+is not looking at.
+
 **A filter never orders anything.** Without `--sort`, results come back by issue
 key descending — near enough to creation order to be mistaken for "most recent",
 which is why `--updated-after` above is paired with a `--sort`. `--order` on its

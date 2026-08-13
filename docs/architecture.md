@@ -92,12 +92,23 @@ sends the query, and `jql explain`, which says what would be sent. A second copy
 would make the explanation a second implementation, and the two would disagree
 on the first change to either.
 
+**Reading a value back is the same package's job.** `jql.Unquote` is the
+inverse of the quoting nothing else is allowed to do, and it exists because
+Jira answers in JQL's own spelling: the label suggestion endpoint returns
+`a,b` as a quoted literal and a backslash doubled, so a caller comparing that
+to what somebody typed would report every awkward value as unknown. Putting the
+inverse anywhere else would be a second reading of an escape grammar that has
+one implementation on purpose.
+
 **Not all of it is cached, and that is a per-kind judgement.** The field
 catalogue and create metadata change when an administrator edits a screen, so a
 day-old answer is still the answer. An issue's available transitions change when
 the issue moves, so they are fetched every time and not memoized within a
 process either: two calls in one run can legitimately differ, and answering the
-second from the first would hide it.
+second from the first would hide it. Labels are the same judgement reached the
+same way: a label exists exactly as long as an issue carries it, so
+`site.UnknownLabels` caches nothing and a stale answer would report a live
+label as unknown.
 
 Four more rules, all enforced in `internal/lint/importgraph_test.go` against the
 real import graph from `go list`, so a build-tagged file cannot hide an import:

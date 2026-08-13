@@ -38,6 +38,13 @@ internal/resource/issue datacenter	internal/resource/issue/testdata/issue-record
 internal/resource/issue datacenter	internal/resource/issue/testdata/unknown-status-recorded.datacenter.json	issue list --project ENG --status NOSUCHSTATUS
 internal/resource/issue datacenter	internal/resource/issue/testdata/comma-label-recorded.datacenter.json	issue list --project ENG --label 'a,b'
 
+# The label check, both verdicts, so the second is a control on the first. The
+# unknown one above spends two lookups, the label and then a check that the
+# route answers anything at all, and warns; this one spends a single lookup,
+# finds the label, and says nothing. A warning nobody can see not firing is the half
+# that is easy to get wrong and impossible to notice.
+internal/resource/issue datacenter	internal/resource/issue/testdata/known-label-recorded.datacenter.json	issue list --project ENG --label pagination
+
 internal/resource/jql datacenter	internal/resource/jql/testdata/validate-recorded.datacenter.json	jql validate --jql 'project = ENG ORDER BY key DESC'
 internal/resource/jql datacenter	internal/resource/jql/testdata/invalid-recorded.datacenter.json	jql validate --jql 'project = NOSUCHPROJECT'
 

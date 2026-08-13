@@ -225,6 +225,34 @@ $ jr jql explain --jql 'your query here'
 Remember that repeated flags OR together and different flags AND together:
 `--status Done --type Bug` means Done **and** a Bug.
 
+### `UNKNOWN_LABEL`, a warning rather than an error
+
+Labels are the one filter value nothing on the server validates. A status or an
+issue type that does not exist comes back as a 400 naming it; a label that does
+not exist is a legal query, and the answer is an honest, empty, complete result
+with exit 0. That is indistinguishable from asking for a real label on a day
+nothing carries it, so `jr` checks the label and says so:
+
+```console
+$ jr issue list --label regresion
+<warning v="1">
+  <code>UNKNOWN_LABEL</code>
+  <message>no issue on this site carries the label "regresion"</message>
+</warning>
+key	status	assignee	updated	summary
+```
+
+Nothing is refused: the query runs, the exit is 0, and stdout is unchanged.
+
+Two things it does not mean. **Silence is not a promise that the label will
+match here**, because the check is site-wide, and a label alive in a project
+this query does not cover produces no warning and no rows. And **a site that cannot answer
+the check gets no warning either**: where the route is absent, the site reports
+no labels at all, or the request fails, `jr` says nothing rather than guessing.
+If you want to know why a label query is empty and no warning appeared, look
+at the scope first: `--project`, and any `--status` or date filter alongside
+it.
+
 ### Exit 3 — a truncated result
 
 **Not an error.** The rows you got are real; there were more. The default limit
