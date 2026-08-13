@@ -1,9 +1,13 @@
 <!--
 The subject of the squashed commit comes from this PR's title, so write it as a
 Conventional Commit: `<type>(<scope>): <subject>`, imperative, under 72
-characters, no trailing period. The body below becomes the commit message, and
-it matters more than the title — say what was wrong and why the fix is shaped
-the way it is.
+characters, no trailing period.
+
+The body of the squashed commit comes from the commit messages on the branch,
+not from this description, so write those with the same care: say what was
+wrong and why the fix is shaped the way it is. This page is for a reviewer who
+has the diff in front of them. The commit message is for somebody reading
+`git log` in two years who does not.
 -->
 
 ## What was wrong
