@@ -1,7 +1,8 @@
 # Output contract
 
 The output shape is a public API. It is versioned, and breaking it requires a
-major bump.
+major bump. While the release version starts with a zero, that bump moves the
+minor position; see [Stability policy](#stability-policy).
 
 This document describes what `jr` emits. It is the reference a consumer pins
 against; `jr contract` emits the machine-readable form of the same thing.
@@ -1046,12 +1047,37 @@ diffing two runs must not see a difference that means nothing.
 ## Stability policy
 
 - Adding a new optional element or attribute: **minor**.
+- Making a required element or attribute optional: **major**. It reads like the
+  bullet above and is its opposite. An addition is something no existing
+  consumer looks for; this is something an existing consumer already reads, and
+  it will now sometimes not be there.
 - Adding a field to a command's _default_ column set: **major**. Agents diff
   output.
 - Changing an exit code's meaning, an error `code` string, or a `kind`:
   **major**.
 - `jr contract` (or `jr --contract`) dumps the machine-readable schema for every
   kind this build can emit, so a consumer can pin and verify.
+
+### What "major" means before 1.0.0
+
+This project is in `0.y.z`, where
+[semver §4](https://semver.org/spec/v2.0.0.html#spec-item-4) says the public API
+is not to be considered stable and anything may change. **So a change marked
+major above moves the minor position while the release version starts with a
+zero: 0.1.1 to 0.2.0, not to 1.0.0 and not to 0.1.2.** Tagging 1.0.0 is a claim
+about how stable this tool intends to be from then on, and no single breaking
+change is a reason to make that claim.
+
+The kind versions are unaffected by any of this, and they are what a consumer
+should actually be pinning. They are per-kind and start at 1, so `issue.get`
+going 8 to 9 says exactly what changed for someone parsing `issue.get`, and says
+nothing about the twenty-odd kinds that did not move. The release version tells
+you a shape moved somewhere; `kind` and `v` tell you whether it was yours.
+
+A Conventional Commit's `!` and its `BREAKING CHANGE:` footer mark the shape
+change wherever it lands, and they do not decide where. `feat(issue)!:` in a
+0.x release is a minor bump, and the footer is still how the changelog and
+anyone reading `git log` find it.
 
 ## Verifying against `jr contract`
 
