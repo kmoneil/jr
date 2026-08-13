@@ -217,6 +217,38 @@ func (c *Client) ListStream(
 	}
 }
 
+// exhausted reports whether have items out of a server-reported total is the
+// whole set.
+//
+// The total is a pointer because an absent one is not a zero. It used to be an
+// int, and `total` missing from a response decoded to 0, so the first
+// non-empty page satisfied `have >= 0` and every listing reported itself
+// complete after one request. Two of three comments reached stdout with
+// complete="true" and exit 0, which is the one thing this project's output is
+// not allowed to say.
+//
+// An absent total is not an answer, so it is never yes. The caller keeps
+// asking, and the empty page it eventually gets is the answer instead.
+func exhausted(have int, total *int) bool {
+	return total != nil && have >= *total
+}
+
+// reportedTotal is the count the server gave, or zero when it gave none.
+//
+// It exists for the two places that need an int and can live with zero meaning
+// unknown: the progress line, where zero makes Update render a bare count
+// rather than a ratio against nothing, and the `total` attribute on an
+// embedded thread, where it is wrong and is carded. It must not be used to
+// decide whether a result is complete. That is what exhausted is for, and
+// reading an absent total as zero is exactly the bug exhausted exists to
+// prevent.
+func reportedTotal(total *int) int {
+	if total == nil {
+		return 0
+	}
+	return *total
+}
+
 // streamOffsetPaged writes an offset-paged sub-resource to a stream.
 //
 // Comments and worklogs both hang off an endpoint that has no cursor, so a
@@ -226,7 +258,7 @@ func (c *Client) ListStream(
 // completeness rule to drift.
 func streamOffsetPaged[T any](
 	inv *registry.Invocation, out *render.Stream, pageSize int,
-	fetch func(startAt, want int) (items []T, total int, err error),
+	fetch func(startAt, want int) (items []T, total *int, err error),
 	node func(T) *render.Node,
 ) (registry.StreamResult, error) {
 	startAt := 0
@@ -249,12 +281,15 @@ func streamOffsetPaged[T any](
 			// Bounded by the caller, so it is not complete and says so.
 			return registry.StreamResult{Complete: false}, nil
 		}
-		inv.Progress.Update(out.Count(), total)
+		inv.Progress.Update(out.Count(), reportedTotal(total))
 
 		startAt += len(items)
-		if startAt >= total {
+		if exhausted(startAt, total) {
 			return registry.StreamResult{Complete: true}, nil
 		}
+		// A server that reported no total costs one more request: the loop runs
+		// until a page comes back empty. That is the price of an honest answer,
+		// and it is paid only by a deployment that does not say.
 	}
 }
 

@@ -154,6 +154,7 @@ func runComponents(
 		return registry.StreamResult{}, err
 	}
 
+	found := len(components)
 	components, complete := registry.Bound(inv.Limit, components)
 	for _, c := range components {
 		node := render.El("component").
@@ -166,7 +167,7 @@ func runComponents(
 			return registry.StreamResult{}, err
 		}
 	}
-	inv.Progress.Update(out.Count(), out.Count())
+	inv.Progress.Update(out.Count(), found)
 	return registry.StreamResult{Complete: complete}, nil
 }
 
@@ -270,6 +271,7 @@ func runVersions(
 		return registry.StreamResult{}, err
 	}
 
+	found := len(versions)
 	versions, complete := registry.Bound(inv.Limit, versions)
 	for _, v := range versions {
 		node := render.El("version").
@@ -284,7 +286,7 @@ func runVersions(
 			return registry.StreamResult{}, err
 		}
 	}
-	inv.Progress.Update(out.Count(), out.Count())
+	inv.Progress.Update(out.Count(), found)
 	return registry.StreamResult{Complete: complete}, nil
 }
 
@@ -386,6 +388,7 @@ func runStatuses(
 		return registry.StreamResult{}, err
 	}
 
+	found := len(types)
 	types, complete := registry.Bound(inv.Limit, types)
 	for _, t := range types {
 		statuses := make([]*render.Node, 0, len(t.Statuses))
@@ -407,7 +410,7 @@ func runStatuses(
 			return registry.StreamResult{}, err
 		}
 	}
-	inv.Progress.Update(out.Count(), out.Count())
+	inv.Progress.Update(out.Count(), found)
 	return registry.StreamResult{Complete: complete}, nil
 }
 

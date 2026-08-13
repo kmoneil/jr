@@ -256,7 +256,11 @@ func requireIssueKey(inv *registry.Invocation) error {
 type CommentPage struct {
 	Comments []Comment
 	StartAt  int
-	Total    int
+	// Total is the server's count of the whole thread, and nil when it did not
+	// report one. A pointer rather than an int because absent and zero are
+	// different facts and only one of them means "there is nothing more": see
+	// exhausted in client.go for what reading them as the same one cost.
+	Total *int
 }
 
 // ListComments reads one page.
@@ -296,7 +300,7 @@ func (c *Client) ListComments(
 	var page struct {
 		StartAt    int          `json:"startAt"`
 		MaxResults int          `json:"maxResults"`
-		Total      int          `json:"total"`
+		Total      *int         `json:"total"`
 		Comments   []rawComment `json:"comments"`
 	}
 	if err := json.Unmarshal(resp.Body, &page); err != nil {
@@ -336,10 +340,10 @@ func runCommentList(
 	}
 
 	return streamOffsetPaged(inv, out, pageSize,
-		func(startAt, want int) ([]Comment, int, error) {
+		func(startAt, want int) ([]Comment, *int, error) {
 			page, err := client.ListComments(ctx, inv.Args[0], startAt, want)
 			if err != nil {
-				return nil, 0, err
+				return nil, nil, err
 			}
 			return page.Comments, page.Total, nil
 		},

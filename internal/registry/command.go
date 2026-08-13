@@ -221,6 +221,14 @@ type StreamResult struct {
 type Progress interface {
 	// Update reports rows so far, and the total if the server disclosed one.
 	// A total of zero means unknown.
+	//
+	// The total is the size of the set the server had, not the number of rows
+	// this run will write. Passing the count twice makes the ratio one from the
+	// first report onward, which says the set is exhausted at the moment
+	// `--limit` has just cut it short and exit 3 is about to say otherwise. So
+	// a command that clips with Bound reports the length it clipped *from*, and
+	// a command whose bound reached the server as maxResults passes zero,
+	// because it genuinely does not know.
 	Update(done, total int)
 	// Done clears the report.
 	Done()
