@@ -20,6 +20,71 @@ accident.
 
 Nothing yet.
 
+## [0.2.0] - 2026-08-13
+
+One breaking change, and it is a small one with a wide blast radius: an
+attribute that was always present may now be absent. **A consumer that reads
+`total` on a comment container has to handle it not being there.** Nothing else
+in the output moved.
+
+A minor rather than a major because this project is in `0.y.z`, where semver
+puts the public API outside its stability guarantee. Tagging 1.0.0 would be a
+claim about how stable this tool intends to be from then on, which is a decision
+to make on its own rather than as a side effect of one change. `docs/output-contract.md`
+now says so, because it did not.
+
+### Output contract
+
+- **`total` is optional on the `comments` container.** `issue.list` v6 → v7 and
+  `issue.get` v8 → v9. It is written only when the server reported a count, and
+  its absence means this tool does not know how long the thread is. **An absent
+  `total` always comes with `complete="false"`** and exit 3, exactly as a thread
+  known to be clipped does, so a consumer already branching on `complete` needs
+  no new branch. One reading it as an integer does: the attribute may not be
+  there, and a missing one is not `0`. In TSV the `comments-total` cell is empty
+  rather than zero.
+- No other kind moved. `jr contract` reports the same versions 0.1.1 did for
+  everything else.
+
+### Fixed
+
+- **An embedded thread reported a clipped result as complete.** `total` was
+  required on the container and built from an integer that decoded to zero when
+  the server sent no count, so `count >= total` held for every thread and one
+  holding two comments of an unknown number was published as `total="0"
+  complete="true"` at exit 0. Neither path that fills that container can page to
+  settle it: `issue get --with-comments` fetches one bounded page by design, and
+  `issue list --with-comments` receives the thread as a projection inside a
+  search response. A required attribute left no way to say "unknown", which is
+  why the fix is a shape change rather than a better default.
+- **0.1.1 said this was already fixed for three paths and had fixed one.** Its
+  entry named `issue get --with-comments`, the projections behind `issue list
+  --with-comments`, and the worklog top-up in `issue activity`. Only the first
+  was true: the other two decided completeness in a different function, on an
+  integer nobody had converted, and shipped unchanged. The claim is corrected
+  here rather than quietly superseded.
+- **`issue activity` built its feed from worklogs it never refetched.** The
+  command tops up any issue whose worklog projection was clipped, because both
+  deployments inline the oldest twenty and a feed about recent work wants the
+  newest. Deciding whether to top up read the same absent count as zero,
+  concluded the projection was whole, and made no request, so the feed silently
+  omitted recent entries and called itself complete. This half had no attribute
+  to get wrong, which is why it outlived the release that claimed it.
+
+### Documentation
+
+- The stability policy gained the rule this release needed and did not have:
+  **making a required element or attribute optional is major.** It reads like
+  "adding a new optional element or attribute", which is minor, and is its
+  opposite: an addition is something no existing consumer looks for, and this is
+  something an existing consumer already reads.
+- It also says what major means before 1.0.0, which nothing did. The document
+  opened with "breaking it requires a major bump" while the project sat at
+  0.1.1, so read literally it demanded 1.0.0 for any breaking change.
+- `docs/releasing.md` gained a "Which number to bump" section pointing at that
+  policy. It described the shape of a version and what to do about a wrong one,
+  and never said how to choose the next.
+
 ## [0.1.1] - 2026-08-13
 
 A code sweep of every package, and seven changes out of it. Six are places
@@ -126,6 +191,7 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.1.1...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.2.0...main
+[0.2.0]: https://github.com/kmoneil/jr/releases/tag/v0.2.0
 [0.1.1]: https://github.com/kmoneil/jr/releases/tag/v0.1.1
 [0.1.0]: https://github.com/kmoneil/jr/releases/tag/v0.1.0
