@@ -380,13 +380,14 @@ func runList(
 		return registry.StreamResult{}, err
 	}
 
+	found := len(projects)
 	projects, complete := registry.Bound(inv.Limit, projects)
 	for _, p := range projects {
 		if err := out.Write(p.Node()); err != nil {
 			return registry.StreamResult{}, err
 		}
 	}
-	inv.Progress.Update(out.Count(), out.Count())
+	inv.Progress.Update(out.Count(), found)
 	return registry.StreamResult{Complete: complete}, nil
 }
 

@@ -349,13 +349,14 @@ func runList(
 		return registry.StreamResult{}, err
 	}
 
+	found := len(boards)
 	boards, complete := registry.Bound(inv.Limit, boards)
 	for _, b := range boards {
 		if err := out.Write(b.Node()); err != nil {
 			return registry.StreamResult{}, err
 		}
 	}
-	inv.Progress.Update(out.Count(), out.Count())
+	inv.Progress.Update(out.Count(), found)
 	return registry.StreamResult{Complete: complete}, nil
 }
 

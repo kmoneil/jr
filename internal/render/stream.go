@@ -48,6 +48,17 @@ type Stream struct {
 
 	count  int
 	closed bool
+
+	// failed is the first refusal this stream produced.
+	//
+	// Once a row has been refused the collection is not a collection any more,
+	// and Close has to say so rather than emit what it has. It emitted an empty
+	// one: a TSV header, or an envelope reading count="0" complete="true", for
+	// a document that had just been rejected. Nothing shipped that, because
+	// internal/cli returns the run error before reaching Close, which is a rule
+	// held by every caller remembering it rather than by the stream. A latch is
+	// the stream holding it.
+	failed error
 }
 
 // Streams reports whether a format emits rows as they arrive.
@@ -103,10 +114,27 @@ func (s *Stream) Write(items ...*Node) error {
 	if s.closed {
 		return errs.Runtime("STREAM_CLOSED", "wrote to a closed stream")
 	}
+	if s.failed != nil {
+		return s.failed
+	}
 
+	// The element name every item in this batch has to match: the stream's own
+	// when it has one, and otherwise the first item of this batch.
+	//
+	// Seeding it from the batch is what makes a mixed batch refusable at all.
+	// The check used to read the stream's counters, which this loop advances
+	// afterwards, so every item of a single Write saw an empty stream and the
+	// comparison never ran. Two elements in one call went out as TSV and were
+	// refused as XML by validateCollectionItems, which is the same document
+	// accepted or rejected by --format.
+	want := s.itemName()
 	for _, item := range items {
-		if err := s.check(item); err != nil {
+		if err := s.check(item, want); err != nil {
+			s.failed = err
 			return err
+		}
+		if want == "" {
+			want = item.Name
 		}
 	}
 
@@ -132,7 +160,12 @@ func (s *Stream) Write(items ...*Node) error {
 // A streamed row is checked here rather than at Close, because by then it is
 // already written. This is the only place a collection's shape can still be
 // refused before a consumer has read it.
-func (s *Stream) check(item *Node) error {
+//
+// want is the element name established so far, or empty when this item is the
+// first the collection has seen. It is a parameter rather than something read
+// off the stream because the caller advances the stream's counters after this
+// loop, so reading them here made the first batch unanswerable.
+func (s *Stream) check(item *Node, want string) error {
 	if item == nil {
 		return errs.Runtime("INVALID_DOC", "stream kind %q was given a nil item", s.spec.Kind)
 	}
@@ -142,13 +175,10 @@ func (s *Stream) check(item *Node) error {
 	if err := conformTo(s.spec.Kind, item); err != nil {
 		return err
 	}
-	if s.count == 0 && len(s.items) == 0 {
-		return nil
-	}
-	if name := s.itemName(); name != "" && item.Name != name {
+	if want != "" && item.Name != want {
 		return errs.Runtime("INVALID_DOC",
 			"stream kind %q mixes item elements %q and %q",
-			s.spec.Kind, name, item.Name)
+			s.spec.Kind, want, item.Name)
 	}
 	return nil
 }
@@ -187,6 +217,13 @@ func (s *Stream) Close(complete bool, nextPageToken string) error {
 		return nil
 	}
 	s.closed = true
+
+	if s.failed != nil {
+		// A refused collection has no honest closing document. Reporting the
+		// refusal again is the answer; emitting an empty one that calls itself
+		// complete is the opposite of it.
+		return s.failed
+	}
 
 	if complete && nextPageToken != "" {
 		return errs.Runtime("INVALID_DOC",

@@ -645,11 +645,10 @@ func (c *Client) receive(r Request, target *url.URL, requestID string, attempt i
 ) (*Response, error) {
 	var payload []byte
 	if !streaming {
-		var err error
-		payload, err = io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
-		if err != nil {
-			return nil, errs.Remote("TRUNCATED_RESPONSE", "the response body could not be read").
-				WithRequestID(requestID).Wrap(err)
+		var rerr *errs.Error
+		payload, rerr = readBounded(resp.Body)
+		if rerr != nil {
+			return nil, rerr.WithRequestID(requestID)
 		}
 	}
 	elapsed := c.clock.Now().Sub(start)
@@ -684,6 +683,45 @@ func (c *Client) receive(r Request, target *url.URL, requestID string, attempt i
 		out.Stream = scope.handOver(resp.Body, resp.ContentLength)
 	}
 	return out, nil
+}
+
+// readBounded reads a buffered response body, refusing one past the cap rather
+// than returning the first maxResponseBytes of it.
+//
+// It reads one byte more than it will accept, which is the whole of the
+// technique: io.ReadAll over an io.LimitReader at the cap returns exactly the
+// cap and a nil error for a body of any size beyond it, so the caller is handed
+// a clipped body presented as a whole one. boundedBody makes this argument
+// against LimitReader for the streamed path a hundred lines above, and the
+// buffered path went on using it — a JSON consumer then failed to decode and
+// reported that Jira had returned something unreadable, when what happened is
+// that this client stopped reading.
+// It returns *errs.Error rather than error so the caller can stamp the request
+// id on whichever of the two refusals it produced.
+func readBounded(body io.Reader) ([]byte, *errs.Error) {
+	payload, err := io.ReadAll(io.LimitReader(body, maxResponseBytes+1))
+	if err != nil {
+		return nil, errs.Remote("TRUNCATED_RESPONSE",
+			"the response body could not be read").Wrap(err)
+	}
+	if len(payload) > maxResponseBytes {
+		return nil, errOversizedResponse()
+	}
+	return payload, nil
+}
+
+// errOversizedResponse is what a caller gets for a buffered body past the cap.
+//
+// Runtime rather than Remote, for the reason errUnboundedStream gives: Remote
+// is exit 9 and publishes itself retryable, and a response that was too large
+// once will be too large again. Advertising a retry that cannot work spends an
+// agent's budget on a certainty.
+func errOversizedResponse() *errs.Error {
+	return errs.Runtime("RESPONSE_TOO_LARGE",
+		"the response body is larger than the %d bytes this client will buffer",
+		int64(maxResponseBytes)).
+		WithRemedy("narrow the request: ask for fewer fields, a smaller " +
+			"--page-size, or a shorter time range")
 }
 
 // cancelOnClose ties a request's cancellation to the lifetime of its body, so
