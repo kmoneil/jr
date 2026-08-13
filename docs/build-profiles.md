@@ -230,9 +230,25 @@ Three limits apply to **all four** and are worth stating once:
   process with no terminal cannot hang or open a browser. It is not a smaller
   authority than `full` and must not be chosen as though it were.
 
-`make size` asserts the reader build stays under 12 MB. It guards against a
-terminal, display-server, or `os/exec` dependency creeping in. It is **not** a
-measure of what a profile excludes, and it should not be read as one.
+`make size` asserts the reader build stays under 12 MB. It is a backstop against
+something large arriving: a TUI toolkit, a display-server client, a browser
+launcher, anything dragging in `os/exec` and a shell. It is **not** a measure of
+what a profile excludes, and it should not be read as one.
+
+It is not a boundary either, and the distinction is not academic.
+`golang.org/x/term` is imported with no build tag by `internal/cli/env.go` and
+links into all four profiles, `ci` included. That is deliberate: `isTerminal` is
+what keeps the progress line off a pipe, so it has to work in every build and
+cannot sit behind the `prompt` tag beside `promptSecret`. The budget did not
+notice it arrive and could not have, because it is a few kilobytes against four
+megabytes of headroom.
+
+So the rule is about what a dependency *does*, not what it weighs. Reading
+whether a file descriptor is a terminal is permitted everywhere. Drawing on one
+is not, and what enforces that is the build tags and the import graph rather
+than a byte count. `internal/lint/notice_test.go` links every profile on three
+platforms and fails when a module reaches a binary without appearing in
+`NOTICE`, which is how `x/term` was found in the first place.
 
 Binary size is a poor proxy for compile-out. `full` and `agent` are near enough
 the same number of bytes despite differing by two commands, because the excluded
