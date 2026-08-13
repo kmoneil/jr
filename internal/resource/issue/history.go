@@ -213,7 +213,10 @@ type HistoryPage struct {
 	// Saves is how many entries this page held, which is what an offset
 	// advances by.
 	Saves int
-	Total int
+	// Total is nil when the changelog reported no count. See CommentPage.Total
+	// and exhausted in client.go: an absent count read as zero ends a paged
+	// listing after its first page and calls the result complete.
+	Total *int
 }
 
 // ListHistory reads an issue's changelog.
@@ -266,12 +269,12 @@ func (c *Client) ListHistory(
 	// difference is visible.
 	var body struct {
 		Values     []rawHistory `json:"values"`
-		Total      int          `json:"total"`
+		Total      *int         `json:"total"`
 		StartAt    int          `json:"startAt"`
 		MaxResults int          `json:"maxResults"`
 		Changelog  *struct {
 			Histories []rawHistory `json:"histories"`
-			Total     int          `json:"total"`
+			Total     *int         `json:"total"`
 			StartAt   int          `json:"startAt"`
 		} `json:"changelog"`
 	}
@@ -416,12 +419,14 @@ func streamPagedHistory(
 		if bounded {
 			return registry.StreamResult{Complete: false}, nil
 		}
-		inv.Progress.Update(out.Count(), page.Total)
+		inv.Progress.Update(out.Count(), reportedTotal(page.Total))
 
 		startAt += page.Saves
-		if startAt >= page.Total {
+		if exhausted(startAt, page.Total) {
 			return registry.StreamResult{Complete: true}, nil
 		}
+		// No total means keep going; the `page.Saves == 0` check above is what
+		// ends it then, one request later than a reported total would.
 	}
 }
 
@@ -449,12 +454,16 @@ func streamWholeHistory(
 	if err != nil {
 		return registry.StreamResult{}, err
 	}
-	inv.Progress.Update(out.Count(), page.Total)
+	inv.Progress.Update(out.Count(), reportedTotal(page.Total))
 
 	// Complete when the caller's limit did not stop it and the server sent
 	// every save it claimed to have.
+	//
+	// A changelog that claimed nothing is not a changelog that was whole. This
+	// path makes exactly one request by design, so there is no second one to
+	// resolve the doubt with, and an unknown length is reported as partial.
 	return registry.StreamResult{
-		Complete: !bounded && page.Saves >= page.Total,
+		Complete: !bounded && exhausted(page.Saves, page.Total),
 	}, nil
 }
 

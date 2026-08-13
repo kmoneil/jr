@@ -188,7 +188,9 @@ Reading takes no write tag, so this is in every build.`),
 // WorklogPage is one page plus what the server said about the rest.
 type WorklogPage struct {
 	Worklogs []Worklog
-	Total    int
+	// Total is nil when the server reported no count, which is not the same as
+	// a count of zero. See CommentPage.Total and exhausted in client.go.
+	Total *int
 }
 
 // ListWorklogs reads one page. Like comments, this endpoint pages by offset on
@@ -218,7 +220,7 @@ func (c *Client) ListWorklogs(
 
 	var page struct {
 		StartAt  int          `json:"startAt"`
-		Total    int          `json:"total"`
+		Total    *int         `json:"total"`
 		Worklogs []rawWorklog `json:"worklogs"`
 	}
 	if err := json.Unmarshal(resp.Body, &page); err != nil {
@@ -252,10 +254,10 @@ func runWorklogList(
 	}
 
 	return streamOffsetPaged(inv, out, pageSize,
-		func(startAt, want int) ([]Worklog, int, error) {
+		func(startAt, want int) ([]Worklog, *int, error) {
 			page, err := client.ListWorklogs(ctx, inv.Args[0], startAt, want)
 			if err != nil {
-				return nil, 0, err
+				return nil, nil, err
 			}
 			return page.Worklogs, page.Total, nil
 		},
