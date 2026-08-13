@@ -1,7 +1,7 @@
 {
   "error": {
     "code": "UNKNOWN_COMMAND",
-    "detail": "build profile full, tags=tui,prompt,render,browser,clipboard,mcp,write,admin",
+    "detail": "build profile full, tags=prompt,render,mcp,write,admin",
     "exit": 5,
     "exit-name": "NOT_FOUND",
     "message": "no command named \"nope\" in this build",

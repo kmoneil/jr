@@ -5,11 +5,8 @@ run:
   # Lint the tagged code too. A capability that only compiles under a build tag
   # is still shipped code.
   build-tags:
-    - tui
     - prompt
     - render
-    - browser
-    - clipboard
     - mcp
     - write
     - admin

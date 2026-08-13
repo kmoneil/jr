@@ -30,7 +30,7 @@ LDFLAGS := -s -w \
 
 # Shipped profiles. A feature excluded here contributes zero bytes: an agent
 # introspecting the binary sees the truth, not a list of commands that refuse.
-TAGS_FULL   := tui,prompt,render,browser,clipboard,mcp,write,admin
+TAGS_FULL   := prompt,render,mcp,write,admin
 TAGS_AGENT  := mcp,write
 TAGS_READER := mcp
 TAGS_CI     :=
@@ -94,7 +94,7 @@ build-mac:
 	@mkdir -p $(BIN)
 	GOOS=darwin GOARCH=amd64 go build -tags "$(TAGS_FULL)" -ldflags "$(LDFLAGS)" -o $(BIN)/$(BINARY)-mac $(PKG)
 
-## build-agent: no TTY assumptions, no interactivity, no browser, no clipboard
+## build-agent: no TTY assumptions, no interactivity, cannot block on input
 .PHONY: build-agent
 build-agent:
 	@mkdir -p $(BIN)

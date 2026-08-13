@@ -64,7 +64,6 @@ func short(importPath string) string {
 func TestOnlyTheEdgesImportResources(t *testing.T) {
 	allowed := []string{
 		"cmd/",
-		"internal/tui",
 		"internal/mcp",
 		"internal/workflow",
 		"internal/resource/",
@@ -80,7 +79,7 @@ func TestOnlyTheEdgesImportResources(t *testing.T) {
 		}
 		for _, imp := range p.Imports {
 			if strings.HasPrefix(short(imp), "internal/resource/") {
-				t.Errorf("%s imports %s; only cmd, tui, mcp, and workflow may import a resource",
+				t.Errorf("%s imports %s; only cmd, mcp, and workflow may import a resource",
 					self, short(imp))
 			}
 		}
@@ -149,7 +148,6 @@ func TestFoundationPackagesStayLeaves(t *testing.T) {
 	forbidden := []string{
 		"internal/cli",
 		"internal/resource",
-		"internal/tui",
 		"internal/mcp",
 		"internal/workflow",
 	}
@@ -258,11 +256,12 @@ func TestTransportOwnsHTTP(t *testing.T) {
 // no build of this tool spawns anything.
 //
 // It is true today by absence rather than by decision, and an absence nobody
-// asserts is a line somebody adds in a hurry — the obvious way to open a browse
+// asserts is a line somebody adds in a hurry. The obvious way to open a browse
 // URL, copy a key to the clipboard, or read a credential out of a system
-// keyring is to shell out, and all three are declared build tags waiting for an
-// implementation. A process this tool starts inherits its environment, which is
-// where `JIRA_API_TOKEN` lives.
+// keyring is to shell out; the first two were declared build tags that never
+// gated anything and were dropped on 2026-08-13, so this assertion is what is
+// left holding the ground they claimed. A process this tool starts inherits its
+// environment, which is where `JIRA_API_TOKEN` lives.
 //
 // The tests are exempt: internal/lint builds and runs the binaries it makes
 // claims about, which is the whole method here.

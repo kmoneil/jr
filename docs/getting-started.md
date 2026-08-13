@@ -42,7 +42,7 @@ guide says `jr`.
 $ jr version
 <result kind="version" v="1">
   <version app="jr" release="0.1.0" profile="full" ...>
-    <display>jr 0.1.0 (full; tags=tui,prompt,render,...)</display>
+    <display>jr 0.1.0 (full; tags=prompt,render,mcp,write,admin)</display>
 ```
 
 If that prints a document naming a release and a profile, you are ready. A

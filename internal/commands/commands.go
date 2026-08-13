@@ -9,8 +9,8 @@
 // import this package, and the assertions in internal/cli then run against
 // every registered command rather than only the built-ins.
 //
-// Importing a resource is otherwise forbidden outside cmd, tui, mcp, and
-// workflow. This package is the fifth exception, and internal/lint knows it.
+// Importing a resource is otherwise forbidden outside cmd, mcp, and workflow.
+// This package is the fourth exception, and internal/lint knows it.
 package commands
 
 import (

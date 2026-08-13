@@ -135,26 +135,33 @@ read. That work is carded and not built.
 
 ## Tags
 
-| Tag         | Intends to gate                                   | Gates today                 |
-| ----------- | ------------------------------------------------- | --------------------------- |
-| `write`     | All mutating commands                             | the 21 mutating verbs       |
-| `mcp`       | `jr mcp serve`                                    | `jr mcp serve`              |
-| `prompt`    | Interactive prompts, the setup wizard, completion | `jr completion`. Also the no-echo token prompt inside `auth login`, which is in every build and only asks here |
-| `admin`     | Project, board, and sprint administration         | `jr sprint close`           |
-| `tui`       | `jr ui`, interactive tables                       | **nothing**, no `jr ui` yet |
-| `render`    | Human-readable rendering for a terminal           | `--format markdown`         |
-| `browser`   | `jr open`, the OAuth browser flow                 | **nothing**, no OAuth yet   |
-| `clipboard` | Copying keys and URLs                             | **nothing**, nothing copies |
+| Tag      | Intends to gate                                   | Gates today                 |
+| -------- | ------------------------------------------------- | --------------------------- |
+| `write`  | All mutating commands                             | the 21 mutating verbs       |
+| `mcp`    | `jr mcp serve`                                    | `jr mcp serve`              |
+| `prompt` | Interactive prompts, the setup wizard, completion | `jr completion`. Also the no-echo token prompt inside `auth login`, which is in every build and only asks here |
+| `admin`  | Project, board, and sprint administration         | `jr sprint close`           |
+| `render` | Human-readable rendering for a terminal           | `--format markdown`         |
+
+There were eight. `tui`, `browser`, and `clipboard` were dropped on 2026-08-13,
+having gated nothing since they were declared: there was no `jr ui`, no OAuth
+browser flow, and nothing that copies. They were honest about it in this table
+and in `notYetGating`, and honesty in a footnote is not the same as accuracy in
+the thing a reader sees. `jr version` named eight capabilities and the binary
+had five, which is the failure this tool exists to refuse in the one place it
+describes itself. Each one is a two-line file and a table row on the day
+somebody builds the feature.
 
 The right-hand column is not documentation that can drift. Two tests hold it,
 because it makes two different claims.
 
 `internal/lint/tags_test.go` asserts that a tag gates _code at all_: one gating
 nothing must be listed in `notYetGating` with a reason, and one that starts
-gating something fails the test until it is taken off that list. A file that
-only records the tag is set, or a package that is nothing but a doc comment,
-does not count as gating, because that would report exactly the reassurance the audit
-exists to withhold.
+gating something fails the test until it is taken off that list. That list is
+empty now, so every declared tag gates real code and any new one has to arrive
+with either its feature or its excuse. A file that only records the tag is set,
+or a package that is nothing but a doc comment, does not count as gating,
+because that would report exactly the reassurance the audit exists to withhold.
 
 `internal/lint/profiles_test.go` asserts what each cell actually says, by
 building the full profile without each tag in turn and comparing what
@@ -187,7 +194,7 @@ per tag. A tag enabled without an entry there fails
 ## Shipped profiles
 
 ```
-make build         # full     tui,prompt,render,browser,clipboard,mcp,write,admin
+make build         # full     prompt,render,mcp,write,admin
 make build-agent   # agent    mcp,write
 make build-reader  # reader   mcp
 make build-ci      # ci       (none)
@@ -197,7 +204,7 @@ make build-all     # all four
 | Profile  | Guarantee                                                                              |
 | -------- | -------------------------------------------------------------------------------------- |
 | `full`   | Everything. Assumes a human at a terminal.                                             |
-| `agent`  | No TTY assumptions, no interactivity, no browser, no clipboard. Cannot block on input. |
+| `agent`  | No TTY assumptions, no interactivity, no human-readable rendering. Cannot block on input. |
 | `reader` | **Physically cannot mutate Jira.** The mutating commands are not in the binary.        |
 | `ci`     | Query only, smallest possible.                                                         |
 
@@ -227,13 +234,15 @@ Three limits apply to **all four** and are worth stating once:
   image you build, it is strong: the caller has no alternative binary. On a
   workstation where `jr` is also on the `PATH`, the caller picks.
 - **`agent` is a portability profile, not a permission one.** It exists so a
-  process with no terminal cannot hang or open a browser. It is not a smaller
+  process with no terminal cannot hang waiting for one. It is not a smaller
   authority than `full` and must not be chosen as though it were.
 
 `make size` asserts the reader build stays under 12 MB. It is a backstop against
 something large arriving: a TUI toolkit, a display-server client, a browser
-launcher, anything dragging in `os/exec` and a shell. It is **not** a measure of
-what a profile excludes, and it should not be read as one.
+launcher, anything dragging in `os/exec` and a shell. None of those has a tag
+waiting for it any more, which makes the budget the earlier of the two warnings
+rather than the second. It is **not** a measure of what a profile excludes, and
+it should not be read as one.
 
 It is not a boundary either, and the distinction is not academic.
 `golang.org/x/term` is imported with no build tag by `internal/cli/env.go` and
@@ -303,7 +312,7 @@ display	jr 1.2.0 (reader; tags=mcp)
 
 **A profile carries no code it cannot reach.** `make lint-untagged` runs
 `staticcheck -checks=U1000 ./...` with no build tags, which is the build a `ci`
-or `reader` user actually gets. `.golangci.yml` turns all eight tags on
+or `reader` user actually gets. `.golangci.yml` turns every tag on
 deliberately: code behind a tag is still shipped code, and the cost is that
 `unused` then analyses one build in which every file is present, so a symbol
 reachable only from a `//go:build write` file looks used. `echoMode` sat in an

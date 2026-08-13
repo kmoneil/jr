@@ -170,7 +170,7 @@ Generated from the registry of the binary that printed this, so it is the truth
 about that binary and not about the project. A reader build lists no mutating
 commands because it contains none.
 
-65 commands, profile `full`, tags `tui, prompt, render, browser, clipboard, mcp, write, admin`.
+65 commands, profile `full`, tags `prompt, render, mcp, write, admin`.
 
 | Command | | Does |
 | --- | --- | --- |

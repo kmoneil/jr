@@ -39,11 +39,8 @@ const App = "jr"
 // KnownTags lists every build tag this project defines, in the order they are
 // documented. A tag not in this list is not a capability.
 var KnownTags = []string{
-	"tui",
 	"prompt",
 	"render",
-	"browser",
-	"clipboard",
 	"mcp",
 	"write",
 	"admin",
@@ -51,14 +48,11 @@ var KnownTags = []string{
 
 // TagDescriptions explains each tag for `jr schema` and `jr version`.
 var TagDescriptions = map[string]string{
-	"tui":       "Interactive terminal UI (jr ui)",
-	"prompt":    "Interactive prompts and the setup wizard",
-	"render":    "Human-readable rendering: the markdown output format",
-	"browser":   "Opening URLs and the OAuth browser flow",
-	"clipboard": "Copying keys and URLs to the system clipboard",
-	"mcp":       "MCP server (jr mcp serve)",
-	"write":     "All mutating commands",
-	"admin":     "Project, board, and sprint administration",
+	"prompt": "Interactive prompts and the setup wizard",
+	"render": "Human-readable rendering: the markdown output format",
+	"mcp":    "MCP server (jr mcp serve)",
+	"write":  "All mutating commands",
+	"admin":  "Project, board, and sprint administration",
 }
 
 // enabled is populated by the tag-gated files in this package, one per tag.
@@ -108,7 +102,7 @@ func MissingTags(want []string) []string {
 // "custom" for any other combination.
 func Profile() string {
 	switch strings.Join(Tags(), ",") {
-	case "tui,prompt,render,browser,clipboard,mcp,write,admin":
+	case "prompt,render,mcp,write,admin":
 		return "full"
 	case "mcp,write":
 		return "agent"
