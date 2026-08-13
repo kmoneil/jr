@@ -160,6 +160,14 @@ cover:
 #   make fuzz FUZZTIME=5m
 FUZZTIME ?= 60s
 
+# What the sweep covers. Override to fuzz one package at a time:
+#   make fuzz FUZZPKGS=./internal/jql
+#
+# CI passes one package per job, so twenty targets are twenty parallel 20s
+# runs rather than one twenty-minute queue. The wall clock stops being the sum
+# and becomes the slowest package, and the CPU time spent is the same.
+FUZZPKGS ?= ./...
+
 # Fuzz sweep. Each target runs for FUZZTIME.
 #
 # -run=^$$ so the regular test suite does NOT run before each target: without
@@ -198,9 +206,9 @@ FUZZTIME ?= 60s
 ## fuzz: run every fuzz target for FUZZTIME each (default 60s)
 .PHONY: fuzz
 fuzz:
-	@echo "==> Fuzz sweep (FUZZTIME=$(FUZZTIME) per target, tags=$(TAGS_FULL))"
+	@echo "==> Fuzz sweep (FUZZTIME=$(FUZZTIME) per target, tags=$(TAGS_FULL), pkgs=$(FUZZPKGS))"
 	@failed=0; start=$$(date +%s); ran=0; flaked=0; \
-	for pkg in $$(go list -tags "$(TAGS_FULL)" ./...); do \
+	for pkg in $$(go list -tags "$(TAGS_FULL)" $(FUZZPKGS)); do \
 		for target in $$(go test -tags "$(TAGS_FULL)" $$pkg -list 'Fuzz.*' 2>/dev/null | grep '^Fuzz' || true); do \
 			ran=$$((ran + 1)); \
 			printf "    %-52s " "$${pkg#$(MODULE)/} $$target"; \
@@ -226,6 +234,19 @@ fuzz:
 	done; \
 	echo "==> $$ran target(s) in $$(($$(date +%s) - start))s, $$flaked flaked in the toolchain"; \
 	exit $$failed
+
+# The list CI builds its fuzz matrix from, discovered the same way the sweep
+# discovers targets and under the same tags, because a package listed by hand
+# is a package that stops being listed the day somebody adds another one. It
+# prints nothing for a package with no targets, so the matrix has no empty jobs.
+## fuzz-packages: list the packages holding fuzz targets, one per line
+.PHONY: fuzz-packages
+fuzz-packages:
+	@for pkg in $$(go list -tags "$(TAGS_FULL)" ./...); do \
+		if go test -tags "$(TAGS_FULL)" $$pkg -list 'Fuzz.*' 2>/dev/null | grep -q '^Fuzz'; then \
+			echo "$${pkg#$(MODULE)/}"; \
+		fi; \
+	done
 
 ## fuzz-jql-values: hammer the JQL value round-trip fuzzer
 .PHONY: fuzz-jql-values

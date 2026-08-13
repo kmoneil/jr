@@ -23,11 +23,22 @@ steps below are in this order.
 4. **The section is dated the day you tag.** The heading carries a date and the
    workflow does not check it, so a changelog prepared on one day and tagged the
    next publishes notes dated wrong.
-5. **The README's status banner still says something true.** It reads
-   "pre-release, and deliberately untagged" and names `0.0.0-untagged+<sha>` as
-   what every build reports. That is the one sentence in the documentation that
-   a tag falsifies, and it is a paragraph a first-time reader reaches before
-   anything else.
+5. **The README says nothing a tag has just made false.** There are three
+   places, and on the first release all three change:
+
+   | Where | What it says today |
+   | --- | --- |
+   | The badge row | `status-pre--release` |
+   | The status banner | "pre-release, and deliberately untagged", and every build reports `0.0.0-untagged+<sha>` |
+   | **Install** | "No release binary yet, and that is deliberate" |
+
+   Install is the one with a reader waiting on it: from the first tag there are
+   sixteen archives, `checksums.txt`, and an attestation, and somebody who
+   arrives wanting the tool should not be told to install Go first. Build from
+   source stays, below the download.
+
+   Nothing asserts these three, because a sentence about a release cannot be
+   checked against a repository that has not made one. They are here instead.
 
 ## Cutting it
 

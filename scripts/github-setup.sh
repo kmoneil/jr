@@ -46,11 +46,22 @@ gh repo view "$REPO" >/dev/null 2>&1 || {
 # .github/workflows/ci.yml, and a name that does not match a job silently
 # protects nothing — GitHub waits for a check that will never report. Keep this
 # list and that file in step.
+# The contexts a pull request has to report before it can merge. Every name
+# here is a job name in .github/workflows/ci.yml, and
+# internal/lint/requiredchecks_test.go holds the two lists together: a required
+# check no job reports sits pending forever and makes every pull request
+# unmergeable, including the one that would fix it.
+#
+# The fuzz sweep is deliberately absent. It runs after a merge and in the
+# nightly, not on a pull request, so requiring it here would require a context
+# that only ever reports "skipped". Every check below is deterministic: the
+# same commit gets the same verdict, which is the property that makes a red one
+# worth reading. The regression half of fuzzing is inside the test legs, where
+# `go test` runs the seed corpus and every committed crasher.
 CHECKS=(
 	"format, vet, lint"
 	"vulnerability scan"
 	"output contract is unchanged"
-	"fuzz"
 	"build profiles and size budget"
 	"test (tags=none)"
 	"test (tags=mcp)"

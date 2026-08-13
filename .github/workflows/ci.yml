@@ -16,8 +16,8 @@ jobs:
     name: format, vet, lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: gofumpt
@@ -27,7 +27,9 @@ jobs:
       - name: vet
         run: make vet
       # v8 is the first action release that runs golangci-lint v2, which
-      # `.golangci.yml` declares with `version: "2"`.
+      # `.golangci.yml` declares with `version: "2"`, and v9 is the first that
+      # runs on Node 24. v8 is a node20 action, so it kept the deprecation
+      # warning this bump exists to clear.
       #
       # The version is pinned rather than `latest`, and it is the version this
       # repository lints with locally, because golangci-lint refuses a module
@@ -36,7 +38,7 @@ jobs:
       # with "the Go language version (go1.24) used to build golangci-lint is
       # lower than the targeted Go version". A linter that floats is also a
       # linter that can fail a pull request that changed nothing.
-      - uses: golangci/golangci-lint-action@v8
+      - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12.2
       # A second pass with no build tags, because the config turns all eight on
@@ -53,8 +55,8 @@ jobs:
     name: vulnerability scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           # go.mod pins a patch version, so a runner on an older 1.26 fetches
           # the toolchain it asks for. That is the point: the scan reports the
@@ -80,8 +82,8 @@ jobs:
           - "mcp,write"
           - "tui,prompt,render,browser,clipboard,mcp,write,admin"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
       # internal/lint runs gocognit as a subprocess and fails rather than skips
@@ -103,8 +105,8 @@ jobs:
     name: output contract is unchanged
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
       # The golden files are the public output contract. A diff here is a diff
@@ -122,12 +124,61 @@ jobs:
             exit 1
           fi
 
-  fuzz:
-    name: fuzz
+  # The fuzz sweep does not run on a pull request. It runs here after a merge,
+  # and properly in fuzz-nightly.yml.
+  #
+  # The regression half is already on the pull request, inside every `test` leg
+  # above: `go test` compiles the fuzz files under all four tag sets and
+  # executes the seed corpus plus every crasher ever committed under
+  # testdata/fuzz, deterministically, with no fuzzing budget at all. That is
+  # what stops a fixed bug from returning, and it is the half worth blocking a
+  # merge on.
+  #
+  # What is left is discovery, and discovery scales with cumulative CPU time
+  # against a corpus that persists rather than with the length of any one run.
+  # A 20-second run against a corpus last night already explored re-derives
+  # what it derived then, so on a pull request it was paying for almost no new
+  # coverage. It was measured before it was removed: ten legs each spent about
+  # 30 seconds on checkout, setup-go, and compiling to do 20 seconds of
+  # fuzzing, and because 19 jobs were queueing for a runner pool that does not
+  # hold 19, the last leg did not start until 136 seconds into the run.
+  #
+  # What stays on the pull request is the deterministic part. What moves here
+  # is the part whose verdict is a matter of luck and timing, which is also the
+  # part that should never have been able to fail somebody's unrelated merge.
+  fuzz-packages:
+    name: list the packages with fuzz targets
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.list.outputs.packages }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      # Discovered rather than listed, and by the Makefile rather than here,
+      # because the tag set a target hides behind is the Makefile's business:
+      # `make fuzz` once swept past internal/workflow entirely, since an
+      # untagged `go test -list` reported no targets there.
+      - name: list
+        id: list
+        run: |
+          packages=$(make -s fuzz-packages | jq -R . | jq -sc .)
+          echo "packages=$packages" >> "$GITHUB_OUTPUT"
+          echo "$packages"
+
+  fuzz-run:
+    name: fuzz (${{ matrix.package }})
+    needs: fuzz-packages
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.fuzz-packages.outputs.packages) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
       # Go keeps the generated corpus in $GOCACHE/fuzz. Without this, every CI
@@ -139,33 +190,55 @@ jobs:
         id: gocache
         run: echo "dir=$(go env GOCACHE)/fuzz" >> "$GITHUB_OUTPUT"
       - name: restore the fuzz corpus
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ steps.gocache.outputs.dir }}
-          # The key rotates every run so a run that finds new inputs saves
-          # them; restore-keys falls back to the most recent previous corpus.
-          key: fuzz-corpus-${{ github.run_id }}
-          restore-keys: fuzz-corpus-
-
-      # The seed corpus runs as part of `go test`. This is the search on top of
-      # it: quoting, escaping, and date parsing are where a silent
-      # mis-interpretation would do real damage, so they get exercised with
-      # inputs nobody thought to write down.
+          # Keyed per package, because each job only ever fuzzes one and a
+          # shared key would have ten jobs racing to overwrite one entry. The
+          # key rotates every run so a run that finds new inputs saves them;
+          # restore-keys falls back to the most recent previous corpus, which
+          # on a pull request is whatever the nightly left on main.
+          key: fuzz-corpus-${{ matrix.package }}-${{ github.run_id }}
+          restore-keys: fuzz-corpus-${{ matrix.package }}-
       - name: fuzz
-        run: make fuzz FUZZTIME=60s
+        run: make fuzz FUZZPKGS=./${{ matrix.package }} FUZZTIME=20s
       - name: upload any crashers
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: fuzz-corpus
-          path: internal/**/testdata/fuzz/
+          name: fuzz-corpus-${{ strategy.job-index }}
+          path: ${{ matrix.package }}/testdata/fuzz/
+
+  # Ten leg results and one verdict, so a red sweep on main is one line in the
+  # run list rather than a matrix somebody has to expand.
+  #
+  # It is not a required check. Nothing here is, now that the sweep does not run
+  # on a pull request, and a required context that only ever reports "skipped"
+  # is the gate-that-cannot-fail this repository keeps finding in other clothes.
+  # internal/lint/requiredchecks_test.go holds the ruleset's list to these job
+  # names either way.
+  fuzz:
+    name: fuzz
+    needs: [fuzz-packages, fuzz-run]
+    if: always() && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: every package fuzzed and none failed
+        run: |
+          echo "discovery: ${{ needs.fuzz-packages.result }}"
+          echo "sweep:     ${{ needs.fuzz-run.result }}"
+          # A skipped sweep is a failure and not a pass. It means discovery
+          # produced no packages, and a green tick for having fuzzed nothing is
+          # the exact shape of gate this repository keeps finding.
+          [ "${{ needs.fuzz-packages.result }}" = "success" ] || exit 1
+          [ "${{ needs.fuzz-run.result }}" = "success" ] || exit 1
 
   profiles:
     name: build profiles and size budget
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: build every profile
