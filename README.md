@@ -11,7 +11,7 @@ It would rather fail than hand you something that merely looks right.
 
 ![Go 1.26](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache--2.0-f5a623)](LICENSE)
-![Status: pre-release](https://img.shields.io/badge/status-pre--release-f5a623)
+[![Release](https://img.shields.io/github/v/release/kmoneil/jr?label=release&color=f5a623)](https://github.com/kmoneil/jr/releases/latest)
 ![MCP: built in](https://img.shields.io/badge/MCP-server%20built%20in-f5a623)
 ![Network in tests: none](https://img.shields.io/badge/tests-never%20touch%20the%20network-4c1)
 
@@ -45,11 +45,12 @@ to stderr carrying a token to resume from. stdout stayed exactly as parseable
 as it was. No script downstream will ever mistake that page for the whole result
 set, and the same is true of every command, in every format, on every path.
 
-> **Status: pre-release, and deliberately untagged.** The command surface is
-> complete and tested: 65 commands in the full build, 43 in the reader. Every
-> build reports itself as `0.0.0-untagged+<sha>` until there is a release worth
-> pinning. See [Not yet implemented](#not-yet-implemented) for what is knowingly
-> absent.
+> **Status: released, and pinnable.** The command surface is complete and
+> tested: 65 commands in the full build, 43 in the reader. Every output kind
+> also carries its own schema version, and those move independently of the
+> release, so a consumer pins `kind` and `v` from the document it parses rather
+> than the version it installed. See
+> [Not yet implemented](#not-yet-implemented) for what is knowingly absent.
 
 **Jump to:** [Quickstart](#quickstart) · [Why this exists](#why-this-exists) ·
 [Commands](#what-works-today) · [A short tour](#a-short-tour) · [MCP](#mcp) ·
@@ -148,7 +149,26 @@ product, which is the same idea from the other end.
 
 ## Install
 
-No release binary yet, and that is deliberate. Build from source with Go 1.26:
+Every release carries four profiles for linux and darwin, on amd64 and arm64.
+`jr-full` is everything; the others are in [build profiles](#build-profiles),
+and the one you want for an agent is probably `jr-reader`, which cannot change
+anything in Jira because it does not contain the code that could.
+
+```console
+$ gh release download --repo kmoneil/jr --pattern 'jr-full_*_darwin_arm64.tar.gz'
+$ tar xzf jr-full_*_darwin_arm64.tar.gz
+$ install jr-full_*/jr ~/.local/bin/jr
+```
+
+Each release also has a `checksums.txt` over every archive, and a build
+provenance attestation, so an archive can be traced to the workflow run and the
+commit that produced it:
+
+```console
+$ gh attestation verify jr-full_*_darwin_arm64.tar.gz --repo kmoneil/jr
+```
+
+Or build from source, which needs Go 1.26:
 
 ```
 git clone https://github.com/kmoneil/jr && cd jr
