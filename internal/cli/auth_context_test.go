@@ -216,6 +216,23 @@ func TestAuthLifecycle(t *testing.T) {
 		t.Errorf("auth token did not produce a header value:\n%s", token.stdout)
 	}
 
+	// The recipe in this command's own help, run. It used to be
+	// `curl -H "Authorization: $(jr auth token)"`, which hands curl an XML
+	// document: the value is one field of a record, and a record renders like
+	// every other record. A worked example is a claim about what happens when
+	// somebody types it, and nothing had.
+	tsv := mustRun(t, env, "auth", "token", "--format", "tsv")
+	var header string
+	for line := range strings.SplitSeq(tsv.stdout, "\n") {
+		if field, value, ok := strings.Cut(line, "\t"); ok && field == "authorization" {
+			header = value
+		}
+	}
+	if !strings.HasPrefix(header, "Basic ") {
+		t.Errorf("the pipeline in `auth token --help` yielded %q from:\n%s",
+			header, tsv.stdout)
+	}
+
 	blocked := run(t, env, "auth", "logout", "--site", "acme.atlassian.invalid")
 	if blocked.exit != exitcode.Blocked {
 		t.Errorf("logout without --yes exited %v", blocked.exit)
