@@ -22,9 +22,9 @@ import (
 // commit that changes the corresponding golden file.
 const (
 	KindList    = "issue.list"
-	VersionList = 6
+	VersionList = 7
 	KindGet     = "issue.get"
-	VersionGet  = 8
+	VersionGet  = 9
 )
 
 // Body formats a description can arrive in.
@@ -117,16 +117,22 @@ type Issue struct {
 	// and returns the *newest* 20, so a 25-comment issue arrives as comments 6
 	// to 25 with ThreadStartAt 5. A count and a completeness flag together
 	// cannot say which end you are holding — measured 2026-08-12 against both.
-	ThreadTotal   int
+	//
+	// ThreadTotal is nil when the projection carried no count, which is not the
+	// same as a thread of length zero: nil means this tool does not know how
+	// long the thread is, and there is no second request to ask with. See
+	// exhausted in client.go.
+	ThreadTotal   *int
 	ThreadStartAt int
 
 	// Work is the worklog projection and Changes the changelog, populated the
 	// same way and on the same terms as Thread. Both deployments cap the
 	// worklog projection at 20 and return the *oldest* 20, so WorkTotal is the
-	// number that decides whether the recent work is even in here.
+	// number that decides whether the recent work is even in here. It is nil on
+	// the same terms as ThreadTotal, and for the same reason.
 	Work      []Worklog
 	HasWork   bool
-	WorkTotal int
+	WorkTotal *int
 	// Changes is the whole changelog on both deployments, which is why it
 	// carries no total: nothing observed clips it. It arrives in opposite
 	// orders on the two deployments and is sorted by whoever consumes it.
@@ -499,7 +505,7 @@ func attachWork(issue *Issue, data json.RawMessage, mode BodyMode) error {
 		Fields struct {
 			Worklog *struct {
 				Worklogs []rawWorklog `json:"worklogs"`
-				Total    int          `json:"total"`
+				Total    *int         `json:"total"`
 			} `json:"worklog"`
 		} `json:"fields"`
 	}
@@ -561,7 +567,11 @@ func attachChanges(issue *Issue, data json.RawMessage) error {
 }
 
 // WorkComplete reports whether every worklog arrived.
-func (i Issue) WorkComplete() bool { return len(i.Work) >= i.WorkTotal }
+//
+// A projection that carried no total has not said the worklog is whole, so it
+// is not complete. There is no request to make that would settle it here: the
+// projection came inside a search response.
+func (i Issue) WorkComplete() bool { return exhausted(len(i.Work), i.WorkTotal) }
 
 // attachThread reads the comment projection a search returns when `comment` is
 // among the requested fields.
@@ -579,7 +589,7 @@ func attachThread(issue *Issue, data json.RawMessage, mode BodyMode) error {
 		Fields struct {
 			Comment *struct {
 				Comments   []rawComment `json:"comments"`
-				Total      int          `json:"total"`
+				Total      *int         `json:"total"`
 				StartAt    int          `json:"startAt"`
 				MaxResults int          `json:"maxResults"`
 			} `json:"comment"`
@@ -616,8 +626,14 @@ func attachThread(issue *Issue, data json.RawMessage, mode BodyMode) error {
 // one, and deciding from a full page would report every such issue as partial
 // forever. That was settled once for `issue get --with-comments`; the search
 // projection reaches the same question by a different route.
+//
+// An absent total is therefore not complete rather than trivially complete. It
+// used to be an int, so a projection with no `total` decoded to zero and every
+// thread satisfied `>= 0`: a clipped Cloud thread published complete="true" and
+// exit 0, on a row whose whole purpose is to say when it holds part of
+// something.
 func (i Issue) ThreadComplete() bool {
-	return len(i.Thread) >= i.ThreadTotal
+	return exhausted(len(i.Thread), i.ThreadTotal)
 }
 
 // extraFields pulls the requested non-default fields out of the raw payload.
@@ -788,13 +804,20 @@ func (i Issue) Node() *render.Node {
 // twenty. The offset is written only when it is non-zero, because on Data
 // Center, and on `issue get`, it always is zero and an attribute that is always
 // the same value is noise on every row.
+//
+// `total` is written only when the server reported one. An absent attribute is
+// this tool saying it does not know how long the thread is, which is a thing it
+// has to be able to say: writing zero beside five comments, or beside
+// complete="false", is a worse answer than not answering.
 func (i Issue) threadNode() *render.Node {
 	items := make([]*render.Node, 0, len(i.Thread))
 	for _, c := range i.Thread {
 		items = append(items, c.Node())
 	}
 	n := render.ListEl("comments", "comment", items...)
-	n.Attr("total", strconv.Itoa(i.ThreadTotal))
+	if i.ThreadTotal != nil {
+		n.Attr("total", strconv.Itoa(*i.ThreadTotal))
+	}
 	n.Attr(render.CompleteAttr, strconv.FormatBool(i.ThreadComplete()))
 	if i.ThreadStartAt > 0 {
 		n.Attr("start-at", strconv.Itoa(i.ThreadStartAt))

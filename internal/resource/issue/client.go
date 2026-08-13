@@ -235,13 +235,14 @@ func exhausted(have int, total *int) bool {
 
 // reportedTotal is the count the server gave, or zero when it gave none.
 //
-// It exists for the two places that need an int and can live with zero meaning
-// unknown: the progress line, where zero makes Update render a bare count
-// rather than a ratio against nothing, and the `total` attribute on an
-// embedded thread, where it is wrong and is carded. It must not be used to
-// decide whether a result is complete. That is what exhausted is for, and
-// reading an absent total as zero is exactly the bug exhausted exists to
-// prevent.
+// It exists for the progress line and nothing else, where zero makes Update
+// render a bare count rather than a ratio against nothing, and where the worst
+// a wrong number can do is misdraw a line on a terminal. It must never reach
+// stdout: an embedded thread used to take its `total` from here, which wrote
+// zero beside real comments, and that attribute is optional now so it can say
+// nothing instead. It must not be used to decide whether a result is complete
+// either. That is what exhausted is for, and reading an absent total as zero is
+// exactly the bug exhausted exists to prevent.
 func reportedTotal(total *int) int {
 	if total == nil {
 		return 0

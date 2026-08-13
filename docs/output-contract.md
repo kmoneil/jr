@@ -103,7 +103,8 @@ Three attributes, and each answers a question the others cannot:
 - `count` is how many comments arrived.
 - `total` is how many the server says the thread has. A caller deciding whether
   to spend a request on `issue comment list` needs the size of what it would
-  fetch, and `complete` only ever says whether the two agree.
+  fetch, and `complete` only ever says whether the two agree. It is **written
+  only when the server reported a count**; see below.
 - `start-at` is where in the thread the first returned comment sits. It is
   **written only when it is not zero**, and it is not decoration: Data Center
   inlines the whole thread from the oldest comment, and Cloud caps the
@@ -133,6 +134,31 @@ a row.
 issues, so the clipped container is not in the document at all — the comments it
 could not read were never rendered — and the warning names `event` to say the
 feed is missing some of what it merged.
+
+### An absent `total` means the thread's length is unknown
+
+`total` is optional, and its absence is an answer rather than a gap. A server
+that sent no count has not said how long the thread is, and neither path that
+fills this container can ask again: `issue get --with-comments` fetches one
+bounded page by design, and `issue list --with-comments` gets the thread as a
+projection inside a search response, where there is no second request to make.
+
+```xml
+<comments count="5" complete="false">
+```
+
+**An absent `total` always comes with `complete="false"`**, so the run exits 3
+and the record or the row is incomplete, exactly as a thread known to be clipped
+is. It is a reason to spend a request on `issue comment list` rather than a
+reason to skip one: five comments with no count may be all of them, or may be
+five of four hundred, and this tool cannot tell which.
+
+That is the change that took `issue.list` to v7 and `issue.get` to v9. Both
+previously wrote `total="0"` when the server sent no count, and `0` is a number
+a consumer can branch on: `count >= total` held for any thread, so a clipped one
+was published `complete="true"` at exit 0. A required attribute left the tool no
+way to say it did not know, so removing the requirement was the fix rather than
+choosing a better default.
 
 ### `markdown` is presentation, and carries no promise
 
@@ -266,7 +292,7 @@ Every successful XML response:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<result kind="issue.list" v="6">
+<result kind="issue.list" v="7">
   <issues count="3" complete="true">
     <issue key="ENG-101">
       <summary>Retry logic drops the last error</summary>
@@ -292,7 +318,7 @@ the XML tree:
 ```json
 {
   "kind": "issue.list",
-  "v": 6,
+  "v": 7,
   "count": 3,
   "complete": true,
   "issues": [ … ]
@@ -508,7 +534,7 @@ container's `count` is derived from its children and cannot disagree with them.
 
 ### The reporter is reported
 
-`issue.list` v6 and `issue.get` v8 carry a `reporter` element, on the same terms
+`issue.list` v7 and `issue.get` v9 carry a `reporter` element, on the same terms
 as `assignee`: always present, and empty when the server discloses nobody.
 
 It was asked for on every request from the first version of this tool — it is in
@@ -864,7 +890,7 @@ refuses the write if the issue has changed since the caller read it. Without it
 two callers editing one issue both exit 0 and the earlier write is lost, with
 nothing truncated, nothing in error, and nothing to say it happened.
 
-`issue.get` v8 carries a `precondition` attribute, which is what the flag takes.
+`issue.get` v9 carries a `precondition` attribute, which is what the flag takes.
 It is opaque: what it holds is the millisecond timestamp Jira served, and the
 `updated` element is RFC 3339 to the second, so conditioning on the published
 value would leave a whole second in which another edit is invisible. It also

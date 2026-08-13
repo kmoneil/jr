@@ -25,12 +25,12 @@ issue.comment.list	2	issue.comment.list
 issue.create	1	issue.create
 issue.delete	1	issue.delete
 issue.edit	2	issue.edit
-issue.get	8	issue.get
+issue.get	9	issue.get
 issue.history	1	issue.history
 issue.link.add	1	issue.link.add
 issue.link.list	1	issue.link.list
 issue.link.remove	1	issue.link.remove
-issue.list	6	issue.list
+issue.list	7	issue.list
 issue.move	3	issue.move
 issue.watch	1	issue.watch
 issue.worklog.add	2	issue.worklog.add

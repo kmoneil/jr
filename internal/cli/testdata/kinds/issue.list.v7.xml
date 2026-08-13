@@ -1,0 +1,145 @@
+      <element name="issue">
+        <attributes count="7">
+          <attribute name="key" type="string" optional="false"/>
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="type" type="string" optional="true"/>
+          <attribute name="priority" type="string" optional="true"/>
+          <attribute name="project" type="string" optional="true"/>
+          <attribute name="resolution" type="string" optional="true"/>
+          <attribute name="parent" type="string" optional="true"/>
+        </attributes>
+        <elements count="13">
+          <element name="summary" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="status" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="category" type="string" optional="false" enum="to-do,in-progress,done,unknown"/>
+            </attributes>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="assignee" optional="false" repeated="false">
+            <attributes count="2">
+              <attribute name="id" type="string" optional="false"/>
+              <attribute name="display" type="string" optional="false"/>
+            </attributes>
+            <elements count="0"/>
+          </element>
+          <element name="reporter" optional="false" repeated="false">
+            <attributes count="2">
+              <attribute name="id" type="string" optional="false"/>
+              <attribute name="display" type="string" optional="false"/>
+            </attributes>
+            <elements count="0"/>
+          </element>
+          <element name="created" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="updated" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="url" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="age" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="description" optional="true" repeated="false">
+            <attributes count="1">
+              <attribute name="format" type="string" optional="false" enum="wiki,adf,markdown"/>
+            </attributes>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="labels" list-of="label" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="label" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="components" list-of="component" optional="true" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="component" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="fix-versions" list-of="fix-version" optional="true" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="fix-version" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="comments" list-of="comment" optional="true" repeated="false">
+            <attributes count="4">
+              <attribute name="count" type="int" optional="false"/>
+              <attribute name="total" type="int" optional="true"/>
+              <attribute name="complete" type="bool" optional="false"/>
+              <attribute name="start-at" type="int" optional="true"/>
+            </attributes>
+            <elements count="1">
+              <element name="comment" optional="true" repeated="true">
+                <attributes count="2">
+                  <attribute name="id" type="string" optional="false"/>
+                  <attribute name="visibility" type="string" optional="true"/>
+                </attributes>
+                <elements count="4">
+                  <element name="author" optional="false" repeated="false">
+                    <attributes count="2">
+                      <attribute name="id" type="string" optional="true"/>
+                      <attribute name="display" type="string" optional="false"/>
+                    </attributes>
+                    <elements count="0"/>
+                  </element>
+                  <element name="created" optional="false" repeated="false">
+                    <attributes count="0"/>
+                    <text name="text" type="timestamp" optional="false"/>
+                    <elements count="0"/>
+                  </element>
+                  <element name="updated" optional="false" repeated="false">
+                    <attributes count="0"/>
+                    <text name="text" type="timestamp" optional="false"/>
+                    <elements count="0"/>
+                  </element>
+                  <element name="body" optional="true" repeated="false">
+                    <attributes count="1">
+                      <attribute name="format" type="string" optional="false" enum="wiki,adf,markdown"/>
+                    </attributes>
+                    <text name="text" type="string" optional="false"/>
+                    <elements count="0"/>
+                  </element>
+                </elements>
+              </element>
+            </elements>
+          </element>
+        </elements>
+        <extra type="string">the id of a field requested with --field, e.g. customfield_10042</extra>
+      </element>
