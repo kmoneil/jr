@@ -514,7 +514,11 @@ func topUpWorklogs(ctx context.Context, client *Client, i *Issue) (bool, error) 
 		return false, err
 	}
 	i.Work = topped.Worklogs
-	return len(i.Work) < topped.Total, nil
+	// Still short unless the server said how many there are and this has them
+	// all. A server that reported no count has not said the feed is whole, and
+	// a feed that quietly drops entries is the one thing this command must not
+	// produce.
+	return !exhausted(len(i.Work), topped.Total), nil
 }
 
 // activityWant is what the caller asked to see.

@@ -236,9 +236,20 @@ func (r *Recorder) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, int64(r.limit)))
+	// One byte past the limit, and refused if it arrives. A LimitReader at the
+	// limit returns exactly the limit with no error, so a body beyond it would
+	// be written into the cassette silently short and replayed that way by
+	// every test that ever loads it. A fixture that quietly lost its tail is
+	// not evidence, and the recorder is the last place that can still say so.
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, int64(r.limit)+1))
 	if err != nil {
 		return nil, err
+	}
+	if len(respBody) > r.limit {
+		return nil, errs.Runtime("RECORDING_TOO_LARGE",
+			"%s %s answered with more than the %d bytes a cassette will hold",
+			req.Method, req.URL.Path, r.limit).
+			WithRemedy("record a narrower request: fewer fields, a smaller page")
 	}
 	_ = resp.Body.Close()
 	resp.Body = io.NopCloser(bytes.NewReader(respBody))
