@@ -207,6 +207,12 @@ $ jr issue list --project ENG --with-comments --format tsv \
 ENG-3
 ```
 
+**`comments-total` is empty when the server sent no count at all.** That is not
+a thread of length zero, it is this tool saying it does not know how long the
+thread is, and the run exits 3 for it exactly as a thread known to be clipped
+does. The `awk` above already does the right thing with it: an empty cell is not
+equal to the count, so the row is one to read the hard way, which it is.
+
 Comment authorship is still not searchable — this fetches threads and looks
 rather than asking Jira a question it cannot answer. What it saves is the
 request per issue, not the reading.

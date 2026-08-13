@@ -55,6 +55,21 @@ $ git push origin v0.1.0
 The tag goes on `main` after the changelog has landed, not before — the workflow
 reads `CHANGELOG.md` **from the tagged commit**.
 
+## Which number to bump
+
+[The stability policy](output-contract.md#stability-policy) decides it, and the
+kinds decide the policy: what the release version does follows from whether a
+kind's shape moved and how, not from how much code changed.
+
+The one thing to know before reading it is that **this project is in `0.y.z`, so
+a change the policy calls major moves the minor position.** 0.1.1 to 0.2.0, not
+1.0.0. Tagging 1.0.0 says this tool's shape is stable from then on, and that is
+a decision to make on its own and not as a side effect of one breaking change.
+
+A commit carrying `!` and a `BREAKING CHANGE:` footer is how you find those
+changes in `git log` since the last tag. It does not by itself say which
+position moves.
+
 ## What the version looks like
 
 `scripts/version.sh` produces it, always semver, in four cases:

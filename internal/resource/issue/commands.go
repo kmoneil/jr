@@ -162,7 +162,15 @@ func commentsSchema() *render.Schema {
 		// whether they agree and never says by how much, and a caller deciding
 		// whether to spend a second request on `issue comment list` needs the
 		// size of what it would fetch.
-		render.Field{Name: "total", Type: render.TypeInt},
+		//
+		// Optional because a server that sent no count has not told this tool
+		// how long the thread is, and neither path that fills this container can
+		// ask again: the record fetches one bounded page by design, and the row
+		// gets its thread as a projection inside a search response. An absent
+		// `total` means unknown, it always comes with complete="false", and it
+		// is the reason to spend that second request rather than a reason not
+		// to. Writing zero there instead was published for two releases.
+		render.Field{Name: "total", Type: render.TypeInt, Optional: true},
 		render.Field{Name: render.CompleteAttr, Type: render.TypeBool},
 		// Where in the thread the first returned comment sits. Present only
 		// when it is not zero, which in practice means a Cloud search
@@ -1413,13 +1421,14 @@ func attachComments(ctx context.Context, c *Client, doc *render.Doc, key string)
 		items = append(items, comment.Node())
 	}
 	container := render.ListEl("comments", "comment", items...)
-	// A total the server did not report is written as zero, which is wrong and
-	// is the half of this that cannot be fixed here: `total` is a required
-	// attribute of the container, so saying "unknown" needs it to become
-	// optional, which is a schema change and a version bump on two kinds. See
-	// _plans/backlog/an-embedded-thread-cannot-say-it-does-not-know.md. The
-	// attribute is cosmetic; the one below is not, and it is honest now.
-	container.Attr("total", strconv.Itoa(reportedTotal(page.Total)))
+	// A total the server did not report leaves the attribute off, rather than
+	// writing zero. This command asks for one bounded page and has no second
+	// request to settle it with, so "I do not know how long this thread is" is
+	// an answer it genuinely has to give, and an optional attribute is where it
+	// gives it.
+	if page.Total != nil {
+		container.Attr("total", strconv.Itoa(*page.Total))
+	}
 
 	// Total is the server's count of the whole thread, so it decides this
 	// rather than a full page doing so: exactly `commentCap` comments is a

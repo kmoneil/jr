@@ -1,7 +1,8 @@
 # Output contract
 
 The output shape is a public API. It is versioned, and breaking it requires a
-major bump.
+major bump. While the release version starts with a zero, that bump moves the
+minor position; see [Stability policy](#stability-policy).
 
 This document describes what `jr` emits. It is the reference a consumer pins
 against; `jr contract` emits the machine-readable form of the same thing.
@@ -103,7 +104,8 @@ Three attributes, and each answers a question the others cannot:
 - `count` is how many comments arrived.
 - `total` is how many the server says the thread has. A caller deciding whether
   to spend a request on `issue comment list` needs the size of what it would
-  fetch, and `complete` only ever says whether the two agree.
+  fetch, and `complete` only ever says whether the two agree. It is **written
+  only when the server reported a count**; see below.
 - `start-at` is where in the thread the first returned comment sits. It is
   **written only when it is not zero**, and it is not decoration: Data Center
   inlines the whole thread from the oldest comment, and Cloud caps the
@@ -133,6 +135,31 @@ a row.
 issues, so the clipped container is not in the document at all — the comments it
 could not read were never rendered — and the warning names `event` to say the
 feed is missing some of what it merged.
+
+### An absent `total` means the thread's length is unknown
+
+`total` is optional, and its absence is an answer rather than a gap. A server
+that sent no count has not said how long the thread is, and neither path that
+fills this container can ask again: `issue get --with-comments` fetches one
+bounded page by design, and `issue list --with-comments` gets the thread as a
+projection inside a search response, where there is no second request to make.
+
+```xml
+<comments count="5" complete="false">
+```
+
+**An absent `total` always comes with `complete="false"`**, so the run exits 3
+and the record or the row is incomplete, exactly as a thread known to be clipped
+is. It is a reason to spend a request on `issue comment list` rather than a
+reason to skip one: five comments with no count may be all of them, or may be
+five of four hundred, and this tool cannot tell which.
+
+That is the change that took `issue.list` to v7 and `issue.get` to v9. Both
+previously wrote `total="0"` when the server sent no count, and `0` is a number
+a consumer can branch on: `count >= total` held for any thread, so a clipped one
+was published `complete="true"` at exit 0. A required attribute left the tool no
+way to say it did not know, so removing the requirement was the fix rather than
+choosing a better default.
 
 ### `markdown` is presentation, and carries no promise
 
@@ -266,7 +293,7 @@ Every successful XML response:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<result kind="issue.list" v="6">
+<result kind="issue.list" v="7">
   <issues count="3" complete="true">
     <issue key="ENG-101">
       <summary>Retry logic drops the last error</summary>
@@ -292,7 +319,7 @@ the XML tree:
 ```json
 {
   "kind": "issue.list",
-  "v": 6,
+  "v": 7,
   "count": 3,
   "complete": true,
   "issues": [ … ]
@@ -508,7 +535,7 @@ container's `count` is derived from its children and cannot disagree with them.
 
 ### The reporter is reported
 
-`issue.list` v6 and `issue.get` v8 carry a `reporter` element, on the same terms
+`issue.list` v7 and `issue.get` v9 carry a `reporter` element, on the same terms
 as `assignee`: always present, and empty when the server discloses nobody.
 
 It was asked for on every request from the first version of this tool — it is in
@@ -864,7 +891,7 @@ refuses the write if the issue has changed since the caller read it. Without it
 two callers editing one issue both exit 0 and the earlier write is lost, with
 nothing truncated, nothing in error, and nothing to say it happened.
 
-`issue.get` v8 carries a `precondition` attribute, which is what the flag takes.
+`issue.get` v9 carries a `precondition` attribute, which is what the flag takes.
 It is opaque: what it holds is the millisecond timestamp Jira served, and the
 `updated` element is RFC 3339 to the second, so conditioning on the published
 value would leave a whole second in which another edit is invisible. It also
@@ -1020,12 +1047,37 @@ diffing two runs must not see a difference that means nothing.
 ## Stability policy
 
 - Adding a new optional element or attribute: **minor**.
+- Making a required element or attribute optional: **major**. It reads like the
+  bullet above and is its opposite. An addition is something no existing
+  consumer looks for; this is something an existing consumer already reads, and
+  it will now sometimes not be there.
 - Adding a field to a command's _default_ column set: **major**. Agents diff
   output.
 - Changing an exit code's meaning, an error `code` string, or a `kind`:
   **major**.
 - `jr contract` (or `jr --contract`) dumps the machine-readable schema for every
   kind this build can emit, so a consumer can pin and verify.
+
+### What "major" means before 1.0.0
+
+This project is in `0.y.z`, where
+[semver §4](https://semver.org/spec/v2.0.0.html#spec-item-4) says the public API
+is not to be considered stable and anything may change. **So a change marked
+major above moves the minor position while the release version starts with a
+zero: 0.1.1 to 0.2.0, not to 1.0.0 and not to 0.1.2.** Tagging 1.0.0 is a claim
+about how stable this tool intends to be from then on, and no single breaking
+change is a reason to make that claim.
+
+The kind versions are unaffected by any of this, and they are what a consumer
+should actually be pinning. They are per-kind and start at 1, so `issue.get`
+going 8 to 9 says exactly what changed for someone parsing `issue.get`, and says
+nothing about the twenty-odd kinds that did not move. The release version tells
+you a shape moved somewhere; `kind` and `v` tell you whether it was yours.
+
+A Conventional Commit's `!` and its `BREAKING CHANGE:` footer mark the shape
+change wherever it lands, and they do not decide where. `feat(issue)!:` in a
+0.x release is a minor bump, and the footer is still how the changelog and
+anyone reading `git log` find it.
 
 ## Verifying against `jr contract`
 
