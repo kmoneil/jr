@@ -1102,6 +1102,14 @@ zero: 0.1.1 to 0.2.0, not to 1.0.0 and not to 0.1.2.** Tagging 1.0.0 is a claim
 about how stable this tool intends to be from then on, and no single breaking
 change is a reason to make that claim.
 
+**The demotion cascades, so a change marked minor above moves the patch
+position: 0.2.0 to 0.2.1.** A new command, a new flag, a new warning code, and
+a new optional attribute are all minor, and none of them can move the minor
+position while a breaking change is doing so, or the two would be
+indistinguishable in the only place a consumer looks. This half was inferred
+for two releases before it was written down, and 0.2.1 is the first release
+that had to choose.
+
 The kind versions are unaffected by any of this, and they are what a consumer
 should actually be pinning. They are per-kind and start at 1, so `issue.get`
 going 8 to 9 says exactly what changed for someone parsing `issue.get`, and says

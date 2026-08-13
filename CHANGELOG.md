@@ -20,6 +20,76 @@ accident.
 
 Nothing yet.
 
+## [0.2.1] - 2026-08-13
+
+One new check and one thing removed. **Nothing changed shape**: no kind moved a
+schema version, no default column set gained a field, and no exit code or error
+`code` changed meaning, so a script written against 0.2.0 parses 0.2.1
+identically.
+
+A patch rather than a minor because the demotion this project uses in `0.y.z`
+cascades. A breaking change moves the minor position, so a feature that breaks
+nothing cannot also move it. `docs/output-contract.md` now says that; it had
+said only the first half, and this is the first release that had to choose.
+
+### Added
+
+- **`issue list` says so when a label filter names a label nothing carries.**
+  `--label retyr` returned a header, no rows, `complete="true"`, and exit 0, and
+  so did `--label retry` on a day nothing carried it: a typo and a fact were
+  indistinguishable. A label no issue on the site carries now produces the
+  warning `UNKNOWN_LABEL` on stderr. **The query still runs and still exits 0**,
+  because asking about a label nobody uses is a legal question with a correct
+  answer, and stdout is byte-identical to what 0.2.0 emitted. `--not-label` is
+  checked too, where an unknown value widens the result set instead of emptying
+  it.
+
+  It costs one request per distinct label, and one more only when it is about to
+  warn. Those count against `--max-requests` like any other. Nothing is cached,
+  because a label exists exactly as long as an issue carries it.
+
+  It stays quiet rather than guessing where it cannot tell: a site that reports
+  no labels at all, a result set filled to the server's cap, any failed request,
+  and an MCP tool call, which discards stderr and so does not spend the requests
+  either. Silence is never a claim that a label will match, because the check
+  is site-wide and a query may be scoped to one project.
+
+### Removed
+
+- **The `tui`, `browser`, and `clipboard` build tags.** They came from the
+  spec's tag table, written before any code was, and no build ever carried a
+  feature behind them. `jr version` prints a shorter tag list as a result: the
+  full profile now reports `tags=prompt,render,mcp,write,admin`. No command,
+  flag, or output changed, because there was nothing behind them to remove.
+
+### Output contract
+
+- **Nothing moved.** `jr contract` reports the same versions 0.2.0 did for every
+  kind.
+- The stability policy gained two rules it needed and did not have. **Adding a
+  warning `code` is minor and bumps no kind version**, because a warning is a
+  separate document on stderr and a command that gains one emits the same result
+  it did before; changing what an existing warning code means is major, for the
+  reason an error code is. And **the pre-1.0 demotion cascades**, so a minor
+  change moves the patch position.
+- The warnings this tool emits are now documented as one set, namely
+  `RESULT_TRUNCATED`, `POSSIBLE_DUPLICATE`, and `UNKNOWN_LABEL`, rather than
+  each being described where it happens to arise.
+
+### Documentation
+
+- **`jr auth token --help` documented a pipeline that cannot work.** Its example
+  was `curl -H "Authorization: $(jr auth token)"`, and the value is one field of
+  a record, so curl received an XML document and failed with an argument error
+  that reads like a curl problem. The help now shows the form that works, and a
+  test runs it.
+- **The `jr version` example in `docs/getting-started.md` named 0.1.0** at
+  0.2.0, and carried a tag set three tags out of date. It shows the untagged
+  form a clone prints instead, which cannot go stale, and two gates now hold it
+  there: one refusing a release string in any hand-written document, and the
+  existing worked-version-banner check, which had been reading four files and
+  not that one.
+
 ## [0.2.0] - 2026-08-13
 
 One breaking change, and it is a small one with a wide blast radius: an
@@ -191,7 +261,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.2.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.2.1...main
+[0.2.1]: https://github.com/kmoneil/jr/releases/tag/v0.2.1
 [0.2.0]: https://github.com/kmoneil/jr/releases/tag/v0.2.0
 [0.1.1]: https://github.com/kmoneil/jr/releases/tag/v0.1.1
 [0.1.0]: https://github.com/kmoneil/jr/releases/tag/v0.1.0
