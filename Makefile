@@ -51,6 +51,30 @@ READER_MAX_BYTES := 12582912
 GOLDEN_PKGS         := ./internal/render/ ./internal/adf/
 GOLDEN_PKGS_PROFILE := ./internal/cli/
 
+# The tools `make ci` shells out to, pinned.
+#
+# Three of these were `@latest` until 2026-08-13, which means the verdict on an
+# immutable commit depends on what somebody published that morning. A tag is the
+# release here and the release gate re-runs `make ci` on the tagged commit, so a
+# new gofumpt could fail a release that changed no code, and the fix would be a
+# tag that cannot be moved. `@latest` also has no cache key, which is the other
+# half: there is no way to say "the bin I built for whatever latest was".
+#
+# Bumping one is a commit, which is the point. `go install <pkg>@latest` says
+# what the newest is.
+GOFUMPT_VERSION       := v0.11.0
+STATICCHECK_VERSION   := v0.7.0
+GOVULNCHECK_VERSION   := v1.6.0
+GOLANGCI_LINT_VERSION := v2.12.2
+GOCOGNIT_VERSION      := v1.2.1
+
+TOOLS := \
+	mvdan.cc/gofumpt@$(GOFUMPT_VERSION) \
+	honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION) \
+	golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) \
+	github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) \
+	github.com/uudashr/gocognit/cmd/gocognit@$(GOCOGNIT_VERSION)
+
 .DEFAULT_GOAL := help
 
 ## help: list the available targets
@@ -412,6 +436,37 @@ ci: fmt-check vet lint vuln test-profiles test-race build-all size
 fmt-check:
 	@out=$$(gofumpt -l .); \
 	if [ -n "$$out" ]; then echo "not formatted:"; echo "$$out"; exit 1; fi
+
+## tools: install the pinned tools make ci shells out to
+#
+# Both workflows call this, so CI and a developer run the same versions. It is
+# not a prerequisite of `ci`: that would reinstall five binaries on every local
+# run to guard against a drift a developer can see in the failure.
+.PHONY: tools
+tools:
+	@set -e; for t in $(TOOLS); do echo "go install $$t"; go install "$$t"; done
+
+## tools-key: a cache key for the pinned tool versions
+#
+# The release gate's tool install is the one network fetch standing in front of
+# an operation that cannot be undone, and it is what failed on the first attempt
+# at v0.1.1: sum.golang.org returned an INTERNAL_ERROR mid-fetch, nothing was
+# built, and the tag was already public. Caching the bin directory takes that
+# fetch off the common path rather than retrying it and hoping.
+#
+# It hashes the versions rather than this file, so an edit anywhere else in the
+# Makefile does not throw away a cache that is still correct.
+.PHONY: tools-key
+tools-key:
+	@printf '%s\n' $(TOOLS) | sort | shasum -a 256 | cut -d' ' -f1
+
+# print-<VAR> echoes one variable, so a workflow step that installs a single
+# tool reads its version from here rather than repeating it. `make ci` and the
+# jobs that run one target at a time then cannot pin different versions of the
+# same tool, which is a drift nothing would report: the pull request would go
+# green under one gofumpt and the release gate red under another.
+print-%:
+	@echo '$($*)'
 
 ## hooks: install the repo's git hooks
 .PHONY: hooks

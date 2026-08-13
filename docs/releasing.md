@@ -114,6 +114,36 @@ repository at this commit:
 $ gh attestation verify jr-reader_0.1.0_darwin_arm64.tar.gz --repo kmoneil/jr
 ```
 
+## If the release did not finish
+
+Different from the section below, and the difference is the whole of what to do.
+A release that is *wrong* exists and somebody may have fetched it. A release
+that did not *finish* does not exist: the tag is public and there is nothing
+behind it.
+
+**Re-run the workflow. Do not re-tag.**
+
+```console
+$ gh run list --workflow=release.yml --limit 1
+$ gh run rerun <id> --failed
+```
+
+The tag is already correct, which is why moving it is the wrong instinct even
+though the release is missing. The gate is the first of three jobs and `build`
+and `publish` both hang off it, so a red gate means nothing was compiled and
+nothing was published. There is no half-published state to clean up.
+
+This has happened once, on the first attempt at `v0.1.1`: `sum.golang.org`
+returned an `INTERNAL_ERROR` while the gate was installing the tools `make ci`
+expects. The re-run was green in every job. The tools are pinned and cached
+since, so that fetch is off the common path rather than retried, but a scan, a
+registry, or a runner can still fail transiently and the answer is the same one.
+
+One thing to know while reading the run list: **a re-run overwrites the run's
+conclusion**, so a release that failed and was re-run reads `success` afterwards
+and leaves no trace of the flake. If you want the failure recorded, record it
+somewhere other than the run history.
+
 ## If a release is wrong
 
 **Do not move the tag.** Anyone who fetched it has the old commit under the same

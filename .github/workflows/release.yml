@@ -29,17 +29,29 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
+      # The versions live in the Makefile so a developer running `make ci` runs
+      # what the gate runs. Three of them were `@latest` until 2026-08-13, which
+      # made the verdict on an immutable commit depend on what was published
+      # that morning.
+      - name: the pinned tool versions
+        id: tools
+        run: echo "key=$(make -s tools-key)" >> "$GITHUB_OUTPUT"
+      # This fetch is the only network in front of an operation that cannot be
+      # undone, and it is what failed on the first attempt at v0.1.1:
+      # sum.golang.org returned an INTERNAL_ERROR mid-fetch, nothing was built,
+      # and the tag was already public. A hit skips the install entirely rather
+      # than retrying it, so the common path does not touch the checksum
+      # database at all. A miss installs and saves, and `make ci` fails closed
+      # if a tool is somehow absent either way.
+      - name: restore the tools
+        id: toolcache
+        uses: actions/cache@v6
+        with:
+          path: ~/go/bin
+          key: gate-tools-${{ runner.os }}-go${{ env.GO_VERSION }}-${{ steps.tools.outputs.key }}
       - name: install the tools make ci expects
-        run: |
-          go install mvdan.cc/gofumpt@latest
-          go install honnef.co/go/tools/cmd/staticcheck@latest
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          # /v2 in the path: .golangci.yml declares `version: "2"`, and the
-          # unversioned path installs the v1 line, which cannot read it.
-          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
-          # internal/lint shells out to gocognit and fails closed when it is
-          # missing, so `make ci` does not pass without it.
-          go install github.com/uudashr/gocognit/cmd/gocognit@v1.2.1
+        if: steps.toolcache.outputs.cache-hit != 'true'
+        run: make tools
       - name: make ci
         run: make ci
       - name: the binary agrees with the tag
