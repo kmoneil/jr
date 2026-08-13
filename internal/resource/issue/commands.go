@@ -1413,14 +1413,24 @@ func attachComments(ctx context.Context, c *Client, doc *render.Doc, key string)
 		items = append(items, comment.Node())
 	}
 	container := render.ListEl("comments", "comment", items...)
-	container.Attr("total", strconv.Itoa(page.Total))
+	// A total the server did not report is written as zero, which is wrong and
+	// is the half of this that cannot be fixed here: `total` is a required
+	// attribute of the container, so saying "unknown" needs it to become
+	// optional, which is a schema change and a version bump on two kinds. See
+	// _plans/backlog/an-embedded-thread-cannot-say-it-does-not-know.md. The
+	// attribute is cosmetic; the one below is not, and it is honest now.
+	container.Attr("total", strconv.Itoa(reportedTotal(page.Total)))
 
 	// Total is the server's count of the whole thread, so it decides this
 	// rather than a full page doing so: exactly `commentCap` comments is a
 	// complete thread, not a truncated one, and guessing from the page size
 	// would report every such issue as partial forever.
+	//
+	// A server that reported no total has not said the thread is whole, and
+	// this cannot page to find out — it deliberately fetches one bounded page.
+	// So unknown is not complete.
 	container.Attr(render.CompleteAttr,
-		strconv.FormatBool(len(page.Comments) >= page.Total))
+		strconv.FormatBool(exhausted(len(page.Comments), page.Total)))
 
 	doc.Record.Child(container)
 	return nil
