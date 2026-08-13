@@ -22,16 +22,32 @@ const progressInterval = 100 * time.Millisecond
 // is no structured form of "42% done" worth defining, and a human watching a
 // hundred-request run needs to know it is moving.
 type ttyProgress struct {
-	mu      sync.Mutex
-	w       io.Writer
-	last    time.Time
+	mu   sync.Mutex
+	w    io.Writer
+	last time.Time
+	// noun is what is being counted, from the command's CollectionName.
+	//
+	// It was the literal "issues", on every streaming command in the tool, so
+	// `project list` reported "12 issues" and `field list` reported "148
+	// issues". Cosmetic, human-only, and never present on a pipe, which is how
+	// it survived. It is fixed because the tool's whole argument is that it
+	// does not say things that are not so, and the right value was already
+	// declared: streamSpec reads the same field two functions from here.
+	noun    string
 	width   int
 	started time.Time
 	done    bool
 }
 
-func newTTYProgress(w io.Writer) *ttyProgress {
-	return &ttyProgress{w: w, started: time.Now()}
+func newTTYProgress(w io.Writer, noun string) *ttyProgress {
+	if noun == "" {
+		// A command that streams declares its collection —
+		// TestStreamingCommandsDeclareTheirCollection holds them to it — so
+		// this is for a caller that built one by hand rather than for a gap in
+		// the registry.
+		noun = "rows"
+	}
+	return &ttyProgress{w: w, noun: noun, started: time.Now()}
 }
 
 // Update implements registry.Progress.
@@ -55,7 +71,7 @@ func (p *ttyProgress) Update(done, total int) {
 	} else {
 		line = humanCount(done)
 	}
-	line += " issues, " + time.Since(p.started).Round(time.Second).String()
+	line += " " + p.noun + ", " + time.Since(p.started).Round(time.Second).String()
 
 	p.write(line)
 }
@@ -107,13 +123,14 @@ func humanCount(n int) string {
 	return b.String()
 }
 
-// progress returns a reporter for this invocation.
+// progress returns a reporter for this invocation, counting whatever the
+// command said it emits.
 //
 // Nothing is reported unless stderr is a terminal: a piped run must produce
 // byte-identical stderr whether or not a human happens to be watching.
-func (a *app) progress() registry.Progress {
+func (a *app) progress(noun string) registry.Progress {
 	if !isTerminal(a.stderr) {
 		return registry.NoProgress
 	}
-	return newTTYProgress(a.stderr)
+	return newTTYProgress(a.stderr, noun)
 }

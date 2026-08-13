@@ -225,13 +225,14 @@ func runAttachmentList(
 		return registry.StreamResult{}, err
 	}
 
+	found := len(items)
 	items, complete := registry.Bound(inv.Limit, items)
 	for _, a := range items {
 		if err := out.Write(a.Node()); err != nil {
 			return registry.StreamResult{}, err
 		}
 	}
-	inv.Progress.Update(out.Count(), out.Count())
+	inv.Progress.Update(out.Count(), found)
 	return registry.StreamResult{Complete: complete}, nil
 }
 

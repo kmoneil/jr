@@ -25,7 +25,7 @@ func (a *app) stream(ctx context.Context, rc *registry.Command, inv *registry.In
 		return err
 	}
 
-	reporter := a.progress()
+	reporter := a.progress(rc.CollectionName)
 	inv.Progress = reporter
 	defer reporter.Done()
 
