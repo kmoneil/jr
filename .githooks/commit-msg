@@ -35,3 +35,48 @@ fi
 case "$subject" in
 	*.) echo "commit-msg: the subject ends with a period; drop it."; exit 1 ;;
 esac
+
+# No markdown in the body.
+#
+# A commit message is plain text. Git renders nothing, and GitHub shows it
+# preformatted, so a heading is the characters "## " and a table is a row of
+# pipes on every surface that will ever display it. The history had both for a
+# week, because the squash setting took the pull request description, which is
+# markdown by design, as the commit body.
+#
+# What stays: hyphen bullets, indented blocks for code and log output,
+# backticks around identifiers, bare URLs, and trailers. The test is whether it
+# reads correctly unrendered, which is the only way it will ever be read.
+#
+# Headings are matched from two hashes rather than one. This file still holds
+# git's own comment lines when a message is written in an editor, and those
+# start with a single hash, so "# " cannot be told apart from an H1 here. Two
+# is what the damage looked like anyway.
+body=$(tail -n +2 "$1")
+
+flag() {
+	echo "commit-msg: $1 in the body, and a commit message is plain text."
+	echo
+	printf '%s\n' "$body" | grep -nE "$2" | head -3 | sed 's/^/  /'
+	echo
+	echo "  $3"
+	echo
+	echo "  Keep: hyphen bullets, indented code and log output, backticks,"
+	echo "  bare URLs, trailers. It has to read correctly unrendered."
+	exit 1
+}
+
+printf '%s\n' "$body" | grep -Eq '^#{2,6} ' &&
+	flag "a markdown heading" '^#{2,6} ' "Say it in a sentence, or start a new paragraph."
+printf '%s\n' "$body" | grep -Eq '^\|' &&
+	flag "a markdown table" '^\|' "Use an indented block, or prose."
+printf '%s\n' "$body" | grep -Eq '^[-*] \[[ xX]\]' &&
+	flag "a task list" '^[-*] \[[ xX]\]' "Checklists belong on the pull request, not in the history."
+printf '%s\n' "$body" | grep -Eq '^```' &&
+	flag "a fenced code block" '^```' "Indent the block by four spaces instead."
+printf '%s\n' "$body" | grep -Eq '\*\*[^*/ ][^*/]*\*\*' &&
+	flag "markdown emphasis" '\*\*[^*/ ][^*/]*\*\*' "Emphasis does not survive plain text; write the sentence so it does not need it."
+printf '%s\n' "$body" | grep -Eq '\[[^]]+\]\([^)]+\)' &&
+	flag "a markdown link" '\[[^]]+\]\([^)]+\)' "Put the bare URL, which a terminal can follow."
+
+exit 0
