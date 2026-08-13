@@ -281,6 +281,11 @@ func TestTheWorkedVersionExamplesAreOnesTheCodeCouldPrint(t *testing.T) {
 	files := []string{
 		"../../docs/build-profiles.md",
 		"../../docs/output-contract.md",
+		// The on-ramp prints a banner too, and was not read here for as long
+		// as this test existed. Its example named a real release and the tag
+		// set of a build three tags ago, and the check that would have caught
+		// the second half was this one, looking elsewhere.
+		"../../docs/getting-started.md",
 		"../../internal/buildinfo/buildinfo.go",
 		"../../internal/cli/session.go",
 	}

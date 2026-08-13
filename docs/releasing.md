@@ -35,9 +35,22 @@ steps below are in this order.
    - both install paths use `gh release download --pattern`, which needs no
      version number at all.
 
-   So this step is a check rather than an edit. Nothing asserts it, because a
-   sentence about a release cannot be checked against a repository until the
-   release exists, and by then the sentence has already shipped.
+   So this step is a check rather than an edit.
+
+   **A fifth place was missed by all of that, and is now asserted.**
+   `docs/getting-started.md` printed a worked `jr version` naming 0.1.0 and
+   went on printing it through 0.1.1 and 0.2.0. It is sample output rather
+   than a sentence, which is exactly why reading the prose did not catch it.
+   `internal/lint/releaseversions_test.go` now refuses any release string in
+   any hand-written document except the `1.2.0` placeholder and the
+   `0.0.0-untagged+<sha>` form a clone prints, neither of which any build
+   produces. The claim that could not be checked was "this is the current
+   release"; the one that can is "no document names a release at all".
+
+   The same example also showed a tag set three tags out of date, and the gate
+   that reads worked version banners,
+   `TestTheWorkedVersionExamplesAreOnesTheCodeCouldPrint`, was not reading
+   this file. It is now.
 
 ## Cutting it
 

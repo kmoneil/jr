@@ -41,14 +41,15 @@ guide says `jr`.
 ```console
 $ jr version
 <result kind="version" v="1">
-  <version app="jr" release="0.1.0" profile="full" ...>
-    <display>jr 0.1.0 (full; tags=prompt,render,mcp,write,admin)</display>
+  <version app="jr" release="0.0.0-untagged+2acd8a4" profile="full" ...>
+    <display>jr 0.0.0-untagged+2acd8a4 (full; tags=prompt,render,mcp,write,admin)</display>
 ```
 
-If that prints a document naming a release and a profile, you are ready. A
-build from a source tree with no tag reads `0.0.0-untagged+<sha>` instead,
-which is expected and is what `scripts/version.sh` produces when `git describe`
-has nothing to describe.
+That is what a clone prints: `scripts/version.sh` produces
+`0.0.0-untagged+<sha>` when `git describe` has nothing to describe, and a clone
+has no tag. An archive downloaded from the releases page names its release
+there instead. Either way, if it prints a document naming a version and a
+profile, you are ready.
 
 > **Which build?** The full build gives you everything. There are smaller ones —
 > `make build-reader` produces a binary that physically cannot change anything
