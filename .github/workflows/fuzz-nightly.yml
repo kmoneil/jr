@@ -29,7 +29,9 @@ permissions:
   contents: read
 
 env:
-  GO_VERSION: "1.26"
+  # The patch, not the minor. See the note in ci.yml: setup-go pins
+  # GOTOOLCHAIN=local, so this has to match go.mod's directive exactly.
+  GO_VERSION: "1.26.6"
 
 jobs:
   packages:

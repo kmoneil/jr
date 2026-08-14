@@ -9,7 +9,10 @@ permissions:
   contents: read
 
 env:
-  GO_VERSION: "1.26"
+  # The patch, not the minor. actions/setup-go sets GOTOOLCHAIN=local, so the
+  # go command will not fetch what go.mod asks for: it refuses. This has to be
+  # the same patch version go.mod names, and a lint test says so.
+  GO_VERSION: "1.26.6"
 
 jobs:
   check:
@@ -68,10 +71,15 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          # go.mod pins a patch version, so a runner on an older 1.26 fetches
-          # the toolchain it asks for. That is the point: the scan reports the
-          # standard library it is actually built against, and GO-2026-5856 was
-          # a finding in crypto/tls rather than in anything this module wrote.
+          # GO_VERSION is the patch go.mod names, so the scan reports the
+          # standard library this build is actually against. GO-2026-5856 was a
+          # finding in crypto/tls rather than in anything this module wrote, and
+          # so were the four that followed it: the toolchain is the exposure.
+          #
+          # This said the runner would fetch what go.mod asked for. It does not.
+          # setup-go sets GOTOOLCHAIN=local, so a mismatch is `go.mod requires
+          # go >= X (running go Y; GOTOOLCHAIN=local)` and every job fails at
+          # once. The two numbers move together or nothing runs.
           go-version: ${{ env.GO_VERSION }}
       - name: govulncheck
         run: |

@@ -9,7 +9,10 @@ permissions:
   contents: read
 
 env:
-  GO_VERSION: "1.26"
+  # The patch, not the minor. See the note in ci.yml: setup-go pins
+  # GOTOOLCHAIN=local, so this has to match go.mod's directive exactly. A
+  # published archive is built with whatever this names.
+  GO_VERSION: "1.26.6"
 
 jobs:
   # The tag is the release. Everything CI checks on a branch is checked again

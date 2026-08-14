@@ -14,6 +14,7 @@ const (
 	vulnTarget    = "vuln"
 	vulnInstall   = "golang.org/x/vuln/cmd/govulncheck"
 	goDirectiveRe = `(?m)^go\s+(\S+)\s*$`
+	goVersionRe   = `(?m)^\s*GO_VERSION:\s*"([^"]+)"`
 
 	// The lint pass that runs with no build tags: its target, the tool it
 	// has to use, the check it has to enable, and what CI must install.
@@ -85,6 +86,49 @@ func TestTheGoDirectivePinsAPatchVersion(t *testing.T) {
 		t.Errorf("go.mod says `go %s`; it has to name a patch version, because "+
 			"a toolchain vulnerability is fixed by the patch and nothing else "+
 			"here requires it", m[1])
+	}
+}
+
+// goWorkflows are every workflow that installs a toolchain. Each one has to
+// name the same patch version go.mod does.
+var goWorkflows = []string{
+	ciWorkflow,
+	"../../.github/workflows/release.yml",
+	"../../.github/workflows/fuzz-nightly.yml",
+}
+
+// TestTheWorkflowsPinTheSameToolchainAsGoMod couples two numbers that have no
+// other reason to agree.
+//
+// actions/setup-go sets GOTOOLCHAIN=local, which is what makes a build
+// reproducible: the toolchain is the one the workflow installed and never one
+// fetched mid-build. The cost is that go.mod's directive stops being a request
+// the runner can satisfy and becomes a floor it either clears or fails at, with
+// `go.mod requires go >= 1.26.6 (running go 1.26.5; GOTOOLCHAIN=local)`.
+//
+// Bumping go.mod for a standard-library CVE and leaving GO_VERSION at "1.26"
+// therefore does not scan the fixed toolchain; it fails every job in the run,
+// including the scan the bump was for. The comment in ci.yml claimed the
+// opposite for as long as the two happened to agree.
+func TestTheWorkflowsPinTheSameToolchainAsGoMod(t *testing.T) {
+	m := regexp.MustCompile(goDirectiveRe).FindStringSubmatch(readFile(t, goModPath))
+	if m == nil {
+		t.Fatal("go.mod has no go directive")
+	}
+	want := m[1]
+
+	for _, path := range goWorkflows {
+		got := regexp.MustCompile(goVersionRe).FindStringSubmatch(readFile(t, path))
+		if got == nil {
+			t.Errorf("%s sets no GO_VERSION, so what it installs is whatever "+
+				"the runner had cached", path)
+			continue
+		}
+		if got[1] != want {
+			t.Errorf("%s pins GO_VERSION %q and go.mod requires %q; setup-go "+
+				"sets GOTOOLCHAIN=local, so every job in that workflow fails "+
+				"until they match", path, got[1], want)
+		}
 	}
 }
 
