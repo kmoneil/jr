@@ -7,6 +7,7 @@ is available, which makes them the ones worth knowing before you need them.
 ## Contents
 
 - [Dates are evaluated in Jira's timezone, not yours](#dates-are-evaluated-in-jiras-timezone-not-yours)
+- [`-1M` is one minute, not one month](#-1m-is-one-minute-not-one-month)
 - [A filter never orders anything](#a-filter-never-orders-anything)
 - [Issue keys do not sort as text](#issue-keys-do-not-sort-as-text)
 - [`sprint = <id>` is not current membership](#sprint--id-is-not-current-membership)
@@ -42,6 +43,26 @@ jr issue list --created-after "$(TZ=America/Chicago date -d @$start '+%Y-%m-%d %
 `startOfWeek()` and friends are passed through rather than computed locally on
 purpose: they carry Jira's own notion of when a week begins, which a converted
 instant does not.
+
+## `-1M` is one minute, not one month
+
+Jira's period units are case-insensitive on a date field, so `M` and `m` are one
+unit and that unit is minutes. `--updated-after -1M` asks for the last minute
+and answers exit 0, `complete="true"`, and usually empty.
+
+There is no month unit on a field. The units are `m` `h` `d` `w`, either case,
+and a compound sums its components with the sign on the front: `-4w 2d` is
+thirty days. For a month, say a month:
+
+```bash
+jr issue list --updated-after -30d               # thirty days
+jr issue list --updated-after 'startOfMonth()'   # this calendar month
+jr issue list --updated-after 'endOfDay(-1M)'    # a month ago
+```
+
+The third one is a **different grammar**, and it is the reason to read this
+twice: inside a date function the units are `y M w d h m`, they are
+case-sensitive, `M` means months, and there is no compound form.
 
 ## A filter never orders anything
 

@@ -702,6 +702,41 @@ Cloud, because Cloud accepts one: the rule is the field and the deployment
 together, and a blanket refusal would invent a limit half the installed base
 does not have.
 
+### A relative period is spelled two ways, and `M` is both of them
+
+Every date flag also takes a period relative to now. It is spelled one way as a
+value on a date field and a different way as a duration argument to a date
+function, and the two disagree. Measured 2026-08-14 against Cloud and Data
+Center 10.4, identical on both:
+
+|          | on a field, `--updated-after -7d`      | in a function, `--updated-after 'endOfDay(-1d)'` |
+| -------- | -------------------------------------- | ------------------------------------------------ |
+| units    | `m` `h` `d` `w` `M`                    | `y` `M` `w` `d` `h` `m`                          |
+| case     | insensitive: `-7D` is `-7d`            | **sensitive**: `-1D`, `-1W`, `-1H`, `-1Y` refused |
+| `M`      | **minutes**                            | **months**                                       |
+| `y`      | refused                                | accepted                                         |
+| compound | `-4w 2d` accepted                      | refused                                          |
+
+**`M` is the row to read twice.** `--updated-after -1M` is one minute and
+`--updated-after 'endOfDay(-1M)'` is one month, and neither spelling is a
+mistake at the server. There is no seconds unit in either.
+
+A compound period carries its sign once, on the front, and its components sum:
+`-1w 7d` selects exactly what `-14d` selects. A sign on any later component is
+refused, and so is a run-on with no space:
+
+```
+-4w 2d      accepted
+-1d 2h 3m   accepted, and any number of components
+-4w -2d     refused by Jira
+4w2d        refused by Jira
+```
+
+`jr` refuses what Jira refuses in each grammar, with `INVALID_DATE` at exit 2
+and before a request is spent, and accepts everything else. It carried one
+grammar for both until 2026-08-14, which made it refuse `endOfDay(-1y)` that
+Jira accepts and refuse `-7D` and `-4w 2d` that both deployments accept.
+
 ### `issue activity --since` is the one date resolved here
 
 Every other date flag is a clause in a query, and the server evaluates it.
@@ -714,7 +749,7 @@ So this one flag is resolved locally, and what that costs is different per form:
 
 | Form                       | How it resolves                                                          | Requests |
 | -------------------------- | ------------------------------------------------------------------------ | -------- |
-| `-7d`, `+30m`, `2w`        | An offset names an instant, which is the same in every zone.             | none     |
+| `-7d`, `+30m`, `2w`, `-4w 2d` | An offset names an instant, which is the same in every zone. A compound sums its components, here as well as at the server. | none     |
 | `2026-08-10`, with or without a time of day | A wall clock, read in the **account's** zone, because that is the clock Jira reads it in. | one GET to `/myself` |
 | `startOfWeek()` and any other function | Refused. See below.                                           | none     |
 
@@ -1185,6 +1220,13 @@ diffing two runs must not see a difference that means nothing.
   answered wrongly. Fixing a wrong answer is not a reason to spare the version:
   the caller has to change what they send either way, and the version number is
   the only place they find that out before it happens.
+- Accepting an input that used to be refused: **minor**, and it is the row above
+  read backwards. Every invocation a script already makes still runs and still
+  means the same thing; what changed is that a form which exited 2 now answers.
+  The reader this matters to is the one who *worked around* the refusal, and
+  minor is where they look for that. The row exists because the two directions
+  are not symmetric and a policy that names only one of them is silent rather
+  than permissive about the other, which is how 0.3.0 nearly shipped as a patch.
 - Moving a refusal earlier, so that the same input carries a different `code`:
   **major**, for the same reason and against the same reader. `BAD_REQUEST` from
   Jira and `INVALID_DATE` from `jr` describe one mistake, and a consumer

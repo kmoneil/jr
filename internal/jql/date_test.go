@@ -121,6 +121,11 @@ func FuzzParseDateDoesNotPanic(f *testing.F) {
 	for _, seed := range []string{
 		"", "2026-08-04", "-7d", "now()", "2020-13-45", "(", ")", "()",
 		"a()", "\x00", "0000-00-00", "9999-99-99",
+		// The two grammars a period has, and the boundaries between them.
+		"-7D", "-4w 2d", "4w2d", "-4w -2d", "-1w  2d", "-1w\t2d",
+		"endOfDay(-1y)", "endOfDay(-1D)", `endOfDay("-1w 2d")`,
+		// Periods that match the pattern and cannot be held in a Duration.
+		"1000000d", "100000d 100000d",
 	} {
 		f.Add(seed)
 	}
@@ -152,6 +157,13 @@ func TestClassifyDateNamesEveryFormParseDateAccepts(t *testing.T) {
 		"+30m":             jql.DateRelative,
 		"2w":               jql.DateRelative,
 		"-1M":              jql.DateRelative,
+		"-7D":              jql.DateRelative,
+		"-1W":              jql.DateRelative,
+		"-4w 2d":           jql.DateRelative,
+		"  -1w 7d  ":       jql.DateRelative,
+		"4w2d":             jql.DateInvalid,
+		"-1y":              jql.DateInvalid,
+		"endOfDay(-1y)":    jql.DateFunction,
 		"2026-08-10":       jql.DateAbsolute,
 		"2026/08/10":       jql.DateAbsolute,
 		"2026-08-10 13:45": jql.DateAbsolute,
@@ -243,6 +255,13 @@ func TestResolveDateReportsWhatItCannotName(t *testing.T) {
 		{"", time.UTC, "empty"},
 		{"2026-08-10", nil, "a wall clock with no zone to read it in"},
 		{"99999999999999999999d", time.UTC, "an offset too large to hold"},
+		// A Duration is nanoseconds in an int64, so it runs out at 292 years
+		// while Jira answers a query for 2739 of them. Both of these used to
+		// wrap: the first to a negative offset naming an instant in the
+		// future, which is a bound pointing the wrong way rather than a
+		// missing one.
+		{"1000000d", time.UTC, "a single component larger than a Duration"},
+		{"100000d 100000d", time.UTC, "two components that fit and do not sum"},
 	} {
 		if _, ok := jql.ResolveDate(tc.input, tc.loc, now); ok {
 			t.Errorf("ResolveDate(%q) claimed an instant: %s", tc.input, tc.why)
@@ -250,8 +269,8 @@ func TestResolveDateReportsWhatItCannotName(t *testing.T) {
 	}
 }
 
-// TestEveryRelativeUnitResolves holds the unit switch to the pattern above it,
-// and pins the unit that was wrong.
+// TestEveryRelativeUnitResolves sweeps every letter rather than iterating a
+// list, because a list is what it was and a list cannot see what was added.
 //
 // `M` is minutes. Jira's period units are case-insensitive, and this resolved
 // `M` as thirty days, so `-1M` asked the server for one minute and told the
@@ -259,25 +278,171 @@ func TestResolveDateReportsWhatItCannotName(t *testing.T) {
 // deployments: `-60M`, `-60m` and `-1h` return the same rows, and `-43200M`
 // returns the same rows as `-30d`.
 //
-// The switch ends in a default arm that means minutes, which is correct only
-// while the pattern's class is exactly these five. A unit added to one and not
-// the other would silently become minutes.
+// The old switch ended in a default arm meaning minutes, correct only while the
+// pattern's class was exactly five characters, and the old test iterated those
+// five. Adding `D` to the class would have made `-7D` seven minutes with both
+// of them green. So the assertion runs the other way now: every letter the
+// pattern accepts must appear here with a duration somebody measured, and every
+// letter it does not accept must be refused. A unit cannot enter the pattern
+// without entering this table, whatever it is added to.
 func TestEveryRelativeUnitResolves(t *testing.T) {
 	now := time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC)
-	for unit, want := range map[string]time.Duration{
-		"m": time.Minute,
-		"h": time.Hour,
-		"d": 24 * time.Hour,
-		"w": 7 * 24 * time.Hour,
-		"M": time.Minute,
-	} {
-		got, ok := jql.ResolveDate("1"+unit, time.UTC, now)
+
+	// Both cases of each unit, because Jira reads them case-insensitively:
+	// `-7D` and `-1W` are accepted by both deployments and answer identically
+	// to their lowercase spellings. `y` and `s` are absent because Jira refuses
+	// them on a date field, which is what makes this a measurement rather than
+	// a preference.
+	want := map[string]time.Duration{
+		"m": time.Minute, "M": time.Minute,
+		"h": time.Hour, "H": time.Hour,
+		"d": 24 * time.Hour, "D": 24 * time.Hour,
+		"w": 7 * 24 * time.Hour, "W": 7 * 24 * time.Hour,
+	}
+
+	for _, unit := range letters() {
+		input := "1" + unit
+		expected, named := want[unit]
+
+		if kind := jql.ClassifyDate(input); (kind == jql.DateRelative) != named {
+			if named {
+				t.Errorf("the unit %q is measured and the pattern refuses it", unit)
+			} else {
+				t.Errorf("the pattern accepts the unit %q and nothing here "+
+					"says what it means", unit)
+			}
+			continue
+		}
+		if !named {
+			continue
+		}
+
+		got, ok := jql.ResolveDate(input, time.UTC, now)
 		if !ok {
-			t.Errorf("the unit %q does not resolve", unit)
+			t.Errorf("the unit %q is accepted and does not resolve", unit)
+			continue
+		}
+		if d := got.Sub(now); d != expected {
+			t.Errorf("1%s = %v, want %v", unit, d, expected)
+		}
+	}
+}
+
+// letters is every ASCII letter, which is the space a unit can live in.
+func letters() []string {
+	all := make([]string, 0, 52)
+	for c := byte('A'); c <= 'Z'; c++ {
+		all = append(all, string(c), string(c+('a'-'A')))
+	}
+	return all
+}
+
+// TestACompoundPeriodSumsItsComponents pins the form the card that raised this
+// thought had no local representation.
+//
+// It has one: the components sum and the sign is written once, on the front of
+// the whole period. Measured on Cloud, counting rows, because the arithmetic is
+// the part a server can disagree about: `-1w 7d` returned exactly what `-14d`
+// returned, `-1w 1d` returned nine rows where `-7d` returned seven and `-14d`
+// returned eighteen, and `-1d 1d` returned two days' worth.
+//
+// That is what makes a compound one duration like any other, and therefore
+// something the query and the local event filter can both apply. Accepting it
+// in the query and refusing to resolve it here would recreate the split that
+// `--since` spent a day closing.
+func TestACompoundPeriodSumsItsComponents(t *testing.T) {
+	now := time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC)
+	for input, want := range map[string]time.Duration{
+		"-1w 7d":    -14 * 24 * time.Hour,
+		"-1w 1d":    -8 * 24 * time.Hour,
+		"-1d 1d":    -2 * 24 * time.Hour,
+		"1d 2h 3m":  26*time.Hour + 3*time.Minute,
+		"+1d 2h":    26 * time.Hour,
+		"-1d 2h 3m": -(26*time.Hour + 3*time.Minute),
+		// Case is insensitive in a compound too, and two spaces are accepted:
+		// `updated >= "-1w  2d"` validates.
+		"-1D 2H":  -26 * time.Hour,
+		"-1w  2d": -9 * 24 * time.Hour,
+	} {
+		got, ok := jql.ResolveDate(input, time.UTC, now)
+		if !ok {
+			t.Errorf("ResolveDate(%q) resolved nothing", input)
 			continue
 		}
 		if d := got.Sub(now); d != want {
-			t.Errorf("1%s = %v, want %v", unit, d, want)
+			t.Errorf("ResolveDate(%q) = %v from now, want %v", input, d, want)
+		}
+	}
+}
+
+// TestTheCompoundFormsJiraRefusesAreRefusedHere is the other half, and the
+// reason it is a separate test is that a period this accepts and Jira does not
+// is a round trip spent on a BAD_REQUEST.
+//
+// Every one of these was put to the server: it refuses a sign on any component
+// but the first, refuses components run together with no space, and refuses a
+// unit it does not have. A tab is not measured either way, so it is refused,
+// which is the direction a caller can see and rewrite.
+func TestTheCompoundFormsJiraRefusesAreRefusedHere(t *testing.T) {
+	for _, input := range []string{
+		"4w2d",    // no space: "Date value '4w2d' ... is invalid"
+		"-4w -2d", // a sign on the second component
+		"-1w 2y",  // `y` is not a unit on a date field
+		"-1w\t2d", // a tab, which nothing has measured
+		"-1w 2",   // a component with no unit
+		"- 1w",    // a detached sign
+	} {
+		if kind := jql.ClassifyDate(input); kind == jql.DateRelative {
+			t.Errorf("ClassifyDate(%q) = DateRelative, and Jira refuses it", input)
+		}
+		if _, err := jql.ParseDate(input); err == nil {
+			t.Errorf("ParseDate accepted %q, which Jira refuses", input)
+		}
+	}
+}
+
+// TestADateFunctionArgumentIsItsOwnGrammar holds the second table to the
+// server, and it exists because there was only one table.
+//
+// A duration argument to a date function is not spelled like a period on a date
+// field. Measured 2026-08-14 against Cloud and Data Center 10.4, both
+// identical: the units are `y M w d h m`, they are case-sensitive, there is no
+// compound form, and **`M` is months here and minutes there**. On Data Center,
+// `updated >= endOfDay(-1M)` returns the seeded issues and `endOfDay(-1m)`
+// returns none, which is months against end-of-day-a-minute-ago.
+//
+// Sharing one pattern with the date-value grammar had `jr` refusing
+// `endOfDay(-1y)` that Jira accepts, and would have made widening that pattern
+// accept `endOfDay(-1D)` that Jira refuses, quoted or not.
+func TestADateFunctionArgumentIsItsOwnGrammar(t *testing.T) {
+	// Case-sensitive, so this is the exact spelling and not a fold.
+	accepted := map[string]bool{
+		"y": true, // Years, which a date value has no unit for.
+		"M": true, // Months, where a date value reads the same letter as minutes.
+		"w": true, "d": true, "m": true,
+		"h": true, // Accepted, although Jira's own error text omits it.
+	}
+
+	for _, unit := range letters() {
+		input := "endOfDay(-1" + unit + ")"
+		_, err := jql.ParseDate(input)
+		if accepted[unit] && err != nil {
+			t.Errorf("ParseDate(%q) refused a unit Jira accepts: %v", input, err)
+		}
+		if !accepted[unit] && err == nil {
+			t.Errorf("ParseDate(%q) accepted a unit Jira refuses", input)
+		}
+	}
+
+	// The forms either side of the unit table.
+	for input, valid := range map[string]bool{
+		"endOfDay(-1)":       true,  // A bare number is days, and is accepted.
+		"endOfDay(0)":        true,  //
+		`endOfDay("-1w 2d")`: false, // No compound form here.
+		"endOfDay(-1.5d)":    false, // No fractions either.
+	} {
+		if _, err := jql.ParseDate(input); (err == nil) != valid {
+			t.Errorf("ParseDate(%q) valid = %v, want %v", input, err == nil, valid)
 		}
 	}
 }

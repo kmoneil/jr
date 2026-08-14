@@ -1,7 +1,9 @@
 package jql
 
 import (
+	"math"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -48,9 +50,113 @@ var dateLayouts = []struct {
 	{"2006/01/02", false},
 }
 
-// relativePattern matches Jira's relative date syntax: an optional sign, a
-// number, and a unit. `-7d`, `2w`, `+30m`.
-var relativePattern = regexp.MustCompile(`^[-+]?\d+[mhdwM]$`)
+// dateValueUnits are the units Jira accepts in a period on a date field, and
+// the duration each one names.
+//
+// Keyed on the lowercase spelling, because Jira reads these case-insensitively.
+// That is not a convenience here, it is the reason `M` means minutes: `M` and
+// `m` are one unit, and this code once read `M` as thirty days, so
+// `--updated-after -1M` asked the server for the last minute and told the local
+// filter it meant the last month. Measured 2026-08-14 against Cloud and Data
+// Center 10.4 in both directions: `-60M`, `-60m` and `-1h` return the same rows,
+// `-43200M` returns the same rows as `-30d`, and `-7D`, `-2H` and `-1W` are
+// accepted and answer identically to their lowercase spellings.
+//
+// `y` and `s` are not units here. `updated >= "-1y"` is refused by the server,
+// which matters because a *function argument* does take `y` and is a different
+// grammar, see functionArgUnits.
+//
+// **This table is the only place a date-value unit exists.** relativePattern's
+// character class is generated from it and relativeOffset resolves through it,
+// so the pattern cannot accept a unit the resolver has never heard of. What
+// stood here before was a hand-written class beside a switch ending in a default
+// arm that meant minutes, and adding `D` to that class would have made `-7D`
+// seven minutes without a compiler or a test saying anything.
+//
+// The keys have to stay lowercase, because the lookup folds and the map does
+// not: an uppercase key would generate a class character that matches and a key
+// the fold cannot find, which is the same silent zero in a new costume.
+// TestEveryRelativeUnitResolves is what holds them there. It sweeps every
+// letter and requires the pattern's answer and this table's to agree, so a unit
+// added to one and not the other fails rather than resolving to nothing.
+var dateValueUnits = map[byte]time.Duration{
+	'm': time.Minute,
+	'h': time.Hour,
+	'd': 24 * time.Hour,
+	'w': 7 * 24 * time.Hour,
+}
+
+// functionArgUnits are the units Jira accepts in a duration argument to a date
+// function: `endOfDay(-1d)`, `startOfMonth(-1M)`.
+//
+// **A different grammar from the one above**, which is why it is a different
+// table. Measured 2026-08-14 through the server's own parser, and it disagrees
+// with a date value about three things:
+//
+//   - Case. These are case-sensitive. `endOfDay(-1D)`, `-1W`, `-1H` and `-1Y`
+//     are all refused, quoted or unquoted, while `updated >= "-1D"` is accepted.
+//   - `M`. It is **months** here and minutes there. Jira's own message says so:
+//     "should have the format (+/-)n(yMwdm), e.g -1M for 1 month earlier".
+//     Measured rather than believed, because that message is also incomplete:
+//     `startOfDay(-1M)` returns what `-30d` returns where a minute returns none,
+//     and `h` is accepted despite not appearing in the list.
+//   - Compounds. `endOfDay("-1w 2d")` is refused; `updated >= "-1w 2d"` is not.
+//
+// One pattern served both grammars until this table existed, which left `jr`
+// refusing `endOfDay(-1y)` that Jira accepts, and would have made any widening
+// of the date-value class start accepting `endOfDay(-1D)` that Jira refuses.
+//
+// **No duration, deliberately.** A year and a month are not a fixed count of
+// nanoseconds, and a function is the server's to evaluate: ResolveDate refuses
+// a DateFunction rather than computing one, so nothing here needs to name an
+// instant. A table carrying a duration would be an invitation to compute one.
+var functionArgUnits = map[byte]bool{
+	'y': true, // Years.
+	'M': true, // Months, where the other grammar reads the same letter as minutes.
+	'w': true, // Weeks.
+	'd': true, // Days.
+	'h': true, // Hours, accepted although Jira's error text omits it.
+	'm': true, // Minutes.
+}
+
+// unitClass renders the character class a pattern matches, from the table that
+// gives those characters their meaning.
+//
+// Generated rather than written, because a class and a lookup table are two
+// lists with no reason to agree, and this file has already shipped the
+// consequence once. Sorted so the compiled pattern does not depend on map
+// iteration order.
+func unitClass[V any](units map[byte]V) string {
+	class := make([]byte, 0, len(units))
+	for u := range units {
+		class = append(class, u)
+	}
+	slices.Sort(class)
+	return string(class)
+}
+
+// relativeComponent is one `<number><unit>` of a period on a date field.
+var relativeComponent = `\d+[` + unitClass(dateValueUnits) + `]`
+
+// relativePattern matches Jira's relative date syntax on a date field: an
+// optional sign, then one or more components separated by spaces. `-7d`, `2w`,
+// `+30m`, `-4w 2d`.
+//
+// Case-insensitive because Jira is, and the flag is the claim: the alternative
+// is spelling both cases into the class, which reads as a list rather than as
+// the property it encodes.
+//
+// The sign is written once, on the front of the whole period. `-4w -2d` is
+// refused by Jira and by this, and `4w2d` with no space is refused by both.
+// Components sum and the sign applies to the total: `-1w 7d` returns exactly
+// what `-14d` returns, measured.
+var relativePattern = regexp.MustCompile(
+	`(?i)^[-+]?` + relativeComponent + `(?: +` + relativeComponent + `)*$`)
+
+// functionArgPattern matches a duration argument to a date function. Case
+// matters, and there is no compound form.
+var functionArgPattern = regexp.MustCompile(
+	`^[-+]?\d+[` + unitClass(functionArgUnits) + `]$`)
 
 // datePattern and dateSeparator tell an out-of-range date from a word, so
 // dateHint can say which part is wrong. Compiled once, beside relativePattern
@@ -197,14 +303,11 @@ func ResolveDate(input string, loc *time.Location, now time.Time) (time.Time, bo
 
 // relativeOffset reads Jira's relative date syntax as a duration.
 //
-// **`M` is minutes, not months.** The units are Jira's and Jira's are
-// case-insensitive, which is not what this code believed: it resolved `M` as
-// thirty days, so `--updated-after -1M` asked the server for the last minute
-// and told any local filter it meant the last month, a factor of 43,200 apart
-// and silent on both sides.
-//
-// Measured 2026-08-14 against Cloud and against Data Center 10.4, counting rows
-// on a project whose issues were all touched within the hour:
+// **`M` is minutes, not months**, because the units are Jira's and Jira's are
+// case-insensitive. This code believed otherwise and resolved `M` as thirty
+// days, so `--updated-after -1M` asked the server for the last minute and told
+// any local filter it meant the last month, a factor of 43,200 apart and silent
+// on both sides. Measured 2026-08-14 against Cloud and Data Center 10.4:
 //
 //	              Data Center   Cloud
 //	-1h                     5       0
@@ -219,34 +322,71 @@ func ResolveDate(input string, loc *time.Location, now time.Time) (time.Time, bo
 // there are zero for both spellings and the 43200/1440 pair is what carries the
 // argument on that deployment.
 //
-// The pattern above accepts only lowercase for the other four units, so `jr` is
-// stricter than the server rather than differently lenient, which is the safe
-// direction: a spelling this refuses is one the caller can rewrite, and a
-// spelling this misreads is one nobody can see.
+// A compound period sums its components and takes its sign from the front:
+// `-1w 7d` is fourteen days back, and returned exactly what `-14d` returned on
+// the sandbox. That is what makes a compound one duration like any other, and
+// therefore resolvable here rather than a form the query accepts and the event
+// filter cannot apply.
+//
 // Call it only for a string relativePattern has matched. That is what makes the
-// indexing safe and the default arm correct: the pattern's unit class is
-// exactly `mhdwM`, so anything that is not `h`, `d` or `w` is one of the two
-// spellings of minutes. A unit added to the pattern without a case here would
-// silently become minutes, which is why the two are written one above the
-// other.
+// unit lookup safe with no fallback: the class the pattern matches is generated
+// from dateValueUnits, so a unit it accepts is a key that exists. There is no
+// default arm to be wrong, which is the whole reason the class is generated.
 func relativeOffset(s string) (time.Duration, bool) {
-	n, err := strconv.Atoi(strings.TrimPrefix(s[:len(s)-1], "+"))
-	if err != nil {
-		// A number too large to hold. It matched the pattern, so it is a date
-		// the caller wrote and not a typo, and the honest answer is that this
-		// process cannot name the instant.
-		return 0, false
+	// One character, because the pattern allows one. Trimming the set would
+	// quietly accept `--1d` if the pattern ever did.
+	var negative bool
+	switch s[0] {
+	case '-':
+		negative, s = true, s[1:]
+	case '+':
+		s = s[1:]
 	}
-	switch s[len(s)-1] {
-	case 'h':
-		return time.Duration(n) * time.Hour, true
-	case 'd':
-		return time.Duration(n) * 24 * time.Hour, true
-	case 'w':
-		return time.Duration(n) * 7 * 24 * time.Hour, true
-	default: // 'm' and 'M', which Jira reads as the same unit.
-		return time.Duration(n) * time.Minute, true
+
+	var total time.Duration
+	for part := range strings.FieldsSeq(s) {
+		n, err := strconv.Atoi(part[:len(part)-1])
+		if err != nil {
+			// A number too large to hold. It matched the pattern, so it is a
+			// date the caller wrote and not a typo, and the honest answer is
+			// that this process cannot name the instant.
+			return 0, false
+		}
+		unit := dateValueUnits[toLowerASCII(part[len(part)-1])]
+
+		// A duration is nanoseconds in an int64, which runs out at 292 years,
+		// and a period Jira answers happily can pass that: `-1000000d` is a
+		// legal query and 2739 years. Multiplying it here would wrap to a
+		// negative and name an instant in the future, which is the same class
+		// of defect as reading `M` as months, so it is refused for the same
+		// reason a twenty-digit number is.
+		if int64(n) > int64(maxDuration/unit) {
+			return 0, false
+		}
+		component := time.Duration(n) * unit
+		if total > maxDuration-component {
+			return 0, false
+		}
+		total += component
 	}
+
+	if negative {
+		return -total, true
+	}
+	return total, true
+}
+
+// maxDuration is the largest instant offset a time.Duration can hold, about 292
+// years.
+const maxDuration = time.Duration(math.MaxInt64)
+
+// toLowerASCII folds one unit letter, which is all the case-insensitivity
+// relativePattern's `(?i)` lets through.
+func toLowerASCII(b byte) byte {
+	if b >= 'A' && b <= 'Z' {
+		return b + ('a' - 'A')
+	}
+	return b
 }
 
 // ParseDate resolves a user-supplied date into a JQL value.
@@ -258,7 +398,8 @@ func ParseDate(input string) (Value, error) {
 	s := strings.TrimSpace(input)
 	if s == "" {
 		return nil, errs.Usage("INVALID_DATE", "date is empty").
-			WithRemedy("use YYYY-MM-DD, a relative offset like -7d, or a function like startOfWeek()")
+			WithRemedy("use YYYY-MM-DD, a relative offset like -7d or -4w 2d, " +
+				"or a function like startOfWeek()")
 	}
 
 	switch ClassifyDate(s) {
@@ -271,8 +412,8 @@ func ParseDate(input string) (Value, error) {
 	}
 
 	e := errs.Usage("INVALID_DATE", "%q is not a date", input).
-		WithRemedy("use YYYY-MM-DD, YYYY-MM-DD HH:MM, a relative offset like -7d, " +
-			"or a function like startOfWeek()")
+		WithRemedy("use YYYY-MM-DD, YYYY-MM-DD HH:MM, a relative offset like " +
+			"-7d or -4w 2d, or a function like startOfWeek()")
 	if hint := dateHint(s); hint != "" {
 		return nil, e.WithDetail("%s", hint)
 	}
@@ -328,13 +469,20 @@ func parseDateFunction(s string) (Value, error) {
 		case arg == "":
 			return nil, errs.Usage("INVALID_DATE", "%s has an empty argument", name).
 				WithDetail("input: %s", s)
-		case relativePattern.MatchString(arg), isNumeric(arg):
+		case functionArgPattern.MatchString(arg), isNumeric(arg):
 			f.Args = append(f.Args, Text(arg))
 		default:
+			// functionArgPattern and not relativePattern: a duration argument
+			// is a narrower grammar than a date value, with its own units and
+			// its own answer for `M`. The remedy names the units because the
+			// difference is invisible from here, `-1D` being accepted on a
+			// field and refused in a function.
 			return nil, errs.Usage("INVALID_DATE",
 				"%q is not a valid argument to %s", arg, name).
 				WithDetail("input: %s", s).
-				WithRemedy("an offset argument looks like -1, -1d, or 2w")
+				WithRemedy("an offset argument looks like -1, -1d, or -2M; " +
+					"the units are y M w d h m and are case-sensitive here, " +
+					"where M is months")
 		}
 	}
 	return f, nil
