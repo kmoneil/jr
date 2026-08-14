@@ -20,6 +20,66 @@ accident.
 
 Nothing yet.
 
+## [0.3.3] - 2026-08-14
+
+`jr jql validate` stops calling a query clean when Jira said something about it.
+
+**Nothing changed shape, and nothing that worked stops working.** No kind moved
+a schema version, no default column set gained a field, no exit code or error
+`code` changed meaning, and no input that used to be accepted is refused. A
+query that was valid is still valid. What changed is that a warning Jira was
+already sending now reaches you.
+
+A patch rather than a minor, and the row that decides it did not exist before
+this release, which is the fourth time in four releases that picking the number
+found a missing rule. The policy is written around a kind's *shape*, and here the
+shape is exactly what did not move: `warning` has been an optional repeated child
+of `jql.validate` since v1, published in `jr contract` and in the output
+contract. What moved is how often it is filled in. That is now
+[a row of its own](docs/output-contract.md#stability-policy), minor, cascading to
+the patch position the way every minor does in `0.y.z`.
+
+### Fixed
+
+- **A value that does not exist is reported on Cloud, not only on Data Center.**
+  `jr jql validate` asked Cloud's parse endpoint in a mode that withholds this
+  class of diagnostic, so a query naming a user who does not exist came back
+  valid and silent:
+
+  ```console
+  $ jr jql validate --jql 'assignee = "someone-who-left"'
+  <query valid="true" method="parse">
+    <jql>assignee = "someone-who-left"</jql>
+    <warning>The value 'someone-who-left' does not exist for the field 'assignee'.</warning>
+  </query>
+  ```
+
+  The `<warning>` line is the new one. Data Center reported this all along,
+  because it answers this question with a zero-row search and reads the
+  `warningMessages` that come back; the two deployments now answer identically.
+
+  Five spellings were affected, all of them naming a person: `assignee`,
+  `reporter`, `creator`, `watcher`, and a value inside an `IN` list. Errors were
+  never affected, on either deployment.
+
+  **`valid` does not move.** A warning means Jira will run the query, so
+  promoting it to `valid="false"` would refuse queries the server answers, in the
+  one command whose job is to report the server's opinion rather than hold one.
+  If you branch on the attribute alone you will see no change at all; if you want
+  to know whether a clause matches nothing because nothing matches it or because
+  the value was typed wrong, read the warnings.
+
+  The replacement mode was swept against the old one over 25 queries before the
+  change. It returns identical errors on every one, adds the five warnings above,
+  and stays clean over twelve queries that legitimately match nothing, including
+  an unused label, a text search for a string nothing contains, `IS EMPTY`,
+  `currentUser()`, and `startOfWeek()`.
+
+### Output contract
+
+- No kind moved. `jql.validate` stays at **v1**: `warning` was always in its
+  schema, and this release fills it in where Cloud used to leave it out.
+
 ## [0.3.2] - 2026-08-14
 
 `jr` stops refusing relative periods that Jira accepts.
@@ -470,7 +530,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.3.2...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.3.3...main
+[0.3.3]: https://github.com/kmoneil/jr/releases/tag/v0.3.3
 [0.3.2]: https://github.com/kmoneil/jr/releases/tag/v0.3.2
 [0.3.1]: https://github.com/kmoneil/jr/releases/tag/v0.3.1
 [0.3.0]: https://github.com/kmoneil/jr/releases/tag/v0.3.0
