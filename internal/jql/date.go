@@ -29,11 +29,23 @@ import (
 // same point from the other side — two issues edited concurrently were stamped
 // with the identical `updated` — so a timestamp is not a cursor at any
 // precision, and the resume point has to be a (timestamp, key) pair.
-var dateLayouts = []string{
-	"2006-01-02 15:04",
-	"2006/01/02 15:04",
-	"2006-01-02",
-	"2006/01/02",
+//
+// **A minute is not accepted on every field.** Data Center refuses one on
+// `worklogDate` while taking it on `updated`, and Cloud takes it on both, so
+// which of these four a given clause may use is a property of the field and the
+// deployment together. That belongs where the deployment is known, not here;
+// `hasTime` is what lets a caller ask which layouts carry a clock without
+// keeping a second copy of this list, and a second copy of this list is exactly
+// the defect that produced the card this note was written under.
+var dateLayouts = []struct {
+	layout string
+	// hasTime marks a layout that names a time of day as well as a date.
+	hasTime bool
+}{
+	{"2006-01-02 15:04", true},
+	{"2006/01/02 15:04", true},
+	{"2006-01-02", false},
+	{"2006/01/02", false},
 }
 
 // relativePattern matches Jira's relative date syntax: an optional sign, a
@@ -109,12 +121,38 @@ func ClassifyDate(input string) DateKind {
 	case relativePattern.MatchString(s):
 		return DateRelative
 	}
-	for _, layout := range dateLayouts {
-		if _, err := time.Parse(layout, s); err == nil {
+	for _, l := range dateLayouts {
+		if _, err := time.Parse(l.layout, s); err == nil {
 			return DateAbsolute
 		}
 	}
 	return DateInvalid
+}
+
+// DateHasTimeOfDay reports whether a date names a time as well as a day.
+//
+// It exists because a minute is not accepted on every field: Data Center
+// refuses one on `worklogDate` and takes one on `updated`, and Cloud takes both.
+// Which fields those are is a property of the deployment, so the rule lives with
+// the code that knows the deployment; what that code needs from here is only
+// whether the caller wrote a clock, which is this package's business because
+// this package owns the layouts.
+//
+// False for a relative offset and for a function. Neither carries a time of day
+// in a sense a field can refuse: an offset is arithmetic on the server's clock,
+// and Data Center accepts `-5d` on `worklogDate` in the same breath as it
+// refuses `2026-08-10 00:00`.
+// The layouts answer the question on their own: nothing else this package
+// accepts parses as one, so an offset and a function fall through to the same
+// false as a word does.
+func DateHasTimeOfDay(input string) bool {
+	s := strings.TrimSpace(input)
+	for _, l := range dateLayouts {
+		if _, err := time.Parse(l.layout, s); err == nil {
+			return l.hasTime
+		}
+	}
+	return false
 }
 
 // ResolveDate resolves a date into the instant it names, for a caller that must
@@ -146,8 +184,8 @@ func ResolveDate(input string, loc *time.Location, now time.Time) (time.Time, bo
 		if loc == nil {
 			return time.Time{}, false
 		}
-		for _, layout := range dateLayouts {
-			if t, err := time.ParseInLocation(layout, s, loc); err == nil {
+		for _, l := range dateLayouts {
+			if t, err := time.ParseInLocation(l.layout, s, loc); err == nil {
 				return t, true
 			}
 		}

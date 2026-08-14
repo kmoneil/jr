@@ -281,3 +281,29 @@ func TestEveryRelativeUnitResolves(t *testing.T) {
 		}
 	}
 }
+
+// TestDateHasTimeOfDay is what lets a caller apply a rule this package cannot
+// know: which fields take a clock is a property of the field and the deployment
+// together, and both live elsewhere.
+func TestDateHasTimeOfDay(t *testing.T) {
+	for input, want := range map[string]bool{
+		"2026-08-10 13:45":     true,
+		"2026/08/10 13:45":     true,
+		"  2026-08-10 13:45  ": true,
+		"2026-08-10":           false,
+		"2026/08/10":           false,
+		// An offset is arithmetic on the server's clock, and Data Center takes
+		// `-5d` on the same field it refuses `2026-08-10 00:00` on.
+		"-7d":  false,
+		"+30m": false,
+		// A function is the server's, and refusing it for carrying a clock
+		// would be this package guessing at what it computes.
+		"startOfDay()": false,
+		"whenever":     false,
+		"":             false,
+	} {
+		if got := jql.DateHasTimeOfDay(input); got != want {
+			t.Errorf("DateHasTimeOfDay(%q) = %v, want %v", input, got, want)
+		}
+	}
+}

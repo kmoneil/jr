@@ -641,6 +641,33 @@ means their own day rather than the account's, the way to say so is an absolute
 literal converted into the account's zone — `docs/recipes.md` has the
 conversion.
 
+### A minute is not accepted on every field
+
+`updated >= "2026-08-12 18:13"` parses on both deployments. `worklogDate` does
+not, on one of them. Measured 2026-08-14 against Data Center 10.4 and the Cloud
+sandbox:
+
+| Clause                              | Data Center | Cloud    |
+| ----------------------------------- | ----------- | -------- |
+| `updated >= "2026-08-10 00:00"`     | accepted    | accepted |
+| `worklogDate >= "2026-08-10 00:00"` | **refused** | accepted |
+| `worklogDate >= "2026-08-10"`       | accepted    | accepted |
+| `worklogDate >= "-7d"`              | accepted    | accepted |
+
+Data Center says so itself:
+
+```
+Date value '2026-08-10 00:00' for field 'worklogDate' is invalid.
+Valid formats include: 'YYYY/MM/DD', 'YYYY-MM-DD', or a period format
+e.g. '-5d', '4w 2d'.
+```
+
+So `--worklog-after` and `--worklog-before` refuse a time of day on Data Center,
+with `INVALID_DATE` at exit 2, before the request is spent. They accept one on
+Cloud, because Cloud accepts one: the rule is the field and the deployment
+together, and a blanket refusal would invent a limit half the installed base
+does not have.
+
 ### `issue activity --since` is the one date resolved here
 
 Every other date flag is a clause in a query, and the server evaluates it.
