@@ -234,7 +234,14 @@ named field they moved. Neither says what was done, and assembling that by hand
 is where the answer stops being checkable.
 
 --since is required and bounds the candidate set, because a feed with no time
-bound is a sweep of every issue the credential can see.
+bound is a sweep of every issue the credential can see. It bounds each event as
+well, which is a second job and the one this command is for: an issue updated
+yesterday holds comments from years ago, and reporting them because their issue
+matched answers a question about issues while claiming to answer one about
+events. An absolute date is read in the Jira account's timezone, which is what
+Jira reads it in and costs one request to learn; a relative offset names an
+instant and costs nothing; a date function is refused, because computing one
+here would substitute this client's notion of a boundary for the server's.
 
 **Where the comment half comes from.** Comment authorship is not searchable in
 JQL on either deployment, so comments are matched here rather than by the
@@ -263,7 +270,8 @@ feed that exits 3 is not the same answer as an empty feed that exits 0.`),
 			Name: sinceFlag, Type: registry.TypeString,
 			Usage: "only events at or after this date or offset, e.g. -7d; " +
 				"required, and it bounds the issues searched as well as the " +
-				"events reported",
+				"events reported; a date function like startOfWeek() is " +
+				"refused here, because this command compares dates itself",
 			Required: true,
 		}, {
 			Name: userFlag, Type: registry.TypeString,
@@ -321,11 +329,92 @@ func validateActivity(ctx context.Context, inv *registry.Invocation) error {
 	if _, err := jql.ParseDate(since); err != nil {
 		return err
 	}
-	inv.SetValue(activitySinceKey, ActivityCutoff(since, time.Now()))
+	if err := resolveActivityCutoff(ctx, inv, since); err != nil {
+		return err
+	}
 	if err := resolveActivityUser(ctx, inv); err != nil {
 		return err
 	}
 	return requirePageSize(inv)
+}
+
+// resolveActivityCutoff turns --since into the instant the event filter uses,
+// and refuses what it cannot turn into one.
+//
+// The refusal is the point. --since does two jobs: it goes to the server as
+// `updated >=`, which bounds the *issues*, and it bounds each *event* here.
+// This command emits events, and an issue updated yesterday holds comments from
+// years ago, so a --since that reaches only the first job answers a question
+// about issues while claiming to answer one about events. That is what it did
+// for four of the seven forms it accepted, at exit 0 and complete="true".
+func resolveActivityCutoff(
+	ctx context.Context, inv *registry.Invocation, since string,
+) error {
+	var loc *time.Location
+	switch jql.ClassifyDate(since) {
+	case jql.DateFunction:
+		// Resolving one here means computing it, and computing it means
+		// substituting this client's notion of a boundary for Jira's:
+		// startOfWeek() carries the server's idea of which day a week starts
+		// on. docs/output-contract.md says dates are passed through for that
+		// reason, and this command is the one that also has to compare them.
+		// So the honest answer is to decline the combination rather than to
+		// bound the issues and leave the events unbounded.
+		return errs.Usage("UNBOUNDABLE_DATE",
+			"--%s cannot take a date function on this command", sinceFlag).
+			WithDetail("%s filters events in this process, and computing %s "+
+				"here would substitute this client's boundary for Jira's",
+				strings.Join([]string{buildinfo.App, "issue", "activity"}, " "),
+				strings.TrimSpace(since)).
+			WithRemedy("use an absolute date like 2026-08-10, or a relative " +
+				"offset like -7d")
+	case jql.DateAbsolute:
+		// An absolute literal is a wall clock, and Jira reads it in the
+		// account's zone. Only this form needs the request.
+		resolved, err := accountLocation(ctx, inv)
+		if err != nil {
+			return err
+		}
+		loc = resolved
+	case jql.DateRelative, jql.DateInvalid:
+		// An offset names an instant, which is the same in every zone, so this
+		// form costs no request. DateInvalid cannot arrive: ParseDate refused
+		// it above, and ActivityCutoff reports it rather than guessing.
+	}
+
+	cutoff := ActivityCutoff(since, loc, time.Now())
+	if cutoff == "" {
+		return errs.Usage("UNBOUNDABLE_DATE",
+			"--%s cannot be resolved to an instant", sinceFlag).
+			WithDetail("input: %s", strings.TrimSpace(since)).
+			WithRemedy("use an absolute date like 2026-08-10, or a relative " +
+				"offset like -7d")
+	}
+	inv.SetValue(activitySinceKey, cutoff)
+	return nil
+}
+
+// accountLocation reads the timezone Jira evaluates this caller's dates in.
+//
+// One GET to /myself, and only for the forms that need it. Both deployments
+// have been recorded sending a zone, so an account without one is a refusal
+// rather than a fallback.
+func accountLocation(
+	ctx context.Context, inv *registry.Invocation,
+) (*time.Location, error) {
+	if inv.Jira == nil {
+		return nil, errs.Runtime("NO_SESSION",
+			"--%s cannot be resolved without a connection to Jira", sinceFlag)
+	}
+	meta, err := inv.Jira.Metadata(ctx)
+	if err != nil {
+		return nil, err
+	}
+	me, err := site.Whoami(ctx, meta.Client, meta.Info)
+	if err != nil {
+		return nil, err
+	}
+	return me.Location()
 }
 
 func isEventKind(k string) bool {
@@ -567,59 +656,29 @@ const activitySinceKey = "issue.activity.since"
 
 // ActivityCutoff turns --since into the instant an event is compared against.
 //
-// Exported for the test that pins the four forms it resolves, because getting
-// this wrong shows up as a feed that is quietly too wide or too narrow rather
-// than as a failure.
+// Exported for the test that holds it to the set `jql.ParseDate` accepts,
+// because getting this wrong shows up as a feed that is quietly too wide or too
+// narrow rather than as a failure. It was wrong for exactly that reason: this
+// carried its own list of two layouts against the four `jql` accepts, and the
+// two it could not read resolved to "no bound at all".
 //
 // `jql.ParseDate` settles whether the input is *valid* and what the query
 // should carry; this settles what the client-side filter compares to, which is
 // a separate job because three of the four kinds are filtered here rather than
-// by the server. Only the two forms that resolve locally are turned into an
-// instant: an absolute date, and a relative offset in Jira's own syntax. A date
-// *function* like `startOfWeek()` is left to the server alone, and the event
-// filter then bounds nothing, which is honest — the issues came back already
-// narrowed by it.
-func ActivityCutoff(input string, now time.Time) string {
-	s := strings.TrimSpace(input)
-	if s == "" {
+// by the server. Both now read the same enumeration, so a form cannot be
+// accepted in one and unresolvable in the other.
+//
+// loc is the timezone on the Jira account's profile. An absolute literal is a
+// wall clock and Jira reads it in that zone, so reading it here in UTC is wrong
+// by the offset: five hours of over-reporting on America/Chicago, and nine
+// hours of silently dropped events on Asia/Tokyo.
+//
+// An empty return means the input names no instant this process can compute,
+// which is a refusal at the caller and never an unbounded filter.
+func ActivityCutoff(input string, loc *time.Location, now time.Time) string {
+	t, ok := jql.ResolveDate(input, loc, now)
+	if !ok {
 		return ""
 	}
-	if d, ok := relativeOffset(s); ok {
-		return now.Add(d).UTC().Format(time.RFC3339)
-	}
-	for _, layout := range []string{"2006-01-02", "2006/01/02"} {
-		if t, err := time.Parse(layout, s); err == nil {
-			return t.UTC().Format(time.RFC3339)
-		}
-	}
-	return ""
-}
-
-// relativeOffset reads Jira's relative date syntax as a duration. The units are
-// Jira's, where `m` is minutes and `M` is months.
-func relativeOffset(s string) (time.Duration, bool) {
-	if len(s) < 2 {
-		return 0, false
-	}
-	unit := s[len(s)-1]
-	n, err := strconv.Atoi(strings.TrimPrefix(s[:len(s)-1], "+"))
-	if err != nil {
-		return 0, false
-	}
-	switch unit {
-	case 'm':
-		return time.Duration(n) * time.Minute, true
-	case 'h':
-		return time.Duration(n) * time.Hour, true
-	case 'd':
-		return time.Duration(n) * 24 * time.Hour, true
-	case 'w':
-		return time.Duration(n) * 7 * 24 * time.Hour, true
-	case 'M':
-		// Thirty days, and deliberately not a calendar month: this bounds a
-		// client-side filter over events the server already narrowed, so it
-		// only has to be no *wider* than what the query asked for.
-		return time.Duration(n) * 30 * 24 * time.Hour, true
-	}
-	return 0, false
+	return t.UTC().Format(time.RFC3339)
 }

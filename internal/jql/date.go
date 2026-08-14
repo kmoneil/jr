@@ -69,6 +69,132 @@ var dateFunctions = map[string]bool{
 	"projectsleadbyuser":   true,
 }
 
+// DateKind classifies a date this package accepts, so a caller that has to
+// compare values locally can tell what it is being handed before it tries.
+//
+// The distinction is not cosmetic. A relative offset names an instant, and an
+// instant is the same in every timezone. An absolute literal names a wall clock
+// and means nothing until a zone is supplied. A function is arithmetic only the
+// server can do.
+type DateKind int
+
+const (
+	// DateInvalid is anything ParseDate refuses.
+	DateInvalid DateKind = iota
+	// DateRelative is Jira's offset syntax: -7d, +30m, 2w.
+	DateRelative
+	// DateAbsolute is one of dateLayouts, with or without a time of day.
+	DateAbsolute
+	// DateFunction is shaped like a call: startOfWeek(), endOfDay(-1). The
+	// shape is what is classified, not the validity — parseDateFunction
+	// settles whether the name and the arguments are real, so that a bad
+	// function is still refused as a bad function rather than as a bad date.
+	DateFunction
+)
+
+// ClassifyDate reports which of the three forms an input takes.
+//
+// This is the single enumeration of what a date may be. ParseDate branches on
+// it and so does ResolveDate, which is what stops the two from drifting: a
+// layout added here is accepted and resolvable in the same commit, and
+// `TestEveryAcceptedDateIsBoundedOrRefused` fails if a command can be handed a
+// form it cannot apply.
+func ClassifyDate(input string) DateKind {
+	s := strings.TrimSpace(input)
+	switch {
+	case s == "":
+		return DateInvalid
+	case strings.HasSuffix(s, ")"):
+		return DateFunction
+	case relativePattern.MatchString(s):
+		return DateRelative
+	}
+	for _, layout := range dateLayouts {
+		if _, err := time.Parse(layout, s); err == nil {
+			return DateAbsolute
+		}
+	}
+	return DateInvalid
+}
+
+// ResolveDate resolves a date into the instant it names, for a caller that must
+// compare against it in this process rather than send it to Jira.
+//
+// Only `issue activity` needs this, and it needs it because three of its four
+// event kinds are matched here rather than by the server. Everything else on a
+// query passes the value through, which is deliberate and documented in
+// `docs/output-contract.md`: computing a date locally substitutes this client's
+// notion of a boundary for Jira's.
+//
+// loc is the timezone on the **Jira account's profile**, because that is the
+// clock Jira evaluates a literal in. Passing the local machine's zone, or UTC
+// on an account that is not on UTC, produces a bound that is wrong by the
+// offset — silently, and in the direction that drops events on any account east
+// of UTC.
+//
+// Reports false for a function, for an unparseable input, and for an absolute
+// literal with no zone to read it in. A false is never a reason to fall back to
+// an unbounded filter; the caller refuses.
+func ResolveDate(input string, loc *time.Location, now time.Time) (time.Time, bool) {
+	s := strings.TrimSpace(input)
+	switch ClassifyDate(s) {
+	case DateRelative:
+		if d, ok := relativeOffset(s); ok {
+			return now.Add(d), true
+		}
+	case DateAbsolute:
+		if loc == nil {
+			return time.Time{}, false
+		}
+		for _, layout := range dateLayouts {
+			if t, err := time.ParseInLocation(layout, s, loc); err == nil {
+				return t, true
+			}
+		}
+	case DateInvalid, DateFunction:
+		return time.Time{}, false
+	}
+	return time.Time{}, false
+}
+
+// relativeOffset reads Jira's relative date syntax as a duration. The units are
+// Jira's, where `m` is minutes and `M` is months.
+//
+// A month is thirty days here and not a calendar month. That is an
+// approximation, and where this feeds a client-side event filter it is an
+// approximation in the direction that **drops** events: the server's `-1M` from
+// the 31st reaches back further than thirty days, so an event in the gap
+// satisfies the query and is then filtered out here. Whether Jira accepts `M`
+// at all is unmeasured against either deployment, which is why this still says
+// thirty rather than having been corrected to something equally unmeasured: a
+// calendar month computed here would be a second guess, not a fix.
+// Call it only for a string relativePattern has matched. That is what makes the
+// indexing safe and the default arm correct: the pattern's unit class is
+// exactly `mhdwM`, so anything that is not the first four is the fifth. A unit
+// added to the pattern without a case here would silently become months, which
+// is why the two are written one above the other.
+func relativeOffset(s string) (time.Duration, bool) {
+	n, err := strconv.Atoi(strings.TrimPrefix(s[:len(s)-1], "+"))
+	if err != nil {
+		// A number too large to hold. It matched the pattern, so it is a date
+		// the caller wrote and not a typo, and the honest answer is that this
+		// process cannot name the instant.
+		return 0, false
+	}
+	switch s[len(s)-1] {
+	case 'm':
+		return time.Duration(n) * time.Minute, true
+	case 'h':
+		return time.Duration(n) * time.Hour, true
+	case 'd':
+		return time.Duration(n) * 24 * time.Hour, true
+	case 'w':
+		return time.Duration(n) * 7 * 24 * time.Hour, true
+	default:
+		return time.Duration(n) * 30 * 24 * time.Hour, true
+	}
+}
+
 // ParseDate resolves a user-supplied date into a JQL value.
 //
 // It accepts an absolute date, a relative offset, or a date function. Anything
@@ -81,19 +207,13 @@ func ParseDate(input string) (Value, error) {
 			WithRemedy("use YYYY-MM-DD, a relative offset like -7d, or a function like startOfWeek()")
 	}
 
-	// A function call: startOfWeek(), endOfDay(-1).
-	if strings.HasSuffix(s, ")") {
+	switch ClassifyDate(s) {
+	case DateFunction:
+		// A function call: startOfWeek(), endOfDay(-1).
 		return parseDateFunction(s)
-	}
-
-	if relativePattern.MatchString(s) {
+	case DateRelative, DateAbsolute:
 		return Text(s), nil
-	}
-
-	for _, layout := range dateLayouts {
-		if _, err := time.Parse(layout, s); err == nil {
-			return Text(s), nil
-		}
+	case DateInvalid:
 	}
 
 	e := errs.Usage("INVALID_DATE", "%q is not a date", input).

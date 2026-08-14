@@ -641,6 +641,39 @@ means their own day rather than the account's, the way to say so is an absolute
 literal converted into the account's zone — `docs/recipes.md` has the
 conversion.
 
+### `issue activity --since` is the one date resolved here
+
+Every other date flag is a clause in a query, and the server evaluates it.
+`issue activity` cannot work that way: comments are not searchable in JQL on
+either deployment, so three of its four event kinds are matched in this process,
+and `--since` has to bound the events as well as the issues the query selected.
+An issue updated yesterday holds comments from years ago.
+
+So this one flag is resolved locally, and what that costs is different per form:
+
+| Form                       | How it resolves                                                          | Requests |
+| -------------------------- | ------------------------------------------------------------------------ | -------- |
+| `-7d`, `+30m`, `2w`        | An offset names an instant, which is the same in every zone.             | none     |
+| `2026-08-10`, with or without a time of day | A wall clock, read in the **account's** zone, because that is the clock Jira reads it in. | one GET to `/myself` |
+| `startOfWeek()` and any other function | Refused. See below.                                           | none     |
+
+A function is refused rather than approximated because computing one means
+choosing the day a week starts on, and the paragraph above is the reason not to.
+The alternative shipped first and was worse than either: the bound reached the
+query, the events were compared against nothing, and the feed reported itself
+`complete="true"` at exit 0 while carrying events from outside the window.
+
+| Code                       | Exit | Meaning                                                                                                                                                  |
+| -------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UNBOUNDABLE_DATE`         | 2    | `--since` names no instant this process can compute: a date function, on the one command that has to compare dates itself. `remedy` names the forms that work. |
+| `NO_ACCOUNT_TIMEZONE`      | 2    | An absolute `--since`, and the site did not report the account's zone. Both deployments send one, so this is a site breaking its own contract; reading the literal as UTC anyway would be wrong by the offset with nothing in the output to say so. |
+| `UNKNOWN_ACCOUNT_TIMEZONE` | 2    | The site named a zone this build cannot resolve. The zone database is compiled in, so this is a name no database has.                                     |
+
+All three are exit 2 and not 9. A missing field is malformed data, which is what
+9 means, but 9 is also `retryable`, and a second attempt reads the same profile
+and fails the same way. What the caller has is a combination this site cannot
+support and a remedy that works on the next invocation.
+
 ## TSV escaping
 
 Every record is one line and every field is one column. Within a field:

@@ -308,7 +308,9 @@ $ jr issue list --created-after "$(TZ=America/Chicago date -d @$start '+%Y-%m-%d
 
 `startOfWeek()` and friends are passed through rather than computed here on
 purpose — they carry Jira's own notion of when a week begins, which a converted
-instant does not.
+instant does not. The exception is `jr issue activity`, which compares dates
+itself and therefore refuses a function rather than passing it through: see
+`UNBOUNDABLE_DATE` below.
 
 ## Refusals that look like bugs
 
@@ -407,6 +409,41 @@ message.
 `jr sprint start` refused because the sprint has no window and you did not pass
 one. Jira will not run a sprint that has no dates; this says so without spending
 the round trip.
+
+### `UNBOUNDABLE_DATE`
+
+`jr issue activity --since startOfWeek()`, or any other date function. Every
+other date flag is a clause the server evaluates, so a function is passed
+through. This one is not: comments are not searchable in JQL, so `issue
+activity` matches most of its events in this process, and `--since` has to bound
+the events and not only the issues the query found.
+
+Computing `startOfWeek()` here means choosing which day a week starts on, and
+that choice is Jira's. So the combination is refused. Use an absolute date or a
+relative offset:
+
+```console
+$ jr issue activity --since -7d
+$ jr issue activity --since 2026-08-10
+```
+
+The version that shipped before did neither: the function reached the query, the
+events were compared against nothing, and the feed reported `complete="true"` at
+exit 0 with events from outside the window in it.
+
+### `NO_ACCOUNT_TIMEZONE` / `UNKNOWN_ACCOUNT_TIMEZONE`
+
+An absolute `--since` on `jr issue activity` is a wall clock, and reading it
+means knowing the account's zone, which is one request to `/myself`. These say
+the site did not report a zone, or reported one that is not a zone.
+
+Both deployments send one, so this is unusual. Reading the literal as UTC anyway
+would put the bound five or nine hours off with nothing in the output to say so.
+A relative offset needs no zone and always works:
+
+```console
+$ jr issue activity --since -7d
+```
 
 ```console
 $ jr sprint start 5
