@@ -2261,6 +2261,13 @@ valid="false" with the reasons, because the reasons are the product: an agent
 checking a query before it acts needs to know what is wrong with it, and an
 exit code cannot carry a list. Branch on the attribute, not on the status.
 
+A valid query can still carry warnings, and they are why the attribute is not
+the whole answer. Jira warns when it will run the query and something in it
+names nothing on this site, most often a value that does not exist for the
+field: a user who has left, or was never here, or was typed wrong. The clause
+is legal and matches nothing, so valid="true" with a warning and valid="true"
+without one mean different things and lead to different next steps.
+
 The two deployments answer this differently. Cloud has an endpoint for exactly
 this question. Data Center does not, so the query is sent as a search bounded to
 zero results — which parses and permission-checks it without fetching anything.

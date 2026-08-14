@@ -126,6 +126,13 @@ valid="false" with the reasons, because the reasons are the product: an agent
 checking a query before it acts needs to know what is wrong with it, and an
 exit code cannot carry a list. Branch on the attribute, not on the status.
 
+A valid query can still carry warnings, and they are why the attribute is not
+the whole answer. Jira warns when it will run the query and something in it
+names nothing on this site, most often a value that does not exist for the
+field: a user who has left, or was never here, or was typed wrong. The clause
+is legal and matches nothing, so valid="true" with a warning and valid="true"
+without one mean different things and lead to different next steps.
+
 The two deployments answer this differently. Cloud has an endpoint for exactly
 this question. Data Center does not, so the query is sent as a search bounded to
 zero results — which parses and permission-checks it without fetching anything.
@@ -225,9 +232,24 @@ func (c *Client) checkParse(ctx context.Context, query string) (Result, error) {
 	resp, err := c.Transport.Do(ctx, transport.Request{
 		Method: transport.MethodPost,
 		Path:   path,
-		// strict is the whole point: a query Jira would run with warnings is
-		// not one this command should call valid without saying so.
-		Query:  url.Values{"validation": {"strict"}},
+		// A query Jira would run with warnings is not one this command should
+		// call valid without saying so. That was the argument for `strict`, and
+		// `strict` is the mode that does not do it.
+		//
+		// Measured 2026-08-14 against a Cloud site, on `assignee = "nobody"`:
+		// `strict` returns neither an errors key nor a warnings key, `warn`
+		// returns the warning naming the value, and `none` returns both keys
+		// empty. So the silence under `strict` is a dropped diagnostic rather
+		// than a clean verdict, and every user-valued operand was invisible
+		// here. Data Center never had the gap, because checkSearch below reads
+		// warningMessages off the search it already makes.
+		//
+		// `warn` was swept against `strict` over 25 queries and is a superset:
+		// identical errors on every one, five warnings `strict` withheld, and
+		// clean over twelve queries that legitimately match nothing. Nothing
+		// here promotes a warning to invalid, so the only change is that the
+		// warnings Jira sends reach the caller.
+		Query:  url.Values{"validation": {"warn"}},
 		Header: map[string][]string{"Content-Type": {"application/json"}},
 		Body:   body,
 	})
