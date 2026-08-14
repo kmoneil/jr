@@ -1144,6 +1144,19 @@ diffing two runs must not see a difference that means nothing.
   output.
 - Changing an exit code's meaning, an error `code` string, or a `kind`:
   **major**.
+- Refusing an input that used to be accepted: **major**. Nothing about the
+  output's shape moves, so a script still _parses_ every document identically —
+  and the invocation it was built around now exits 2. This row was missing until
+  0.3.0, whose whole content is three date forms that used to be accepted and
+  answered wrongly. Fixing a wrong answer is not a reason to spare the version:
+  the caller has to change what they send either way, and the version number is
+  the only place they find that out before it happens.
+- Moving a refusal earlier, so that the same input carries a different `code`:
+  **major**, for the same reason and against the same reader. `BAD_REQUEST` from
+  Jira and `INVALID_DATE` from `jr` describe one mistake, and a consumer
+  branching on `code` sees a string it has never seen. The exit is unchanged and
+  that is not enough, because `code` is the field the contract tells people to
+  branch on.
 - Adding a warning `code`: **minor**, and it bumps no kind version. A warning is
   a separate document on stderr, so no existing consumer is reading for one it
   has never seen, and a command that gains a warning emits the same result it
