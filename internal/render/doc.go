@@ -14,6 +14,22 @@ type Doc struct {
 	Kind    string
 	Version int
 
+	// Site is the Jira this answer came from: the base URL the request was
+	// actually sent to, including any context path, and not the one configured.
+	// Empty for a command that never reached a site, which is every local one —
+	// `context list` has no Jira to name and says nothing rather than guessing.
+	//
+	// It is provenance and therefore data, not a diagnostic. An answer stored
+	// in a file outlives the shell that produced it, and two answers from two
+	// Jiras are otherwise indistinguishable once they are both on disk. The
+	// case that raised it was a command silently running against the wrong
+	// instance and returning a well-formed, complete, exit-0 document about it.
+	//
+	// **TSV carries no envelope and so carries no site.** That is the same
+	// limitation truncation already has there, and the reason `complete="false"`
+	// becomes a stderr warning plus exit 3 in that format.
+	Site string
+
 	// Exactly one of Collection and Record is set.
 	Collection *Collection
 	Record     *Node

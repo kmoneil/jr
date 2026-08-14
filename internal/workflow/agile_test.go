@@ -421,6 +421,8 @@ func replayConn(t *testing.T, fixture string) (*transport.Client, *transport.Rep
 // stubSession is a registry.Session over a recorded conversation, so a command
 // runs with no auth, no config, and no network.
 type stubSession struct {
+	// site overrides what Site reports, for a test about provenance.
+	site   string
 	fields []string
 	conn   *transport.Client
 	kind   site.Kind
@@ -551,4 +553,13 @@ func TestTheDocumentAHalfAppliedMoveCarriesIsDeclared(t *testing.T) {
 			"refuse to write it and the caller would learn nothing",
 			partial.Doc.Kind, partial.Doc.Version)
 	}
+}
+
+// Site implements registry.Session. A fixed value, because provenance is a
+// property of the answer and these tests assert documents.
+func (s *stubSession) Site() string {
+	if s.site != "" {
+		return s.site
+	}
+	return "https://recorded.invalid"
 }

@@ -10,6 +10,9 @@ import (
 type StreamSpec struct {
 	Kind    string
 	Version int
+	// Site is the Jira the rows came from, for the envelope. See Doc.Site: it
+	// reaches the buffered formats and not TSV, which has no envelope.
+	Site string
 	// Name is the container element, e.g. "issues".
 	Name    string
 	Columns []Column
@@ -240,6 +243,7 @@ func (s *Stream) Close(complete bool, nextPageToken string) error {
 			NextPageToken: nextPageToken,
 			Columns:       s.spec.Columns,
 		})
+		doc.Site = s.spec.Site
 		return Write(s.w, doc, s.format)
 	}
 

@@ -292,7 +292,22 @@ func (a *app) runDocument(
 			"command %s emitted kind %q v%d, which it does not declare",
 			rc.Name(), doc.Kind, doc.Version)
 	}
+	doc.Site = siteOf(inv)
 	return a.emit(doc)
+}
+
+// siteOf names the Jira an invocation reached, for the envelope.
+//
+// Empty for a command with no session, which is every local one. It is read
+// here, at the boundary that renders, rather than by each resource: a resource
+// that had to remember to stamp its own provenance would be a resource that
+// eventually forgot, and the envelope is the one place every document passes
+// through.
+func siteOf(inv *registry.Invocation) string {
+	if inv == nil || inv.Jira == nil {
+		return ""
+	}
+	return inv.Jira.Site()
 }
 
 // newInvocation assembles everything a command is handed before it runs.

@@ -245,7 +245,7 @@ hold:
 
 ```console
 $ jr issue get ENG-101
-<result kind="issue.get" v="9">
+<result kind="issue.get" v="9" site="https://your-company.atlassian.net">
   <issue key="ENG-101" type="Story" priority="High" project="ENG">
     <summary>Retry logic drops the last error</summary>
     <status category="in-progress">In Progress</status>

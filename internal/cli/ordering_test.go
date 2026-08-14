@@ -343,3 +343,4 @@ func (unreachableSession) RequireBoard() (string, error)   { return "1", nil }
 func (unreachableSession) Fields() []string                { return nil }
 func (unreachableSession) CheckWritable(string) error      { return nil }
 func (unreachableSession) Idempotency() *idem.Ledger       { return nil }
+func (unreachableSession) Site() string                    { return "https://unreachable.invalid" }

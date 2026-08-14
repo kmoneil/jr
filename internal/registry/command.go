@@ -292,6 +292,18 @@ type Session interface {
 	// no state directory. A caller finds out by the flag having no effect
 	// rather than by a silent duplicate.
 	Idempotency() *idem.Ledger
+	// Site is the Jira this session resolves to, including any context path,
+	// and empty when no site can be resolved at all.
+	//
+	// It is on the interface rather than read by type assertion because a
+	// session that cannot say which Jira it points at is a session nobody
+	// should be able to write. The document envelope carries this, so an answer
+	// stored in a file still names the instance that produced it.
+	//
+	// Resolving it costs nothing and reaches no network: it is the value
+	// Connect would dial, available before Connect is called and unchanged by
+	// it.
+	Site() string
 }
 
 // Invocation is everything a command needs from the caller.

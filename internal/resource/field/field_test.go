@@ -176,6 +176,8 @@ func run(t *testing.T, limit registry.Limit, format render.Format) (string, regi
 // stubSession is a registry.Session backed by a stubbed transport, so the
 // command is exercised with no auth, no config, and no network.
 type stubSession struct {
+	// site overrides what Site reports, for a test about provenance.
+	site   string
 	fields []string
 	doer   *stubDoer
 	meta   *site.Metadata
@@ -280,4 +282,13 @@ func TestListSurfacesAFetchFailure(t *testing.T) {
 	} else if code := errs.Coerce(err).Code; code != "MALFORMED_FIELD_LIST" {
 		t.Errorf("code = %q, want MALFORMED_FIELD_LIST", code)
 	}
+}
+
+// Site implements registry.Session. A fixed value, because provenance is a
+// property of the answer and these tests assert documents.
+func (s *stubSession) Site() string {
+	if s.site != "" {
+		return s.site
+	}
+	return "https://recorded.invalid"
 }

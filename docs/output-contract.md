@@ -293,7 +293,7 @@ Every successful XML response:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<result kind="issue.list" v="7">
+<result kind="issue.list" v="7" site="https://acme.atlassian.net">
   <issues count="3" complete="true">
     <issue key="ENG-101">
       <summary>Retry logic drops the last error</summary>
@@ -308,6 +308,11 @@ Every successful XML response:
 
 - `kind`, stable identifier for the payload shape. An agent dispatches on it.
 - `v`, schema version for that kind, incremented on breaking change.
+- `site`, **the Jira this answer came from**: the base URL the request was
+  actually sent to, including any context path. Present on every document from a
+  command that reached a site, and **absent** on one that did not — `jr version`
+  and `jr context list` name no Jira rather than an empty one. See
+  [Provenance](#provenance) below.
 - `complete`, **`true` only if the result set is exhaustive.** If a limit
   truncated it, `complete="false"` and `<next-page-token>` is present. There is
   no third state and no way to get a truncated set that claims to be complete.
@@ -320,13 +325,42 @@ the XML tree:
 {
   "kind": "issue.list",
   "v": 7,
+  "site": "https://acme.atlassian.net",
   "count": 3,
   "complete": true,
   "issues": [ … ]
 }
 ```
 
-TSV emits a header row and nothing else, no envelope, no counts.
+TSV emits a header row and nothing else, no envelope, no counts, no site.
+
+### Provenance
+
+`site` names the instance, because an answer outlives the shell that produced
+it. Two documents from two Jiras were otherwise indistinguishable once both were
+on disk, and the case that added this was a command run against the wrong
+instance returning a well-formed, complete, exit-0 document about it. Nothing
+misbehaved; the answer simply did not say what it was an answer about.
+
+Three things it is, precisely:
+
+- **The URL that was used, not the one configured.** They differ under a context
+  path, and differing is the case worth reporting.
+- **Data, not a diagnostic.** It is on the envelope rather than on stderr,
+  because stderr is discarded by exactly the caller that most needs it — an MCP
+  tool call never sees any.
+- **Not the context name.** A context name is local and means nothing to
+  whoever reads the file next. The site is the fact.
+
+**TSV carries none**, because TSV has no envelope. That is the same limit
+truncation has in that format, where `complete="false"` becomes a structured
+stderr warning plus exit 3. A column was considered and rejected: it would
+change a default column set, which is a breaking change, and repeat one value on
+every row. So a caller who needs provenance in a pipeline asks for a structured
+format, and `jr issue list --format json` is the whole of the answer.
+
+Adding it moved no kind version. The per-kind shapes describe the payload, and
+this is on the envelope every kind shares.
 
 ## Streaming
 
@@ -995,7 +1029,7 @@ honours no `If-Match`. So the check is a read, a comparison, and then the write,
 and it has a window one round trip wide. A verb that ran one records it:
 
 ```xml
-<result kind="issue.edit" v="2">
+<result kind="issue.edit" v="2" site="https://acme.atlassian.net">
   <issue key="ENG-101" action="edited">
     <precondition method="read-compare"/>
   </issue>
@@ -1061,7 +1095,7 @@ rather than a bare acknowledgement. The id in `sprint.create` is the only place 
 caller learns what their new sprint was numbered.
 
 ```xml
-<result kind="sprint.start" v="1">
+<result kind="sprint.start" v="1" site="https://acme.atlassian.net">
   <sprint id="4" state="active" board="3" action="started">
     <name>Sprint 14</name>
     <goal>Ship the importer</goal>

@@ -52,6 +52,20 @@ func (a *app) newSession() (*session, error) {
 	return &session{app: a, resolved: resolved}, nil
 }
 
+// Site implements registry.Session.
+//
+// The error is dropped on purpose. A session with no resolvable site is one
+// whose first Connect will fail with `NO_SITE` and a remedy; saying so twice,
+// once as an empty envelope attribute, helps nobody. Absent means "this answer
+// names no Jira", which is the honest reading either way.
+func (s *session) Site() string {
+	siteURL, err := s.resolved.RequireSite()
+	if err != nil {
+		return ""
+	}
+	return siteURL
+}
+
 // Project implements registry.Session.
 func (s *session) Project() string { return s.resolved.Project }
 

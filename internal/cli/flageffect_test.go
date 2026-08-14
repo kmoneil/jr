@@ -1079,6 +1079,7 @@ func (s sweepSession) Metadata(ctx context.Context) (*site.Metadata, error) {
 
 func (sweepSession) CheckWritable(string) error      { return nil }
 func (sweepSession) Project() string                 { return "ENG" }
+func (sweepSession) Site() string                    { return "https://sweep.invalid" }
 func (sweepSession) RequireProject() (string, error) { return "ENG", nil }
 func (sweepSession) Board() string                   { return "1" }
 func (sweepSession) RequireBoard() (string, error)   { return "1", nil }

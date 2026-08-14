@@ -15,6 +15,11 @@ func writeXML(w *writer, d *Doc) {
 	root := El("result").
 		Attr("kind", d.Kind).
 		Attr("v", strconv.Itoa(d.Version))
+	// Absent rather than empty for a command that reached no site. An empty
+	// attribute would read as "a site that is the empty string".
+	if d.Site != "" {
+		root.Attr("site", d.Site)
+	}
 
 	switch {
 	case d.Record != nil:

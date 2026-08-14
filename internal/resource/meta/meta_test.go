@@ -334,6 +334,8 @@ func runStream(
 // stubSession is a registry.Session backed by a stubbed transport, so a command
 // is exercised with no auth, no config, and no network.
 type stubSession struct {
+	// site overrides what Site reports, for a test about provenance.
+	site   string
 	fields []string
 	// doer is an interface because createmeta needs a transport that answers
 	// two different requests, and a single-body stub cannot.
@@ -562,4 +564,13 @@ func (r *recordingDoer) Do(
 		Body:   []byte(r.body),
 		Header: map[string][]string{"Content-Type": {"application/json"}},
 	}, nil
+}
+
+// Site implements registry.Session. A fixed value, because provenance is a
+// property of the answer and these tests assert documents.
+func (s *stubSession) Site() string {
+	if s.site != "" {
+		return s.site
+	}
+	return "https://recorded.invalid"
 }
