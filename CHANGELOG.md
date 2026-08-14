@@ -20,6 +20,80 @@ accident.
 
 Nothing yet.
 
+## [0.3.2] - 2026-08-14
+
+`jr` stops refusing relative periods that Jira accepts.
+
+**Nothing changed shape, and nothing that worked stops working.** No kind moved
+a schema version, no default column set gained a field, no exit code or error
+`code` changed meaning, and every date form 0.3.1 accepted is still accepted and
+still means the same thing. What changed is that four forms which exited 2 now
+answer.
+
+A patch rather than a minor because accepting an input that used to be refused
+is minor under the stability policy, and the demotion this project uses in
+`0.y.z` cascades: a change the policy calls minor moves the patch position. That
+policy row did not exist before this release, which is the third time in three
+releases that picking the number found a missing rule.
+
+### Added
+
+- **The relative periods Jira accepts on a date field.** Its units are
+  case-insensitive for every unit and it takes a compound period, and `jr` took
+  neither. All four of these used to be `INVALID_DATE` at exit 2, and all four
+  are answered by Cloud and by Data Center 10.4:
+
+  ```console
+  $ jr issue list --updated-after -7D
+  $ jr issue list --updated-after -2H
+  $ jr issue list --updated-after -1W
+  $ jr issue list --updated-after "-4w 2d"
+  ```
+
+  A compound carries its sign once, on the front, and its components sum, so
+  `-1w 7d` selects exactly what `-14d` selects. It resolves in this process as
+  well as at the server, which means `jr issue activity --since "-4w 2d"` bounds
+  the events and not only the search.
+
+- **`y` in a date function's duration argument.** `--updated-after 'endOfDay(-1y)'`
+  was refused here and accepted by both deployments.
+
+### Fixed
+
+- **A date function's argument is a different grammar, and was being checked
+  against the wrong one.** A period on a date field and a duration argument to a
+  date function disagree about case, about which units exist, and about `M`:
+
+  |          | `--updated-after -1M`  | `--updated-after 'endOfDay(-1M)'` |
+  | -------- | ---------------------- | --------------------------------- |
+  | units    | `m` `h` `d` `w` `M`    | `y` `M` `w` `d` `h` `m`           |
+  | case     | insensitive            | **sensitive**                     |
+  | `M`      | **minutes**            | **months**                        |
+  | compound | accepted               | refused                           |
+
+  One pattern was validating both, which is what refused `endOfDay(-1y)` above.
+  There are two now, each generated from the table of units that gives those
+  characters their meaning, so a unit cannot be accepted by a pattern and unknown
+  to the code that reads it. `docs/output-contract.md` carries the comparison.
+
+  **`--updated-after -1M` is still one minute**, and `endOfDay(-1M)` is still one
+  month. Both were already true; neither is a change.
+
+- **A relative offset too large for a `time.Duration` is refused rather than
+  wrapped.** `-1000000d` is a legal query and 2739 years, and multiplying it into
+  an `int64` of nanoseconds wrapped to a negative, so a bound written as the past
+  named an instant in the future. Only `issue activity --since` resolves an
+  offset locally, so only it could be affected.
+
+### Output contract
+
+- **Nothing moved.** `jr contract` reports the same versions 0.3.1 did for every
+  kind.
+- `docs/output-contract.md` gains the two-grammar comparison, the compound
+  period's arithmetic, and a stability policy row for **accepting an input that
+  used to be refused**: minor, because every invocation a script already makes
+  still runs and still means the same thing.
+
 ## [0.3.1] - 2026-08-14
 
 A document now names the Jira it came from.
@@ -396,7 +470,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.3.1...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.3.2...main
+[0.3.2]: https://github.com/kmoneil/jr/releases/tag/v0.3.2
 [0.3.1]: https://github.com/kmoneil/jr/releases/tag/v0.3.1
 [0.3.0]: https://github.com/kmoneil/jr/releases/tag/v0.3.0
 [0.2.1]: https://github.com/kmoneil/jr/releases/tag/v0.2.1
