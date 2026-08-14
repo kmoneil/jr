@@ -20,6 +20,90 @@ accident.
 
 Nothing yet.
 
+## [0.3.0] - 2026-08-14
+
+Three date defects, all of them found in one transcript of somebody using 0.2.1
+to ask what they had worked on that week. They got the answer, and they got it
+by routing around the tool twice.
+
+**Nothing changed shape.** No kind moved a schema version, no default column set
+gained a field, and no exit code changed meaning, so a script written against
+0.2.1 parses 0.3.0 identically.
+
+**It is still a minor-position bump**, because three forms that used to be
+accepted are now refused, and one refusal moved from Jira to here and changed
+the `code` it carries. A script parses every document the same way and may stop
+working all the same. The stability policy had no row for that and now has two.
+
+### Fixed
+
+- **`issue activity --since` bounds the events, not only the search.**
+  `--since "2026-08-10 00:00"` returned events from before the bound, at exit 0,
+  `complete="true"`, with nothing on stderr. `--since` does two jobs: it goes to
+  the server as `updated >=`, which bounds the *issues*, and it is resolved here
+  into the instant each *event* is compared against. An issue updated yesterday
+  holds comments from years ago, so a bound that reaches only the first answers a
+  question about issues while claiming to answer one about events.
+
+  The two halves disagreed about what a date is. Four of the seven forms
+  `--since` accepted resolved to "no bound at all". They are one enumeration now,
+  read by the query builder and the event filter alike.
+
+- **An absolute `--since` is read in the Jira account's timezone.** It was read
+  in UTC, so even the two forms that did work were wrong by the account's
+  offset: five hours of over-reporting on `America/Chicago`, and nine hours of
+  silently dropped events on `Asia/Tokyo`. This costs one `GET /myself`, and only
+  for an absolute date; a relative offset names an instant and still costs
+  nothing.
+
+- **`M` is minutes, not months.** `relativeOffset` read it as thirty days. Jira's
+  period units are case-insensitive, so `M` and `m` are one unit and this was out
+  by a factor of 43,200: `--updated-after -1M` asked the server for the last
+  minute and told the local filter it meant the last month. Measured against both
+  deployments, where `-60M`, `-60m` and `-1h` return the same rows and `-43200M`
+  returns what `-30d` returns.
+
+  **This changes no query.** The string was always sent verbatim and Jira always
+  read it as minutes; what was wrong was what `jr` believed it meant, which only
+  `issue activity` acted on.
+
+- **`--worklog-after` and `--worklog-before` refuse a time of day on Data
+  Center**, where Jira refuses it, instead of spending a request to be told. They
+  still accept one on Cloud, where Jira accepts it. The rule is the field and the
+  deployment together — `updated` takes a minute on both — so a blanket refusal
+  would have invented a limit half the installed base does not have.
+
+### Changed
+
+- **A date function on `issue activity --since` is refused** with
+  `UNBOUNDABLE_DATE`, rather than bounding the issues and comparing the events
+  against nothing. Computing `startOfWeek()` here means choosing the day a week
+  starts on, and that choice is Jira's. Use an absolute date or a relative
+  offset; every other date flag still passes a function straight through.
+
+- **The zone database is compiled in.** `time.LoadLocation` otherwise reads a
+  host copy that a Windows binary and a scratch container do not have. About
+  450 KB, against roughly 4 MB of headroom under the reader binary's size budget.
+
+### Output contract
+
+- **Nothing moved.** `jr contract` reports the same versions 0.2.1 did for every
+  kind.
+- Three new error codes, all exit 2: `UNBOUNDABLE_DATE`,
+  `NO_ACCOUNT_TIMEZONE`, and `UNKNOWN_ACCOUNT_TIMEZONE`. The last two are a site
+  that did not report the account's zone, or reported one no database has; both
+  deployments send one, so neither is expected in practice.
+- **`INVALID_DATE` now fires where `BAD_REQUEST` did**, for a worklog date
+  carrying a time of day on Data Center. Same exit, different `code`, because the
+  refusal happens here now instead of at the far end.
+- The stability policy gained the two rules this release needed and did not have.
+  **Refusing an input that used to be accepted is major**, and so is **moving a
+  refusal earlier so the same input carries a different `code`**. Neither moves a
+  kind's shape, which is what the rest of the policy is written around, and both
+  break a caller's working command. Fixing a wrong answer does not spare the
+  version: the caller has to change what they send either way, and the version
+  number is the only place they find that out before it happens.
+
 ## [0.2.1] - 2026-08-13
 
 One new check and one thing removed. **Nothing changed shape**: no kind moved a
@@ -261,7 +345,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.2.1...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.3.0...main
+[0.3.0]: https://github.com/kmoneil/jr/releases/tag/v0.3.0
 [0.2.1]: https://github.com/kmoneil/jr/releases/tag/v0.2.1
 [0.2.0]: https://github.com/kmoneil/jr/releases/tag/v0.2.0
 [0.1.1]: https://github.com/kmoneil/jr/releases/tag/v0.1.1
