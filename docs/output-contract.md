@@ -1247,6 +1247,18 @@ diffing two runs must not see a difference that means nothing.
   has never seen, and a command that gains a warning emits the same result it
   did before. Changing what an existing warning code means is **major**, for the
   reason an error code is.
+- Populating an optional element the schema already declared, for inputs where
+  it used to be absent: **minor**, and it bumps no kind version. The shape did
+  not move: the element was in the schema, in `jr contract`, and in this
+  document, and a consumer was already told it might be there. What moved is how
+  often it is. This is the row the previous one read backwards from: a warning
+  gaining a `code` is new information in a place nobody was reading, and this is
+  new information in a place everybody was told to read and some inputs never
+  filled. The reader it matters to is the one who inferred a rule from the
+  silence, the way "no `warning` child means the query is clean" was true of
+  every Cloud query before 0.3.3 and is now true only of clean ones. Emptying an
+  element that used to be populated is **major**, because that reader's
+  inference fails in the direction that loses information rather than gains it.
 - `jr contract` (or `jr --contract`) dumps the machine-readable schema for every
   kind this build can emit, so a consumer can pin and verify.
 
