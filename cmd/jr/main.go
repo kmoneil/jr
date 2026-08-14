@@ -1,4 +1,4 @@
-// Command jr is a deterministic Jira client for scripts and agents.
+// Command jr is a deterministic client for Jira, built for scripts and agents.
 //
 // This file contains no logic beyond process wiring. Everything it can do comes
 // from the command registry, and which commands are in the registry is decided

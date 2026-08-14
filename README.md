@@ -4,7 +4,7 @@
 
 # jr
 
-### A Jira client whose output is a versioned contract
+### A client for Jira whose output is a versioned contract
 
 Built for scripts and agents first, humans second.
 It would rather fail than hand you something that merely looks right.
@@ -56,7 +56,8 @@ set, and the same is true of every command, in every format, on every path.
 [Commands](#what-works-today) · [A short tour](#a-short-tour) · [MCP](#mcp) ·
 [Agent skill](#the-agent-skill) ·
 [Docs](#documentation) · [Build profiles](#build-profiles) ·
-[Development](#development) · [Security](#security) · [License](#license)
+[Development](#development) · [Security](#security) · [License](#license) ·
+[Trademarks](#trademarks)
 
 ## Quickstart
 
@@ -905,6 +906,14 @@ that only lists wins is not one.
 Nothing is vendored, and [NOTICE](NOTICE) lists the five direct dependencies a
 binary links, with their licences and the one upstream NOTICE that has to travel
 with them.
+
+## Trademarks
+
+Jira and Atlassian are trademarks of Atlassian Pty Ltd. `jr` is an independent
+third-party client, not affiliated with, sponsored by, or endorsed by Atlassian.
+
+The same statement is in [NOTICE](NOTICE), which travels inside every release
+archive, so it reaches somebody holding only the tarball.
 
 ## How this was built
 

@@ -5,7 +5,7 @@ description: Query and modify Jira from the command line with `jr`, a client who
 
 # jr
 
-`jr` is a Jira client built for programs first. Its output is a versioned
+`jr` is a client for Jira, built for programs first. Its output is a versioned
 contract, and its central promise is inverted from most tools:
 
 **When `jr` cannot honor a request exactly, it fails. It never approximates,

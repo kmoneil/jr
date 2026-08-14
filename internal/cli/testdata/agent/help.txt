@@ -1,4 +1,4 @@
-jr is a Jira client whose output is a versioned contract.
+jr is a client for Jira whose output is a versioned contract.
 
 Every result carries a kind and a schema version. A result set that was
 truncated is never reported as complete: it exits 3 and says so. Any request
