@@ -1,4 +1,4 @@
-jr: a Jira client whose output is a versioned contract
+jr: a client for Jira whose output is a versioned contract
 Copyright 2026 Kevin O'Neil
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use
@@ -11,6 +11,19 @@ Unless required by applicable law or agreed to in writing, software distributed
 under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
 CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
+
+--------------------------------------------------------------------------------
+
+Trademarks
+
+Jira and Atlassian are trademarks of Atlassian Pty Ltd. jr is an independent
+third-party client. It is not affiliated with, sponsored by, or endorsed by
+Atlassian, and Atlassian does not support it.
+
+The name appears here only to say what this tool talks to, which is the
+descriptive use Atlassian's trademark policy permits. No Atlassian mark is in
+the name of this project, its module path, its repository, or its binary, and
+none should be added to a fork's.
 
 --------------------------------------------------------------------------------
 

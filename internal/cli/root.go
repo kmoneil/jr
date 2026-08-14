@@ -34,9 +34,9 @@ var groupSummaries = map[string]string{
 func (a *app) newRoot() *cobra.Command {
 	root := &cobra.Command{
 		Use:   buildinfo.App,
-		Short: "A deterministic Jira client for scripts and agents",
+		Short: "A deterministic client for Jira, built for scripts and agents",
 		Long: strings.TrimSpace(`
-` + buildinfo.App + ` is a Jira client whose output is a versioned contract.
+` + buildinfo.App + ` is a client for Jira whose output is a versioned contract.
 
 Every result carries a kind and a schema version. A result set that was
 truncated is never reported as complete: it exits 3 and says so. Any request
