@@ -29,11 +29,23 @@ import (
 // same point from the other side — two issues edited concurrently were stamped
 // with the identical `updated` — so a timestamp is not a cursor at any
 // precision, and the resume point has to be a (timestamp, key) pair.
-var dateLayouts = []string{
-	"2006-01-02 15:04",
-	"2006/01/02 15:04",
-	"2006-01-02",
-	"2006/01/02",
+//
+// **A minute is not accepted on every field.** Data Center refuses one on
+// `worklogDate` while taking it on `updated`, and Cloud takes it on both, so
+// which of these four a given clause may use is a property of the field and the
+// deployment together. That belongs where the deployment is known, not here;
+// `hasTime` is what lets a caller ask which layouts carry a clock without
+// keeping a second copy of this list, and a second copy of this list is exactly
+// the defect that produced the card this note was written under.
+var dateLayouts = []struct {
+	layout string
+	// hasTime marks a layout that names a time of day as well as a date.
+	hasTime bool
+}{
+	{"2006-01-02 15:04", true},
+	{"2006/01/02 15:04", true},
+	{"2006-01-02", false},
+	{"2006/01/02", false},
 }
 
 // relativePattern matches Jira's relative date syntax: an optional sign, a
@@ -69,6 +81,174 @@ var dateFunctions = map[string]bool{
 	"projectsleadbyuser":   true,
 }
 
+// DateKind classifies a date this package accepts, so a caller that has to
+// compare values locally can tell what it is being handed before it tries.
+//
+// The distinction is not cosmetic. A relative offset names an instant, and an
+// instant is the same in every timezone. An absolute literal names a wall clock
+// and means nothing until a zone is supplied. A function is arithmetic only the
+// server can do.
+type DateKind int
+
+const (
+	// DateInvalid is anything ParseDate refuses.
+	DateInvalid DateKind = iota
+	// DateRelative is Jira's offset syntax: -7d, +30m, 2w.
+	DateRelative
+	// DateAbsolute is one of dateLayouts, with or without a time of day.
+	DateAbsolute
+	// DateFunction is shaped like a call: startOfWeek(), endOfDay(-1). The
+	// shape is what is classified, not the validity — parseDateFunction
+	// settles whether the name and the arguments are real, so that a bad
+	// function is still refused as a bad function rather than as a bad date.
+	DateFunction
+)
+
+// ClassifyDate reports which of the three forms an input takes.
+//
+// This is the single enumeration of what a date may be. ParseDate branches on
+// it and so does ResolveDate, which is what stops the two from drifting: a
+// layout added here is accepted and resolvable in the same commit, and
+// `TestEveryAcceptedDateIsBoundedOrRefused` fails if a command can be handed a
+// form it cannot apply.
+func ClassifyDate(input string) DateKind {
+	s := strings.TrimSpace(input)
+	switch {
+	case s == "":
+		return DateInvalid
+	case strings.HasSuffix(s, ")"):
+		return DateFunction
+	case relativePattern.MatchString(s):
+		return DateRelative
+	}
+	for _, l := range dateLayouts {
+		if _, err := time.Parse(l.layout, s); err == nil {
+			return DateAbsolute
+		}
+	}
+	return DateInvalid
+}
+
+// DateHasTimeOfDay reports whether a date names a time as well as a day.
+//
+// It exists because a minute is not accepted on every field: Data Center
+// refuses one on `worklogDate` and takes one on `updated`, and Cloud takes both.
+// Which fields those are is a property of the deployment, so the rule lives with
+// the code that knows the deployment; what that code needs from here is only
+// whether the caller wrote a clock, which is this package's business because
+// this package owns the layouts.
+//
+// False for a relative offset and for a function. Neither carries a time of day
+// in a sense a field can refuse: an offset is arithmetic on the server's clock,
+// and Data Center accepts `-5d` on `worklogDate` in the same breath as it
+// refuses `2026-08-10 00:00`.
+// The layouts answer the question on their own: nothing else this package
+// accepts parses as one, so an offset and a function fall through to the same
+// false as a word does.
+func DateHasTimeOfDay(input string) bool {
+	s := strings.TrimSpace(input)
+	for _, l := range dateLayouts {
+		if _, err := time.Parse(l.layout, s); err == nil {
+			return l.hasTime
+		}
+	}
+	return false
+}
+
+// ResolveDate resolves a date into the instant it names, for a caller that must
+// compare against it in this process rather than send it to Jira.
+//
+// Only `issue activity` needs this, and it needs it because three of its four
+// event kinds are matched here rather than by the server. Everything else on a
+// query passes the value through, which is deliberate and documented in
+// `docs/output-contract.md`: computing a date locally substitutes this client's
+// notion of a boundary for Jira's.
+//
+// loc is the timezone on the **Jira account's profile**, because that is the
+// clock Jira evaluates a literal in. Passing the local machine's zone, or UTC
+// on an account that is not on UTC, produces a bound that is wrong by the
+// offset — silently, and in the direction that drops events on any account east
+// of UTC.
+//
+// Reports false for a function, for an unparseable input, and for an absolute
+// literal with no zone to read it in. A false is never a reason to fall back to
+// an unbounded filter; the caller refuses.
+func ResolveDate(input string, loc *time.Location, now time.Time) (time.Time, bool) {
+	s := strings.TrimSpace(input)
+	switch ClassifyDate(s) {
+	case DateRelative:
+		if d, ok := relativeOffset(s); ok {
+			return now.Add(d), true
+		}
+	case DateAbsolute:
+		if loc == nil {
+			return time.Time{}, false
+		}
+		for _, l := range dateLayouts {
+			if t, err := time.ParseInLocation(l.layout, s, loc); err == nil {
+				return t, true
+			}
+		}
+	case DateInvalid, DateFunction:
+		return time.Time{}, false
+	}
+	return time.Time{}, false
+}
+
+// relativeOffset reads Jira's relative date syntax as a duration.
+//
+// **`M` is minutes, not months.** The units are Jira's and Jira's are
+// case-insensitive, which is not what this code believed: it resolved `M` as
+// thirty days, so `--updated-after -1M` asked the server for the last minute
+// and told any local filter it meant the last month, a factor of 43,200 apart
+// and silent on both sides.
+//
+// Measured 2026-08-14 against Cloud and against Data Center 10.4, counting rows
+// on a project whose issues were all touched within the hour:
+//
+//	              Data Center   Cloud
+//	-1h                     5       0
+//	-60M                    5       0     equal to -1h on both
+//	-60m                    5       0
+//	-1M                     0       0     one minute, not one month
+//	-30d                    5       6
+//	-43200M                 -        6     43200 minutes, equal to -30d
+//	-1440M                  -        0     equal to -1d
+//
+// Cloud's sandbox had nothing touched within the hour, so the minute-scale rows
+// there are zero for both spellings and the 43200/1440 pair is what carries the
+// argument on that deployment.
+//
+// The pattern above accepts only lowercase for the other four units, so `jr` is
+// stricter than the server rather than differently lenient, which is the safe
+// direction: a spelling this refuses is one the caller can rewrite, and a
+// spelling this misreads is one nobody can see.
+// Call it only for a string relativePattern has matched. That is what makes the
+// indexing safe and the default arm correct: the pattern's unit class is
+// exactly `mhdwM`, so anything that is not `h`, `d` or `w` is one of the two
+// spellings of minutes. A unit added to the pattern without a case here would
+// silently become minutes, which is why the two are written one above the
+// other.
+func relativeOffset(s string) (time.Duration, bool) {
+	n, err := strconv.Atoi(strings.TrimPrefix(s[:len(s)-1], "+"))
+	if err != nil {
+		// A number too large to hold. It matched the pattern, so it is a date
+		// the caller wrote and not a typo, and the honest answer is that this
+		// process cannot name the instant.
+		return 0, false
+	}
+	switch s[len(s)-1] {
+	case 'h':
+		return time.Duration(n) * time.Hour, true
+	case 'd':
+		return time.Duration(n) * 24 * time.Hour, true
+	case 'w':
+		return time.Duration(n) * 7 * 24 * time.Hour, true
+	default: // 'm' and 'M', which Jira reads as the same unit.
+		return time.Duration(n) * time.Minute, true
+	}
+}
+
 // ParseDate resolves a user-supplied date into a JQL value.
 //
 // It accepts an absolute date, a relative offset, or a date function. Anything
@@ -81,19 +261,13 @@ func ParseDate(input string) (Value, error) {
 			WithRemedy("use YYYY-MM-DD, a relative offset like -7d, or a function like startOfWeek()")
 	}
 
-	// A function call: startOfWeek(), endOfDay(-1).
-	if strings.HasSuffix(s, ")") {
+	switch ClassifyDate(s) {
+	case DateFunction:
+		// A function call: startOfWeek(), endOfDay(-1).
 		return parseDateFunction(s)
-	}
-
-	if relativePattern.MatchString(s) {
+	case DateRelative, DateAbsolute:
 		return Text(s), nil
-	}
-
-	for _, layout := range dateLayouts {
-		if _, err := time.Parse(layout, s); err == nil {
-			return Text(s), nil
-		}
+	case DateInvalid:
 	}
 
 	e := errs.Usage("INVALID_DATE", "%q is not a date", input).

@@ -879,7 +879,14 @@ named field they moved. Neither says what was done, and assembling that by hand
 is where the answer stops being checkable.
 
 --since is required and bounds the candidate set, because a feed with no time
-bound is a sweep of every issue the credential can see.
+bound is a sweep of every issue the credential can see. It bounds each event as
+well, which is a second job and the one this command is for: an issue updated
+yesterday holds comments from years ago, and reporting them because their issue
+matched answers a question about issues while claiming to answer one about
+events. An absolute date is read in the Jira account's timezone, which is what
+Jira reads it in and costs one request to learn; a relative offset names an
+instant and costs nothing; a date function is refused, because computing one
+here would substitute this client's notion of a boundary for the server's.
 
 **Where the comment half comes from.** Comment authorship is not searchable in
 JQL on either deployment, so comments are matched here rather than by the
@@ -910,7 +917,7 @@ jr issue activity --since -1d --kind transition --format json
 
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
-| `--since` | `string` | — | only events at or after this date or offset, e.g. -7d; required, and it bounds the issues searched as well as the events reported (required) |
+| `--since` | `string` | — | only events at or after this date or offset, e.g. -7d; required, and it bounds the issues searched as well as the events reported; a date function like startOfWeek() is refused here, because this command compares dates itself (required) |
 | `--user` | `string` | — | only events by this person, by display name, email, or id; the word currentUser resolves to the caller |
 | `--kind` | `string` | — | only events of this kind: comment, transition, field, or worklog; repeat for several (repeatable) |
 | `--jql` | `string` | — | raw JQL narrowing the issues searched, combined with --since and always parenthesized |

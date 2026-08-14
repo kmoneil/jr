@@ -3,6 +3,7 @@ package jql_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kmoneil/jr/internal/jql"
 )
@@ -137,4 +138,172 @@ func FuzzParseDateDoesNotPanic(f *testing.F) {
 			t.Fatalf("ParseDate(%q) accepted a value that cannot render: %v", in, err)
 		}
 	})
+}
+
+// TestClassifyDateNamesEveryFormParseDateAccepts is the enumeration the rest of
+// the tool branches on.
+//
+// It exists because a second, narrower list of date forms lived in
+// `internal/resource/issue` and the four forms in the gap were accepted by the
+// query builder and applied by no filter. One enumeration, read by both.
+func TestClassifyDateNamesEveryFormParseDateAccepts(t *testing.T) {
+	for input, want := range map[string]jql.DateKind{
+		"-7d":              jql.DateRelative,
+		"+30m":             jql.DateRelative,
+		"2w":               jql.DateRelative,
+		"-1M":              jql.DateRelative,
+		"2026-08-10":       jql.DateAbsolute,
+		"2026/08/10":       jql.DateAbsolute,
+		"2026-08-10 13:45": jql.DateAbsolute,
+		"2026/08/10 13:45": jql.DateAbsolute,
+		"  2026-08-10  ":   jql.DateAbsolute,
+		"startOfWeek()":    jql.DateFunction,
+		"endOfDay(-1)":     jql.DateFunction,
+		// Shape, not validity: a bad function is still classified as one, so
+		// that ParseDate can refuse it as a bad function rather than as a word.
+		"nonsense()": jql.DateFunction,
+		"":           jql.DateInvalid,
+		"whenever":   jql.DateInvalid,
+		"2020-13-45": jql.DateInvalid,
+	} {
+		got := jql.ClassifyDate(input)
+		if got != want {
+			t.Errorf("ClassifyDate(%q) = %v, want %v", input, got, want)
+		}
+		// Nothing ParseDate accepts may classify as invalid. A form one of them
+		// knows and the other does not is the whole defect, one layer down.
+		//
+		// The implication is one-way on purpose: a function is classified by
+		// its shape and validated by name, so `nonsense()` is a DateFunction
+		// that ParseDate refuses. That is what lets it be refused as a bad
+		// function rather than as a word.
+		if _, err := jql.ParseDate(input); err == nil && got == jql.DateInvalid {
+			t.Errorf("ParseDate accepts %q and ClassifyDate calls it invalid", input)
+		}
+	}
+}
+
+// TestResolveDateReadsALiteralInTheZoneItIsGiven pins the half of a date that
+// only matters when a value is compared here rather than sent.
+//
+// A relative offset names an instant and is the same everywhere. A literal is a
+// wall clock and means nothing without a zone — Jira reads it in the account's,
+// so resolving it in UTC is wrong by the offset, in the direction that drops
+// events for anybody east of it.
+func TestResolveDateReadsALiteralInTheZoneItIsGiven(t *testing.T) {
+	now := time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC)
+	tokyo, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		t.Fatalf("this build cannot read the zone database: %v", err)
+	}
+
+	for input, want := range map[string]string{
+		"-7d":  "2026-08-05T12:00:00Z",
+		"+30m": "2026-08-12T12:30:00Z",
+		"-2h":  "2026-08-12T10:00:00Z",
+		"2w":   "2026-08-26T12:00:00Z",
+		// Minutes. Jira's units are case-insensitive, and this used to read
+		// `M` as thirty days.
+		"-1M":  "2026-08-12T11:59:00Z",
+		"-60M": "2026-08-12T11:00:00Z",
+		// UTC+9, so midnight in Tokyo is 15:00Z the day before. A resolver
+		// reading this in UTC would bound nine hours late and drop events the
+		// caller asked for.
+		"2026-08-10":       "2026-08-09T15:00:00Z",
+		"2026/08/10":       "2026-08-09T15:00:00Z",
+		"2026-08-10 13:45": "2026-08-10T04:45:00Z",
+		"2026/08/10 13:45": "2026-08-10T04:45:00Z",
+	} {
+		got, ok := jql.ResolveDate(input, tokyo, now)
+		if !ok {
+			t.Errorf("ResolveDate(%q) resolved nothing", input)
+			continue
+		}
+		if at := got.UTC().Format(time.RFC3339); at != want {
+			t.Errorf("ResolveDate(%q) = %s, want %s", input, at, want)
+		}
+	}
+}
+
+// TestResolveDateReportsWhatItCannotName keeps the false honest.
+//
+// Every one of these used to resolve to the zero value in a caller that read it
+// as "no bound", which is how a feed reported itself complete while filtering
+// nothing. There is no input for which a false may be read as "everything".
+func TestResolveDateReportsWhatItCannotName(t *testing.T) {
+	now := time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		input string
+		loc   *time.Location
+		why   string
+	}{
+		{"startOfWeek()", time.UTC, "a function is the server's to evaluate"},
+		{"now()", time.UTC, "so is this one"},
+		{"whenever", time.UTC, "not a date at all"},
+		{"", time.UTC, "empty"},
+		{"2026-08-10", nil, "a wall clock with no zone to read it in"},
+		{"99999999999999999999d", time.UTC, "an offset too large to hold"},
+	} {
+		if _, ok := jql.ResolveDate(tc.input, tc.loc, now); ok {
+			t.Errorf("ResolveDate(%q) claimed an instant: %s", tc.input, tc.why)
+		}
+	}
+}
+
+// TestEveryRelativeUnitResolves holds the unit switch to the pattern above it,
+// and pins the unit that was wrong.
+//
+// `M` is minutes. Jira's period units are case-insensitive, and this resolved
+// `M` as thirty days, so `-1M` asked the server for one minute and told the
+// local filter it meant one month. Measured 2026-08-14 against both
+// deployments: `-60M`, `-60m` and `-1h` return the same rows, and `-43200M`
+// returns the same rows as `-30d`.
+//
+// The switch ends in a default arm that means minutes, which is correct only
+// while the pattern's class is exactly these five. A unit added to one and not
+// the other would silently become minutes.
+func TestEveryRelativeUnitResolves(t *testing.T) {
+	now := time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC)
+	for unit, want := range map[string]time.Duration{
+		"m": time.Minute,
+		"h": time.Hour,
+		"d": 24 * time.Hour,
+		"w": 7 * 24 * time.Hour,
+		"M": time.Minute,
+	} {
+		got, ok := jql.ResolveDate("1"+unit, time.UTC, now)
+		if !ok {
+			t.Errorf("the unit %q does not resolve", unit)
+			continue
+		}
+		if d := got.Sub(now); d != want {
+			t.Errorf("1%s = %v, want %v", unit, d, want)
+		}
+	}
+}
+
+// TestDateHasTimeOfDay is what lets a caller apply a rule this package cannot
+// know: which fields take a clock is a property of the field and the deployment
+// together, and both live elsewhere.
+func TestDateHasTimeOfDay(t *testing.T) {
+	for input, want := range map[string]bool{
+		"2026-08-10 13:45":     true,
+		"2026/08/10 13:45":     true,
+		"  2026-08-10 13:45  ": true,
+		"2026-08-10":           false,
+		"2026/08/10":           false,
+		// An offset is arithmetic on the server's clock, and Data Center takes
+		// `-5d` on the same field it refuses `2026-08-10 00:00` on.
+		"-7d":  false,
+		"+30m": false,
+		// A function is the server's, and refusing it for carrying a clock
+		// would be this package guessing at what it computes.
+		"startOfDay()": false,
+		"whenever":     false,
+		"":             false,
+	} {
+		if got := jql.DateHasTimeOfDay(input); got != want {
+			t.Errorf("DateHasTimeOfDay(%q) = %v, want %v", input, got, want)
+		}
+	}
 }

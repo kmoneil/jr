@@ -641,6 +641,66 @@ means their own day rather than the account's, the way to say so is an absolute
 literal converted into the account's zone — `docs/recipes.md` has the
 conversion.
 
+### A minute is not accepted on every field
+
+`updated >= "2026-08-12 18:13"` parses on both deployments. `worklogDate` does
+not, on one of them. Measured 2026-08-14 against Data Center 10.4 and the Cloud
+sandbox:
+
+| Clause                              | Data Center | Cloud    |
+| ----------------------------------- | ----------- | -------- |
+| `updated >= "2026-08-10 00:00"`     | accepted    | accepted |
+| `worklogDate >= "2026-08-10 00:00"` | **refused** | accepted |
+| `worklogDate >= "2026-08-10"`       | accepted    | accepted |
+| `worklogDate >= "-7d"`              | accepted    | accepted |
+
+Data Center says so itself:
+
+```
+Date value '2026-08-10 00:00' for field 'worklogDate' is invalid.
+Valid formats include: 'YYYY/MM/DD', 'YYYY-MM-DD', or a period format
+e.g. '-5d', '4w 2d'.
+```
+
+So `--worklog-after` and `--worklog-before` refuse a time of day on Data Center,
+with `INVALID_DATE` at exit 2, before the request is spent. They accept one on
+Cloud, because Cloud accepts one: the rule is the field and the deployment
+together, and a blanket refusal would invent a limit half the installed base
+does not have.
+
+### `issue activity --since` is the one date resolved here
+
+Every other date flag is a clause in a query, and the server evaluates it.
+`issue activity` cannot work that way: comments are not searchable in JQL on
+either deployment, so three of its four event kinds are matched in this process,
+and `--since` has to bound the events as well as the issues the query selected.
+An issue updated yesterday holds comments from years ago.
+
+So this one flag is resolved locally, and what that costs is different per form:
+
+| Form                       | How it resolves                                                          | Requests |
+| -------------------------- | ------------------------------------------------------------------------ | -------- |
+| `-7d`, `+30m`, `2w`        | An offset names an instant, which is the same in every zone.             | none     |
+| `2026-08-10`, with or without a time of day | A wall clock, read in the **account's** zone, because that is the clock Jira reads it in. | one GET to `/myself` |
+| `startOfWeek()` and any other function | Refused. See below.                                           | none     |
+
+A function is refused rather than approximated because computing one means
+choosing the day a week starts on, and the paragraph above is the reason not to.
+The alternative shipped first and was worse than either: the bound reached the
+query, the events were compared against nothing, and the feed reported itself
+`complete="true"` at exit 0 while carrying events from outside the window.
+
+| Code                       | Exit | Meaning                                                                                                                                                  |
+| -------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UNBOUNDABLE_DATE`         | 2    | `--since` names no instant this process can compute: a date function, on the one command that has to compare dates itself. `remedy` names the forms that work. |
+| `NO_ACCOUNT_TIMEZONE`      | 2    | An absolute `--since`, and the site did not report the account's zone. Both deployments send one, so this is a site breaking its own contract; reading the literal as UTC anyway would be wrong by the offset with nothing in the output to say so. |
+| `UNKNOWN_ACCOUNT_TIMEZONE` | 2    | The site named a zone this build cannot resolve. The zone database is compiled in, so this is a name no database has.                                     |
+
+All three are exit 2 and not 9. A missing field is malformed data, which is what
+9 means, but 9 is also `retryable`, and a second attempt reads the same profile
+and fails the same way. What the caller has is a combination this site cannot
+support and a remedy that works on the next invocation.
+
 ## TSV escaping
 
 Every record is one line and every field is one column. Within a field:
@@ -1084,6 +1144,19 @@ diffing two runs must not see a difference that means nothing.
   output.
 - Changing an exit code's meaning, an error `code` string, or a `kind`:
   **major**.
+- Refusing an input that used to be accepted: **major**. Nothing about the
+  output's shape moves, so a script still _parses_ every document identically —
+  and the invocation it was built around now exits 2. This row was missing until
+  0.3.0, whose whole content is three date forms that used to be accepted and
+  answered wrongly. Fixing a wrong answer is not a reason to spare the version:
+  the caller has to change what they send either way, and the version number is
+  the only place they find that out before it happens.
+- Moving a refusal earlier, so that the same input carries a different `code`:
+  **major**, for the same reason and against the same reader. `BAD_REQUEST` from
+  Jira and `INVALID_DATE` from `jr` describe one mistake, and a consumer
+  branching on `code` sees a string it has never seen. The exit is unchanged and
+  that is not enough, because `code` is the field the contract tells people to
+  branch on.
 - Adding a warning `code`: **minor**, and it bumps no kind version. A warning is
   a separate document on stderr, so no existing consumer is reading for one it
   has never seen, and a command that gains a warning emits the same result it

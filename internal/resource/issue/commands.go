@@ -622,6 +622,9 @@ func validateList(ctx context.Context, inv *registry.Invocation) error {
 	if err := validateChangedFilter(inv); err != nil {
 		return err
 	}
+	if err := validateDateGranularity(ctx, inv); err != nil {
+		return err
+	}
 	if err := validateUserFilters(ctx, inv); err != nil {
 		return err
 	}
@@ -1170,6 +1173,64 @@ func addInvolving(b *jql.Builder, value string) {
 		exprs = append(exprs, userExpr(field, value))
 	}
 	b.Where(jql.AnyOf(exprs...))
+}
+
+// worklogDateFlags are the flags that become a `worklogDate` clause. They are
+// named here rather than derived from addDates because what follows is a claim
+// about that one field, and a list that grew silently when a seventh date flag
+// arrived would apply the claim to a field nobody measured.
+var worklogDateFlags = []string{"worklog-after", "worklog-before"}
+
+// validateDateGranularity refuses a date the deployment's field will not take,
+// instead of spending a request to be told.
+//
+// Measured 2026-08-14. Data Center 10.4 refuses a time of day on `worklogDate`
+// and accepts one on `updated`; Cloud accepts it on both. The server's own
+// words, which is where the remedy comes from:
+//
+//	Date value '2026-08-10 00:00' for field 'worklogDate' is invalid.
+//	Valid formats include: 'YYYY/MM/DD', 'YYYY-MM-DD', or a period format
+//	e.g. '-5d', '4w 2d'.
+//
+// So this is not a property of the field and it is not a property of the
+// deployment; it is the pair, which is why the check is here and not in
+// `internal/jql`. A blanket refusal would break a spelling that works today on
+// Cloud, and that was the shape of the first fix proposed for it.
+//
+// The deployment costs a probe, so it is only asked for once a flag has already
+// been found carrying a clock — the case that is about to fail anyway.
+func validateDateGranularity(ctx context.Context, inv *registry.Invocation) error {
+	var flag, value string
+	for _, name := range worklogDateFlags {
+		if v := inv.Flags.String(name); v != "" && jql.DateHasTimeOfDay(v) {
+			flag, value = name, v
+			break
+		}
+	}
+	if flag == "" {
+		return nil
+	}
+	if inv.Jira == nil {
+		// Nothing to check the field against. The command needs a session to
+		// run at all, so this is a test harness rather than an invocation, and
+		// refusing on a deployment nobody named would be the guess this
+		// function exists to avoid.
+		return nil
+	}
+	_, info, err := inv.Jira.Connect(ctx)
+	if err != nil {
+		return err
+	}
+	if info.Kind != site.DataCenter {
+		return nil
+	}
+	return errs.Usage("INVALID_DATE",
+		"--%s cannot carry a time of day on Data Center", flag).
+		WithDetail("Jira reads worklogDate to the day on this deployment and "+
+			"refuses %q; Cloud accepts it, so this is the pair and not the "+
+			"field alone", value).
+		WithRemedy("drop the time of day, as in 2026-08-10, or use a relative " +
+			"offset like -7d")
 }
 
 // addDates adds every window filter. A missing value is not a filter.
