@@ -202,7 +202,10 @@ func TestResolveDateReadsALiteralInTheZoneItIsGiven(t *testing.T) {
 		"+30m": "2026-08-12T12:30:00Z",
 		"-2h":  "2026-08-12T10:00:00Z",
 		"2w":   "2026-08-26T12:00:00Z",
-		"-1M":  "2026-07-13T12:00:00Z",
+		// Minutes. Jira's units are case-insensitive, and this used to read
+		// `M` as thirty days.
+		"-1M":  "2026-08-12T11:59:00Z",
+		"-60M": "2026-08-12T11:00:00Z",
 		// UTC+9, so midnight in Tokyo is 15:00Z the day before. A resolver
 		// reading this in UTC would bound nine hours late and drop events the
 		// caller asked for.
@@ -247,11 +250,18 @@ func TestResolveDateReportsWhatItCannotName(t *testing.T) {
 	}
 }
 
-// TestEveryRelativeUnitResolves holds the unit switch to the pattern above it.
+// TestEveryRelativeUnitResolves holds the unit switch to the pattern above it,
+// and pins the unit that was wrong.
 //
-// The switch ends in a default arm that means months, which is correct only
+// `M` is minutes. Jira's period units are case-insensitive, and this resolved
+// `M` as thirty days, so `-1M` asked the server for one minute and told the
+// local filter it meant one month. Measured 2026-08-14 against both
+// deployments: `-60M`, `-60m` and `-1h` return the same rows, and `-43200M`
+// returns the same rows as `-30d`.
+//
+// The switch ends in a default arm that means minutes, which is correct only
 // while the pattern's class is exactly these five. A unit added to one and not
-// the other would silently become thirty days.
+// the other would silently become minutes.
 func TestEveryRelativeUnitResolves(t *testing.T) {
 	now := time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC)
 	for unit, want := range map[string]time.Duration{
@@ -259,7 +269,7 @@ func TestEveryRelativeUnitResolves(t *testing.T) {
 		"h": time.Hour,
 		"d": 24 * time.Hour,
 		"w": 7 * 24 * time.Hour,
-		"M": 30 * 24 * time.Hour,
+		"M": time.Minute,
 	} {
 		got, ok := jql.ResolveDate("1"+unit, time.UTC, now)
 		if !ok {

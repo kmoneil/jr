@@ -157,22 +157,40 @@ func ResolveDate(input string, loc *time.Location, now time.Time) (time.Time, bo
 	return time.Time{}, false
 }
 
-// relativeOffset reads Jira's relative date syntax as a duration. The units are
-// Jira's, where `m` is minutes and `M` is months.
+// relativeOffset reads Jira's relative date syntax as a duration.
 //
-// A month is thirty days here and not a calendar month. That is an
-// approximation, and where this feeds a client-side event filter it is an
-// approximation in the direction that **drops** events: the server's `-1M` from
-// the 31st reaches back further than thirty days, so an event in the gap
-// satisfies the query and is then filtered out here. Whether Jira accepts `M`
-// at all is unmeasured against either deployment, which is why this still says
-// thirty rather than having been corrected to something equally unmeasured: a
-// calendar month computed here would be a second guess, not a fix.
+// **`M` is minutes, not months.** The units are Jira's and Jira's are
+// case-insensitive, which is not what this code believed: it resolved `M` as
+// thirty days, so `--updated-after -1M` asked the server for the last minute
+// and told any local filter it meant the last month, a factor of 43,200 apart
+// and silent on both sides.
+//
+// Measured 2026-08-14 against Cloud and against Data Center 10.4, counting rows
+// on a project whose issues were all touched within the hour:
+//
+//	              Data Center   Cloud
+//	-1h                     5       0
+//	-60M                    5       0     equal to -1h on both
+//	-60m                    5       0
+//	-1M                     0       0     one minute, not one month
+//	-30d                    5       6
+//	-43200M                 -        6     43200 minutes, equal to -30d
+//	-1440M                  -        0     equal to -1d
+//
+// Cloud's sandbox had nothing touched within the hour, so the minute-scale rows
+// there are zero for both spellings and the 43200/1440 pair is what carries the
+// argument on that deployment.
+//
+// The pattern above accepts only lowercase for the other four units, so `jr` is
+// stricter than the server rather than differently lenient, which is the safe
+// direction: a spelling this refuses is one the caller can rewrite, and a
+// spelling this misreads is one nobody can see.
 // Call it only for a string relativePattern has matched. That is what makes the
 // indexing safe and the default arm correct: the pattern's unit class is
-// exactly `mhdwM`, so anything that is not the first four is the fifth. A unit
-// added to the pattern without a case here would silently become months, which
-// is why the two are written one above the other.
+// exactly `mhdwM`, so anything that is not `h`, `d` or `w` is one of the two
+// spellings of minutes. A unit added to the pattern without a case here would
+// silently become minutes, which is why the two are written one above the
+// other.
 func relativeOffset(s string) (time.Duration, bool) {
 	n, err := strconv.Atoi(strings.TrimPrefix(s[:len(s)-1], "+"))
 	if err != nil {
@@ -182,16 +200,14 @@ func relativeOffset(s string) (time.Duration, bool) {
 		return 0, false
 	}
 	switch s[len(s)-1] {
-	case 'm':
-		return time.Duration(n) * time.Minute, true
 	case 'h':
 		return time.Duration(n) * time.Hour, true
 	case 'd':
 		return time.Duration(n) * 24 * time.Hour, true
 	case 'w':
 		return time.Duration(n) * 7 * 24 * time.Hour, true
-	default:
-		return time.Duration(n) * 30 * 24 * time.Hour, true
+	default: // 'm' and 'M', which Jira reads as the same unit.
+		return time.Duration(n) * time.Minute, true
 	}
 }
 
