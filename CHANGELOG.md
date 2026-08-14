@@ -20,6 +20,57 @@ accident.
 
 Nothing yet.
 
+## [0.3.1] - 2026-08-14
+
+A document now names the Jira it came from.
+
+**Nothing changed shape.** No kind moved a schema version, no default column set
+gained a field, no exit code or error `code` changed meaning, and no input that
+worked in 0.3.0 stops working. A script written against 0.3.0 parses 0.3.1
+identically and behaves identically.
+
+A patch rather than a minor because an added optional attribute is minor under
+the stability policy, and the demotion this project uses in `0.y.z` cascades: a
+change the policy calls minor moves the patch position.
+
+### Added
+
+- **`site` on the envelope**, naming the instance an answer came from. It is the
+  base URL the request was actually sent to, including any context path, and not
+  the one configured; the two differ under a context path, and differing is the
+  case worth reporting.
+
+  ```xml
+  <result kind="issue.list" v="7" site="https://acme.atlassian.net">
+  ```
+
+  ```json
+  { "kind": "issue.list", "v": 7, "site": "https://acme.atlassian.net", ... }
+  ```
+
+  **Absent, not empty**, on a command that reached no Jira. `jr version` and
+  `jr context list` name no instance rather than an empty one.
+
+  It exists because two answers from two Jiras were byte-identical once both were
+  on disk. The case that prompted it was a command run against the wrong instance
+  returning a well-formed, `complete="true"`, exit-0 document about it, with
+  nothing anywhere in the output to say so. Nothing had misbehaved; the answer
+  simply did not say what it was an answer about.
+
+  **TSV carries none**, because TSV has no envelope. That is the same limit
+  truncation has in that format, where `complete="false"` becomes a structured
+  stderr warning plus exit 3. A column was considered and rejected: it would
+  change a default column set, which is breaking, and repeat one value on every
+  row. A caller who needs provenance in a pipeline asks for `--format json`.
+
+### Output contract
+
+- **Nothing moved.** `jr contract` reports the same versions 0.3.0 did for every
+  kind. The per-kind shapes describe the payload, and `site` is on the envelope
+  every kind shares, so `make golden` rewrote no shape file.
+- The envelope section of `docs/output-contract.md` documents `site`, what it is
+  precisely, and why TSV does not carry it.
+
 ## [0.3.0] - 2026-08-14
 
 Three date defects, all of them found in one transcript of somebody using 0.2.1
@@ -345,7 +396,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.3.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.3.1...main
+[0.3.1]: https://github.com/kmoneil/jr/releases/tag/v0.3.1
 [0.3.0]: https://github.com/kmoneil/jr/releases/tag/v0.3.0
 [0.2.1]: https://github.com/kmoneil/jr/releases/tag/v0.2.1
 [0.2.0]: https://github.com/kmoneil/jr/releases/tag/v0.2.0
