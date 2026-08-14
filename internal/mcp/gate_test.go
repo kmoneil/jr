@@ -57,6 +57,7 @@ func (*gateSession) Board() string                   { return "1" }
 func (*gateSession) RequireBoard() (string, error)   { return "1", nil }
 func (*gateSession) Fields() []string                { return nil }
 func (*gateSession) Idempotency() *idem.Ledger       { return nil }
+func (*gateSession) Site() string                    { return "https://gated.invalid" }
 
 // gatedRegistry registers one mutating command that records whether it ran, so
 // a test can tell "refused" from "ran and failed".

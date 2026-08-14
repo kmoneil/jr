@@ -1949,6 +1949,8 @@ const catalogueJSON = `[
 // stubSession is a registry.Session backed by a stubbed transport, so a command
 // is exercised with no auth, no config, and no network.
 type stubSession struct {
+	// site overrides what Site reports, for a test about provenance.
+	site   string
 	fields []string
 	doer   *stubDoer
 	meta   *site.Metadata
@@ -3438,4 +3440,13 @@ func TestBothCommandsDeclareTheAgeFlag(t *testing.T) {
 			t.Errorf("%s declares no --age", name)
 		}
 	}
+}
+
+// Site implements registry.Session. A fixed value, because provenance is a
+// property of the answer and these tests assert documents.
+func (s *stubSession) Site() string {
+	if s.site != "" {
+		return s.site
+	}
+	return "https://recorded.invalid"
 }

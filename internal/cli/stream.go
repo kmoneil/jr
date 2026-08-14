@@ -69,6 +69,7 @@ func streamSpec(rc *registry.Command, inv *registry.Invocation) render.StreamSpe
 		Version: rc.KindVersion(),
 		Name:    rc.CollectionName,
 		Columns: columns,
+		Site:    siteOf(inv),
 	}
 }
 

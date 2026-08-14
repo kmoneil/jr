@@ -75,6 +75,9 @@ func docValue(d *Doc) map[string]any {
 		"kind": d.Kind,
 		"v":    d.Version,
 	}
+	if d.Site != "" {
+		out["site"] = d.Site
+	}
 	if d.Record != nil {
 		out[d.Record.Name] = nodeValue(d.Record)
 		return out

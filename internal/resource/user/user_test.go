@@ -294,6 +294,8 @@ func replayConn(t *testing.T, fixture string) (*transport.Client, *transport.Rep
 }
 
 type stubSession struct {
+	// site overrides what Site reports, for a test about provenance.
+	site   string
 	fields []string
 	conn   *transport.Client
 	kind   site.Kind
@@ -619,4 +621,13 @@ func TestTheTimezoneIsReportedWhereverTheServerSendsIt(t *testing.T) {
 				tc.fixture, got, tc.want, buf.String())
 		}
 	}
+}
+
+// Site implements registry.Session. A fixed value, because provenance is a
+// property of the answer and these tests assert documents.
+func (s *stubSession) Site() string {
+	if s.site != "" {
+		return s.site
+	}
+	return "https://recorded.invalid"
 }

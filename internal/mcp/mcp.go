@@ -414,10 +414,23 @@ func (s *Server) run(
 	if err != nil {
 		return "", err
 	}
+	doc.Site = siteOf(inv)
 	if err := render.Write(&out, doc, format); err != nil {
 		return "", err
 	}
 	return out.String(), nil
+}
+
+// siteOf names the Jira an invocation reached, for the envelope.
+//
+// A model is the caller here and the one least able to notice it was handed an
+// answer about the wrong instance: it did not choose the context, cannot see
+// the shell, and gets no stderr, which is where every other hint would be.
+func siteOf(inv *registry.Invocation) string {
+	if inv == nil || inv.Jira == nil {
+		return ""
+	}
+	return inv.Jira.Site()
 }
 
 // streamInto runs a collection command and writes its rows, plus the truncation
@@ -430,6 +443,7 @@ func streamInto(ctx context.Context, out *strings.Builder, cmd *registry.Command
 		Version: cmd.KindVersion(),
 		Name:    cmd.CollectionName,
 		Columns: columnsFor(cmd, inv),
+		Site:    siteOf(inv),
 	})
 	if err != nil {
 		return err
