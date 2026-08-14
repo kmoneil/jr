@@ -274,6 +274,10 @@ func TestActivityCutoffResolvesLocally(t *testing.T) {
 		"-7d": "2026-08-05T12:00:00Z",
 		"-1w": "2026-08-05T12:00:00Z",
 		"-2h": "2026-08-12T10:00:00Z",
+		// Case and compound resolve here too, or the feed would be bounded by
+		// the query and not by the filter.
+		"-7D":    "2026-08-05T12:00:00Z",
+		"-1w 7d": "2026-07-29T12:00:00Z",
 		// A literal is a wall clock, and midnight in Chicago is not midnight
 		// in UTC. Both sides of the DST boundary, because the offset is not a
 		// constant.
@@ -306,6 +310,12 @@ func TestActivityCutoffResolvesLocally(t *testing.T) {
 func TestEveryAcceptedSinceIsBoundedOrRefused(t *testing.T) {
 	for _, input := range []string{
 		"-7d", "+30m", "2w", "-1M", "-2h",
+		// The spellings Jira accepts on a date field that this refused until
+		// 2026-08-14: the uppercase units, and the compound form. A compound
+		// is one duration, so it belongs on the same side of this test as any
+		// other offset rather than being accepted by the query and applied to
+		// no event.
+		"-7D", "-1W", "-2H", "-4w 2d", "-1w 7d",
 		"2026-08-10", "2026/08/10",
 		"2026-08-10 00:00", "2026/08/10 13:45",
 		"startOfWeek()", "endOfDay(-1)", "now()", "currentLogin()",
