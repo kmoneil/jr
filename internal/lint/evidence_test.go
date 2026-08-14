@@ -38,7 +38,13 @@ var recordedFixtures = map[string][]string{
 		"versions-empty.cloud.json", "components-empty.cloud.json",
 	},
 	"internal/resource/user": {"search.cloud.json", "me.cloud.json", "user.cloud.json"},
-	"internal/resource/jql":  {"parse.cloud.json", "invalid.cloud.json"},
+	"internal/resource/jql": {
+		"parse.cloud.json", "invalid.cloud.json",
+		// The class `validation=strict` withheld. A hand-written cassette here
+		// would be a claim about which mode Jira answers in, written by the
+		// same reasoning that picked the mode that does not answer.
+		"unknownvalue.cloud.json",
+	},
 	"internal/resource/issue": {
 		"list-recorded.cloud.json",
 		// Both halves of `issue history`, because the command is two

@@ -1,0 +1,23 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/3/jql/parse",
+        "query": "validation=warn",
+        "body": "{\"queries\":[\"assignee = \\\"nosuchuser-xyz\\\"\"]}"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"queries\":[{\"query\":\"assignee = \\\"nosuchuser-xyz\\\"\",\"structure\":{\"where\":{\"field\":{\"name\":\"assignee\",\"encodedName\":\"assignee\"},\"operator\":\"=\",\"operand\":{\"value\":\"nosuchuser-xyz\",\"encodedValue\":\"nosuchuser-xyz\"}}},\"warnings\":[\"The value 'nosuchuser-xyz' does not exist for the field 'assignee'.\"]}]}"
+      }
+    }
+  ]
+}

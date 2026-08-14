@@ -131,6 +131,53 @@ func TestWarningsSurviveAValidQuery(t *testing.T) {
 	}
 }
 
+// TestCloudReportsAValueThatDoesNotExist is the Cloud half of the test above,
+// and it exists because for two releases there was no Cloud half.
+//
+// `checkParse` asked for `validation=strict`, which does not promote this
+// warning to an error but drops it: the reply carries no errors key and no
+// warnings key, so `assignee = "nobody"` was reported valid and silent while
+// Data Center reported the warning for the same query. Measured 2026-08-14;
+// `validation=none` returns both keys empty, which is what distinguishes a
+// withheld diagnostic from a clean verdict.
+//
+// The mode is pinned by the recording rather than by an assertion here. The
+// replayer matches on the canonical query string, so sending `strict` again
+// leaves the interaction unplayed and this fails on the last check.
+//
+// `valid` staying true is half the assertion and not a detail. A warning is
+// Jira running the query and saying something about it, so promoting it to
+// invalid here would refuse queries the server answers, and would do it in the
+// one command whose whole job is to report the server's opinion rather than
+// hold one.
+func TestCloudReportsAValueThatDoesNotExist(t *testing.T) {
+	const query = `assignee = "nosuchuser-xyz"`
+
+	conn, replayer := replayConn(t, "unknownvalue.cloud.json")
+	client := &jqlcmd.Client{Transport: conn, Site: site.Info{Kind: site.Cloud}}
+
+	got, err := client.Check(t.Context(), query)
+	if err != nil {
+		t.Fatalf("check: %v", err)
+	}
+	if !got.Valid {
+		t.Errorf("a warning became a verdict: valid = false, errors = %v", got.Errors)
+	}
+	if len(got.Warnings) != 1 {
+		t.Fatalf("warnings = %v, want the one Jira sent", got.Warnings)
+	}
+	if !strings.Contains(got.Warnings[0], "does not exist for the field 'assignee'") {
+		t.Errorf("warning = %q, want Jira's own words", got.Warnings[0])
+	}
+	if _, ok := got.Node().ChildNamed("warning"); !ok {
+		t.Error("the warning did not reach the output")
+	}
+	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+		t.Errorf("the parse was never sent as recorded, which means the "+
+			"validation mode moved: %v", unplayed)
+	}
+}
+
 // TestAQueryThatCannotLexCostsNoRoundTrip covers the local checks running
 // first. They are not a parser and never claim to be, but an unterminated
 // string is not worth a request.
@@ -416,7 +463,9 @@ func (s *stubSession) RequireBoard() (string, error) {
 // luck looks exactly like one that was right by evidence, and only one of them
 // stays right when the API moves.
 func TestTheCloudFixturesAreRecordings(t *testing.T) {
-	for _, name := range []string{"parse.cloud.json", "invalid.cloud.json"} {
+	for _, name := range []string{
+		"parse.cloud.json", "invalid.cloud.json", "unknownvalue.cloud.json",
+	} {
 		cassette, err := transport.LoadCassette(filepath.Join("testdata", name))
 		if err != nil {
 			t.Fatalf("load %s: %v", name, err)

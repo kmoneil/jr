@@ -930,6 +930,15 @@ or its parentheses did not balance. The three are not the same claim, and a
 consumer that treats them as one is trusting a lexer with a question only the
 server can answer.
 
+A verdict can be `valid="true"` and still carry `warning` elements, so read the
+document rather than only the attribute. Jira warns when it will run the query
+and something in it names nothing on this site, most often a value that does not
+exist for the field: a user who has left, or was never here, or was typed wrong.
+The clause is legal and matches nothing, which is why it is a warning and not a
+refusal, and why `valid="true"` with a warning and `valid="true"` without one
+lead to different next steps. Both deployments report this. Cloud did not until
+2026-08-14, because the parse endpoint was asked in a mode that withholds it.
+
 ### Errors about reaching the site
 
 `NO_SUCH_ENDPOINT`, `NETWORK`, `TIMEOUT`, `MALFORMED_SERVER_INFO`,

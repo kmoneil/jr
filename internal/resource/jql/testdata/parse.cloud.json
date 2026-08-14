@@ -6,7 +6,7 @@
       "request": {
         "method": "POST",
         "path": "/rest/api/3/jql/parse",
-        "query": "validation=strict",
+        "query": "validation=warn",
         "body": "{\"queries\":[\"project = ENG AND status = Open\"]}"
       },
       "response": {
