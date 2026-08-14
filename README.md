@@ -901,7 +901,9 @@ that only lists wins is not one.
 
 ## License
 
-[Apache License 2.0](LICENSE). Copyright 2026 Kevin O'Neil.
+[Apache License 2.0](LICENSE). Use it, fork it, ship it inside something you
+sell; the licence text is the whole of what is asked. Copyright 2026 Kevin
+O'Neil, because a licence is a grant from somebody, and the notice is who.
 
 Nothing is vendored, and [NOTICE](NOTICE) lists the five direct dependencies a
 binary links, with their licences and the one upstream NOTICE that has to travel
