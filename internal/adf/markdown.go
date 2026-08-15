@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/kmoneil/jr/internal/errs"
 )
@@ -1180,7 +1181,15 @@ func escapeText(s string, lineStart bool) string {
 			}
 		}
 		b.WriteRune(r)
-		atLineStart = r == '\n'
+		// A line start survives the whitespace in front of it. The read side
+		// trims a line before it decides what block the line begins, and it
+		// trims more than the indentation markdown itself strips: a vertical
+		// tab, a form feed, and a non-breaking space all reach the setext check
+		// as nothing, so `\v=` under a paragraph line arrives there as `=` and
+		// is read as a heading underline rather than as the two characters that
+		// were written. Unicode's whitespace, because that is the set the
+		// strings.TrimSpace over there works from.
+		atLineStart = r == '\n' || (atLineStart && unicode.IsSpace(r))
 	}
 	return b.String()
 }

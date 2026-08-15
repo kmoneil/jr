@@ -89,6 +89,13 @@ func TestMarkdownSurvivesTheRoundTrip(t *testing.T) {
 		{"a hash that is not a heading", `\# not a heading`},
 		{"a number that is not a list", `1\. not a list`},
 		{"an ampersand", `\&amp; stays four characters`},
+		// The escape is the case again, and the whitespace in front of it is
+		// why: a line start is where a block can begin, and the read side finds
+		// that start after whitespace markdown itself does not strip. Without
+		// the escape these are a setext heading and a rule.
+		{"a setext underline behind a vertical tab", "0\\\n\v\\="},
+		{"a setext underline behind a non-breaking space", "0\\\n\u00a0\\="},
+		{"a rule behind a vertical tab", "0\\\n\v\\---"},
 		{"mixed blocks", "# Repro\n\n1. Start it\n2. Wait\n\n```go\nclient.Do(req)\n```\n\n> [!WARNING]\n> It hangs."},
 	}
 
