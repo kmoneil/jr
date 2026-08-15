@@ -728,14 +728,6 @@ func merges(char byte, inner string, prev, prevLive, next byte) bool {
 	if char == '_' && (isWordByte(prev) || isWordByte(next)) {
 		return true
 	}
-	// Nothing opens or closes against whitespace, so a span written there
-	// would not be a span at all.
-	if isSpaceByte(prev) && isSpaceByte(next) && prev != 0 && next != 0 {
-		return false
-	}
-	if prevLive == char || next == char {
-		return true
-	}
 	// A live delimiter strictly inside would close this span early, wherever
 	// it came from — a nested span that picked the same character, or an
 	// underscore inside a word, which looks like one and is inert.
@@ -743,7 +735,23 @@ func merges(char byte, inner string, prev, prevLive, next byte) bool {
 		return true
 	}
 	// Flush on one side only.
-	return (len(inner) > 0 && inner[0] == char) != (endsWithLive(inner) == char)
+	if (len(inner) > 0 && inner[0] == char) != (endsWithLive(inner) == char) {
+		return true
+	}
+	// Both of those are about the span's own content and are decided before
+	// what surrounds it, because the check below used to sit in front of them
+	// and hide both. A span with a space either side reached it, returned "does
+	// not merge", and was written with asterisks however many live delimiters
+	// its content held: `00 ***0*0*0*0*0*** 0` is what that produced, and no
+	// reader takes those runs apart the way they were meant.
+	//
+	// What surrounding whitespace does rule out is the merge below it, because
+	// nothing opens or closes against a space, so a neighbour's delimiter
+	// cannot run together with this one's.
+	if isSpaceByte(prev) && isSpaceByte(next) && prev != 0 && next != 0 {
+		return false
+	}
+	return prevLive == char || next == char
 }
 
 // insideLive reports an unescaped delimiter somewhere other than the two ends.
@@ -1218,19 +1226,33 @@ func escapeText(s string, lineStart bool) string {
 	return b.String()
 }
 
-// intraword reports whether the rune at i sits between two letters or digits,
-// where CommonMark's flanking rules make an underscore inert.
+// intraword reports whether the rune at i sits between two characters that are
+// neither whitespace nor punctuation, which is where CommonMark's flanking
+// rules make an underscore inert and where it is safe to leave unescaped.
+//
+// Running out of runes is not intraword. The next node's first character is not
+// visible from here, so the two ends of a text node are escaped whether they
+// need it or not.
 func intraword(runes []rune, i int) bool {
 	return i > 0 && i+1 < len(runes) &&
 		isWordRune(runes[i-1]) && isWordRune(runes[i+1])
 }
 
+// isWordRune is the third class of the flanking rules, the one with no name in
+// the specification: not whitespace and not punctuation.
+//
+// It used to count an underscore itself as a word character, which made the
+// second underscore of a pair look intraword and go out unescaped. That agreed
+// with the scanner this package had, which asked the same question of the
+// single character in front of the delimiter. It does not agree with the
+// flanking rules, where an underscore is punctuation: `\__0` is an escaped
+// underscore and then a live one that opens a span, so the writer emitted two
+// characters of text and the reader read one of them as markup. Found by the
+// round-trip fuzzer half a second into the sweep that was verifying the parser
+// this rule now has to match.
 func isWordRune(r rune) bool {
-	return r == '_' ||
-		(r >= '0' && r <= '9') ||
-		(r >= 'a' && r <= 'z') ||
-		(r >= 'A' && r <= 'Z') ||
-		r > 127
+	space, punct := classify(r)
+	return !space && !punct
 }
 
 // startsOrderedList reports whether the rune at i closes an ordered-list marker

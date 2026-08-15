@@ -97,6 +97,16 @@ func TestMarkdownSurvivesTheRoundTrip(t *testing.T) {
 		// over the whole phrase stays one span rather than becoming three with
 		// the spaces falling out from between them.
 		{"emphasis over a phrase with strong on each word", "_**one** **two** **three**_"},
+		// A nested span flush against its parent's close. The writer spells the
+		// outer mark with underscores so the two delimiters cannot merge into
+		// one run; the reader takes a run apart whichever way it is written.
+		{"emphasis inside strong, flush against the close", "__bold *and italic*__"},
+		{"strong inside emphasis, flush against the close", "_italic **and bold**_"},
+		// The writer spells the outer mark with underscores wherever its
+		// content holds a live asterisk, so the run it closes with is its own.
+		// A reader takes `**0*0***` apart correctly and this package will not
+		// write it: the conservatism costs a spelling and never a document.
+		{"a run that closes an emphasis and a strong", "0 __0*0*__ _0_**0**"},
 		{"a setext underline behind a vertical tab", "0\\\n\v\\="},
 		{"a setext underline behind a non-breaking space", "0\\\n\u00a0\\="},
 		{"a rule behind a vertical tab", "0\\\n\v\\---"},

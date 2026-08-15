@@ -30,6 +30,14 @@ func TestPathologicalInputFinishes(t *testing.T) {
 		{"unclosed emphasis", strings.Repeat("*a ", 10000)},
 		{"unclosed strike", strings.Repeat("~~a ", 10000)},
 		{"escapes", strings.Repeat("\\*", 10000)},
+		// The shapes the delimiter stack is worst at, which are not the ones
+		// above: a closer searches backwards, so a line of closers that find
+		// nothing is the case openers_bottom exists for, and a long run that
+		// pairs repeatedly walks further back on each pairing.
+		{"closers with no openers", strings.Repeat("a* ", 10000)},
+		{"openers then one long closer", strings.Repeat("*a", 5000) + strings.Repeat("*", 5000)},
+		{"delimiters that pair", strings.Repeat("*a* ", 10000)},
+		{"intraword underscores", strings.Repeat("a_b", 10000)},
 	}
 
 	for _, c := range cases {
@@ -139,6 +147,48 @@ func TestConversionIsLinearInSpanCount(t *testing.T) {
 	if ratio > 3 {
 		t.Errorf("doubling the inline nodes multiplied allocation by %.2f, "+
 			"want about 2 — conversion is superlinear in the number of spans", ratio)
+	}
+}
+
+// delimiterLine is `a* a* a* … `: one delimiter run per word, every one of them
+// able to close and none of them able to open.
+//
+// That is the shape the backwards search is worst at, because every closer
+// walks the whole prefix before finding nothing. It is also what a paragraph of
+// ordinary prose with a few stray asterisks looks like to this parser.
+func delimiterLine(n int) string { return strings.Repeat("a* ", n) }
+
+// TestEmphasisPairingDoesNotRescanThePrefix guards the table CommonMark calls
+// openers_bottom, which is the one part of the emphasis algorithm that looks
+// like an optimisation and is not optional.
+//
+// Without it every closer that finds no opener walks the whole prefix again,
+// which is quadratic in the delimiter count and needs nothing unusual to
+// reach: a paragraph of prose with a stray asterisk per line is the shape.
+//
+// This is a ceiling and not the ratio-of-allocations the two guards above use,
+// because the rescan allocates nothing. Removing the table and measuring
+// proved it: the ratio stayed at 2.17 and said linear, while the same input
+// went from 101ms to 6.6 seconds. A guard has to measure the resource the
+// defect spends, and this one spends CPU.
+//
+// The size is chosen so the bar cannot be reached by a slow runner. Correct is
+// 0.15s here and the quadratic is around 26s, so five seconds is a factor of
+// thirty of headroom for the implementation that works and a factor of five of
+// margin against the one that does not.
+func TestEmphasisPairingDoesNotRescanThePrefix(t *testing.T) {
+	const closers = 80000
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, _ = adf.FromMarkdown(delimiterLine(closers))
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("pairing %d closers against no opener did not finish in 5s; "+
+			"the backwards search is rescanning the prefix", closers)
 	}
 }
 
