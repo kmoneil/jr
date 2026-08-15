@@ -100,6 +100,23 @@ jobs:
       contents: read
       issues: write
     steps:
+      # `gh issue create` refuses the whole issue over a label it cannot find,
+      # so the label has to exist before the report does. It did not on
+      # 2026-08-15: the sweep found a real crasher in internal/adf, this step
+      # exited 1 with "could not add label: 'fuzz' not found", and nothing was
+      # filed. The run was red, which is the only reason anybody looked.
+      #
+      # --force updates the label if it is already there, so this is idempotent
+      # and the report no longer depends on repository settings staying put.
+      - name: make sure the label exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create fuzz \
+            --repo "${{ github.repository }}" \
+            --color 5319e7 \
+            --description "Found by the nightly fuzz sweep" \
+            --force
       # One issue per run rather than one per package, because a crasher in a
       # shared helper lights up several at once and ten issues describing one
       # bug is worse than one issue naming ten packages.
