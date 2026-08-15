@@ -1,0 +1,2 @@
+go test fuzz v1
+string("*__0__ __0__ __0__*")

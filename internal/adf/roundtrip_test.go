@@ -93,6 +93,10 @@ func TestMarkdownSurvivesTheRoundTrip(t *testing.T) {
 		// why: a line start is where a block can begin, and the read side finds
 		// that start after whitespace markdown itself does not strip. Without
 		// the escape these are a setext heading and a rule.
+		// The span that reaches furthest is the one that opens, so the emphasis
+		// over the whole phrase stays one span rather than becoming three with
+		// the spaces falling out from between them.
+		{"emphasis over a phrase with strong on each word", "_**one** **two** **three**_"},
 		{"a setext underline behind a vertical tab", "0\\\n\v\\="},
 		{"a setext underline behind a non-breaking space", "0\\\n\u00a0\\="},
 		{"a rule behind a vertical tab", "0\\\n\v\\---"},

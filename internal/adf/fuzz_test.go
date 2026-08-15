@@ -103,6 +103,9 @@ func FuzzMarkdownRoundTrips(f *testing.F) {
 		// an inert underscore taken for a closer
 		"0\\\n\v\\=", // a setext underline behind a vertical tab, which the
 		// writer read as mid-line and the reader trimmed away
+		"*__0__ __0__ __0__*", // one mark over a run and a narrower one on each
+		// word, which opened the narrow mark first and cut the wide one into
+		// spans that shed the mark from a space per conversion
 	} {
 		f.Add(seed)
 	}

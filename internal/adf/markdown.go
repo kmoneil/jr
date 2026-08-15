@@ -517,7 +517,7 @@ var spanMarks = []string{"link", "strong", "em", "strike"}
 func renderInline(nodes []Node, applied []Mark, written, where string) (string, error) {
 	var b strings.Builder
 	for i := 0; i < len(nodes); {
-		mark, ok := nextSpanMark(nodes[i], applied)
+		mark, ok := nextSpanMark(nodes, i, applied)
 		if !ok {
 			s, err := inline(nodes[i], atLineStart(written+b.String()), where+" > "+nodes[i].Type)
 			if err != nil {
@@ -585,20 +585,44 @@ func renderSpan(nodes []Node, i, j int, mark Mark, applied []Mark,
 	return lead + open + core + closing + trail, nil
 }
 
-// nextSpanMark returns the outermost mark on n that is not already open.
-func nextSpanMark(n Node, applied []Mark) (Mark, bool) {
+// nextSpanMark returns the mark to open at i: the one reaching furthest along
+// the run, with spanMarks order breaking a tie.
+//
+// Reaching furthest is what markdown can express. A span nests inside another
+// or it does not overlap it at all, so opening the shorter mark first cuts the
+// longer one into pieces, and each piece is a fresh span whose edge whitespace
+// then moves outside it — which is where the mark on that whitespace is lost.
+// The round-trip fuzzer found it as text that took one pass per space to
+// settle: `*__0__ __0__ __0__*` is em over the whole run with strong on each
+// word, and opening strong first (it is outermost in spanMarks) emitted
+// `***0*** _**0** **0**_`, dropping the em from one space per conversion until
+// there were none left.
+//
+// The tie is what spanMarks was for and still decides: two marks over the same
+// extent nest in a fixed order, so the same text under the same marks is
+// written the same way whatever order Jira stored them in.
+func nextSpanMark(nodes []Node, i int, applied []Mark) (Mark, bool) {
+	n := nodes[i]
 	if n.Type != "text" {
 		return Mark{}, false
 	}
+	var best Mark
+	reach := 0
 	for _, name := range spanMarks {
 		for _, m := range n.Marks {
 			if m.Type != name || carriesAll(applied, m) {
 				continue
 			}
-			return m, true
+			run := 1
+			for j := i + 1; j < len(nodes) && carries(nodes[j], m); j++ {
+				run++
+			}
+			if run > reach {
+				best, reach = m, run
+			}
 		}
 	}
-	return Mark{}, false
+	return best, reach > 0
 }
 
 func carriesAll(applied []Mark, m Mark) bool {
