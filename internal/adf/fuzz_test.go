@@ -101,6 +101,8 @@ func FuzzMarkdownRoundTrips(f *testing.F) {
 		// backslash and reads back as one
 		"**0_0*", // an escaped asterisk counted as a live delimiter, and
 		// an inert underscore taken for a closer
+		"0\\\n\v\\=", // a setext underline behind a vertical tab, which the
+		// writer read as mid-line and the reader trimmed away
 	} {
 		f.Add(seed)
 	}
