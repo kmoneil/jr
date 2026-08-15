@@ -961,17 +961,39 @@ func checkEdgeSpace(s, where string) error {
 // separately closes and reopens the emphasis between two words — `**a****b**` —
 // which is not what the document says and, run together, is not reliably what
 // a CommonMark parser reads either.
+// The run is gathered and joined once rather than appended to as it grows. A
+// string is immutable, so `prev.Text += n.Text` copies everything already
+// merged on every node, which is quadratic in the bytes of the run — half a
+// second on a paragraph holding ten thousand delimiters, which the emphasis
+// scanner produces one node each for.
 func coalesce(nodes []Node) []Node {
 	out := make([]Node, 0, len(nodes))
+	var run []string
+
+	// closeRun writes the gathered text back to the node it belongs to. While
+	// a run is open that node holds only its first piece, and nothing reads it
+	// until here.
+	closeRun := func() {
+		if len(run) > 0 {
+			out[len(out)-1].Text = strings.Join(run, "")
+			run = run[:0]
+		}
+	}
+
 	for _, n := range nodes {
 		if len(out) > 0 && n.Type == "text" {
 			if prev := &out[len(out)-1]; prev.Type == "text" && sameMarks(prev.Marks, n.Marks) {
-				prev.Text += n.Text
+				if len(run) == 0 {
+					run = append(run, prev.Text)
+				}
+				run = append(run, n.Text)
 				continue
 			}
 		}
+		closeRun()
 		out = append(out, n)
 	}
+	closeRun()
 	return out
 }
 
