@@ -1189,6 +1189,13 @@ document it came from. A single newline inside a paragraph joins its lines,
 because that is what markdown means by one; a trailing backslash is a hard
 break.
 
+Emphasis is CommonMark's delimiter-run algorithm rather than an approximation
+of it, flanking rules and the rule of three included, so a closing run is spent
+across the spans that need it: `**bold *and italic***` is a strong span holding
+an emphasised one. A scanner that looks for a closing run of one exact length
+reads those three asterisks as belonging to nothing and hands back a paragraph
+with the asterisks still in it, which is the failure mode this replaced.
+
 Anything else exits 2 with `MARKDOWN_UNSUPPORTED`, naming the construct **and
 the line it is on**: setext headings, indented code blocks, unclosed fences,
 lazily continued blockquotes, aligned table columns, an image beside other

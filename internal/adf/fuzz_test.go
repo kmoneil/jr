@@ -106,6 +106,23 @@ func FuzzMarkdownRoundTrips(f *testing.F) {
 		"*__0__ __0__ __0__*", // one mark over a run and a narrower one on each
 		// word, which opened the narrow mark first and cut the wide one into
 		// spans that shed the mark from a space per conversion
+		"0 __0__*__0__ 0*__0__", // the writer's own spelling of a span ending
+		// flush against its parent's close, which the reader could not take
+		// apart because it looked for a closing run of one exact length
+		"**bold *and italic***", // the same shape as anybody writes it
+		"*foo**bar*",            // the rule of three, which is the only thing
+		// standing between this and a nest nobody meant
+		"\x00**0***", // a control character beside a delimiter, which the
+		// writer treats as no word character and the flanking rules put in the
+		// class that has neither an opener nor a closer beside it
+		"0 __0!_*_*__000", // an underscore beside an escaped underscore, where
+		// the escaping counted the neighbour as a word character and the
+		// flanking rules count it as punctuation, so one of the two characters
+		// the writer meant as text opened a span
+		"00 ***********************0*********0*0***0*0************* 0",
+		// a span whose content holds live delimiters, with a space either side
+		// of it: the space said no neighbour could merge and the check that
+		// says so ran before the two about the content, and hid them
 	} {
 		f.Add(seed)
 	}

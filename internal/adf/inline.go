@@ -9,7 +9,9 @@ import (
 //
 // It is a scanner rather than a full CommonMark implementation, and where the
 // two would differ it refuses instead of choosing. The rule throughout: if the
-// text could mean two things, it is not converted.
+// text could mean two things, it is not converted. Emphasis is the exception,
+// and it is CommonMark's own algorithm rather than an approximation of it —
+// see emphasis.go for what an approximation cost.
 func parseInline(s string, at int) ([]Node, error) {
 	nodes, err := scanInline(s, at)
 	if err != nil {
@@ -18,8 +20,8 @@ func parseInline(s string, at int) ([]Node, error) {
 	return coalesce(nodes), nil
 }
 
-// inlineOut accumulates the nodes scanInline emits and the literal text between
-// them.
+// inlineOut accumulates the pieces scanInline emits and the literal text
+// between them.
 //
 // It exists so the construct arms of that switch can share one shape. Each of
 // them asks a scanner for a construct at the cursor and gets a width back, and
@@ -31,8 +33,8 @@ func parseInline(s string, at int) ([]Node, error) {
 // What is left in the switch is the part that is genuinely CommonMark's: one
 // arm per inline construct markdown has, each naming the bytes that open it.
 type inlineOut struct {
-	nodes []Node
-	lit   strings.Builder
+	pieces []piece
+	lit    strings.Builder
 }
 
 // literal adds one byte to the run of plain text.
@@ -41,7 +43,9 @@ func (o *inlineOut) literal(c byte) { o.lit.WriteByte(c) }
 // flush ends the current run of literal text, if there is one.
 func (o *inlineOut) flush() {
 	if o.lit.Len() > 0 {
-		o.nodes = append(o.nodes, Node{Type: "text", Text: o.lit.String()})
+		o.pieces = append(o.pieces, piece{
+			nodes: []Node{{Type: "text", Text: o.lit.String()}},
+		})
 		o.lit.Reset()
 	}
 }
@@ -50,30 +54,43 @@ func (o *inlineOut) flush() {
 // advances.
 //
 // A width of zero is the scanner saying "not that construct here" — a backtick
-// that never closes, a bracket with no link after it, an asterisk that opens
-// nothing. That is a literal byte rather than an error, which is the rule this
-// whole scanner runs on: where the text could mean two things it is refused,
-// but where it plainly means one thing it is that thing, and an unmatched
-// delimiter plainly means itself.
+// that never closes, a bracket with no link after it. That is a literal byte
+// rather than an error, which is the rule this whole scanner runs on: where the
+// text could mean two things it is refused, but where it plainly means one
+// thing it is that thing, and an unmatched delimiter plainly means itself.
 func (o *inlineOut) take(c byte, nodes []Node, width int) int {
 	if width == 0 {
 		o.literal(c)
 		return 1
 	}
 	o.flush()
-	o.nodes = append(o.nodes, nodes...)
+	o.pieces = append(o.pieces, piece{nodes: nodes})
 	return width
 }
 
 // takeOne is take for the scanners that produce a single node.
 func (o *inlineOut) takeOne(c byte, node Node, width int) int {
-	if width == 0 {
-		o.literal(c)
-		return 1
+	return o.take(c, []Node{node}, width)
+}
+
+// delimiter records a run of emphasis characters, whose meaning is decided
+// once the whole line is in hand.
+func (o *inlineOut) delimiter(d piece) int {
+	if !d.canOpen && !d.canClose {
+		// A run that can do neither is text, and writing it as text now keeps
+		// the literal run it sits in contiguous. That is worth doing rather
+		// than leaving to the merge at the end: the intraword underscore is
+		// the common case, a description full of custom field ids has
+		// thousands of them, and each one would otherwise split a paragraph
+		// into three nodes for the merge to put back together.
+		for range d.n {
+			o.literal(d.char)
+		}
+		return d.n
 	}
 	o.flush()
-	o.nodes = append(o.nodes, node)
-	return width
+	o.pieces = append(o.pieces, d)
+	return d.n
 }
 
 // scanInline walks the bytes of one inline run, emitting a node per construct
@@ -156,11 +173,10 @@ func scanInline(s string, at int) ([]Node, error) {
 			i += out.take(c, nodes, width)
 
 		case c == '*' || c == '_':
-			nodes, width, err := emphasisAt(s, i, at)
-			if err != nil {
-				return nil, err
-			}
-			i += out.take(c, nodes, width)
+			// Recorded rather than resolved. What a run of asterisks means
+			// depends on the runs after it as well as the text around it, so
+			// the decision waits until the line has been read.
+			i += out.delimiter(delimiterAt(s, i))
 
 		default:
 			out.literal(c)
@@ -168,7 +184,9 @@ func scanInline(s string, at int) ([]Node, error) {
 		}
 	}
 	out.flush()
-	return out.nodes, nil
+
+	matchEmphasis(out.pieces)
+	return emphasisNodes(out.pieces, at)
 }
 
 // isASCIIPunct reports the characters a backslash may escape in CommonMark.
@@ -234,6 +252,11 @@ func delimitedAt(s, delim string, mark Mark, at int) ([]Node, int, error) {
 // findCloser returns the index of the next closing delimiter at or after from,
 // skipping escapes and code spans so a delimiter inside one does not close the
 // span outside it. It returns -1 where there is none.
+//
+// This serves strikethrough, which GFM spells with a fixed pair and not with
+// the delimiter runs emphasis uses. Emphasis went through here once, matching
+// a closer of exactly the length it opened with, which is the bug emphasis.go
+// exists to have fixed.
 func findCloser(s string, from int, delim string) int {
 	for i := from; i < len(s); {
 		switch {
@@ -246,10 +269,8 @@ func findCloser(s string, from int, delim string) int {
 			}
 			i++
 		case s[i] == delim[0]:
-			// A run longer than the delimiter is not this delimiter: `*` does
-			// not close inside `**`. Matching one was how `*0**0**0*` — a bold
-			// word inside an italic sentence, which CommonMark reads correctly
-			// — came apart into three pieces.
+			// A run longer than the delimiter is not this delimiter, so `~~~`
+			// does not close a strike opened with `~~`.
 			run := 0
 			for i+run < len(s) && s[i+run] == delim[0] {
 				run++
@@ -263,81 +284,6 @@ func findCloser(s string, from int, delim string) int {
 		}
 	}
 	return -1
-}
-
-// emphasisAt reads a run of `*` or `_` and the text it wraps.
-func emphasisAt(s string, start, at int) ([]Node, int, error) {
-	char := s[start]
-	run := 0
-	for start+run < len(s) && s[start+run] == char {
-		run++
-	}
-	run = min(run, 3)
-
-	// An underscore between two word characters is inert in CommonMark, which
-	// is what keeps `customfield_10042` a field id rather than emphasis.
-	if char == '_' && start > 0 && isWordByte(s[start-1]) {
-		return nil, 0, nil
-	}
-	// Nothing opens a span with whitespace after it.
-	if start+run >= len(s) || isSpaceByte(s[start+run]) {
-		return nil, 0, nil
-	}
-
-	rest := s[start:]
-	end, ok := findEmphasisEnd(rest, char, run)
-	if !ok {
-		return nil, 0, nil
-	}
-
-	inner, err := scanInline(rest[run:end], at)
-	if err != nil {
-		return nil, 0, err
-	}
-	if err := applyEmphasis(inner, run, at); err != nil {
-		return nil, 0, err
-	}
-	return inner, end + run, nil
-}
-
-// findEmphasisEnd locates the run that closes the span, or reports that nothing
-// does.
-//
-// A run with a space before it does not close, so the search keeps looking:
-// `a * b * c` is three words and two asterisks, not emphasis around " b ".
-func findEmphasisEnd(rest string, char byte, run int) (int, bool) {
-	delim := strings.Repeat(string(char), run)
-	for from := run; ; {
-		found := findCloser(rest, from, delim)
-		if found < 0 {
-			return 0, false
-		}
-		closes := found > run && !isSpaceByte(rest[found-1])
-		if closes && char == '_' && found+run < len(rest) && isWordByte(rest[found+run]) {
-			// An underscore between two word characters is inert, so it is not
-			// this span's closer, though the next one might be. Giving up here
-			// left `_0_0_` unparsed, and its writer had no other spelling.
-			closes = false
-		}
-		if closes {
-			return found, true
-		}
-		from = found + run
-	}
-}
-
-// applyEmphasis marks the span: one delimiter is emphasis, two are strong,
-// three are both.
-func applyEmphasis(inner []Node, run, at int) error {
-	if run != 2 {
-		if err := addMark(inner, Mark{Type: "em"}, at); err != nil {
-			return err
-		}
-	}
-	if run >= 2 {
-		return addMark(inner, Mark{Type: "strong"}, at)
-	}
-	return nil
 }
 
 // isSpaceByte is CommonMark's whitespace, which a delimiter may not sit
