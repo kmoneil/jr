@@ -1,0 +1,103 @@
+# Mutation testing, scheduled for the same reason the fuzz search is.
+#
+# Coverage says a line ran. This asks whether any test notices when the line
+# changes, which is a different question and the one that matters for the three
+# packages it sweeps: jql builds every query and owns the only place a value is
+# quoted, render writes the output contract, and site decides what a deployment
+# is. `internal/jql` sits at 100% statement coverage with four fuzz targets and
+# still lets sixteen mutants live.
+#
+# It is not on the pull-request path and it is not required. The sweep takes
+# minutes, and a mutation score moves when a test is added anywhere, so a
+# threshold on it would redden a pull request that touched nothing near the
+# mutant, which is how a real find gets waved through. `scripts/mutate.sh`
+# compares against a baseline that only goes down, so the signal here is a
+# regression rather than the standing list of survivors.
+name: mutation-weekly
+
+on:
+  schedule:
+    # 06:43 UTC on Mondays. Off the hour because every cron in the world runs on
+    # it, and weekly rather than nightly because the baseline moves when
+    # somebody writes a test, not when the clock does.
+    - cron: "43 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # The patch, not the minor. See the note in ci.yml: setup-go pins
+  # GOTOOLCHAIN=local, so this has to match go.mod's directive exactly.
+  GO_VERSION: "1.26.6"
+
+jobs:
+  mutate:
+    name: mutation sweep
+    runs-on: ubuntu-latest
+    # The three packages take about four minutes on a developer machine, and a
+    # runner has fewer cores and a cold build cache. Generous rather than tight:
+    # a sweep killed halfway reports fewer mutants tried, and this is a job
+    # whose whole output is a count.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      # Pinned from the Makefile, so a scheduled run and a developer run mutate
+      # with the same binary. A float here would move the baseline without
+      # anybody changing a test.
+      - name: gremlins
+        run: go install github.com/go-gremlins/gremlins/cmd/gremlins@$(make -s print-GREMLINS_VERSION)
+      - name: sweep
+        run: make mutate | tee mutation.log
+      # The log carries the file, line, and mutator of every survivor, which is
+      # the part somebody acts on. Kept whether the run passed or failed,
+      # because the standing list is what the next test is written from.
+      - name: keep the report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutation-report
+          path: mutation.log
+          if-no-files-found: warn
+
+  report:
+    name: report a regression
+    needs: mutate
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      # The label has to exist before the issue does, or `gh issue create`
+      # refuses the whole issue over it. That cost the fuzz sweep a real find on
+      # 2026-08-15, so this is not defensive coding, it is a repeat.
+      - name: make sure the label exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create mutation \
+            --repo "${{ github.repository }}" \
+            --color 1d76db \
+            --description "Found by the weekly mutation sweep" \
+            --force
+      - name: open an issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "mutation: the weekly sweep moved off its baseline" \
+            --label mutation \
+            --body "$(printf '%s\n' \
+              "The weekly mutation sweep did not match scripts/mutation-baseline.tsv on ${{ github.sha }}." \
+              "" \
+              "Run: $RUN" \
+              "" \
+              "More mutants surviving means a test stopped noticing a change it used to catch." \
+              "Fewer means somebody wrote one and the baseline owes an update in the same change." \
+              "The mutation-report artifact lists every survivor by file, line, and mutator.")"

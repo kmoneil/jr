@@ -400,6 +400,7 @@ name to `customfield_10042` should not cost a round trip on every invocation.
 | Build profiles      | Matrix build of all profiles, a size assertion, and a command count per profile                                                | Every PR                                                                                                                                                                                                            |
 | Fuzzing             | `make fuzz`, all 23 targets, built with the full tag set                                                                       | Every PR, 60s per target                                                                                                                                                                                            |
 | Complexity          | `make complexity`, gocognit over `internal/` and `cmd/`                                                                        | Cognitive 15, or an exemption naming its score and its reason                                                                                                                                                       |
+| Mutation            | `make mutate`, gremlins over `jql/`, `render/`, and `site/`                                                                    | Weekly, against a per-package baseline of surviving mutants that only goes down                                                                                                                                     |
 
 **A red from the fuzz sweep means the target, and the toolchain does not get a
 vote.** Go 1.26 fails a fuzz target that found nothing. When the time budget
@@ -424,6 +425,25 @@ failure message contains the phrase. Upstream is
 and in no 1.26.x, so `TestTheFuzzFlakeWorkaroundIsStillNeeded` fails on a
 released 1.27 and names what to delete. Scaffolding for somebody else's bug
 outlives the bug otherwise.
+
+**Mutation testing is a ratchet, and its timeout is a correctness setting.**
+Coverage says a line ran; a surviving mutant says nothing noticed when the line
+changed. `internal/jql` sits at 100% statement coverage with four fuzz targets
+and lets sixteen mutants live, which is what the sweep is for. It runs weekly
+rather than per pull request, because the sweep takes minutes and a score moves
+when a test is added anywhere, so a threshold on it would redden a change that
+touched nothing near the mutant. `scripts/mutation-baseline.tsv` carries the
+surviving count per package: more fails, and fewer fails too, asking for the
+baseline to be lowered in the same change.
+
+Gremlins derives its per-mutant timeout by multiplying the measured suite time,
+and its default coefficient is unusable here rather than merely tight. The
+`internal/jql` suite runs in 15 milliseconds, so the derived timeout lands below
+the compile, 194 of 216 mutants are abandoned unrun, and the tool reports
+`Test efficacy: 100.00%` over the 25 that finished. `scripts/mutate.sh` sets the
+coefficient, `internal/lint/mutation_test.go` holds it above the range where
+that happens, and the workflow goes through `make mutate` so the scheduled sweep
+cannot pick up a different one.
 
 **The complexity limit is enforced, and its one exception is written down.**
 15 was the number every complexity card in this project had been measured
