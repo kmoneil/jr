@@ -325,3 +325,83 @@ func TestAMalformedDestinationIsNotAShortLink(t *testing.T) {
 		}
 	}
 }
+
+// TestWhitespaceMarkdownDoesNotCountSurvives is the Jira to markdown to Jira
+// path for characters CommonMark does not call whitespace and Unicode does.
+//
+// The reader decided block structure with strings.TrimSpace, which trims the
+// vertical tab, the form feed, NEL and the non-breaking space. A heading ending
+// in a non-breaking space came back one character shorter, a table cell did
+// too, and a line holding only one read as blank and split a paragraph in two.
+// Silently, with no refusal and no warning, which is the one thing this package
+// is not allowed to do to a value.
+//
+// Jira keeps the character: a heading ending in U+00A0 posted to the Cloud
+// sandbox on 2026-08-16 came back with it. So the tool was dropping something
+// the server stores, on the path a person performs by reading an issue, editing
+// the body, and sending it back.
+func TestWhitespaceMarkdownDoesNotCountSurvives(t *testing.T) {
+	// The JSON escape rather than the character, because a raw vertical tab is
+	// a control character and JSON forbids one inside a string literal. The
+	// non-breaking space is not a control character and either form parses.
+	const (
+		nbsp = `\u00a0`
+		vt   = `\u000b`
+	)
+	cases := []struct{ name, adf, want string }{{
+		name: "a heading ending in a non-breaking space",
+		adf:  wrap(`{"type":"heading","attrs":{"level":1},"content":[{"type":"text","text":"x` + nbsp + `"}]}`),
+		want: "x\u00a0",
+	}, {
+		name: "a heading ending in a vertical tab",
+		adf:  wrap(`{"type":"heading","attrs":{"level":1},"content":[{"type":"text","text":"x` + vt + `"}]}`),
+		want: "x\v",
+	}, {
+		name: "a paragraph ending in a non-breaking space",
+		adf:  para(`{"type":"text","text":"x` + nbsp + `"}`),
+		want: "x\u00a0",
+	}, {
+		name: "a table cell ending in a non-breaking space",
+		adf: wrap(`{"type":"table","content":[{"type":"tableRow","content":[` +
+			`{"type":"tableHeader","content":[{"type":"paragraph","content":[` +
+			`{"type":"text","text":"a` + nbsp + `"}]}]}]}]}`),
+		want: "a\u00a0",
+	}}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			markdown, err := convert(t, c.adf)
+			if err != nil {
+				t.Fatalf("ToMarkdown: %v", err)
+			}
+			back, err := adf.FromMarkdown(markdown)
+			if err != nil {
+				t.Fatalf("this package cannot read its own output: %v\n%q", err, markdown)
+			}
+			// Compared as documents, because PlainText is deliberately lossy
+			// and trims the very character this is about.
+			parsed, err := adf.Parse([]byte(c.adf))
+			if err != nil {
+				t.Fatalf("Parse: %v", err)
+			}
+			want, _ := json.Marshal(parsed)
+			got, _ := json.Marshal(back)
+			if string(got) != string(want) {
+				t.Errorf("the round trip changed the document\n wrote %q\n sent %s\n back %s\n (the character at stake is %q)",
+					markdown, want, got, c.want)
+			}
+		})
+	}
+}
+
+// A line holding nothing but a character markdown does not count as whitespace
+// is not a blank line, so it does not end a paragraph.
+func TestALineOfNonMarkdownWhitespaceIsNotBlank(t *testing.T) {
+	doc, err := adf.FromMarkdown("a\n\u00a0\nb")
+	if err != nil {
+		t.Fatalf("FromMarkdown: %v", err)
+	}
+	if n := len(doc.Content); n != 1 {
+		t.Errorf("built %d blocks, want 1: a non-breaking space does not make a line blank", n)
+	}
+}
