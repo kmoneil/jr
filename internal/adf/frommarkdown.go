@@ -9,6 +9,33 @@ import (
 	"github.com/kmoneil/jr/internal/errs"
 )
 
+// blockSpace is the whitespace markdown counts when it decides block
+// structure: a space and a tab, and nothing else.
+//
+// strings.TrimSpace is Unicode's set, which adds the vertical tab, the form
+// feed, NEL, and the non-breaking space. Deciding a block with it ate those
+// characters silently at a line edge. A heading ending in a non-breaking space
+// came back one character shorter, so did a table cell, and a line holding only
+// one read as blank and split a paragraph in two. None of it was refused or
+// warned about, which is the one thing this package is not allowed to do to a
+// value.
+//
+// It matters because Jira keeps the character. A heading ending in U+00A0
+// posted to the Cloud sandbox on 2026-08-16 came back with the U+00A0 on it, so
+// the tool was dropping something the server stores, on the Jira to markdown to
+// Jira path that a person actually performs. An NBSP at a line edge is not
+// exotic; it is what a paste out of a word processor leaves behind.
+//
+// A line ending never reaches here. FromMarkdown turns CRLF and a lone CR into
+// LF before anything is parsed and the text is split on LF, so a carriage
+// return cannot survive to be trimmed or to make a line look non-blank. That
+// was the risk worth checking before narrowing the set, and it was already
+// closed.
+const blockSpace = " \t"
+
+// trimLine is TrimSpace over markdown's whitespace rather than Unicode's.
+func trimLine(s string) string { return strings.Trim(s, blockSpace) }
+
 // FromMarkdown converts markdown to an ADF document.
 //
 // It covers a documented subset and refuses the rest by name. That is the
@@ -171,7 +198,7 @@ func parseBlocks(lines []string, first int) ([]Node, error) {
 	var out []Node
 	for i := 0; i < len(lines); {
 		line := lines[i]
-		if strings.TrimSpace(line) == "" {
+		if trimLine(line) == "" {
 			i++
 			continue
 		}
@@ -248,10 +275,10 @@ func fenceOf(line string) string {
 
 func parseFence(lines []string, at int) (Node, int, error) {
 	fence := fenceOf(lines[0])
-	info := strings.TrimSpace(strings.TrimPrefix(strings.TrimLeft(lines[0], " "), fence))
+	info := trimLine(strings.TrimPrefix(strings.TrimLeft(lines[0], " "), fence))
 
 	for end := 1; end < len(lines); end++ {
-		closer := strings.TrimSpace(lines[end])
+		closer := trimLine(lines[end])
 		if strings.HasPrefix(closer, fence[:1]) && len(closer) >= len(fence) &&
 			strings.Trim(closer, fence[:1]) == "" {
 			node := Node{Type: "codeBlock"}
@@ -286,10 +313,10 @@ func headingLevel(line string) int {
 func parseHeading(lines []string, at int) (Node, int, error) {
 	trimmed := strings.TrimLeft(lines[0], " ")
 	level := headingLevel(lines[0])
-	text := strings.TrimSpace(trimmed[level:])
+	text := trimLine(trimmed[level:])
 	text = trimClosingHashes(text)
 
-	content, err := parseInline(strings.TrimSpace(text), at)
+	content, err := parseInline(trimLine(text), at)
 	if err != nil {
 		return Node{}, 0, err
 	}
@@ -324,7 +351,7 @@ func trimClosingHashes(text string) string {
 // isThematicBreak reports a rule: three or more of one character, spaces
 // permitted between them and nothing else on the line.
 func isThematicBreak(line string) bool {
-	trimmed := strings.ReplaceAll(strings.TrimSpace(line), " ", "")
+	trimmed := strings.ReplaceAll(trimLine(line), " ", "")
 	if len(trimmed) < 3 {
 		return false
 	}
@@ -341,7 +368,7 @@ func isThematicBreak(line string) bool {
 // paragraph and `---` after a blank line are a heading and a rule, and one
 // invisible blank line between them is the whole difference.
 func isSetextUnderline(line string) bool {
-	trimmed := strings.TrimSpace(line)
+	trimmed := trimLine(line)
 	if trimmed == "" {
 		return false
 	}
@@ -361,7 +388,7 @@ func isSetextUnderline(line string) bool {
 // a quote.
 func leadingQuoteType(lines []string) string {
 	for _, line := range lines {
-		if strings.TrimSpace(line) == "" {
+		if trimLine(line) == "" {
 			continue
 		}
 		if isIndentedCode(line) || fenceOf(line) != "" ||
@@ -397,7 +424,7 @@ func quoteBody(lines []string, at int) ([]string, int, error) {
 	for used < len(lines) {
 		line := strings.TrimLeft(lines[used], " ")
 		if !strings.HasPrefix(line, ">") {
-			if strings.TrimSpace(line) == "" {
+			if trimLine(line) == "" {
 				break
 			}
 			return nil, 0, unsupported(at+used,
@@ -473,7 +500,7 @@ func parseQuote(lines []string, at int) (Node, int, error) {
 
 // alertName reads a GitHub alert marker and maps it back to ADF's panel type.
 func alertName(line string) (string, bool) {
-	trimmed := strings.TrimSpace(line)
+	trimmed := trimLine(line)
 	if !strings.HasPrefix(trimmed, "[!") || !strings.HasSuffix(trimmed, "]") {
 		return "", false
 	}
@@ -641,7 +668,7 @@ func gatherItemBody(lines []string, from int, first marker, width int) ([]string
 	i := from
 	for i < len(lines) {
 		line := lines[i]
-		if strings.TrimSpace(line) == "" {
+		if trimLine(line) == "" {
 			// A blank line ends the item unless the list continues under it,
 			// which is what makes a list loose rather than what ends it.
 			if i+1 >= len(lines) || !continuesItem(lines[i+1], first) {
@@ -747,7 +774,11 @@ func splitNestedTasks(it listItem) (own []string, nested []listItem, err error) 
 
 // taskItemNode builds one taskItem from the lines that belong to it.
 func taskItemNode(it listItem, own []string) (Node, error) {
-	text := strings.TrimSpace(strings.Join(own, "\n"))
+	// The one trim in this file whose input is several lines rather than one,
+	// so a line ending belongs in its set: a blank line above or below the
+	// item's content is structure and goes, and trimLine alone would leave it
+	// and hand the writer text starting with a newline.
+	text := strings.Trim(strings.Join(own, "\n"), blockSpace+"\n")
 	if strings.Contains(text, "\n\n") {
 		return Node{}, unsupported(it.at, "a task holding more than one paragraph")
 	}
@@ -794,15 +825,15 @@ func nestedTasks(lines []string, at int) ([]listItem, error) {
 
 // isTableStart reports a GFM table: a row of cells, then a delimiter row.
 func isTableStart(lines []string) bool {
-	if len(lines) < 2 || !strings.HasPrefix(strings.TrimSpace(lines[0]), "|") {
+	if len(lines) < 2 || !strings.HasPrefix(trimLine(lines[0]), "|") {
 		return false
 	}
-	delim := strings.TrimSpace(lines[1])
+	delim := trimLine(lines[1])
 	if !strings.HasPrefix(delim, "|") {
 		return false
 	}
 	for _, cell := range splitRow(delim) {
-		if strings.Trim(strings.TrimSpace(cell), "-:") != "" || cell == "" {
+		if strings.Trim(trimLine(cell), "-:") != "" || cell == "" {
 			return false
 		}
 	}
@@ -825,7 +856,7 @@ func parseTable(lines []string, at int) (Node, int, error) {
 	rows := []Node{header}
 
 	used := 2
-	for used < len(lines) && strings.HasPrefix(strings.TrimSpace(lines[used]), "|") {
+	for used < len(lines) && strings.HasPrefix(trimLine(lines[used]), "|") {
 		row, err := tableRowNode(splitRow(lines[used]), "tableCell", at+used)
 		if err != nil {
 			return Node{}, 0, err
@@ -838,7 +869,7 @@ func parseTable(lines []string, at int) (Node, int, error) {
 
 // splitRow splits a table row on unescaped pipes.
 func splitRow(line string) []string {
-	trimmed := strings.TrimSpace(line)
+	trimmed := trimLine(line)
 	trimmed = strings.TrimSuffix(strings.TrimPrefix(trimmed, "|"), "|")
 
 	var cells []string
@@ -864,7 +895,7 @@ func splitRow(line string) []string {
 func tableRowNode(cells []string, element string, at int) (Node, error) {
 	out := make([]Node, 0, len(cells))
 	for _, cell := range cells {
-		content, err := parseInline(strings.TrimSpace(cell), at)
+		content, err := parseInline(trimLine(cell), at)
 		if err != nil {
 			return Node{}, err
 		}
@@ -922,7 +953,7 @@ func paragraphExtent(lines []string, at int) (int, error) {
 	used := 0
 	for used < len(lines) {
 		line := lines[used]
-		if strings.TrimSpace(line) == "" {
+		if trimLine(line) == "" {
 			return used, nil
 		}
 		if used > 0 {
