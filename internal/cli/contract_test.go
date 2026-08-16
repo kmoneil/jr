@@ -11,6 +11,7 @@ import (
 	"github.com/kmoneil/jr/internal/exitcode"
 	"github.com/kmoneil/jr/internal/registry"
 	"github.com/kmoneil/jr/internal/render"
+	"github.com/kmoneil/jr/internal/site"
 
 	// The contract rules must hold for every command the binary ships, not
 	// only the built-ins, so the resources are linked in here too.
@@ -57,6 +58,21 @@ var jqlReportsRatherThanRefuses = map[string]string{
 		"answer; refusing the input would refuse to report on it. It answers " +
 		"valid=\"false\" at exit 0, which TestAMalformedQueryIsAResultNotAnError " +
 		"and TestAQueryThatCannotLexCostsNoRoundTrip assert",
+}
+
+// jqlNeedsNoServerCheck names the commands that take a raw fragment and do not
+// ask Jira what it means, with the reason each does not.
+//
+// It is a second list rather than a second use of the one above because the two
+// questions are different. That one is about refusing a fragment that cannot be
+// contained, which every command answers locally. This is about asking the
+// server whether the query means anything, which only matters for a command
+// that goes on to run it.
+var jqlNeedsNoServerCheck = map[string]string{
+	"jql.explain": "it never sends the query. It describes what would be sent, " +
+		"locally, and there is no result of its own to come back confidently " +
+		"empty. jql.ValidateFragment still refuses a fragment it could not " +
+		"contain, which TestRawJQLIsRefusedWhereverItIsAccepted asserts",
 }
 
 // malformedFragments are fragments no command may combine into a query it
@@ -133,6 +149,70 @@ func TestRawJQLIsRefusedWhereverItIsAccepted(t *testing.T) {
 			}
 			if len(verdicts) > 1 {
 				t.Errorf("the surfaces disagree about %q: %v", fragment, verdicts)
+			}
+		})
+	}
+}
+
+// TestEveryRawQueryIsCheckedWithTheServer is the same argument as the test
+// above, one layer out.
+//
+// jql.ValidateFragment settles whether a fragment can be contained. It cannot
+// settle whether the query means anything, because that is a fact about the
+// site: Cloud answers `nosuchfield = 1` with HTTP 200 and no rows, which is
+// indistinguishable from an honest empty result. So every command that sends a
+// raw fragment asks the server before it runs, and this holds them to it by
+// counting the request rather than by reading a declaration.
+//
+// A command that takes --jql and forgets the check fails here, and cannot be
+// quieted except by writing down why it is exempt in jqlReportsRatherThanRefuses
+// alongside the local reason.
+func TestEveryRawQueryIsCheckedWithTheServer(t *testing.T) {
+	for _, kind := range []site.Kind{site.Cloud, site.DataCenter} {
+		t.Run(string(kind), func(t *testing.T) {
+			var checked []string
+			for _, c := range cli.Registry().All() {
+				if !slices.ContainsFunc(c.Flags, func(f registry.Flag) bool {
+					return f.Name == "jql"
+				}) || jqlReportsRatherThanRefuses[c.Name()] != "" ||
+					jqlNeedsNoServerCheck[c.Name()] != "" {
+					continue
+				}
+
+				rt := &recordingTransport{kind: kind}
+				flags := registry.NewFlags()
+				fillRequiredFlags(c, flags)
+				flags.SetString("jql", "project = ENG")
+				err := c.Validate(t.Context(), &registry.Invocation{
+					Jira:  sweepSession{rt: rt, kind: kind},
+					Flags: flags, Limit: registry.Limit{N: registry.DefaultLimit},
+					Progress: registry.NoProgress,
+				})
+				if err != nil {
+					t.Fatalf("%s refused a valid fragment: %v", c.Name(), err)
+				}
+
+				// Cloud has an endpoint for the question. Data Center has none,
+				// and a search bounded to zero rows is the closest thing.
+				want := "/jql/parse"
+				if kind != site.Cloud {
+					want = "maxResults\":0"
+				}
+				if !slices.ContainsFunc(rt.seen, func(r string) bool {
+					return strings.Contains(r, want)
+				}) {
+					t.Errorf("%s sends a raw --jql and never asked the server "+
+						"what it means; it would answer a meaningless query "+
+						"with a complete empty result. Requests made: %v",
+						c.Name(), rt.seen)
+					continue
+				}
+				checked = append(checked, c.Name())
+			}
+			// A sweep that found nothing to sweep is a sweep that asserts
+			// nothing, which is how three gates in this tree went quiet.
+			if len(checked) == 0 {
+				t.Fatal("no command sends a raw --jql; this test asserted nothing")
 			}
 		})
 	}

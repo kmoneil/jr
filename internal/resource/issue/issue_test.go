@@ -1963,6 +1963,11 @@ type stubSession struct {
 	// project overrides the default scope, and unscoped removes it entirely.
 	project  string
 	unscoped bool
+	// jqlVerdict is what the server says about a raw --jql, as the body its
+	// endpoint would return. Empty means a clean verdict, which is what almost
+	// every test here wants: they pass a --jql to exercise something else and
+	// are not about whether Jira understands it.
+	jqlVerdict string
 	// metaClient answers metadata lookups. It is separate from doer so a test
 	// can point transitions at a recorded conversation while the field
 	// catalogue stays a stub.
@@ -2000,7 +2005,10 @@ func (s *stubSession) Metadata(context.Context) (*site.Metadata, error) {
 		case s.doer != nil:
 			client = s.doer
 		}
-		s.meta = &site.Metadata{Client: client, Info: site.Info{Kind: kind}}
+		s.meta = &site.Metadata{
+			Client: jqlChecked{inner: client, verdict: s.jqlVerdict, kind: kind},
+			Info:   site.Info{Kind: kind},
+		}
 	}
 	return s.meta, nil
 }
@@ -2067,6 +2075,149 @@ func (s *stubDoer) Do(_ context.Context, r transport.Request) (*transport.Respon
 		Body:   []byte(body),
 		Header: map[string][]string{"Content-Type": {"application/json"}},
 	}, nil
+}
+
+// jqlChecked answers the server-side query check and passes everything else to
+// the client underneath.
+//
+// Every raw --jql is checked against Jira before the command runs, on the
+// metadata client. A stub built to answer a catalogue lookup answers that check
+// with a catalogue, which is not a parse result, so without this every test
+// that passes a --jql fails on a request it was never about. A test that *is*
+// about the verdict sets stubSession.jqlVerdict.
+//
+// Intercepting a POST to /search is safe on this client and only on this one:
+// the metadata client fetches fields, users, labels and transitions, and never
+// searches. It is the command's own transport that runs the query.
+type jqlChecked struct {
+	inner   site.Doer
+	verdict string
+	kind    site.Kind
+}
+
+func (j jqlChecked) Do(ctx context.Context, r transport.Request) (*transport.Response, error) {
+	parse := j.kind == site.Cloud && strings.Contains(r.Path, "/jql/parse")
+	search := j.kind != site.Cloud && r.Method == transport.MethodPost &&
+		strings.HasSuffix(r.Path, "/search")
+	if !parse && !search {
+		return j.inner.Do(ctx, r)
+	}
+	body := j.verdict
+	if body == "" {
+		body = `{"queries":[{"query":"","errors":[],"warnings":[]}]}`
+		if search {
+			body = `{"issues":[],"warningMessages":[]}`
+		}
+	}
+	return &transport.Response{
+		Status: 200,
+		Body:   []byte(body),
+		Header: map[string][]string{"Content-Type": {"application/json"}},
+	}, nil
+}
+
+// TestAQueryJiraWouldAnswerEmptyIsRefused is the defect this check exists for.
+//
+// Cloud's search endpoint answers a query it knows is meaningless with HTTP 200
+// and no rows, so `--jql 'nosuchfield = 1'` came back well-formed, complete,
+// exit 0 and empty: indistinguishable from an honest "nothing matches". Data
+// Center refuses three of the four classes and answers the unknown-user class
+// the same confident empty, so the check runs on both.
+//
+// A warning refuses as firmly as an error, because the warning is where Jira
+// reports a value that does not exist for a field. `assignee = "nobody"` is
+// valid JQL naming nobody, and it is the same wrong answer as a misspelled
+// field. It also makes --jql agree with --assignee, which refuses a user it
+// cannot resolve.
+func TestAQueryJiraWouldAnswerEmptyIsRefused(t *testing.T) {
+	const (
+		unknownField = `{"queries":[{"query":"x","errors":` +
+			`["Field nosuchfield does not exist or you do not have permission to view it."],` +
+			`"warnings":[]}]}`
+		unknownUser = `{"queries":[{"query":"x","errors":[],"warnings":` +
+			`["The value nobody-xyz does not exist for the field assignee."]}]}`
+		clean = `{"queries":[{"query":"x","errors":[],"warnings":[]}]}`
+		// Data Center says it in the body of the bounded search instead.
+		dcWarning = `{"issues":[],"warningMessages":` +
+			`["The value nobody-xyz does not exist for the field assignee."]}`
+		dcClean = `{"issues":[],"warningMessages":[]}`
+	)
+
+	cases := []struct {
+		name    string
+		kind    site.Kind
+		verdict string
+		says    string
+	}{
+		{"cloud, unknown field", site.Cloud, unknownField, "nosuchfield"},
+		{"cloud, unknown user", site.Cloud, unknownUser, "nobody-xyz"},
+		{"cloud, clean", site.Cloud, clean, ""},
+		{"data center, unknown user", site.DataCenter, dcWarning, "nobody-xyz"},
+		{"data center, clean", site.DataCenter, dcClean, ""},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cmd, ok := registry.Lookup("issue.list")
+			if !ok {
+				t.Fatal("issue list is not registered")
+			}
+			flags := registry.NewFlags()
+			flags.SetString("jql", "assignee = \"nobody-xyz\"")
+			err := cmd.Validate(t.Context(), &registry.Invocation{
+				Jira:  &stubSession{project: "ENG", kind: c.kind, jqlVerdict: c.verdict},
+				Flags: flags, Limit: registry.Limit{N: 50},
+				Progress: registry.NoProgress,
+			})
+
+			if c.says == "" {
+				if err != nil {
+					t.Fatalf("a query Jira understands was refused: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("a query Jira would answer with no rows was accepted")
+			}
+			if code := errs.Coerce(err).Code; code != "JQL_NOT_UNDERSTOOD" {
+				t.Errorf("code = %q, want JQL_NOT_UNDERSTOOD", code)
+			}
+			if got := errs.ExitOf(err); got != exitcode.Usage {
+				t.Errorf("exit = %v, want %v", got, exitcode.Usage)
+			}
+			// Jira's own words, because they name the field or the value and
+			// carry the position, and a rewrite would lose both.
+			if detail := errs.Coerce(err).Detail; !strings.Contains(detail, c.says) {
+				t.Errorf("detail %q does not carry Jira's words about %q", detail, c.says)
+			}
+		})
+	}
+}
+
+// A command with no --jql pays nothing: the check is the only request in
+// Validate that a typed flag never triggers.
+func TestAQueryCheckCostsNothingWithoutRawJQL(t *testing.T) {
+	cmd, ok := registry.Lookup("issue.list")
+	if !ok {
+		t.Fatal("issue list is not registered")
+	}
+	doer := &stubDoer{body: "{}"}
+	flags := registry.NewFlags()
+	flags.SetString("assignee", "currentUser")
+	err := cmd.Validate(t.Context(), &registry.Invocation{
+		Jira:  &stubSession{project: "ENG", metaClient: doer},
+		Flags: flags, Limit: registry.Limit{N: 50},
+		Progress: registry.NoProgress,
+	})
+	if err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	// currentUser resolves locally, so nothing here should have asked the
+	// server anything at all.
+	if doer.calls != 0 {
+		t.Errorf("made %d request(s) with no --jql; the check must be free "+
+			"for every invocation that does not pass one", doer.calls)
+	}
 }
 
 // TestListRunsAsARegisteredCommand exercises the layer a user actually

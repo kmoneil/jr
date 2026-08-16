@@ -635,11 +635,76 @@ func validateList(ctx context.Context, inv *registry.Invocation) error {
 		return err
 	}
 
+	if err := refuseQueryJiraDoesNotUnderstand(ctx, inv); err != nil {
+		return err
+	}
+
 	// Last, and after every refusal above it. This one spends requests and
 	// cannot fail the command, so an invocation that was going to be refused
 	// is refused without paying for a diagnostic nobody will read.
 	warnUnknownLabels(ctx, inv)
 	return nil
+}
+
+// refuseQueryJiraDoesNotUnderstand asks the server what a raw --jql means
+// before any of it reaches stdout.
+//
+// Cloud's search endpoint answers a query it knows is meaningless with HTTP 200
+// and no rows. `--jql 'nosuchfield = 1'` came back well-formed, complete, exit
+// 0 and empty, which is indistinguishable from an honest "nothing matches" and
+// is the exact shape this project exists to refuse. Measured 2026-08-14: a
+// syntax error is refused by both deployments, and a *meaning* error is refused
+// by neither Cloud's search nor, for the unknown-user class, Data Center's.
+//
+// Everything reached through a typed flag already has a floor. --field resolves
+// against the catalogue and every user-valued flag goes through ResolveUser. It
+// is --jql that had none, and --jql is what a caller reaches for when a flag
+// will not express the question.
+//
+// A warning refuses as firmly as an error, because the warning is where Jira
+// puts the unknown-value class: `assignee = "nobody-xyz"` is valid JQL naming
+// nobody, and answering it with an empty result is the same wrong answer as a
+// misspelled field. Refusing on it makes --jql agree with --assignee, which
+// refuses a user it cannot resolve.
+//
+// It runs here, in Validate, rather than around the search, because a
+// streaming command writes its header before its body: a verdict that arrives
+// later can only be a warning on stderr, invisible to an MCP caller and split
+// by format. Validate already spends requests for exactly this reason.
+//
+// The check is one request, about 0.2s, and only when --jql is present. A
+// consequence worth knowing: `--max-requests 1` with --jql now fails, because
+// the check and the search are two.
+//
+// What it does not close: on Cloud the operand of a WAS, CHANGED TO, or
+// CHANGED FROM predicate is validated by neither the parse endpoint nor the
+// search, so `status was "NoSuchStatusXYZ"` is still answered empty there. Data
+// Center refuses it. The gap is Atlassian's and is documented rather than
+// implied shut.
+func refuseQueryJiraDoesNotUnderstand(ctx context.Context, inv *registry.Invocation) error {
+	fragment := inv.Flags.String("jql")
+	if fragment == "" || inv.Jira == nil {
+		return nil
+	}
+	meta, err := inv.Jira.Metadata(ctx)
+	if err != nil {
+		return err
+	}
+	got, err := meta.CheckJQL(ctx, fragment)
+	if err != nil {
+		return err
+	}
+	if got.Valid && len(got.Warnings) == 0 {
+		return nil
+	}
+
+	// Jira's own words, unedited: they name the field or the value and carry
+	// the position, and a rewrite would lose both.
+	said := append(append([]string{}, got.Errors...), got.Warnings...)
+	return errs.Usage("JQL_NOT_UNDERSTOOD",
+		"Jira does not understand this query, and would answer it with no rows").
+		WithDetail("%s", strings.Join(said, " ")).
+		WithRemedy("fix the query, or check it first with `jr jql validate --jql ...`")
 }
 
 // requirePageSize refuses a --page-size that can never work, before a session
