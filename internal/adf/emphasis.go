@@ -56,13 +56,6 @@ type piece struct {
 func (p piece) isDelim() bool { return p.char != 0 }
 
 // delimiterAt reads the run of emphasis characters at i and classifies it.
-//
-// Flanking is about what sits either side of the whole run rather than about
-// the run itself: a run that can open has something other than whitespace after
-// it, and one that can close has something other than whitespace before it,
-// with punctuation making both conditional on the other side. The underscore
-// carries one extra rule, which is the whole reason `customfield_10042` is a
-// field id and not emphasis around "10042".
 func delimiterAt(s string, i int) piece {
 	char := s[i]
 	n := 0
@@ -70,20 +63,37 @@ func delimiterAt(s string, i int) piece {
 		n++
 	}
 
-	prevSpace, prevPunct := neighbour(s[:i], true)
-	nextSpace, nextPunct := neighbour(s[i+n:], false)
-
-	left := !nextSpace && (!nextPunct || prevSpace || prevPunct)
-	right := !prevSpace && (!prevPunct || nextSpace || nextPunct)
-
 	d := piece{char: char, n: n, orig: n}
-	if char == '*' {
-		d.canOpen, d.canClose = left, right
-		return d
-	}
-	d.canOpen = left && (!right || prevPunct)
-	d.canClose = right && (!left || nextPunct)
+	d.canOpen, d.canClose = flanking(char,
+		neighbour(s[:i], true), neighbour(s[i+n:], false))
 	return d
+}
+
+// side is how the flanking rules see the character on one side of a delimiter
+// run: whitespace, punctuation, or neither.
+type side struct{ space, punct bool }
+
+// flanking reports what a delimiter run of char may do where it sits.
+//
+// Flanking is about what is either side of the whole run rather than about the
+// run itself: a run that can open has something other than whitespace after it,
+// and one that can close has something other than whitespace before it, with
+// punctuation making both conditional on the other side. The underscore carries
+// one extra rule, which is the whole reason `customfield_10042` is a field id
+// and not emphasis around "10042".
+//
+// Both halves of the package ask it. The reader asks about a run it found; the
+// writer asks about a run it is *about to write*, because a delimiter that can
+// neither open nor close is not ambiguous, it is inert. The reader keeps it as
+// text and the span disappears, silently, on markdown this package wrote
+// itself, which is the failure the round-trip fuzzer exists to catch.
+func flanking(char byte, prev, next side) (canOpen, canClose bool) {
+	left := !next.space && (!next.punct || prev.space || prev.punct)
+	right := !prev.space && (!prev.punct || next.space || next.punct)
+	if char == '*' {
+		return left, right
+	}
+	return left && (!right || prev.punct), right && (!left || next.punct)
 }
 
 // neighbour classifies the character on one side of a delimiter run.
@@ -93,7 +103,7 @@ func delimiterAt(s string, i int) piece {
 // Unicode's, not ASCII's: an em dash or a curly quote beside a delimiter has
 // the same effect on flanking as a comma, and reading only the ASCII set would
 // make emphasis behave differently in a description written in French.
-func neighbour(s string, before bool) (space, punct bool) {
+func neighbour(s string, before bool) side {
 	var r rune
 	var size int
 	if before {
@@ -102,9 +112,10 @@ func neighbour(s string, before bool) (space, punct bool) {
 		r, size = utf8.DecodeRuneInString(s)
 	}
 	if size == 0 {
-		return true, false
+		return side{space: true}
 	}
-	return classify(r)
+	space, punct := classify(r)
+	return side{space: space, punct: punct}
 }
 
 // classify sorts a rune the way CommonMark's flanking rules do: whitespace,

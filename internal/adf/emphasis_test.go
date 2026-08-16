@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/kmoneil/jr/internal/adf"
+	"github.com/kmoneil/jr/internal/errs"
 )
 
 // sketch renders a document's inline content as one line: each text node with
@@ -132,11 +133,18 @@ func TestEmphasisFollowsCommonMark(t *testing.T) {
 // runs into, so the next reader does not mistake it for a parser bug.
 //
 // Both of these are read correctly. What refuses them is ToMarkdown, which
-// FromMarkdown runs before it returns: a span whose delimiter would merge into
-// a run with the character beside it has two spellings and both are read as
-// something the document does not say, so there is no third and it is refused.
-// `after` reads the neighbouring text unescaped on purpose, which makes the
-// refusal wider than it strictly has to be and never narrower.
+// FromMarkdown runs before it returns: a span has two spellings, each of them
+// is read as something the document does not say, and there is no third. The
+// asterisk merges into a run with the delimiter beside it; the underscore is
+// inert where it lands, because a run against punctuation cannot close in front
+// of a word character. `after` reads the neighbouring text unescaped on
+// purpose, which makes the refusal wider than it strictly has to be and never
+// narrower.
+//
+// Neither is rescued by writing the span narrower, which is what renderChoices
+// does with `*0*~~*0*~~0` in the test below: the cut in `**a *b***c` falls on a
+// space the mark covers, and a narrower span there would come back with the
+// space unmarked.
 //
 // The alternative is what this package exists not to do: write it down anyway
 // and hope. A refusal names the construct and offers --raw-body; the shape the
@@ -151,5 +159,109 @@ func TestEmphasisTheWriterCannotSpellIsRefused(t *testing.T) {
 				t.Errorf("FromMarkdown(%q) = %s, want a refusal", src, got)
 			}
 		})
+	}
+}
+
+// TestADelimiterIsWrittenOnlyWhereItCanBeRead is the writer's half of the
+// flanking rules, and it is the nightly fuzzer's find of 2026-08-16.
+//
+// A delimiter that cannot flank is not ambiguous, it is inert: the reader keeps
+// it as text and the span disappears. Emphasis over `0` and a struck `0` used
+// to be written as one span, `*0~~0~~*0`, whose closing asterisk sits between
+// the strike's `~` and a digit: punctuation on one side and a word character on
+// the other, which is the one combination CommonMark lets nothing close. It
+// read back as two literal asterisks and no emphasis, exit 0, from this
+// package's own output.
+//
+// The cases are documents rather than markdown because the failure is on the
+// way out. A document arrives from Jira and there may be no markdown that
+// produces it, so the reader cannot be asked to set the test up.
+func TestADelimiterIsWrittenOnlyWhereItCanBeRead(t *testing.T) {
+	cases := []struct{ name, adf, want, says string }{{
+		name: "emphasis reaching across a strike",
+		adf: para(`{"type":"text","text":"0","marks":[{"type":"em"}]},` +
+			`{"type":"text","text":"0","marks":[{"type":"em"},{"type":"strike"}]},` +
+			`{"type":"text","text":"0"}`),
+		// One span cannot close after the `~`, so the em is written over each
+		// node instead and the strike goes outside the second. Which is how
+		// `*0*~~*0*~~0` was written in the first place: the document is the one
+		// that input builds, and this is the same document spelled again.
+		want: "_0_~~*0*~~0",
+		says: "[em:0][em+strike:0]0",
+	}, {
+		// The strike is not emphasis and `~~` has no flanking rules at all in
+		// GFM, but both used to go through the emphasis choice and inherit its
+		// refusal. Reading `*0~~0~~*0` back produced exactly this document, and
+		// writing it down again failed with an error about emphasis the
+		// document does not contain.
+		name: "a strike beside an asterisk",
+		adf: para(`{"type":"text","text":"*0"},` +
+			`{"type":"text","text":"0","marks":[{"type":"strike"}]},` +
+			`{"type":"text","text":"*0"}`),
+		want: `\*0~~0~~\*0`,
+		says: "*0[strike:0]*0",
+	}, {
+		// The check that refuses the first case has to keep accepting this one:
+		// the two delimiters are flush on both sides, which is one run of three
+		// to a reader, and what flanks it is what is outside the pair.
+		name: "emphasis and strong over one word",
+		adf: para(`{"type":"text","text":"foo"},` +
+			`{"type":"text","text":"bar","marks":[{"type":"em"},{"type":"strong"}]},` +
+			`{"type":"text","text":"baz"}`),
+		want: "foo***bar***baz",
+		says: "foo[em+strong:bar]baz",
+	}, {
+		// Punctuation on the far side of the delimiter is the other half of the
+		// rule, and it is why the characters either side are read as runes: the
+		// last byte of `»` is not a word character and treating it as one would
+		// refuse a document CommonMark can spell.
+		name: "emphasis ending in punctuation, punctuation after",
+		adf: para(`{"type":"text","text":"a.","marks":[{"type":"strong"}]},` +
+			`{"type":"text","text":"»"}`),
+		want: "**a.**»",
+		says: "[strong:a.]»",
+	}}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := convert(t, c.adf)
+			if err != nil {
+				t.Fatalf("ToMarkdown: %v", err)
+			}
+			if got != c.want {
+				t.Errorf("ToMarkdown = %q, want %q", got, c.want)
+			}
+			// What the markdown says is the point; the spelling above is only
+			// how this package happens to say it.
+			if says := sketch(t, got); says != c.says {
+				t.Errorf("%q reads back as %s, want %s", got, says, c.says)
+			}
+		})
+	}
+}
+
+// TestEmphasisWithNoSpellingIsRefusedRatherThanWrittenWrong is the case where
+// no spelling exists, which is a real limit of markdown and not of this
+// package: emphasis cannot end in punctuation and be followed by a word
+// character, in either form, at any width.
+//
+// It is a refusal a caller can hit on a document Jira stored, which is the
+// price of the rule above. The alternative is `**a.**b`, which every reader
+// takes as five characters of text and a bold that never happened.
+func TestEmphasisWithNoSpellingIsRefusedRatherThanWrittenWrong(t *testing.T) {
+	doc := para(`{"type":"text","text":"a.","marks":[{"type":"strong"}]},` +
+		`{"type":"text","text":"b"}`)
+
+	got, err := convert(t, doc)
+	if err == nil {
+		t.Fatalf("ToMarkdown = %q, want a refusal", got)
+	}
+	structured := errs.Coerce(err)
+	if structured.Code != "ADF_UNREPRESENTABLE" {
+		t.Errorf("code = %q, want ADF_UNREPRESENTABLE", structured.Code)
+	}
+	if !strings.Contains(structured.Remedy, "--raw-body") {
+		t.Errorf("remedy %q leaves the caller with no way to read the body",
+			structured.Remedy)
 	}
 }

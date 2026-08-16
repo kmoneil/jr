@@ -1,12 +1,15 @@
 package adf
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/kmoneil/jr/internal/errs"
 )
@@ -469,6 +472,13 @@ func tableLine(cells []string, width int) string {
 
 func inlineList(nodes []Node, where string) (string, error) {
 	out, err := renderInline(trimEdgeBreaks(coalesce(nodes)), nil, "", where)
+	if e, ok := errors.AsType[*noSpelling](err); ok {
+		// Every spelling of some span in here was refused, so this one is about
+		// the document after all. It becomes the ordinary refusal here, at the
+		// only place that knows nothing else was left to try.
+		return "", unrepresentable(e.where,
+			"emphasis that markdown cannot spell unambiguously here")
+	}
 	if err != nil {
 		return "", err
 	}
@@ -517,8 +527,8 @@ var spanMarks = []string{"link", "strong", "em", "strike"}
 func renderInline(nodes []Node, applied []Mark, written, where string) (string, error) {
 	var b strings.Builder
 	for i := 0; i < len(nodes); {
-		mark, ok := nextSpanMark(nodes, i, applied)
-		if !ok {
+		choices := spanChoices(nodes, i, applied)
+		if len(choices) == 0 {
 			s, err := inline(nodes[i], atLineStart(written+b.String()), where+" > "+nodes[i].Type)
 			if err != nil {
 				return "", err
@@ -527,13 +537,7 @@ func renderInline(nodes []Node, applied []Mark, written, where string) (string, 
 			i++
 			continue
 		}
-
-		// Extend the span over every neighbour carrying the same mark.
-		j := i + 1
-		for j < len(nodes) && carries(nodes[j], mark) {
-			j++
-		}
-		span, err := renderSpan(nodes, i, j, mark, applied, written, &b, where)
+		span, j, err := renderChoices(choices, nodes, i, applied, written, &b, where)
 		if err != nil {
 			return "", err
 		}
@@ -541,6 +545,69 @@ func renderInline(nodes []Node, applied []Mark, written, where string) (string, 
 		i = j
 	}
 	return b.String(), nil
+}
+
+// renderChoices writes the span at i the first way that reads back, and returns
+// the index after it.
+//
+// Every choice describes the same document, so the first one that can be
+// written down is the answer and the order is what keeps the output stable. The
+// order is the best spelling first: the mark reaching furthest, at its full
+// extent. What follows it is narrower, and narrower is a real loss where the
+// span has edge whitespace, so it is only ever reached when the span before it
+// has no spelling at all.
+//
+// `*0*~~*0*~~0` is the shape that needs the second attempt. It is em over two
+// nodes with strike on the second, and the em cannot close after the strike's
+// `~` and in front of a digit. Cutting the em back to the first node writes
+// each of them as its own span, and the strike goes outside the second, which
+// is what the input said in the first place.
+func renderChoices(choices []spanChoice, nodes []Node, i int, applied []Mark,
+	written string, b *strings.Builder, where string,
+) (string, int, error) {
+	var refused error
+	for _, c := range choices {
+		for j := c.j; j > i; j-- {
+			// The full extent is never skipped, because a cut is what strands
+			// a mark and there is no cut where the mark itself ends. So every
+			// choice reaches renderSpan at least once, and the caller always
+			// has either a span or a reason.
+			if j < c.j && strands(nodes, j) {
+				continue
+			}
+			span, err := renderSpan(nodes, i, j, c.mark, applied, written, b, where)
+			switch {
+			case err == nil:
+				return span, j, nil
+			case !isNoSpelling(err):
+				return "", 0, err
+			case refused == nil:
+				refused = err
+			}
+		}
+	}
+	return "", 0, refused
+}
+
+// strands reports whether cutting a span before node j would move its mark off
+// the whitespace at the cut.
+//
+// Whitespace at the edge of a span moves outside it, which is a normalisation
+// where it is the edge of what the mark covers and a loss anywhere else. Cut
+// `**a *b***c` after the first node and it writes `**a** ***b***c`, which comes
+// back with the space unmarked: a narrower span is only worth reaching for when
+// it says the same thing, and where no cut does the document has no spelling
+// and is refused.
+func strands(nodes []Node, j int) bool {
+	return strings.TrimRight(nodes[j-1].Text, edgeSpace) != nodes[j-1].Text ||
+		strings.TrimLeft(nodes[j].Text, edgeSpace) != nodes[j].Text
+}
+
+// isNoSpelling reports a span refused for the way it was about to be written
+// rather than for what it says.
+func isNoSpelling(err error) bool {
+	_, ok := errors.AsType[*noSpelling](err)
+	return ok
 }
 
 // renderSpan writes one run of nodes carrying the same mark, delimiters and all.
@@ -575,7 +642,7 @@ func renderSpan(nodes []Node, i, j int, mark Mark, applied []Mark,
 	// is up against.
 	next := after(nodes[j:], applied)
 	if trail != "" {
-		next = trail[0]
+		next = rune(trail[0])
 	}
 	open, closing, err := delimiters(mark, core,
 		beforeOf(b.String(), lead), endsWithLiveOf(b.String(), lead), next, where)
@@ -585,8 +652,15 @@ func renderSpan(nodes []Node, i, j int, mark Mark, applied []Mark,
 	return lead + open + core + closing + trail, nil
 }
 
-// nextSpanMark returns the mark to open at i: the one reaching furthest along
-// the run, with spanMarks order breaking a tie.
+// spanChoice is one way to open a span at i: which mark, and one past the last
+// node it covers.
+type spanChoice struct {
+	mark Mark
+	j    int
+}
+
+// spanChoices lists the ways the span at i can be opened, best first: the mark
+// reaching furthest along the run, with spanMarks order breaking a tie.
 //
 // Reaching furthest is what markdown can express. A span nests inside another
 // or it does not overlap it at all, so opening the shorter mark first cuts the
@@ -601,28 +675,30 @@ func renderSpan(nodes []Node, i, j int, mark Mark, applied []Mark,
 // The tie is what spanMarks was for and still decides: two marks over the same
 // extent nest in a fixed order, so the same text under the same marks is
 // written the same way whatever order Jira stored them in.
-func nextSpanMark(nodes []Node, i int, applied []Mark) (Mark, bool) {
+//
+// It is a list rather than the one best answer because the best answer is
+// sometimes not writable. See renderChoices, which walks the rest of it.
+func spanChoices(nodes []Node, i int, applied []Mark) []spanChoice {
 	n := nodes[i]
 	if n.Type != "text" {
-		return Mark{}, false
+		return nil
 	}
-	var best Mark
-	reach := 0
+	var out []spanChoice
 	for _, name := range spanMarks {
 		for _, m := range n.Marks {
 			if m.Type != name || carriesAll(applied, m) {
 				continue
 			}
-			run := 1
-			for j := i + 1; j < len(nodes) && carries(nodes[j], m); j++ {
-				run++
+			j := i + 1
+			for j < len(nodes) && carries(nodes[j], m) {
+				j++
 			}
-			if run > reach {
-				best, reach = m, run
-			}
+			out = append(out, spanChoice{mark: m, j: j})
 		}
 	}
-	return best, reach > 0
+	// Stable, so spanMarks order survives as the tiebreak it is.
+	slices.SortStableFunc(out, func(a, b spanChoice) int { return b.j - a.j })
+	return out
 }
 
 func carriesAll(applied []Mark, m Mark) bool {
@@ -645,70 +721,154 @@ func carries(n Node, m Mark) bool {
 
 // delimiters returns what opens and closes a span.
 //
-// Emphasis switches to the underscore form when its content begins or ends
-// with an asterisk, which happens whenever a nested span sits flush against
-// this one's delimiter. `*0**0***` is what the asterisk form produces there,
-// and CommonMark reads it as two emphasised words rather than as one holding a
-// bold one — the round-trip fuzzer found it, and nothing else would have.
+// Only emphasis has a delimiter to choose. A strike is `~~` whatever sits
+// beside it (this package's reader spells it with a fixed pair and no flanking
+// rules, as GFM does), and a link is brackets. Both used to go through the
+// emphasis choice first and inherit its refusal, so a strike next to an
+// asterisk was reported as emphasis with no unambiguous spelling: an error
+// about a mark the document did not have, over a character the span does not
+// use. The round-trip fuzzer found it on the second pass over `*0*~~*0*~~0`.
 func delimiters(
-	m Mark, inner string, prev, prevLive, next byte, where string,
+	m Mark, inner string, prev rune, prevLive byte, next rune, where string,
 ) (open, closing string, err error) {
-	// The asterisk form unless one of its delimiters would merge into a run
-	// with what sits next to it — a nested span flush against this one on a
-	// single side, or a neighbouring span's own delimiter. `*0*` beside
-	// `**0**` is `*0***0**`, and the run of three in the middle is read as
-	// something neither span says. Both sides flush is the ordinary `***x***`
-	// spelling, where the runs merge symmetrically and read back correctly.
-	char := ""
-	for _, candidate := range []byte{'*', '_'} {
-		if !merges(candidate, inner, prev, prevLive, next) {
-			char = string(candidate)
-			break
-		}
-	}
-	if char == "" {
-		// Markdown has two spellings for emphasis and both of them would be
-		// read as something this document does not say. There is no third, so
-		// this is refused rather than written down and hoped over.
-		return "", "", unrepresentable(where,
-			"emphasis that markdown cannot spell unambiguously here")
-	}
-
 	switch m.Type {
-	case "strong":
-		return char + char, char + char, nil
-	case "em":
-		return char, char, nil
+	case "strong", "em":
+		return emphasisDelimiters(m.Type, inner, prev, prevLive, next, where)
 	case "strike":
 		return "~~", "~~", nil
 	case "link":
-		href, ok := attrString(m.Attrs, "href")
-		if !ok || href == "" {
-			return "", "", unrepresentable(where, "a link with no address")
-		}
-		target, err := linkTarget(href, where)
-		if err != nil {
-			return "", "", err
-		}
-		if title, ok := attrString(m.Attrs, "title"); ok && title != "" {
-			// Markdown's own title syntax. Dropping it would be a silent loss:
-			// it is what a reader sees on hover and it is not the address.
-			target += ` "` + strings.NewReplacer(`\`, `\`+`\`, `"`, `\`+`"`).Replace(title) + `"`
-		}
-		return "[", "](" + target + ")", nil
+		return linkDelimiters(m, where)
 	}
 	return "", "", unrepresentable(where, "a %q mark", m.Type)
 }
 
+// emphasisDelimiters picks the character a span of emphasis is written with.
+//
+// The asterisk form unless one of its delimiters would merge into a run with
+// what sits next to it: a nested span flush against this one on a single side,
+// or a neighbouring span's own delimiter. `*0*` beside `**0**` is `*0***0**`,
+// and the run of three in the middle is read as something neither span says.
+// Both sides flush is the ordinary `***x***` spelling, where the runs merge
+// symmetrically and read back correctly.
+//
+// A candidate that cannot flank is refused the same way, and it is the older
+// bug of the two: merging is about a delimiter being read as part of something
+// bigger, flanking is about it not being read as a delimiter at all. A run
+// against punctuation cannot close in front of a word character, so the em over
+// `0~~0~~` in `*0*~~*0*~~0` came back out as `*0~~0~~*0`, where the closing
+// asterisk sits between the strike's `~` and a digit, opens a second span, and
+// closes nothing. Both asterisks then read as text and the emphasis was gone,
+// exit 0, from output this package produced itself.
+func emphasisDelimiters(
+	kind, inner string, prev rune, prevLive byte, next rune, where string,
+) (open, closing string, err error) {
+	for _, char := range []byte{'*', '_'} {
+		if merges(char, inner, prev, prevLive, next) ||
+			!flanks(char, inner, prev, next) {
+			continue
+		}
+		run := string(char)
+		if kind == "strong" {
+			run += run
+		}
+		return run, run, nil
+	}
+	// Markdown has two spellings for emphasis and neither of them would be read
+	// as what this document says. There is no third, so this way of writing the
+	// span is refused, and renderInline answers that by trying another. Only a
+	// document with no working spelling at all reaches the caller.
+	return "", "", &noSpelling{where: where}
+}
+
+// linkDelimiters returns the brackets and the address around a link's text.
+func linkDelimiters(m Mark, where string) (open, closing string, err error) {
+	href, ok := attrString(m.Attrs, "href")
+	if !ok || href == "" {
+		return "", "", unrepresentable(where, "a link with no address")
+	}
+	target, err := linkTarget(href, where)
+	if err != nil {
+		return "", "", err
+	}
+	if title, ok := attrString(m.Attrs, "title"); ok && title != "" {
+		// Markdown's own title syntax. Dropping it would be a silent loss: it
+		// is what a reader sees on hover and it is not the address.
+		target += ` "` + strings.NewReplacer(`\`, `\`+`\`, `"`, `\`+`"`).Replace(title) + `"`
+	}
+	return "[", "](" + target + ")", nil
+}
+
+// noSpelling is one way of writing a span refused, not the document refused.
+//
+// It is a type rather than the usual message because renderInline answers it by
+// writing the same document a different way: a narrower span, or a different
+// mark on the outside. Only a refusal that survives every spelling is the
+// caller's problem, and inlineList is where it becomes one.
+type noSpelling struct{ where string }
+
+func (e *noSpelling) Error() string {
+	return "no unambiguous spelling for emphasis at " + e.where
+}
+
+// flanks reports whether a run of char written around core can be read back as
+// the span it was meant to be: opening in front of core, closing behind it.
+//
+// The characters that decide it are the ones the delimiters will actually sit
+// between, which is why this asks about the rendered core rather than about the
+// nodes. A nested strike leaves a `~` there, a nested link a `)`, and an
+// escaped character leaves whatever it escaped, all of them punctuation, which
+// is the class that cannot close in front of a word.
+//
+// A nested span flush against this one on both sides is the exception, and it
+// is the `***bold italic***` spelling: the two delimiters are one run to a
+// reader, so what flanks it is what is outside the pair and what is just inside
+// the nested one. Reading the nested delimiter as this run's neighbour refuses
+// `foo***bar***baz`, which is em and strong over one word and reads back
+// correctly. merges has already rejected flush on one side only, which does
+// not.
+//
+// core is never empty: renderSpan writes the whitespace and returns before
+// reaching a delimiter at all where a span has nothing else in it.
+func flanks(char byte, core string, prev, next rune) bool {
+	run := core
+	if core[0] == char && endsWithLive(core) == char {
+		if run = strings.Trim(core, string(char)); run == "" {
+			return false
+		}
+	}
+	first, _ := utf8.DecodeRuneInString(run)
+	last, _ := utf8.DecodeLastRuneInString(run)
+	canOpen, _ := flanking(char, sideOf(prev), sideOf(first))
+	_, canClose := flanking(char, sideOf(last), sideOf(next))
+	return canOpen && canClose
+}
+
+// sideOf classifies a character the writer is about to sit a delimiter against.
+//
+// Zero is nothing there, the start of the text or the end of it, and it counts
+// as whitespace, the same as the edge does on the way in. A literal NUL
+// arrives as zero too and is punctuation to the reader, and both reach the same
+// verdict here: whitespace and punctuation are read as alternatives in every
+// clause of the flanking rules that mentions either, so the one place they
+// differ is a side this writer never asks about.
+func sideOf(r rune) side {
+	if r == 0 {
+		return side{space: true}
+	}
+	space, punct := classify(r)
+	return side{space: space, punct: punct}
+}
+
+// edgeSpace is every character markdown counts as whitespace, not just the two
+// that come up in practice: a delimiter may not sit against any of them.
+const edgeSpace = " \t\n\r\v\f"
+
 // splitEdgeSpace separates a span's leading and trailing whitespace from what
 // the delimiters actually go around.
 func splitEdgeSpace(s string) (lead, core, trail string) {
-	// Every character markdown counts as whitespace, not just the two that
-	// come up in practice: a delimiter may not sit against any of them.
-	const space = " \t\n\r\v\f"
-	core = strings.TrimLeft(s, space)
+	core = strings.TrimLeft(s, edgeSpace)
 	lead = s[:len(s)-len(core)]
-	trimmed := strings.TrimRight(core, space)
+	trimmed := strings.TrimRight(core, edgeSpace)
 	trail = core[len(trimmed):]
 	return lead, trimmed, trail
 }
@@ -722,12 +882,12 @@ func splitEdgeSpace(s string) (lead, core, trail string) {
 // against both is the ordinary `***x***` spelling, where the runs merge
 // symmetrically and read back correctly.
 //
-// The underscore has one more rule: it is inert against a word character,
-// which is what keeps `customfield_10042` a field id.
-func merges(char byte, inner string, prev, prevLive, next byte) bool {
-	if char == '_' && (isWordByte(prev) || isWordByte(next)) {
-		return true
-	}
+// The underscore's extra rule (inert against a word character, which is what
+// keeps `customfield_10042` a field id) used to be stated here a second time
+// and in a second vocabulary, where an underscore was itself a word character
+// and every byte over 0x7f was one. flanks asks the reader's own rule instead,
+// so the two halves of the package cannot drift on it.
+func merges(char byte, inner string, prev rune, prevLive byte, next rune) bool {
 	// A live delimiter strictly inside would close this span early, wherever
 	// it came from — a nested span that picked the same character, or an
 	// underscore inside a word, which looks like one and is inert.
@@ -748,10 +908,10 @@ func merges(char byte, inner string, prev, prevLive, next byte) bool {
 	// What surrounding whitespace does rule out is the merge below it, because
 	// nothing opens or closes against a space, so a neighbour's delimiter
 	// cannot run together with this one's.
-	if isSpaceByte(prev) && isSpaceByte(next) && prev != 0 && next != 0 {
+	if prev != 0 && next != 0 && unicode.IsSpace(prev) && unicode.IsSpace(next) {
 		return false
 	}
-	return prevLive == char || next == char
+	return prevLive == char || next == rune(char)
 }
 
 // insideLive reports an unescaped delimiter somewhere other than the two ends.
@@ -794,11 +954,17 @@ func atLineStart(written string) bool {
 // before is the character a span will sit against on its left. Whether that
 // character is a live delimiter is a separate question — an escaped asterisk
 // is punctuation and merges with nothing.
-func before(written string) byte {
-	if written == "" {
+//
+// A rune and not a byte, because the flanking rules sort it into three classes
+// and two of them hold characters that do not fit in one. Reading the last byte
+// and calling everything over 0x7f a word character refuses `“**‘x’**”`, which
+// CommonMark reads as bold and this package can write.
+func before(written string) rune {
+	r, size := utf8.DecodeLastRuneInString(written)
+	if size == 0 {
 		return 0
 	}
-	return written[len(written)-1]
+	return r
 }
 
 // beforeOf and endsWithLiveOf answer before and endsWithLive over two pieces
@@ -822,11 +988,29 @@ func before(written string) byte {
 // because the originals are the specification: FuzzSplitHelpersMatchJoined
 // fuzzes the pair against the joined form, which is what makes this a
 // behaviour-preserving change by proof rather than by argument.
-func beforeOf(prefix, suffix string) byte {
-	if suffix != "" {
-		return suffix[len(suffix)-1]
+//
+// The last rune of the pair is not the last rune of the suffix: the suffix is
+// whitespace this span moved outside itself and is usually empty, and a rune
+// spans up to four bytes, so the two pieces have to be read as one string
+// without becoming one. Four bytes off the end of the pair hold the whole of
+// the final rune whatever it is, and DecodeLastRune scans no further back than
+// that either.
+func beforeOf(prefix, suffix string) rune {
+	var tail [utf8.UTFMax]byte
+	n := 0
+	for i := len(suffix) - 1; i >= 0 && n < len(tail); i-- {
+		n++
+		tail[len(tail)-n] = suffix[i]
 	}
-	return before(prefix)
+	for i := len(prefix) - 1; i >= 0 && n < len(tail); i-- {
+		n++
+		tail[len(tail)-n] = prefix[i]
+	}
+	if n == 0 {
+		return 0
+	}
+	r, _ := utf8.DecodeLastRune(tail[len(tail)-n:])
+	return r
 }
 
 // endsWithLiveOf is endsWithLive over the same two pieces.
@@ -868,15 +1052,16 @@ func endsWithLiveOf(prefix, suffix string) byte {
 // delimiter, which is the collision this exists to see; anything else is that
 // node's first character. An escaped one begins with a backslash, so reading
 // the unescaped text is conservative in the direction that matters.
-func after(rest []Node, applied []Mark) byte {
+func after(rest []Node, applied []Mark) rune {
 	if len(rest) == 0 || rest[0].Type != "text" {
 		return 0
 	}
+	first, size := utf8.DecodeRuneInString(rest[0].Text)
 	// Whitespace comes before the next span's delimiter, because that span
 	// moves its own edge whitespace outside itself. Two delimiters with a
 	// space between them do not merge.
-	if rest[0].Text != "" && isSpaceByte(rest[0].Text[0]) {
-		return rest[0].Text[0]
+	if size > 0 && unicode.IsSpace(first) {
+		return first
 	}
 	for _, m := range rest[0].Marks {
 		// A mark already open around both nodes is not written between them.
@@ -887,10 +1072,10 @@ func after(rest []Node, applied []Mark) byte {
 			return '*'
 		}
 	}
-	if rest[0].Text == "" {
+	if size == 0 {
 		return 0
 	}
-	return rest[0].Text[0]
+	return first
 }
 
 // leaf writes one text node, with every span mark already open around it.

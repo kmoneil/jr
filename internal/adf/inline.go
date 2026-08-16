@@ -286,17 +286,6 @@ func findCloser(s string, from int, delim string) int {
 	return -1
 }
 
-// isSpaceByte is CommonMark's whitespace, which a delimiter may not sit
-// against.
-func isSpaceByte(c byte) bool {
-	return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f'
-}
-
-func isWordByte(c byte) bool {
-	return c == '_' || c >= 0x80 ||
-		(c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-}
-
 // addMark applies a mark to every node a span wrapped.
 //
 // ADF puts marks on text, and on nothing else this package writes. Emphasising
