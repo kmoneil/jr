@@ -225,6 +225,41 @@ $ jr jql explain --jql 'your query here'
 Remember that repeated flags OR together and different flags AND together:
 `--status Done --type Bug` means Done **and** a Bug.
 
+### `JQL_NOT_UNDERSTOOD`: Jira does not understand the query
+
+```console
+$ jr issue list --jql 'nosuchfield = 1'
+code: JQL_NOT_UNDERSTOOD
+message: Jira does not understand this query, and would answer it with no rows
+detail: Field 'nosuchfield' does not exist or you do not have permission to view it.
+```
+
+The `detail` is Jira's own message, unedited, because it names the field or the
+value and carries the position.
+
+This refusal exists because Cloud's search endpoint answers a query it knows is
+meaningless with HTTP 200 and no rows. Without the check, a typo inside `--jql`
+came back complete, exit 0, and empty, which reads exactly like an honest
+"nothing matched". So the query is checked before the command runs.
+
+**A warning refuses too.** `--jql 'assignee = "nobody-xyz"'` is valid JQL naming
+a user who does not exist; Jira reports that as a warning and would answer with
+no rows. It is refused for the same reason `--assignee nobody-xyz` is refused,
+so both spellings of the same mistake behave the same way.
+
+If the query is right and you want the answer anyway, the check is the only
+thing between you and it: fix the value, or ask a question that does not name
+something the site does not have. To see the verdict on its own:
+
+```console
+$ jr jql validate --jql 'your query here'
+```
+
+One thing this does not catch, on Cloud only: the operand of a `WAS`,
+`CHANGED TO`, or `CHANGED FROM` predicate. `--jql 'status was "NoSuchStatus"'`
+is checked by neither of Cloud's endpoints and still returns an empty result
+there. Data Center refuses it.
+
 ### `UNKNOWN_LABEL`, a warning rather than an error
 
 Labels are the one filter value nothing on the server validates. A status or an

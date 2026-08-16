@@ -335,6 +335,13 @@ func validateActivity(ctx context.Context, inv *registry.Invocation) error {
 	if err := resolveActivityUser(ctx, inv); err != nil {
 		return err
 	}
+	// The same server-side verdict issue list gets. Both send the fragment, so
+	// both refuse a query Jira would answer with a confident empty result;
+	// getting one of them is worse than getting neither, because a caller would
+	// have to know which command checks.
+	if err := refuseQueryJiraDoesNotUnderstand(ctx, inv); err != nil {
+		return err
+	}
 	return requirePageSize(inv)
 }
 

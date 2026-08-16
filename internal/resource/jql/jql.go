@@ -14,8 +14,6 @@ package jql
 
 import (
 	"context"
-	"encoding/json"
-	"net/url"
 	"strconv"
 	"strings"
 
@@ -180,11 +178,10 @@ type Result struct {
 
 // The three ways this question gets answered.
 const (
-	MethodParse = "parse"
-	// MethodSearch is Data Center, which has no parse endpoint. A search with
-	// maxResults=0 parses and permission-checks the query and returns no
-	// issues, which is the closest thing available.
-	MethodSearch = "search"
+	// Both come from internal/site, which is what reaches the server and
+	// therefore what decides which of them is true of an answer.
+	MethodParse  = site.JQLByParse
+	MethodSearch = site.JQLBySearch
 	// MethodLocal means this tool decided, without asking. It happens when the
 	// query does not lex or its parentheses do not balance — errors worth
 	// catching before spending a round trip. The verdict is reported the same
@@ -209,161 +206,25 @@ func (r Result) Node() *render.Node {
 
 // Check asks Jira whether the query parses.
 //
+// The asking lives in internal/site, because `issue list` needs the same answer
+// before it runs and a resource may not import another resource. What stays
+// here is the shape this command publishes: a Result carries the same fields
+// under the names the kind has always used, so no schema moved when the
+// implementation did.
+//
 // A malformed query is a result, not an error: the command was asked whether
-// the query is valid and it found out. Only a failure to get an answer at all —
-// no credential, no network, a 500 — fails the command.
+// the query is valid and it found out. Only a failure to get an answer at all,
+// no credential, no network, a 500, fails the command.
 func (c *Client) Check(ctx context.Context, query string) (Result, error) {
-	if c.Site.Kind == site.Cloud {
-		return c.checkParse(ctx, query)
-	}
-	return c.checkSearch(ctx, query)
-}
-
-// checkParse uses the endpoint that exists for this and nothing else.
-func (c *Client) checkParse(ctx context.Context, query string) (Result, error) {
-	path := c.Site.APIBase() + "/jql/parse"
-
-	body, err := json.Marshal(map[string]any{"queries": []string{query}})
-	if err != nil {
-		return Result{}, errs.Runtime("ENCODE_FAILED",
-			"cannot encode the query").Wrap(err)
-	}
-
-	resp, err := c.Transport.Do(ctx, transport.Request{
-		Method: transport.MethodPost,
-		Path:   path,
-		// A query Jira would run with warnings is not one this command should
-		// call valid without saying so. That was the argument for `strict`, and
-		// `strict` is the mode that does not do it.
-		//
-		// Measured 2026-08-14 against a Cloud site, on `assignee = "nobody"`:
-		// `strict` returns neither an errors key nor a warnings key, `warn`
-		// returns the warning naming the value, and `none` returns both keys
-		// empty. So the silence under `strict` is a dropped diagnostic rather
-		// than a clean verdict, and every user-valued operand was invisible
-		// here. Data Center never had the gap, because checkSearch below reads
-		// warningMessages off the search it already makes.
-		//
-		// `warn` was swept against `strict` over 25 queries and is a superset:
-		// identical errors on every one, five warnings `strict` withheld, and
-		// clean over twelve queries that legitimately match nothing. Nothing
-		// here promotes a warning to invalid, so the only change is that the
-		// warnings Jira sends reach the caller.
-		Query:  url.Values{"validation": {"warn"}},
-		Header: map[string][]string{"Content-Type": {"application/json"}},
-		Body:   body,
-	})
+	got, err := site.CheckJQL(ctx, c.Transport, c.Site, query)
 	if err != nil {
 		return Result{}, err
 	}
-	if err := transport.Err(resp); err != nil {
-		return Result{}, err
-	}
-
-	var parsed struct {
-		Queries []struct {
-			Query    string   `json:"query"`
-			Errors   []string `json:"errors"`
-			Warnings []string `json:"warnings"`
-		} `json:"queries"`
-	}
-	if err := json.Unmarshal(resp.Body, &parsed); err != nil || len(parsed.Queries) == 0 {
-		return Result{}, errs.Remote("MALFORMED_PARSE_RESULT",
-			"%s did not return a usable parse result", path).
-			WithRequestID(resp.RequestID).Wrap(err)
-	}
-
-	first := parsed.Queries[0]
 	return Result{
-		Query: query, Valid: len(first.Errors) == 0,
-		Errors: first.Errors, Warnings: first.Warnings,
-		Method: MethodParse,
+		Query: got.Query, Valid: got.Valid,
+		Errors: got.Errors, Warnings: got.Warnings,
+		Method: got.Method,
 	}, nil
-}
-
-// checkSearch is Data Center, which has no parse endpoint.
-//
-// maxResults=0 is what makes this a check rather than a query: Jira parses the
-// JQL, applies permissions, and returns the total with no issues attached. It
-// is a heavier answer than a parse and it is the only one available, which is
-// why the result says which was used.
-func (c *Client) checkSearch(ctx context.Context, query string) (Result, error) {
-	path := c.Site.APIBase() + "/search"
-
-	body, err := json.Marshal(map[string]any{
-		// validateQuery is a boolean here. "strict" is Cloud's spelling on its
-		// own parse endpoint, and sending it to Data Center is a deserialization
-		// error that arrives as `valid="false"` — a working query reported
-		// broken, which is the worst answer this command can give.
-		"jql": query, "maxResults": 0, "validateQuery": true,
-	})
-	if err != nil {
-		return Result{}, errs.Runtime("ENCODE_FAILED",
-			"cannot encode the query").Wrap(err)
-	}
-
-	resp, err := c.Transport.Do(ctx, transport.Request{
-		Method: transport.MethodPost,
-		Path:   path,
-		Header: map[string][]string{"Content-Type": {"application/json"}},
-		Body:   body,
-	})
-	if err != nil {
-		return Result{}, err
-	}
-
-	// A 400 here is the answer, not a failure: it is how this deployment says
-	// the query does not parse. Every other status is a real failure and goes
-	// through the normal mapping.
-	if resp.Status == 400 {
-		return Result{
-			Query: query, Valid: false,
-			Errors: messagesFrom(resp.Body), Method: MethodSearch,
-		}, nil
-	}
-	if err := transport.Err(resp); err != nil {
-		return Result{}, err
-	}
-
-	var parsed struct {
-		WarningMessages []string `json:"warningMessages"`
-	}
-	// A body that does not decode is not worth failing a successful check for:
-	// the query parsed, which is what was asked. Warnings are the only thing
-	// lost, and they are absent far more often than they are present.
-	_ = json.Unmarshal(resp.Body, &parsed)
-
-	return Result{
-		Query: query, Valid: true,
-		Warnings: parsed.WarningMessages, Method: MethodSearch,
-	}, nil
-}
-
-// messagesFrom pulls Jira's own error text out of a refusal.
-//
-// The messages are passed through unedited because they carry the position —
-// "(line 1, character 20)" — and that is the one thing a rewrite would lose.
-func messagesFrom(body []byte) []string {
-	var parsed struct {
-		ErrorMessages []string          `json:"errorMessages"`
-		Errors        map[string]string `json:"errors"`
-	}
-	if err := json.Unmarshal(body, &parsed); err != nil {
-		return []string{"Jira refused the query and gave no readable reason"}
-	}
-
-	out := parsed.ErrorMessages
-	// Data Center puts a JQL complaint under the "jql" key rather than in the
-	// message list, depending on the version.
-	for _, key := range []string{"jql", "jqlQuery"} {
-		if msg, ok := parsed.Errors[key]; ok {
-			out = append(out, msg)
-		}
-	}
-	if len(out) == 0 {
-		return []string{"Jira refused the query and gave no readable reason"}
-	}
-	return out
 }
 
 func runValidate(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) {

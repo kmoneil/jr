@@ -840,6 +840,12 @@ func (rt *recordingTransport) RoundTrip(r *http.Request) (*http.Response, error)
 // field this file is quietly asserting Jira sends.
 func sweepResponse(path string, kind site.Kind) string {
 	switch {
+	// Before everything, because a raw --jql is checked against the server in
+	// Validate now and a clean verdict is what a site with nothing to complain
+	// about answers. Data Center has no parse endpoint and asks the bounded
+	// search below instead.
+	case strings.HasSuffix(path, "/jql/parse"):
+		return `{"queries":[{"query":"x","errors":[],"warnings":[]}]}`
 	case strings.HasSuffix(path, "/field"):
 		return `[` + sweepField("customfield_10042", "Story Points") + `,` +
 			sweepField("customfield_10043", "Sprint Goal") + `]`

@@ -1104,6 +1104,7 @@ did not happen.
 | `SELF_PARENT`              | 2    | An issue was named as its own parent. Settled locally, so the cycle costs no round trip.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `NOTHING_TO_EDIT`          | 2    | An edit was given nothing to change, `issue edit` with no field, `context edit` with no setting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `CONFLICTING_EDIT`         | 2    | `context edit` was asked to set and clear the same setting. Both at once has no single right answer, and picking one would make the result depend on an implementation detail nobody can see.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `JQL_NOT_UNDERSTOOD`       | 2    | Jira does not understand a raw `--jql`, and would answer it with no rows. Cloud's search endpoint returns HTTP 200 and an empty result for a query it knows is meaningless, which is indistinguishable from an honest "nothing matches", so the query is checked before the command runs and `detail` carries Jira's own words. A warning refuses as firmly as an error: an unknown *value* is what Jira reports as a warning, and it is the same wrong answer as an unknown field. |
 | `UNCONSTRAINED_QUERY`      | 2    | `issue list --limit all` with no filter would page until the instance is exhausted and return every issue in every project the credential can see. The default bound makes an unfiltered query harmless, one request, fifty rows, so only the pairing is refused. `--all-projects` is how to mean it.                                                                                                                                                                                                                                                                                                                                                                                   |
 | `INVALID_API_VERSION`      | 2    | `--api-version` accepts 2 or 3. Cloud serves v3; Data Center serves v2.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `TOO_MANY_ISSUES`          | 2    | More issues than the agile API moves at once. It is refused rather than split across requests: two requests can half-succeed, and the outcome would be neither moved nor not moved.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
@@ -1188,6 +1189,38 @@ the `jira-` link schemes above, so a body read out of Jira goes back in as the
 document it came from. A single newline inside a paragraph joins its lines,
 because that is what markdown means by one; a trailing backslash is a hard
 break.
+
+### A raw query is checked before it runs
+
+`--jql` is the one input this tool passes through rather than builds, so it is
+the one with no floor under it. Everything reached through a typed flag has one:
+`--field` resolves against the site's catalogue and every user-valued flag goes
+through the user lookup.
+
+Cloud's search endpoint answers a query it knows is meaningless with **HTTP 200
+and no rows**. `--jql 'nosuchfield = 1'` used to come back well-formed,
+complete, exit 0, and empty, which is indistinguishable from an honest "nothing
+matches". So a command that sends a raw fragment asks Jira what it means first,
+and refuses with `JQL_NOT_UNDERSTOOD` at exit 2 carrying Jira's own message.
+
+It runs on both deployments, by the route each one has: Cloud's parse endpoint,
+and on Data Center a search bounded to zero rows, which is the closest thing
+available there. **A warning refuses as firmly as an error**, because an unknown
+*value* is what Jira reports as a warning: `assignee = "nobody-xyz"` is valid
+JQL naming nobody, and answering it with an empty result is the same wrong
+answer as a misspelled field. It also makes `--jql` agree with `--assignee`,
+which refuses a user it cannot resolve.
+
+The check costs **one extra request, and only when `--jql` is present**. A
+consequence worth stating: `--max-requests 1` together with `--jql` now fails,
+because the check and the query are two requests.
+
+**What it does not cover.** On Cloud, the operand of a `WAS`, `CHANGED TO`, or
+`CHANGED FROM` predicate is validated by neither the parse endpoint nor the
+search, so `--jql 'status was "NoSuchStatusXYZ"'` is still answered with a
+complete empty result there. Data Center parses it and refuses. The gap is
+Atlassian's rather than this tool's, and it is written here rather than implied
+shut.
 
 Emphasis is CommonMark's delimiter-run algorithm rather than an approximation
 of it, flanking rules and the rule of three included, so a closing run is spent
