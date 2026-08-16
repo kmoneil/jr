@@ -109,6 +109,7 @@ func TestTheToolListCoversEveryToolTheGateInstalls(t *testing.T) {
 
 	for _, want := range []string{
 		"gofumpt", "staticcheck", "govulncheck", "golangci-lint", "gocognit",
+		"gremlins",
 	} {
 		if !strings.Contains(list, want) {
 			t.Errorf("TOOLS does not install %s, which `make ci` shells out to", want)

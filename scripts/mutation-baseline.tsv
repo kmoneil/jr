@@ -1,0 +1,18 @@
+# The mutants that survive today, per package, as a ratchet.
+#
+# package	lived	why this package is swept
+#
+# Measured 2026-08-16 with gremlins v0.5.0 at --timeout-coefficient 60. A count
+# here is a promise that this many tests are missing, not a target: every one of
+# them is a change to a line that no assertion notices. Lower it as they are
+# killed, and never raise it without saying what got worse.
+#
+# Three packages, not the tree. These are the ones where a surviving mutant is a
+# wrong answer somebody acts on rather than a cosmetic difference: jql builds
+# every query and owns the only place a value is quoted, render writes the
+# output contract, and site decides what a deployment is and resolves the names
+# every command takes. The sweep costs about four minutes on a developer
+# machine and considerably more on a runner, which is why it is scheduled.
+internal/jql	16	the only place a value is quoted; an unexercised branch is an injection
+internal/render	13	the output contract itself, and the escaping rules under it
+internal/site	37	deployment detection, field and user resolution, the cache
