@@ -102,6 +102,44 @@ func TestEveryCorpusDocumentConvertsOrIsRefusedByName(t *testing.T) {
 	assertCorpusGolden(t, "corpus.golden", golden.String())
 }
 
+// TestNothingThisToolWritesIsSomethingItCannotRead closes the gap the golden
+// above leaves open.
+//
+// The golden records what ToMarkdown produces and would not move if the markdown
+// in it stopped being readable, because nothing in that test reads it back. Two
+// documents sat in exactly that state for a day: a link whose text is inline
+// code, which this tool wrote and then refused, because the check that refuses
+// emphasis on inline code refused a link as well. Jira stores that combination,
+// which is why those two entries carry an `adf` payload.
+//
+// A document Jira stored, converted and handed back, has to be one a caller can
+// send again. That is the whole promise of the markdown body format, and it is
+// the round trip a person actually performs: read an issue, edit the body, send
+// it back.
+func TestNothingThisToolWritesIsSomethingItCannotRead(t *testing.T) {
+	for _, e := range loadCorpus(t) {
+		if len(e.ADF) == 0 {
+			continue
+		}
+		t.Run(e.Name, func(t *testing.T) {
+			doc, err := adf.Parse(e.ADF)
+			if err != nil {
+				t.Fatalf("a document Jira stored did not parse: %v", err)
+			}
+			markdown, err := adf.ToMarkdown(doc)
+			if err != nil {
+				// Refused on the way out is the designed answer for a construct
+				// ADF has and markdown does not. The golden above covers it.
+				return
+			}
+			if _, err := adf.FromMarkdown(markdown); err != nil {
+				t.Errorf("this tool wrote markdown it cannot read: %v\n--- wrote ---\n%s",
+					err, markdown)
+			}
+		})
+	}
+}
+
 // TestWhatJiraRefusedIsRefusedBeforeTheRequest keeps the two halves honest.
 //
 // Where the corpus records a document the server would not store and this

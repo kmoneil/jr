@@ -57,6 +57,12 @@ func TestMarkdownSurvivesTheRoundTrip(t *testing.T) {
 		{"a code span holding a backtick", "``a ` b``"},
 		{"a link", "see [the docs](https://example.invalid/x)"},
 		{"a link with a title", `see [the docs](https://example.invalid/x "Docs")`},
+		// Jira stores `code` beside a `link` and beside no other mark, which
+		// two corpus entries show and a probe against the sandbox confirmed.
+		// These were the only documents this tool could write and not read.
+		{"a code span inside a link", "[`x`](https://example.invalid/a)"},
+		{"a code span inside a link with a title", `[` + "`x`" + `](https://example.invalid/a "T")`},
+		{"a code span as part of a link's text", "see [the `code` here](https://example.invalid/a)"},
 		// The escape is the whole case: a title holding the quote that would
 		// otherwise close it has to come back out as one character, not two.
 		{"a link title holding a quote", `see [the docs](https://example.invalid/x "The \"Docs\"")`},
@@ -143,8 +149,13 @@ func TestFromMarkdownRefusesWhatItCannotStore(t *testing.T) {
 		// Jira's own content model, established by posting each of these to
 		// the sandbox rather than read off the ADF documentation. Its refusal
 		// is "INVALID_INPUT; comment: INVALID_INPUT", which names nothing.
-		{"emphasised code", "**`x`**", "emphasis on inline code"},
-		{"struck code", "~~`x`~~", "emphasis on inline code"},
+		// The mark is named rather than called emphasis, because one of these
+		// is not emphasis and the message used to say it was. That wording is
+		// how a link on inline code went unnoticed: it is refused by a check
+		// about emphasis, on a document with no emphasis in it.
+		{"bold code", "**`x`**", "strong on inline code"},
+		{"italic code", "*`x`*", "em on inline code"},
+		{"struck code", "~~`x`~~", "strike on inline code"},
 		{"a quote inside a quote", "> > deep", "a blockquote inside a blockquote"},
 		{"a panel inside a quote", "> > [!INFO]\n> > x", "a panel inside a blockquote"},
 		{"a table inside a quote", "> | a |\n> | --- |", "a table inside a blockquote"},
