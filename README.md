@@ -189,6 +189,7 @@ the full build, 43 in the reader.
 jr auth      login logout status token
 jr context   create edit list use show delete
 jr issue     list get create edit move assign delete clone watch
+jr issue     history activity
 jr issue     comment list add edit delete
 jr issue     link list add remove | worklog list add delete
 jr issue     attachment list download upload
@@ -201,7 +202,7 @@ jr jql       validate explain
 jr field     list
 jr meta      transitions createmeta
 jr mcp       serve
-jr version | schema | contract | skill
+jr version | schema | contract | skill | completion
 ```
 
 Global: `--format tsv|xml|json|yaml`, plus `markdown` in a build with the
@@ -265,14 +266,17 @@ $ jr issue get ENG-101
          precondition="eyJkIjoiY2xvdWQiLCJrIjoiRU5HLTEwMSIsInUiOiIyMDI2LTA4LTA0VDExOjMyOjA3LjQxMloifQ">
     <summary>...</summary>
     <status category="in-progress">In Progress</status>
-    <description format="wiki"><![CDATA[ ... ]]></description>
+    <description format="markdown"><![CDATA[ ... ]]></description>
 ```
 
 XML by default, because one issue is a record and a description full of
 newlines, quotes, and code fences is exactly the mixed content an escaping tax
-would make unreadable. The markup is **named, never converted**: `wiki` on Data
-Center, `adf` on Cloud. A literal `]]>` inside the text is split across two
-CDATA sections rather than closing the block early.
+would make unreadable. The markup is **named, never guessed**: `wiki` on Data
+Center, carried through exactly as the server stores it, and `markdown` on
+Cloud, converted from the document Jira holds by a converter that refuses
+rather than approximates. `--raw-body` names it `adf` and emits that document
+untouched. A literal `]]>` inside the text is split across two CDATA sections
+rather than closing the block early.
 
 The issue shape is the same one `issue list` emits for a row, so a caller parses
 both identically; `get` simply has more of it filled in.
@@ -778,7 +782,7 @@ in the content instead. It is never reported as complete.
 
 ```console
 $ jr mcp serve <<< '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
-{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"issue_list", ...
+{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"auth_status", ...
 ```
 
 The protocol is spoken directly rather than through an SDK: what is needed is
@@ -967,8 +971,10 @@ like one recorded from a server.
   reported as a permission problem, at the exit for one, with a remedy pointing
   at project permissions. The ADF converter is the same lesson applied ahead of
   time: its corpus is 247 documents Jira Cloud actually stored plus 23 it
-  refused, and the round-trip fuzzer over them found fourteen bugs that no
-  hand-written case would have.
+  refused, and the round-trip fuzzer over them keeps finding bugs no
+  hand-written case would have. Every input it has found is an `f.Add` seed in
+  the test source with the defect written beside it, so the list is readable
+  rather than a number in this sentence that was true once.
 - **Where the evidence does not exist, the repository says so, and then goes
   and gets it.** Every Data Center fixture here was constructed until August
   2026, because the only Data Center available was production and recording
