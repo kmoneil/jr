@@ -849,12 +849,12 @@ Features are selected at compile time, so an excluded one contributes zero
 bytes and zero attack surface, and `jr schema` does not list it. A reader
 build does not refuse to write; it does not contain the code that could.
 
-| Build               | Profile | What you get                                       |
-| ------------------- | ------- | -------------------------------------------------- |
-| `make build`        | full    | Everything, including the human-facing extras      |
-| `make build-agent`  | agent   | No TTY, no interactivity, cannot block on input    |
-| `make build-reader` | reader  | Physically cannot mutate Jira                      |
-| `make build-ci`     | ci      | Query only, smallest possible                      |
+| Build               | Profile | What you get                                    |
+| ------------------- | ------- | ----------------------------------------------- |
+| `make build`        | full    | Everything, including the human-facing extras   |
+| `make build-agent`  | agent   | No TTY, no interactivity, cannot block on input |
+| `make build-reader` | reader  | Physically cannot mutate Jira                   |
+| `make build-ci`     | ci      | Query only, smallest possible                   |
 
 ## Development
 
@@ -919,10 +919,9 @@ archive, so it reaches somebody holding only the tarball.
 
 ## How this was built
 
-This tool was built with AI assistance. Most of the lines here were typed by a
-language model. All of them were directed, reviewed, and accepted by a human
-author who is responsible for the result. It is stated because you would
-reasonably want to know, not because it is an excuse or a selling point.
+This tool was built with AI assistance. A human directed, reviewed, and accepted
+every part of the work and takes full responsibility for the result. We share this
+for transparency, not as a selling point or an excuse.
 
 The division of labour is worth being precise about, because "written by AI" has
 come to imply something that did not happen here. The model was fast, tireless,
