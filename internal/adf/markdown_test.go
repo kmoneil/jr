@@ -331,6 +331,50 @@ func TestALinkTitleIsEscapedLikeAnyOtherText(t *testing.T) {
 	}
 }
 
+// TestALinkTitleHoldingABlankLineIsRefused is where escaping runs out.
+//
+// A backslash fixes a line that starts something. It cannot fix a line that is
+// nothing: a blank line ends the paragraph, there is no character to escape,
+// and CommonMark says in as many words that a title may not contain one. The
+// round-trip fuzzer found it at 257 seconds, on a link whose title was two
+// carriage returns, and it predates the escaping fix beside it.
+func TestALinkTitleHoldingABlankLineIsRefused(t *testing.T) {
+	for _, c := range []struct{ name, title string }{
+		{"two newlines", "a\n\nb"},
+		{"a line of spaces", "a\n   \nb"},
+		{"nothing but newlines", "\n\n"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			doc := para(`{"type":"text","text":"x","marks":[{"type":"link","attrs":` +
+				`{"href":"https://example.invalid/x","title":` + quoteJSON(c.title) + `}}]}`)
+			got, err := convert(t, doc)
+			if err == nil {
+				t.Fatalf("ToMarkdown = %q, want a refusal", got)
+			}
+			if code := errs.Coerce(err).Code; code != "ADF_UNREPRESENTABLE" {
+				t.Errorf("code = %q, want ADF_UNREPRESENTABLE", code)
+			}
+			if says := errs.Coerce(err).Message; !strings.Contains(says, "blank line") {
+				t.Errorf("message %q does not name the blank line", says)
+			}
+		})
+	}
+}
+
+// A title that spans lines without a blank one is still written, which is the
+// case the test above must not have swallowed.
+func TestALinkTitleSpanningLinesIsStillWritten(t *testing.T) {
+	doc := para(`{"type":"text","text":"x","marks":[{"type":"link","attrs":` +
+		`{"href":"https://example.invalid/x","title":"a\nb"}}]}`)
+	got, err := convert(t, doc)
+	if err != nil {
+		t.Fatalf("ToMarkdown: %v", err)
+	}
+	if want := "[x](https://example.invalid/x \"a\nb\")"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 // TestUnrepresentableIsRefusedByName is the rule the card exists for. A
 // construct markdown cannot hold is an error naming it, never a best effort
 // that reads like the real thing.
