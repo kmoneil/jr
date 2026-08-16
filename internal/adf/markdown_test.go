@@ -277,6 +277,60 @@ func TestTextIsEscapedSoItReadsBackAsItself(t *testing.T) {
 	}
 }
 
+// TestALinkTitleIsEscapedLikeAnyOtherText is the same rule as the test above,
+// for the one piece of text that had its own escaper.
+//
+// A title escaped the backslash and the quote and nothing else: every character
+// that can end the title early, and none of the ones that can end the
+// *paragraph* early. A title may span lines, and the block parser reads a line
+// inside one as a line: `"a\n> b"` puts a block quote under a paragraph, the
+// paragraph comes apart, and the link is never built. The round-trip fuzzer
+// found it as the writer refusing its own output, at 78 seconds, on
+// `[0](0 "\r\\>\r")`.
+//
+// Jira Cloud stores a newline in a link title. Posted one to the sandbox and
+// read it back: the document is one the server hands over, not only one a
+// caller can construct, which is why this is escaped rather than refused.
+func TestALinkTitleIsEscapedLikeAnyOtherText(t *testing.T) {
+	cases := []struct{ name, title, want string }{
+		{"a quote", `He said "no"`, `He said \"no\"`},
+		{"a backslash", `a\b`, `a\\b`},
+		{"a backslash in front of a quote", `a\"b`, `a\\\"b`},
+		{"a line starting a block quote", "a\n> b", "a\n\\> b"},
+		{"a line starting a heading", "a\n# b", "a\n\\# b"},
+		{"a line starting an ordered list", "a\n1. b", "a\n1\\. b"},
+		{"a line starting a fence", "a\n```", "a\n\\`\\`\\`"},
+		// The ordinary case, which is what every title in the corpus looks
+		// like. It has to come out untouched or the golden moves for nothing.
+		{"nothing to escape", "Docs", "Docs"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			doc := para(`{"type":"text","text":"x","marks":[{"type":"link","attrs":` +
+				`{"href":"https://example.invalid/x","title":` + quoteJSON(c.title) + `}}]}`)
+			got, err := convert(t, doc)
+			if err != nil {
+				t.Fatalf("ToMarkdown: %v", err)
+			}
+			want := `[x](https://example.invalid/x "` + c.want + `")`
+			if got != want {
+				t.Errorf("ToMarkdown\n got  %q\n want %q", got, want)
+			}
+
+			// The escaping is only right if it comes back as what went in.
+			back, err := adf.FromMarkdown(got)
+			if err != nil {
+				t.Fatalf("this package cannot read its own output: %v\n%s", err, got)
+			}
+			marks := back.Content[0].Content[0].Marks
+			if len(marks) != 1 || marks[0].Attrs["title"] != c.title {
+				t.Errorf("title came back as %#v, want %q", marks, c.title)
+			}
+		})
+	}
+}
+
 // TestUnrepresentableIsRefusedByName is the rule the card exists for. A
 // construct markdown cannot hold is an error naming it, never a best effort
 // that reads like the real thing.
