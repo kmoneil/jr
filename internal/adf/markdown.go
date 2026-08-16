@@ -791,11 +791,38 @@ func linkDelimiters(m Mark, where string) (open, closing string, err error) {
 		return "", "", err
 	}
 	if title, ok := attrString(m.Attrs, "title"); ok && title != "" {
+		if blankLineInside(title) {
+			// Escaping fixes a line that *starts* something. It cannot fix a
+			// line that is nothing: a blank line ends the paragraph, there is
+			// no character to put a backslash in front of, and CommonMark says
+			// in as many words that a title may not contain one. So this is
+			// refused where the address holding a line break is refused, and
+			// for the same reason.
+			return "", "", unrepresentable(where, "a link title holding a blank line")
+		}
 		// Markdown's own title syntax. Dropping it would be a silent loss: it
 		// is what a reader sees on hover and it is not the address.
 		target += ` "` + escapeTitle(title) + `"`
 	}
 	return "[", "](" + target + ")", nil
+}
+
+// blankLineInside reports a line of s that is empty or all whitespace, ignoring
+// the first and the last.
+//
+// Those two are not lines of their own in the output. The first carries the
+// bracket, the address and the opening quote in front of it, and the last
+// carries the closing quote and parenthesis after it, so neither can be blank
+// however little the title puts on it. Every line between them stands alone,
+// and one of those being blank is what ends the paragraph.
+func blankLineInside(s string) bool {
+	lines := strings.Split(s, "\n")
+	for _, line := range lines[1:max(len(lines)-1, 1)] {
+		if strings.TrimSpace(line) == "" {
+			return true
+		}
+	}
+	return false
 }
 
 // escapeTitle escapes a link title: text like any other text this writer
