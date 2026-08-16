@@ -123,6 +123,15 @@ func FuzzMarkdownRoundTrips(f *testing.F) {
 		// a span whose content holds live delimiters, with a space either side
 		// of it: the space said no neighbour could merge and the check that
 		// says so ran before the two about the content, and hid them
+		"*0*~~*0*~~0", // em over a strike and out the other side, written as one
+		// span whose closing delimiter then sat between the strike's `~` and a
+		// digit, where CommonMark lets nothing close
+		"foo***bar***baz", // the same shape spelled the way it works, so the
+		// check that refuses the one above has to keep accepting this
+		"**0*****0** **0*****0**0", // strong holding an em and a plain word,
+		// which the writer refused to spell at all rather than trying the other
+		// way of cutting it. Held out of this list while it was open, because
+		// the seeds run in `make test` and everybody's build would have been red
 	} {
 		f.Add(seed)
 	}
