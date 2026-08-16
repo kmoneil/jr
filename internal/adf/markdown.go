@@ -793,9 +793,36 @@ func linkDelimiters(m Mark, where string) (open, closing string, err error) {
 	if title, ok := attrString(m.Attrs, "title"); ok && title != "" {
 		// Markdown's own title syntax. Dropping it would be a silent loss: it
 		// is what a reader sees on hover and it is not the address.
-		target += ` "` + strings.NewReplacer(`\`, `\`+`\`, `"`, `\`+`"`).Replace(title) + `"`
+		target += ` "` + escapeTitle(title) + `"`
 	}
 	return "[", "](" + target + ")", nil
+}
+
+// escapeTitle escapes a link title: text like any other text this writer
+// emits, plus the quote that would close it.
+//
+// It used to escape the backslash and the quote and nothing else, which is
+// every character that can end a title early and none of the ones that can end
+// the *paragraph* early. A title may span lines, and a line inside one still
+// begins a line as far as the block parser is concerned, so
+// `[x](u "a` + newline + `> b")` puts a block quote under a paragraph: the
+// block layer takes the paragraph apart and the inline parser never sees a
+// link. Jira Cloud stores a newline in a title, verified against the sandbox,
+// so this is a document the server hands back rather than only one a caller
+// can construct.
+//
+// escapeText is the rest of it, and reusing it is the point: the set of things
+// that begin a block is one set, and this file has been bitten twice by
+// keeping a second copy of a rule the reader already owns. It escapes more than
+// a title strictly needs, because emphasis and brackets are inert inside one
+// anyway, and that costs nothing: scanTitle drops the backslash from anything
+// it escaped.
+//
+// The order matters. escapeText doubles a backslash and leaves the quote alone,
+// so the quotes go on after it, and a title holding a backslash in front of a
+// quote survives both passes.
+func escapeTitle(s string) string {
+	return strings.ReplaceAll(escapeText(s, false), `"`, `\"`)
 }
 
 // noSpelling is one way of writing a span refused, not the document refused.

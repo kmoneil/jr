@@ -132,6 +132,11 @@ func FuzzMarkdownRoundTrips(f *testing.F) {
 		// which the writer refused to spell at all rather than trying the other
 		// way of cutting it. Held out of this list while it was open, because
 		// the seeds run in `make test` and everybody's build would have been red
+		"[0](0 \"\r\\>\r\")", // a link title spanning lines, escaped by a rule
+		// that knew what ends a title and not what ends a paragraph, so the
+		// second line of the title read as a block quote
+		`[0](0 "a` + "\n" + `# b")`, // the same shape with a heading under it,
+		// because the first one only proves the character it happens to hold
 	} {
 		f.Add(seed)
 	}
