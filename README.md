@@ -2,8 +2,6 @@
 
 ![jr](docs/assets/jr.png)
 
-# jr
-
 ### A client for Jira whose output is a versioned contract
 
 Built for scripts and agents first, humans second.
@@ -844,6 +842,7 @@ explain itself is the smallest one.
 | [output-contract.md](docs/output-contract.md) | Formats, envelope, truncation, escaping, exit codes, errors, stability policy |
 | [build-profiles.md](docs/build-profiles.md)   | Build tags, shipped profiles, compile-out enforcement                         |
 | [architecture.md](docs/architecture.md)       | Package layout, the dependency rule, testing gates                            |
+| [invariants.md](docs/invariants.md)           | The rules the code cannot break, each naming the test that enforces it        |
 
 Design spec: `_plans/design/jira-cli-v2-spec.md`.
 
