@@ -20,6 +20,85 @@ accident.
 
 Nothing yet.
 
+## [0.4.0] - 2026-08-16
+
+`jr` reads emphasis the way CommonMark does, and refuses markdown it cannot
+write back rather than writing something else.
+
+**Nothing changed shape.** No kind moved a schema version, no default column set
+gained a field, and no exit code or error `code` changed meaning. Every document
+in the 247-entry corpus of bodies Jira Cloud actually stored converts to exactly
+the markdown 0.3.3 produced: `internal/adf/testdata/corpus.golden` is unchanged
+across this release.
+
+**What did change is that some bodies now refuse.** A minor rather than a patch,
+because refusing an input that used to be accepted is major under the stability
+policy, and major moves the minor position while the version starts with a zero.
+The bodies affected are ones whose document has no markdown spelling at all, and
+they used to be written as markdown that reads back as something else. That is
+the trade this release makes in one sentence: a refusal you can see, in place of
+a body that quietly said something different. `--raw-body` emits the document
+untouched and is the way through.
+
+### Fixed
+
+- **Emphasis is CommonMark's delimiter-run algorithm rather than an
+  approximation of it.** The scanner it replaces looked for a closing run of
+  exactly the length it had opened with, which cannot express a nested span
+  ending flush against its parent. `**bold *and italic***` came back as one text
+  node with the asterisks still in it: both marks dropped, no refusal, exit 0, on
+  markdown anybody would write. The rule of three, the flanking rules, and the
+  openers-bottom table are all in now, and about thirty-five cases from the
+  specification are a table in the tests.
+
+- **A delimiter is written only where a reader can flank it.** A run against
+  punctuation cannot close in front of a word character, so emphasis over a
+  struck word wrote `*0~~0~~*0`, whose closing asterisk opens a second span and
+  closes nothing. Both asterisks read back as text and the emphasis was gone.
+  Where one spelling does not work the writer now tries the others before
+  refusing, so documents that used to be refused outright are written.
+
+- **A link title is escaped like every other piece of text.** It escaped the
+  backslash and the quote and nothing else, which is every character that can end
+  the title early and none of the ones that can end the paragraph early. A title
+  spanning lines put a block quote, a heading or a list marker at the start of a
+  line, and the paragraph came apart before the link was built. Jira Cloud does
+  store a newline in a title, so this is a body the server hands back.
+
+- **A control character inside a span is punctuation, not the end of the text.**
+  Emphasis over content beginning or ending with one was refused, because the
+  check that classifies it read "no character" and "the character NUL" as the
+  same thing, and whitespace is the one class that can neither open nor close.
+
+- **A line start survives the whitespace in front of it.** A vertical tab, a form
+  feed or a non-breaking space before a `=` on the line under a paragraph reached
+  the reader as a setext heading underline, because the two halves disagreed
+  about which characters are whitespace.
+
+- **The mark reaching furthest along a run opens first.** Opening the narrower
+  one cut the wider into pieces, and each piece shed the mark from the whitespace
+  at its edge, so `*__0__ __0__ __0__*` lost one space of emphasis per
+  conversion until there were none left.
+
+### Changed
+
+- **Emphasis with no unambiguous spelling is refused** with `ADF_UNREPRESENTABLE`
+  at exit 2, rather than written as something a reader takes differently.
+  Emphasis that ends in punctuation and is followed by a word character has no
+  spelling in either character at any width, which is a limit of markdown and not
+  of this tool.
+
+- **A link title holding a blank line is refused** the same way. Escaping cannot
+  reach it: a blank line ends the paragraph, and there is no character to put a
+  backslash in front of.
+
+### Performance
+
+- A paragraph of many inline nodes no longer rebuilds the output buffer once per
+  span to ask two questions about its last byte. A run of 1600 nodes spent 982MB
+  of 1.01GB on that one line and took 393 times as long as one of 50. Output is
+  byte-identical.
+
 ## [0.3.3] - 2026-08-14
 
 `jr jql validate` stops calling a query clean when Jira said something about it.
@@ -530,7 +609,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.3.3...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.4.0...main
+[0.4.0]: https://github.com/kmoneil/jr/releases/tag/v0.4.0
 [0.3.3]: https://github.com/kmoneil/jr/releases/tag/v0.3.3
 [0.3.2]: https://github.com/kmoneil/jr/releases/tag/v0.3.2
 [0.3.1]: https://github.com/kmoneil/jr/releases/tag/v0.3.1
