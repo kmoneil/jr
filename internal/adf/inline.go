@@ -286,6 +286,42 @@ func findCloser(s string, from int, delim string) int {
 	return -1
 }
 
+// codeSitsWith is the one mark Jira stores on a text node beside `code`.
+//
+// The set comes from posting each combination to the sandbox and reading back
+// what was kept. `code` with `em`, with `strong`, and with `strike` is refused
+// by the server with a 400 that names neither mark, and all three are recorded
+// in testdata/corpus.json as documents Jira would not store. `code` with a
+// `link` is stored and handed back unchanged, which two corpus entries show and
+// a fresh probe confirmed on 2026-08-16.
+//
+// The reading that fits the evidence is that `code` takes no *formatting*, and
+// a link is not formatting: it is where the text points, not how it looks. It
+// is named rather than the conflicts being named, so a mark nobody has tested
+// against `code` is refused rather than sent and answered with that 400.
+const codeSitsWith = "link"
+
+// codeClash reports the mark that cannot sit beside `code` on one text node,
+// once this mark is added to the ones already there.
+//
+// Both directions are asked, because a link can be opened around a code span
+// and a code span can be written inside a link, and only one of those two
+// orders used to reach this at all.
+func codeClash(have []Mark, adding Mark) (string, bool) {
+	if !hasMark(have, "code") && adding.Type != "code" {
+		return "", false
+	}
+	if beside := adding.Type; beside != "code" && beside != codeSitsWith {
+		return beside, true
+	}
+	for _, m := range have {
+		if m.Type != "code" && m.Type != codeSitsWith {
+			return m.Type, true
+		}
+	}
+	return "", false
+}
+
 // addMark applies a mark to every node a span wrapped.
 //
 // ADF puts marks on text, and on nothing else this package writes. Emphasising
@@ -295,13 +331,8 @@ func addMark(nodes []Node, mark Mark, at int) error {
 	for i := range nodes {
 		switch nodes[i].Type {
 		case "text":
-			// Jira stores the code mark only on its own, and refuses a text
-			// node carrying it alongside any other with a 400 that names
-			// neither. Emphasised code is refused here instead.
-			if hasMark(nodes[i].Marks, "code") || mark.Type == "code" {
-				if len(nodes[i].Marks) > 0 && !hasMark(nodes[i].Marks, mark.Type) {
-					return unsupported(at, "emphasis on inline code")
-				}
+			if clash, found := codeClash(nodes[i].Marks, mark); found {
+				return unsupported(at, "%s on inline code", clash)
 			}
 			if !hasMark(nodes[i].Marks, mark.Type) {
 				nodes[i].Marks = append(nodes[i].Marks, mark)

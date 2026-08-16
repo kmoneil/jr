@@ -1204,10 +1204,15 @@ Where CommonMark and this parser would read the same text differently, it
 refuses rather than choosing.
 
 Some refusals are Jira's content model rather than markdown's, established by
-posting each combination to a real site: emphasis on inline code, and a
-blockquote, panel, table, rule, heading, or task list nested where Jira will
-not store one. Jira's own answer to those is `INVALID_INPUT; comment:
+posting each combination to a real site: `em`, `strong`, or `strike` on inline
+code, and a blockquote, panel, table, rule, heading, or task list nested where
+Jira will not store one. Jira's own answer to those is `INVALID_INPUT; comment:
 INVALID_INPUT`, which names neither the node nor where it was.
+
+**A link on inline code is accepted**, because Jira stores it. `code` takes no
+formatting, and a link is not formatting: it is where the text points rather
+than how it looks. The refusal used to cover it and to call it emphasis, which
+made ``[`x`](url)`` a body this tool would write and then refuse to read.
 
 Reading is the other direction and is described under [ADF converted to
 markdown](#adf-converted-to-markdown): a Cloud body comes back as markdown, or
