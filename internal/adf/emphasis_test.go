@@ -220,6 +220,20 @@ func TestADelimiterIsWrittenOnlyWhereItCanBeRead(t *testing.T) {
 			`{"type":"text","text":"»"}`),
 		want: "**a.**»",
 		says: "[strong:a.]»",
+	}, {
+		// A control character is punctuation to the flanking rules and not
+		// whitespace, and whitespace is the one class that can neither open nor
+		// close. The check that asks this reads a zero rune as "nothing there",
+		// which is right for what sits outside a span and wrong for what sits
+		// inside one, because a span's content is never empty and a zero from it
+		// is a literal NUL. Sharing one function for both refused 25 inputs from
+		// the fuzz corpus that this converter had written correctly the day
+		// before, and no fuzzer could have reported it: a refusal ends the
+		// round-trip property early, so refusing more always looks greener.
+		name: "emphasis over a control character",
+		adf:  para(`{"type":"text","text":"\u0000","marks":[{"type":"em"}]}`),
+		want: "*\x00*",
+		says: "[em:\x00]",
 	}}
 
 	for _, c := range cases {

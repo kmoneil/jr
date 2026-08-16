@@ -865,9 +865,25 @@ func flanks(char byte, core string, prev, next rune) bool {
 	}
 	first, _ := utf8.DecodeRuneInString(run)
 	last, _ := utf8.DecodeLastRuneInString(run)
-	canOpen, _ := flanking(char, sideOf(prev), sideOf(first))
-	_, canClose := flanking(char, sideOf(last), sideOf(next))
+	canOpen, _ := flanking(char, sideOf(prev), classified(first))
+	_, canClose := flanking(char, classified(last), sideOf(next))
 	return canOpen && canClose
+}
+
+// classified is sideOf for a character that is definitely there.
+//
+// The two are separate because zero means two things and only one of them is a
+// character. sideOf reads it as nothing there, which is right for what sits
+// outside a span and wrong for what sits inside one: core is never empty, so a
+// zero from it is a literal NUL, and CommonMark's classification of a NUL is
+// punctuation. Sharing sideOf refused 25 inputs from the fuzz corpus that this
+// converter had written correctly the day before, every one of them a NUL
+// against a delimiter, because whitespace is the one class that can neither
+// open nor close. The seed `\x00**0***` is the same collision from the other
+// side, found the same way, in the other half of the package.
+func classified(r rune) side {
+	space, punct := classify(r)
+	return side{space: space, punct: punct}
 }
 
 // sideOf classifies a character the writer is about to sit a delimiter against.
