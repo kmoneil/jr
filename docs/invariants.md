@@ -141,13 +141,18 @@ do not catch, add the test in the same change and cite it here.
   turns `--watcher x --limit all` into a full-instance sweep. A flag that is not
   a filter goes in `notAFilter` with its reason.
   **Enforced by:** `TestEveryFlagIsAFilterOrIsNot`, `TestAnyFilterSatisfiesTheGuard`.
-- **A filter that names a person resolves that person.** Every user-valued flag
-  on `issue list` goes through `site.Metadata.ResolveUser`, spelled
-  `meta.ResolveUser` at the call sites. An unresolved display name matches
-  nothing on Cloud and returns complete, empty, exit 0, which is
-  indistinguishable from an honest answer. The sentinels `unassigned` and
-  `empty` are honoured on `--assignee` only.
-  **Enforced by:** nothing yet.
+- **A filter that names a person resolves that person.** All nine user-valued
+  flags on `issue list` go through `site.Metadata.ResolveUser`, spelled
+  `meta.ResolveUser` at the call sites: `--assignee`, `--reporter`, `--creator`,
+  `--involving`, `--watcher`, `--voter`, `--worklog-author`, `--was-assignee`,
+  and `--changed-by`. An unresolved display name matches nothing on Cloud and
+  returns complete, empty, exit 0, which is indistinguishable from an honest
+  answer. The sentinels `unassigned` and `empty` are honoured on `--assignee`
+  only, because `creator IS EMPTY` matches nothing and `CHANGED BY EMPTY` is not
+  JQL. The sweep takes its subjects from `userFilterFlags`, the list the command
+  itself loops over, so a tenth user-valued flag is covered the day it is added.
+  **Enforced by:** `TestEveryUserFilterResolvesThePersonItNames`,
+  `TestOnlyTheAssigneeTakesTheSentinelWords`.
 - **Retries count against `--max-requests`.** A retry is another request from
   the server's side; a budget that ignored them would bound nothing.
   **Enforced by:** `TestRetriesCountAgainstTheBudget`.

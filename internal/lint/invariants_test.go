@@ -31,13 +31,10 @@ const invariantFloor = 40
 // outstanding forever. That is the rule `unrecorded` follows in
 // evidence_test.go, for the same reason: a ledger nobody has to maintain stops
 // describing the tree.
-var unenforced = map[string]string{
-	"A filter that names a person resolves that person.": "nothing drives a " +
-		"user-valued flag with a display name and reads the outbound JQL back. " +
-		"Both deployments were measured by hand on 2026-08-16 and all six flags " +
-		"resolve, so this is a missing assertion and not a live defect. See " +
-		"_plans/backlog/no-test-asserts-a-user-valued-filter-resolves.md",
-}
+// It is empty, and that is the state to keep it in. The one entry it opened
+// with, that nothing asserted the user-valued filters resolve, was paid off on
+// 2026-08-16 by TestEveryUserFilterResolvesThePersonItNames.
+var unenforced = map[string]string{}
 
 // enforcedBy marks the sentence naming the tests behind an invariant.
 const enforcedBy = "**Enforced by:**"
