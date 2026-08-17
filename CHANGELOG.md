@@ -20,6 +20,148 @@ accident.
 
 Nothing yet.
 
+## [0.5.0] - 2026-08-17
+
+`--jql` asks Jira what a raw fragment means before sending it, rather than
+passing on an empty answer to a question the server did not understand.
+
+**Nothing changed shape.** No kind moved a schema version, no default column set
+gained a field, and no exit code or error `code` changed meaning. One error
+`code` is new, `JQL_NOT_UNDERSTOOD`, and a consumer that has never seen it was
+never being sent it.
+
+A minor rather than a patch, and the row that decides it is
+[refusing an input that used to be accepted](docs/output-contract.md#stability-policy).
+A `--jql` fragment naming a field that does not exist used to be sent and
+answered with zero rows and exit 0; it now exits 2. Nothing about the output's
+shape moves, so a script still parses every document identically, and the
+invocation it was built around now refuses. That row is major, and major moves
+the minor position while the version starts with a zero.
+
+One of the changes below goes the other way, and it is that row read backwards:
+a link on inline code is
+[accepted where it used to be refused](docs/output-contract.md#stability-policy),
+which is minor. The remaining two move no verdict in either direction. The
+whitespace fix was measured across a 2,197-entry corpus and every accept and
+refuse is identical to the release before it; what changed is which characters
+survive. The retry change is diagnostic output only. Minor cascades to the patch
+position and cannot move the minor one while a refusal is doing so, or the two
+would be indistinguishable in the only place a consumer looks.
+
+### Changed
+
+- **A raw `--jql` fragment is checked before it is sent.** Cloud's search
+  endpoint answers a query it knows is meaningless with HTTP 200 and no rows,
+  which is indistinguishable from an honest "nothing matched":
+
+  ```console
+  $ jr issue list --jql 'nosuchfield = 1'
+  # before: exit 0, complete="true", zero rows
+  # now:    exit 2, JQL_NOT_UNDERSTOOD, carrying Jira's own message
+  ```
+
+  Everything reached through a typed flag already had a floor: `--field`
+  resolves against the catalogue and every user-valued flag goes through user
+  resolution. `--jql` had none, and it is what a caller reaches for when a flag
+  will not express the question.
+
+  **A warning refuses as firmly as an error.** The warning is where Jira reports
+  a value that does not exist for a field, so `assignee = "nobody-xyz"` is valid
+  JQL naming nobody, and answering it with an empty result is the same wrong
+  answer as a misspelled field. It also makes `--jql` agree with `--assignee`,
+  which already refuses a user it cannot resolve.
+
+  Both deployments, one path. Cloud uses its parse endpoint; Data Center uses a
+  search bounded to zero rows, which is the closest thing it has. Measured on a
+  local Data Center rather than assumed: its search refuses three classes on its
+  own and answers the unknown-user class with the same confident empty Cloud
+  does.
+
+  The check costs one request, about 0.2s, and only when `--jql` is present. It
+  runs before a streaming command has written its header, because a verdict
+  arriving later could only be a warning on stderr, which is invisible to an MCP
+  caller and would split the contract by format for one input.
+
+  **One consequence worth knowing before you upgrade:** `--max-requests 1` with
+  `--jql` now fails, because the check and the search are two requests.
+
+  What it does not close, documented rather than implied shut: on Cloud the
+  operand of a `WAS`, `CHANGED TO`, or `CHANGED FROM` predicate is validated by
+  neither endpoint, so `status was "NoSuchStatusXYZ"` is still answered empty
+  there. Data Center refuses it. That gap is Atlassian's.
+
+### Fixed
+
+- **A link on inline code is accepted, because Jira stores it.** `jr issue get`
+  writes a link whose text is inline code, and feeding that back was refused.
+  Two of the 247 documents in the corpus are exactly that shape, and they were
+  the only ones this tool could write and could not read.
+
+  The rule is that `code` takes no formatting, and a link is not formatting: it
+  is where the text points rather than how it looks. A mark nobody has tested
+  against `code` is still refused rather than sent and answered with a 400 that
+  names neither.
+
+  The error message also names the mark that clashed. It read `emphasis on
+  inline code` for every case, which is wrong for `strike` and is how this went
+  unnoticed for a day: a link was refused by an error describing a construct the
+  document did not contain.
+
+- **The reader keeps the whitespace markdown does not count.** The block parser
+  decided structure with Unicode's whitespace set, which includes the vertical
+  tab, the form feed, NEL, and the non-breaking space. Markdown's set is a space
+  and a tab. Deciding a block with the wider one ate those characters at a line
+  edge, with no refusal and no warning:
+
+  ```
+  # x<NBSP>          came back as the heading text "x"
+  | a<VT> |          came back as the cell "a"
+  0\n<NBSP>\n0       read as blank, splitting one paragraph into two
+  ```
+
+  Jira keeps the character, which is what decides the direction: a heading and a
+  paragraph each ending in U+00A0 went to a real site and came back with the
+  U+00A0 intact. A non-breaking space at a line edge is not exotic. It is what a
+  paste out of a word processor leaves.
+
+  Measured over a 2,197-entry corpus: the accept and refuse verdicts are
+  identical in both directions, and 5 documents build differently. All five are
+  Unicode spaces, which is exactly the class this changes and nothing else.
+
+- **`--debug` says why a request was not retried.** The retry policy made two
+  decisions and reported neither.
+
+  A POST that got a 5xx is deliberately not replayed, because it may have been
+  processed before the failure and retrying it is how one `issue create` becomes
+  two issues. That decision left a trace identical to a run where the policy was
+  never consulted: one attempt, a 503, and nothing to say the count was on
+  purpose. It now says so, on both paths that can end an exchange, a status that
+  will not be replayed and a connection that dropped.
+
+  A `Retry-After` is capped at 30 seconds so one command cannot become an
+  hour-long hang. The trace now carries what the server asked for beside what
+  was waited, and only when the two differ:
+
+  ```
+  [http] retry attempt=1 GET … status=429 wait=30s asked=1h0m0s reason="rate limited"
+  ```
+
+  Measured afterwards against both deployments: Cloud advertises a one-second
+  burst window on every response, so the cap is roughly two orders of magnitude
+  from firing there, and a default Data Center sends no rate-limit header at
+  all. Raising `--retries` remains the right answer to a Cloud 429.
+
+### Output contract
+
+- No kind moved. Every schema version is unchanged from 0.4.0.
+- `JQL_NOT_UNDERSTOOD` is a new error `code`, at exit 2, and the only addition
+  to the error table. It is raised by `issue list` and `issue activity`, the two
+  commands that take a raw `--jql` and then act on it.
+
+  `jql validate` and `jql explain` also take `--jql` and do **not** raise it.
+  Reporting the server's opinion is their whole job, so they answer with
+  `valid` and any warnings rather than refusing, and that has not changed.
+
 ## [0.4.0] - 2026-08-16
 
 `jr` reads emphasis the way CommonMark does, and refuses markdown it cannot
@@ -609,7 +751,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.4.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.5.0...main
+[0.5.0]: https://github.com/kmoneil/jr/releases/tag/v0.5.0
 [0.4.0]: https://github.com/kmoneil/jr/releases/tag/v0.4.0
 [0.3.3]: https://github.com/kmoneil/jr/releases/tag/v0.3.3
 [0.3.2]: https://github.com/kmoneil/jr/releases/tag/v0.3.2
