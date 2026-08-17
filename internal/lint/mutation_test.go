@@ -214,6 +214,78 @@ func TestTheMutationSweepExitCodesSayWhichFailureItWas(t *testing.T) {
 	}
 }
 
+// TestTheMutationSweepBoundsARunawayMutant holds the cap where it works.
+//
+// Four mutants in internal/jql/token.go do not terminate: the scan loop there
+// has no post statement, so each case advances `i` itself, and flipping one
+// `i++` to `i--` makes it oscillate against a neighbour while appending on every
+// cycle. Gremlins classifies them correctly, as timed out, but the timeout is
+// the coefficient times a measured suite time that includes a cold build, so a
+// runner grants about 104 seconds where this machine grants 4.8. Three
+// scheduled sweeps died taking sixteen gigabytes and the runner with them.
+//
+// The cap has to reach `go` and not this script's own shell. Capping the shell
+// caps gremlins, which sizes itself from NumCPU and then dies copying the
+// source tree per worker on a machine with enough cores. So this asserts the
+// shim is what children actually resolve, rather than asserting that the file
+// contains the word ulimit, which would pass just as happily with the limit in
+// the place that broke.
+func TestTheMutationSweepBoundsARunawayMutant(t *testing.T) {
+	dir := t.TempDir()
+
+	// The stub records what `go` resolves to for a child of the script, which
+	// is the only question worth asking here. It writes to a file rather than
+	// to stdout because the script captures a run's output to parse the count
+	// out of it, so anything printed here never reaches the caller.
+	// It records the resolved file's contents and not its path, because the
+	// script removes the shim on exit and the path would be gone by the time
+	// this test read it.
+	resolvedPath := filepath.Join(dir, "resolved")
+	stub := filepath.Join(dir, "gremlins")
+	body := "#!/bin/sh\ng=$(command -v go)\n" +
+		"{ echo \"resolved: $g\"; cat \"$g\"; } >" + resolvedPath + " 2>/dev/null\n" +
+		"echo 'Lived: 5'\n"
+	if err := os.WriteFile(stub, []byte(body), 0o755); err != nil {
+		t.Fatalf("writing the stubbed gremlins: %v", err)
+	}
+	baseline := filepath.Join(dir, "baseline.tsv")
+	if err := os.WriteFile(baseline, []byte("internal/jql\t5\tthe reason\n"), 0o644); err != nil {
+		t.Fatalf("writing the baseline: %v", err)
+	}
+
+	cmd := exec.Command("bash", mutationScript)
+	cmd.Env = append(os.Environ(), "GREMLINS="+stub, "MUTATION_BASELINE="+baseline)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		if _, ok := errors.AsType[*exec.ExitError](err); !ok {
+			t.Fatalf("running %s: %v", mutationScript, err)
+		}
+	}
+
+	recorded, err := os.ReadFile(resolvedPath)
+	if err != nil {
+		t.Fatalf("%s ran a child that recorded no go at all: %v\n%s",
+			mutationScript, err, out)
+	}
+	if len(recorded) == 0 {
+		t.Fatalf("%s ran a child that could not resolve go:\n%s", mutationScript, out)
+	}
+	if !strings.Contains(string(recorded), "ulimit -v") {
+		t.Errorf("a child of %s resolves go to something that sets no "+
+			"address-space limit. A mutant whose loop does not terminate then "+
+			"allocates until the machine dies, which is what killed three "+
+			"scheduled sweeps.\nIt resolved to:\n%s",
+			mutationScript, firstLine(string(recorded)))
+	}
+}
+
+// firstLine keeps a failure message readable when what was resolved is a
+// megabyte of compiled toolchain rather than a shell script.
+func firstLine(s string) string {
+	line, _, _ := strings.Cut(s, "\n")
+	return line
+}
+
 // TestTheMutationWorkflowKeepsTheSweepsOwnStatus is about one character.
 //
 // A `run:` block on Linux is `bash -e {0}`, with no pipefail. The sweep step

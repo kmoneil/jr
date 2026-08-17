@@ -456,6 +456,20 @@ coefficient, `internal/lint/mutation_test.go` holds it above the range where
 that happens, and the workflow goes through `make mutate` so the scheduled sweep
 cannot pick up a different one.
 
+That coefficient has a second consequence, and it cost three scheduled sweeps
+before anybody measured it. The timeout is the coefficient times the *measured*
+suite time, and on a runner that measurement includes a cold build: 1.74 seconds
+against 79.77 milliseconds locally. So a mutant gets about 104 seconds there
+rather than 4.8, which matters because some mutants do not terminate. Four of
+them turn `internal/jql/token.go`'s scan loop, which has no post statement, into
+an unbounded append. Given 104 seconds one of those takes sixteen gigabytes and
+the runner with it, and lowering the worker count does not help, because one
+runaway is sufficient. `scripts/mutate.sh` therefore caps the address space of
+`go` through a PATH shim rather than of its own shell: capping the shell also
+caps gremlins, which sizes itself from `NumCPU` and then dies copying the source
+tree per worker. The baseline is unmoved by the bound, because a runaway that
+used to exhaust its timeout now dies at the cap and is counted as killed.
+
 Those figures are v0.5.0's. The bump to v0.6.0 on 2026-08-17 was checked against
 the same claim rather than assumed to have fixed it, and it has not: at the tool
 default the same package reports `Killed: 16, Lived: 0, Timed out: 203` and
