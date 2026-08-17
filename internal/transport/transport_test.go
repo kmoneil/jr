@@ -325,6 +325,116 @@ func TestPostIsNotReplayedAfterAnUpstreamError(t *testing.T) {
 	}
 }
 
+// TestTheRefusalToReplayAPostIsTraced asserts the account of the decision, not
+// the decision.
+//
+// The test above counts requests, and it passes whether or not anything ever
+// said why there was one. That gap was real: shouldRetry built the reason on
+// every non-idempotent 5xx and settle traced it only when the request was still
+// retryable, which is exactly when that reason is not the one. So the decision
+// that stops one `issue create` becoming two issues left a trace identical to a
+// run where the retry policy was never consulted, and somebody debugging a
+// create against a wobbling server had nothing to tell them the single attempt
+// was deliberate.
+func TestTheRefusalToReplayAPostIsTraced(t *testing.T) {
+	var debug strings.Builder
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+
+	c, _ := newTestClient(t, srv, transport.Options{
+		Retries: 3,
+		Tracer:  transport.NewTextTracer(&debug),
+	})
+	if _, err := c.Do(t.Context(), transport.Request{
+		Method: http.MethodPost, Path: "/rest/api/3/issue", Body: []byte(`{}`),
+	}); err != nil {
+		t.Fatalf("do: %v", err)
+	}
+
+	trace := debug.String()
+	if trace == "" {
+		t.Fatal("the tracer received nothing, so this test proves nothing")
+	}
+	if !strings.Contains(trace, "non-idempotent request not replayed") {
+		t.Errorf("the trace does not say why the POST was not retried:\n%s", trace)
+	}
+}
+
+// TestTheRefusalToReplayAPostAfterADroppedConnectionIsTraced is the same rule
+// on the other path that can end an exchange.
+//
+// A connection that dies mid-request may have died after Jira accepted it, so a
+// POST is not replayed for exactly the reason a 503 is not. The trace has to
+// say so in both places or the invariant is half held. That `attempt` already
+// traces the network error does not cover it, because the error is what
+// happened and not what was decided about it.
+func TestTheRefusalToReplayAPostAfterADroppedConnectionIsTraced(t *testing.T) {
+	var debug strings.Builder
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		// Hang up without answering, which is what a load balancer recycling a
+		// connection looks like from here. The `ok` guard is not a skip: a
+		// writer that cannot be hijacked answers 200, and the assertion below
+		// fails on that success rather than passing quietly.
+		hijacker, ok := w.(http.Hijacker)
+		if !ok {
+			return
+		}
+		conn, _, err := hijacker.Hijack()
+		if err != nil {
+			return
+		}
+		_ = conn.Close()
+	}))
+	defer srv.Close()
+
+	c, _ := newTestClient(t, srv, transport.Options{
+		Retries: 3,
+		Tracer:  transport.NewTextTracer(&debug),
+	})
+	if _, err := c.Do(t.Context(), transport.Request{
+		Method: http.MethodPost, Path: "/rest/api/3/issue", Body: []byte(`{}`),
+	}); err == nil {
+		t.Fatal("a dropped connection reported success")
+	}
+
+	trace := debug.String()
+	if !strings.Contains(trace, "non-idempotent request not replayed after a network error") {
+		t.Errorf("the trace does not say why the POST was not retried after the "+
+			"connection dropped:\n%s", trace)
+	}
+}
+
+// TestAPlain4xxTracesNoRetryReason keeps the change above from becoming noise.
+//
+// A 404 is not a decision this client made, and settle stays silent for it. The
+// empty reason shouldRetry returns for a sub-500 status is what distinguishes
+// "declined to retry" from "there was nothing to decide", so it is worth an
+// assertion rather than a comment.
+func TestAPlain4xxTracesNoRetryReason(t *testing.T) {
+	var debug strings.Builder
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	c, _ := newTestClient(t, srv, transport.Options{
+		Retries: 3,
+		Tracer:  transport.NewTextTracer(&debug),
+	})
+	if _, err := c.Do(t.Context(), transport.Request{
+		Method: http.MethodPost, Path: "/rest/api/3/issue", Body: []byte(`{}`),
+	}); err != nil {
+		t.Fatalf("do: %v", err)
+	}
+
+	if trace := debug.String(); strings.Contains(trace, "reason=") {
+		t.Errorf("a 404 traced a retry reason, and there was no decision to "+
+			"report:\n%s", trace)
+	}
+}
+
 // TestPostIsReplayedAfterRateLimiting is the exception: a 429 is refused before
 // processing, so replaying it cannot duplicate anything.
 func TestPostIsReplayedAfterRateLimiting(t *testing.T) {
@@ -492,6 +602,75 @@ func TestRetryAfterIsCapped(t *testing.T) {
 	}
 	if clock.slept[0] > 30*time.Second {
 		t.Errorf("slept %s, which is longer than any single wait should be", clock.slept[0])
+	}
+}
+
+// TestACappedRetryAfterSaysWhatTheServerAsked is the other half of the cap.
+//
+// Capping is a decision made on the caller's behalf: the server said an hour
+// and this client comes back 120 times sooner, which can keep a throttle alive
+// and spends --max-requests doing it. The cap is defensible and stays. Making
+// it invisible was not. The asked-for number was computed inside backoff and
+// dropped there, so a --debug trace of a throttled run showed a 30-second wait
+// with nothing to say the server had named a different one.
+func TestACappedRetryAfterSaysWhatTheServerAsked(t *testing.T) {
+	var debug strings.Builder
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Retry-After", "3600")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer srv.Close()
+
+	c, _ := newTestClient(t, srv, transport.Options{
+		Retries: 1,
+		Tracer:  transport.NewTextTracer(&debug),
+	})
+	if _, err := c.Do(t.Context(), transport.Request{
+		Method: http.MethodGet, Path: "/x",
+	}); err != nil {
+		t.Fatalf("do: %v", err)
+	}
+
+	trace := debug.String()
+	if !strings.Contains(trace, "wait=30s") {
+		t.Errorf("the trace does not say what was waited:\n%s", trace)
+	}
+	if !strings.Contains(trace, "asked=1h0m0s") {
+		t.Errorf("the trace does not say what the server asked for, so the "+
+			"120x gap between the two is invisible:\n%s", trace)
+	}
+}
+
+// TestAnHonouredRetryAfterIsNotReportedTwice keeps the field above meaningful.
+//
+// A server that asked for seven seconds and got seven is not a discrepancy, and
+// a line that printed `wait=7s asked=7s` on every retry would make the case
+// that matters look like the ones that do not.
+func TestAnHonouredRetryAfterIsNotReportedTwice(t *testing.T) {
+	var debug strings.Builder
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Retry-After", "7")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer srv.Close()
+
+	c, _ := newTestClient(t, srv, transport.Options{
+		Retries: 1,
+		Tracer:  transport.NewTextTracer(&debug),
+	})
+	if _, err := c.Do(t.Context(), transport.Request{
+		Method: http.MethodGet, Path: "/x",
+	}); err != nil {
+		t.Fatalf("do: %v", err)
+	}
+
+	trace := debug.String()
+	if !strings.Contains(trace, "wait=7s") {
+		t.Fatalf("the server's Retry-After was not honoured:\n%s", trace)
+	}
+	if strings.Contains(trace, "asked=") {
+		t.Errorf("the wait was exactly what the server asked for and the trace "+
+			"reported it as a discrepancy:\n%s", trace)
 	}
 }
 

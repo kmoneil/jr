@@ -252,6 +252,29 @@ do not catch, add the test in the same change and cite it here.
   or an explicit `Replayable`, meaning the caller holds an idempotency key,
   allows a POST retry.
   **Enforced by:** `TestPostIsNotReplayedAfterAnUpstreamError`, `TestPostIsReplayedAfterRateLimiting`.
+- **A retry this client declines to make is traced as a decision.** The rule
+  above was enforced by a test that counts requests, which passes whether or not
+  anything says why the count is one. It was one: `shouldRetry` built the reason
+  on every non-idempotent 5xx and `settle` traced it only when the request was
+  still retryable, which is exactly when that reason is not the one. So the
+  decision that stops one `issue create` becoming two left a `--debug` trace
+  identical to a run where the policy was never consulted. It holds on both
+  paths that end an exchange, a status that will not be replayed and a
+  connection that dropped, because `traceNotRetried` is one function and two
+  copies of it would be two places for the rule to stop being true. A plain 4xx
+  and a cancelled context still trace nothing, because neither is a decision
+  this client made.
+  **Enforced by:** `TestTheRefusalToReplayAPostIsTraced`,
+  `TestTheRefusalToReplayAPostAfterADroppedConnectionIsTraced`,
+  `TestAPlain4xxTracesNoRetryReason`.
+- **A wait this client shortens says what it was asked for.** `Retry-After` is
+  capped at 30 seconds so one command cannot become an hour-long hang, which
+  means a server asking for an hour is retried 120 times sooner than it
+  instructed, which keeps a throttle alive and spends `--max-requests` doing it.
+  The cap stays; being silent about it does not. The trace carries the server's
+  number beside the honoured one whenever the two differ, and only then.
+  **Enforced by:** `TestACappedRetryAfterSaysWhatTheServerAsked`,
+  `TestAnHonouredRetryAfterIsNotReportedTwice`, `TestRetryAfterIsCapped`.
 - **A request path is relative, never absolute.** An absolute path would let a
   server-supplied value redirect the request, and the credential, to another
   host.

@@ -31,8 +31,13 @@ var KeptHeaders = map[string]string{
 		"detects an HTML error page with it; issue/attachment.go reads it too",
 	"Content-Disposition": "issue/attachment.go takes the filename from it, " +
 		"which is the only thing that names a downloaded file",
-	"Retry-After": "transport/retry.go waits for exactly as long as it says " +
-		"before a retry, in either of its two forms",
+	// Not "waits for exactly as long as it says", which this entry claimed
+	// until 2026-08-17 and TestRetryAfterIsCapped has always disproved. The
+	// reason to keep the header is unaffected, since retry.go reads it in both
+	// of its forms. But the sentence explaining why a fixture keeps evidence is
+	// the wrong sentence to be wrong.
+	"Retry-After": "transport/retry.go reads it, in either of its two forms, " +
+		"and waits for as long as it says up to a 30s cap",
 	"X-Authentication-Denied-Reason": "transport/errors.go turns it into the " +
 		"detail on a 401, and it is the only place Jira says which of several " +
 		"auth failures happened",

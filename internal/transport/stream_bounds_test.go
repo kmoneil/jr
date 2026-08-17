@@ -140,8 +140,8 @@ func TestTheBoundedBodyFailsInsteadOfEnding(t *testing.T) {
 		t.Errorf("delivered %d bytes before failing, want 10", n)
 	}
 
-	var structured *errs.Error
-	if !errors.As(err, &structured) {
+	structured, ok := errors.AsType[*errs.Error](err)
+	if !ok {
 		t.Fatalf("error is not structured: %v", err)
 	}
 	if structured.Code != "UNBOUNDED_RESPONSE" {

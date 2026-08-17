@@ -624,6 +624,23 @@ transport**, when the trace event is built rather than when it is printed, so a
 debug trace cannot leak a token — including in URLs, which are scrubbed of
 userinfo and credential-shaped query parameters.
 
+The trace also says what `jr` decided and why, which is usually what you are
+looking for when the request count is not what you expected:
+
+```
+[http] retry attempt=1 GET https://jira.example.com/rest/api/3/search status=429 wait=30s asked=1h0m0s request-id=c1db85 reason="rate limited"
+[http] failure attempt=1 POST https://jira.example.com/rest/api/3/issue status=503 request-id=ab2ca8 reason="non-idempotent request not replayed after an upstream error"
+```
+
+`asked=` appears only when it differs from `wait=`: a single wait is capped at
+30 seconds, so a server asking for longer gets retried sooner than it said. If
+you are still being throttled, that gap is why. Raising `--retries` will not
+help; wait out the server's interval instead.
+
+A `failure` line carrying a reason and a single attempt is `jr` refusing to
+replay a request that may already have been processed. That is deliberate, and
+re-running it by hand is a decision only you can make.
+
 ### See what a command would do
 
 ```console
