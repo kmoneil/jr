@@ -2,12 +2,14 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/kmoneil/jr/internal/buildinfo"
 	"github.com/kmoneil/jr/internal/errs"
 	"github.com/kmoneil/jr/internal/exitcode"
+	"github.com/kmoneil/jr/internal/nearest"
 	"github.com/kmoneil/jr/internal/registry"
 	"github.com/kmoneil/jr/internal/render"
 )
@@ -149,13 +151,18 @@ func (a *app) runSchema(_ context.Context, inv *registry.Invocation) (*render.Do
 		c, ok := a.reg.Lookup(name)
 		if !ok {
 			e := errs.NotFound("UNKNOWN_COMMAND", "no command named %q in this build", name).
-				WithDetail("build profile %s, tags=%s", buildinfo.Profile(), buildinfo.TagList())
-			if near := nearMatches(name, a.reg.Names()); len(near) > 0 {
-				return nil, e.WithRemedy("did you mean: %s", strings.Join(near, ", "))
+				WithRemedy("run `%s schema` for the commands this build contains", buildinfo.App)
+
+			// The profile and the near misses are both detail, because both
+			// answer "what does this build have". The suggestions used to
+			// displace the remedy, which took away the one command that lists
+			// everything at exactly the moment the guess was wrong.
+			detail := fmt.Sprintf("build profile %s, tags=%s",
+				buildinfo.Profile(), buildinfo.TagList())
+			if near := nearest.Strings(name, a.reg.Names(), nearLimit); len(near) > 0 {
+				detail += "; did you mean: " + strings.Join(near, ", ")
 			}
-			return nil, e.WithRemedy(
-				"run `%s schema` for the commands this build contains", buildinfo.App,
-			)
+			return nil, e.WithDetail("%s", detail)
 		}
 		return registry.CommandDoc(c), nil
 	}
@@ -164,17 +171,4 @@ func (a *app) runSchema(_ context.Context, inv *registry.Invocation) (*render.Do
 	// It never produces a truncated list that claims to be exhaustive.
 	all, complete := registry.Bound(inv.Limit, all)
 	return registry.CommandsDoc(all, complete), nil
-}
-
-// nearMatches returns candidates sharing a prefix with want, so a mistyped
-// command name comes back with alternatives rather than just a refusal.
-func nearMatches(want string, candidates []string) []string {
-	var out []string
-	lower := strings.ToLower(want)
-	for _, c := range candidates {
-		if strings.Contains(strings.ToLower(c), lower) || strings.HasPrefix(lower, c) {
-			out = append(out, c)
-		}
-	}
-	return out
 }

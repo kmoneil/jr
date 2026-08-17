@@ -14,11 +14,13 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/kmoneil/jr/internal/auth"
 	"github.com/kmoneil/jr/internal/buildinfo"
 	"github.com/kmoneil/jr/internal/errs"
 	"github.com/kmoneil/jr/internal/exitcode"
+	"github.com/kmoneil/jr/internal/nearest"
 	"github.com/kmoneil/jr/internal/registry"
 	"github.com/kmoneil/jr/internal/render"
 )
@@ -307,4 +309,65 @@ func (a *app) emit(d *render.Doc) error {
 func usageError(cmd *cobra.Command, format string, args ...any) *errs.Error {
 	return errs.Usage("INVALID_USAGE", format, args...).
 		WithRemedy("run `%s --help`", strings.TrimSpace(cmd.CommandPath()))
+}
+
+// nearLimit bounds every suggestion list this package produces. A refusal that
+// prints forty candidates is one nobody reads, and internal/site holds the
+// field catalogue to the same number for the same reason.
+const nearLimit = 5
+
+// flagError is usageError plus the flags this command does have.
+//
+// Mistyping a field name and mistyping a flag name are the same mistake, and
+// until now only one of them was answered: `--field summry` named the near miss
+// and `--assignne` sent the caller to read nine kilobytes of help to find a
+// letter. The candidate set here is the cheapest one in the tool, the command's
+// own declaration, already in memory and a few dozen strings long.
+//
+// Ranked against *this* command's flags rather than every flag jr has.
+// Suggesting `--worklog-author` on a command that has no such flag is a second
+// wrong turn dressed as help.
+func flagError(cmd *cobra.Command, err error) error {
+	e := usageError(cmd, "%s", err.Error())
+
+	typed := typedFlag(err.Error())
+	if typed == "" {
+		return e
+	}
+	near := nearest.Strings(typed, declaredFlags(cmd), nearLimit)
+	if len(near) == 0 {
+		// Nothing close is its own answer. A detail listing three unrelated
+		// flags reads as a finding and costs a turn to rule out.
+		return e
+	}
+
+	dashed := make([]string, 0, len(near))
+	for _, n := range near {
+		dashed = append(dashed, "--"+n)
+	}
+	return e.WithDetail("did you mean: %s", strings.Join(dashed, ", "))
+}
+
+// typedFlag recovers the long flag a caller typed from pflag's own message,
+// which is the only place it survives: the parse error carries the text and not
+// the token.
+//
+// A shorthand gets nothing. `-q` against a command with no `-q` is one
+// character, every other shorthand is one character away from it, and ranking
+// there produces a list of everything.
+func typedFlag(msg string) string {
+	_, after, ok := strings.Cut(msg, "unknown flag: --")
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(after)
+}
+
+// declaredFlags is every long flag name this command accepts, its own and the
+// persistent ones it inherits, because a caller does not know or care which is
+// which.
+func declaredFlags(cmd *cobra.Command) []string {
+	var out []string
+	cmd.Flags().VisitAll(func(f *pflag.Flag) { out = append(out, f.Name) })
+	return out
 }

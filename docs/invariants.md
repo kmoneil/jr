@@ -64,6 +64,17 @@ do not catch, add the test in the same change and cite it here.
   `TestAFailureBeforeTheFirstRowStillWritesNothing`,
   `TestAHalfAppliedWriteReachesStdoutAndStillFails`,
   `TestAnOrdinaryFailureStillWritesNothingToStdout`.
+- **A refusal of a name the caller typed names the near misses, from one rule.**
+  A mistyped field, flag, verb, and command name are the same mistake, and this
+  tool had three different ideas of "close" plus one refusal that offered
+  nothing: edit distance for a field, substring for a command name, cobra's
+  suggester for a subcommand, and silence for a flag. `internal/nearest` is the
+  rule now, the candidates go in `detail` beside the remedy rather than
+  replacing it, and a refusal with nothing close says nothing rather than
+  guessing.
+  **Enforced by:** `TestARefusalOfANameTheCallerTypedNamesTheNearMisses`,
+  `TestARefusalSaysNothingRatherThanGuessing`,
+  `TestSuggestionsComeFromThisCommandsOwnFlags`.
 - **A refusal names the record it refused.** A validation path is built from
   element names, so it is the same string for every row in a collection: without
   this a caller is told which field was refused and has to bisect `--limit` to

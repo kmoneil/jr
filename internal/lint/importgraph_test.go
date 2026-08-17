@@ -144,6 +144,7 @@ func TestFoundationPackagesStayLeaves(t *testing.T) {
 		"internal/buildinfo",
 		"internal/jql",
 		"internal/adf",
+		"internal/nearest",
 	}
 	forbidden := []string{
 		"internal/cli",
