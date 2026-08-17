@@ -141,6 +141,13 @@ type Options struct {
 	// Jitter returns a value in [0,1) for backoff. Nil uses a real random
 	// source; a test supplies a fixed one to get a deterministic schedule.
 	Jitter func() float64
+	// TLS carries a private CA and a client certificate. The zero value leaves
+	// http.DefaultTransport alone, which is the common case and the one where
+	// the standard library's proxy handling and connection pooling matter most.
+	//
+	// Ignored when HTTPClient is set, on the same terms as RoundTripper: a
+	// caller that supplied a whole client has already decided how it dials.
+	TLS TLSOptions
 }
 
 // Client is the HTTP path to one Jira site.
@@ -270,17 +277,14 @@ func New(opt Options) (*Client, error) {
 		jitter:    opt.Jitter,
 		budget:    newBudget(opt.MaxRequests),
 	}
-	if c.http == nil {
-		c.http = &http.Client{}
+	if err := c.dialThrough(opt); err != nil {
+		return nil, err
 	}
 	if c.retries == 0 {
 		c.retries = DefaultRetries
 	}
 	if c.timeout == 0 {
 		c.timeout = DefaultTimeout
-	}
-	if opt.HTTPClient == nil && opt.RoundTripper != nil {
-		c.http = &http.Client{Transport: opt.RoundTripper}
 	}
 	if c.tracer == nil {
 		c.tracer = discardTracer{}
@@ -292,6 +296,45 @@ func New(opt Options) (*Client, error) {
 		c.jitter = defaultJitter
 	}
 	return c, nil
+}
+
+// dialThrough settles which HTTP client this one sends through, in the order
+// the options declare: a client the caller supplied, then a transport built for
+// the site's TLS settings, then the default.
+//
+// Separated from New because the three cases and the recorder's chaining are one
+// decision with its own reasons, and New is otherwise a list of defaults.
+func (c *Client) dialThrough(opt Options) error {
+	if c.http == nil {
+		// A configured TLS client, or nil when nothing was configured and the
+		// default transport is the right answer. The error is returned rather
+		// than swallowed: a CA bundle that was named and then ignored produces
+		// the same verification failure the caller was trying to fix, with
+		// nothing to say the file was never read.
+		tlsClient, err := opt.TLS.httpClient()
+		if err != nil {
+			return err
+		}
+		c.http = tlsClient
+	}
+	if c.http == nil {
+		c.http = &http.Client{}
+	}
+	if opt.HTTPClient != nil || opt.RoundTripper == nil {
+		return nil
+	}
+
+	// A wrapper dials through whatever it was built on, and the recorder is
+	// built on the default transport because it is constructed before any of
+	// this is known. Left alone, a run that is both recording and talking to a
+	// site behind a private CA would send the recorder's requests through the
+	// default chain and drop the bundle silently, which is the same "named it
+	// and ignored it" failure tlsConfig refuses for the bundle itself.
+	if rec, ok := opt.RoundTripper.(*Recorder); ok {
+		rec.chainTo(c.http.Transport)
+	}
+	c.http = &http.Client{Transport: opt.RoundTripper}
+	return nil
 }
 
 // Requests returns how many HTTP calls this client has made, including retries.
