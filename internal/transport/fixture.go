@@ -218,6 +218,19 @@ func NewRecorder(next http.RoundTripper, deployment Deployment) *Recorder {
 	}
 }
 
+// chainTo points the recorder at a transport built after it was.
+//
+// The recorder is constructed before the site's TLS settings are known, so it
+// takes the default transport and this replaces it once there is something to
+// replace it with. It only ever moves off the default: a caller that named a
+// transport meant that one.
+func (r *Recorder) chainTo(next http.RoundTripper) {
+	if next == nil || r.next != http.DefaultTransport {
+		return
+	}
+	r.next = next
+}
+
 // RoundTrip implements http.RoundTripper.
 func (r *Recorder) RoundTrip(req *http.Request) (*http.Response, error) {
 	var reqBody []byte

@@ -313,6 +313,24 @@ do not catch, add the test in the same change and cite it here.
 
 ## Credentials and safety
 
+- **Certificate verification cannot be turned off, by any surface.** A private
+  CA is trusted with `--ca-bundle` and mTLS is answered with a client
+  certificate; skipping verification is not one of the legitimate needs, and
+  every tool that has shipped an `--insecure` has it in a wiki page somewhere as
+  the standard fix for a certificate problem. None of the header redaction, the
+  off-site URL refusal, or the relative-path rule survives a connection nobody
+  verified. Checked three ways, because there are three ways to reintroduce it:
+  a flag, an environment variable, and one line in a `tls.Config` literal.
+  **Enforced by:** `TestNothingCanDisableCertificateVerification`.
+- **A TLS setting that was named is used or refused, never ignored.** A CA
+  bundle that cannot be read fails the invocation rather than falling back to
+  the system roots, because the fallback produces the same verification error
+  the caller was trying to fix with nothing saying the file was never read. The
+  same holds for the recorder, which is built before the site's TLS settings are
+  known and is re-pointed at the configured chain rather than dialling around
+  it.
+  **Enforced by:** `TestABundleThatCannotBeReadIsRefusedRatherThanIgnored`,
+  `TestARecordingRunStillGoesThroughTheConfiguredChain`.
 - **Never log an Authorization, Cookie, or Proxy-Authorization header.**
   Redaction happens when a `transport.Event` is built, not when it is formatted,
   so a credential never reaches a Tracer and no future formatter can leak one.

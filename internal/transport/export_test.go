@@ -1,6 +1,11 @@
 package transport
 
-import "io"
+import (
+	"crypto/tls"
+	"crypto/x509"
+	"io"
+	"net/http"
+)
 
 // This file exists so a test can reach one unexported constructor, and it is
 // the first of its kind in this tree — which is worth a word, because the
@@ -57,3 +62,49 @@ func StreamBoundForTest(r io.ReadCloser) (limit int64, bounded bool) {
 // MaxUndeclaredStreamBytesForTest is the production ceiling, so a test asserts
 // the real number rather than a copy of it that can drift.
 const MaxUndeclaredStreamBytesForTest = maxUndeclaredStreamBytes
+
+// RootPool is the set of roots a client verifies against, or nil when it uses
+// the system default.
+//
+// The TLS assertions need to see the pool rather than a count of it: the
+// question is whether the bundle was *added* to the system roots or replaced
+// them, and x509.CertPool.Subjects cannot answer that — it omits the system
+// roots of a pool that came from SystemCertPool, so both arrangements count the
+// same.
+func RootPool(c *Client) *x509.CertPool {
+	cfg := clientTLSConfig(c)
+	if cfg == nil {
+		return nil
+	}
+	return cfg.RootCAs
+}
+
+// ClientCertificates is what a client would present when a server asks.
+func ClientCertificates(c *Client) []tls.Certificate {
+	cfg := clientTLSConfig(c)
+	if cfg == nil {
+		return nil
+	}
+	return cfg.Certificates
+}
+
+// HasCustomTransport reports whether New built a transport of its own rather
+// than leaving http.DefaultTransport in place, which is the common case and the
+// one worth not disturbing.
+func HasCustomTransport(c *Client) bool { return clientTLSConfig(c) != nil }
+
+// RecorderNext is the transport a recorder dials through, so a test can assert
+// that a recording run still goes through a configured TLS chain rather than
+// around it.
+func RecorderNext(r *Recorder) http.RoundTripper { return r.next }
+
+func clientTLSConfig(c *Client) *tls.Config {
+	if c == nil || c.http == nil {
+		return nil
+	}
+	t, ok := c.http.Transport.(*http.Transport)
+	if !ok {
+		return nil
+	}
+	return t.TLSClientConfig
+}
