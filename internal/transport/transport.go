@@ -363,20 +363,27 @@ func (c *Client) spend(attempt int, lastErr error) error {
 func (c *Client) retryNetwork(ctx context.Context, r Request, target *url.URL,
 	requestID string, attempt int, cause error,
 ) error {
-	if !shouldRetryNetworkError(ctx, r.Method, r.Replayable, cause) || attempt > c.retries {
+	retry, reason := shouldRetryNetworkError(ctx, r.Method, r.Replayable, cause)
+	if !retry || attempt > c.retries {
+		// The same decision settle reports, one layer up. A dropped connection
+		// on a POST is not replayed for the reason a 503 is not, and the trace
+		// has to say so in both places or the rule is only half held. That
+		// `attempt` already traced the network error does not cover it: the
+		// error is what happened, not what was decided about it.
+		c.traceNotRetried(r, target, requestID, attempt, 0, retry, reason)
 		return cause
 	}
-	return c.waitBeforeRetry(ctx, r, target, requestID, attempt, nil, 0, "network error")
+	return c.waitBeforeRetry(ctx, r, target, requestID, attempt, nil, 0, reason)
 }
 
 // waitBeforeRetry records the retry and sleeps for the backoff it earns.
 func (c *Client) waitBeforeRetry(ctx context.Context, r Request, target *url.URL,
 	requestID string, attempt int, header http.Header, status int, reason string,
 ) error {
-	wait := backoff(attempt, header, c.clock.Now(), c.jitter())
+	wait, asked := backoff(attempt, header, c.clock.Now(), c.jitter())
 	c.tracer.Trace(Event{
 		Kind: EventRetry, Method: r.Method, URL: RedactURL(target),
-		Status: status, Attempt: attempt, Wait: wait,
+		Status: status, Attempt: attempt, Wait: wait, Asked: asked,
 		RequestID: requestID, Reason: reason,
 	})
 	if err := c.clock.Sleep(ctx, wait); err != nil {
@@ -385,20 +392,51 @@ func (c *Client) waitBeforeRetry(ctx context.Context, r Request, target *url.URL
 	return nil
 }
 
-// settle finishes a response that will not be retried again.
+// traceNotRetried records why an exchange ended without another attempt.
+//
+// Two paths end one: a status settle will not replay, and a connection-level
+// failure retryNetwork will not. It is a single function because two copies of
+// it would be two places for the rule to stop being true.
+//
+// It used to hold on neither. The condition read `retry && reason != ""`, and
+// `retry` is exactly what is false when the policy declines. So the decision
+// that stops one `issue create` becoming two issues left a `--debug` trace
+// identical to a run where the policy was never consulted, despite having its
+// own invariant, its own tests, and a paragraph in the README. Somebody
+// debugging a create against a wobbling server saw one attempt where they
+// expected four, and had nothing to tell them it was on purpose.
+//
+// Three cases, and the empty reason is one of them rather than an oversight:
+//
+//   - retry is true: the attempts ran out while the status was still
+//     retryable, which is the budget and not the policy.
+//   - retry is false with a reason: the policy declined, and that is the case
+//     this exists for.
+//   - no reason: a plain 4xx, or a context the caller cancelled. Nothing was
+//     decided, so nothing is said.
+func (c *Client) traceNotRetried(r Request, target *url.URL, requestID string,
+	attempt, status int, retry bool, reason string,
+) {
+	if reason == "" {
+		return
+	}
+	if retry {
+		reason = "retry budget exhausted"
+	}
+	c.tracer.Trace(Event{
+		Kind: EventFailure, Method: r.Method, URL: RedactURL(target),
+		Status: status, Attempt: attempt, RequestID: requestID,
+		Reason: reason,
+	})
+}
+
+// settle finishes a response that will not be retried again, and says why it
+// will not be.
 func (c *Client) settle(r Request, target *url.URL, requestID string, attempt int,
 	resp *Response, retry bool, reason string,
 ) *Response {
 	resp.Attempts = attempt
-	if retry && reason != "" {
-		// The budget ran out while the status was still retryable. Report the
-		// status, not a retry error.
-		c.tracer.Trace(Event{
-			Kind: EventFailure, Method: r.Method, URL: RedactURL(target),
-			Status: resp.Status, Attempt: attempt, RequestID: requestID,
-			Reason: "retry budget exhausted",
-		})
-	}
+	c.traceNotRetried(r, target, requestID, attempt, resp.Status, retry, reason)
 	return resp
 }
 

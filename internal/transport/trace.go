@@ -29,14 +29,22 @@ const (
 // is the difference between a rule the debug formatter has to follow and a
 // rule it cannot break.
 type Event struct {
-	Kind      EventKind
-	Method    string
-	URL       string
-	Status    int
-	Header    http.Header
-	Attempt   int
-	Elapsed   time.Duration
-	Wait      time.Duration
+	Kind    EventKind
+	Method  string
+	URL     string
+	Status  int
+	Header  http.Header
+	Attempt int
+	Elapsed time.Duration
+	Wait    time.Duration
+	// Asked is the wait the server named in Retry-After, when it named one.
+	//
+	// It is separate from Wait because the two differ, and the difference is a
+	// decision rather than a rounding: a Retry-After of an hour is capped to
+	// maxDelay, so this client comes back 120 times sooner than it was told to.
+	// The cap is defensible, since one command must not become an hour-long
+	// hang. Being silent about it was not. Zero when the server named nothing.
+	Asked     time.Duration
 	RequestID string
 	Reason    string
 	Bytes     int
@@ -95,6 +103,13 @@ func (t *textTracer) Trace(e Event) {
 	}
 	if e.Wait > 0 {
 		fmt.Fprintf(&b, " wait=%s", e.Wait.Round(time.Millisecond))
+	}
+	// Only when it differs from what was waited. A server that asked for seven
+	// seconds and got seven is not a discrepancy, and printing it every time
+	// would make the line where it matters look like the ones where it does
+	// not.
+	if e.Asked > 0 && e.Asked != e.Wait {
+		fmt.Fprintf(&b, " asked=%s", e.Asked.Round(time.Millisecond))
 	}
 	if e.RequestID != "" {
 		fmt.Fprintf(&b, " request-id=%s", e.RequestID)

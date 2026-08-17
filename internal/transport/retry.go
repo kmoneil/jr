@@ -79,32 +79,52 @@ func shouldRetry(method string, status int, replayable bool) (bool, string) {
 
 // shouldRetryNetworkError decides whether a transport-level failure is worth
 // another attempt. A cancelled context never is.
-func shouldRetryNetworkError(ctx context.Context, method string, replayable bool, err error) bool {
+//
+// It returns a reason for the same purpose shouldRetry does: a decision this
+// client makes on the caller's behalf has to be reportable, and the reason is
+// how. An empty one means there was no policy decision, because the caller
+// stopped this. Saying "not retried" about a Ctrl-C would be noise.
+func shouldRetryNetworkError(
+	ctx context.Context, method string, replayable bool, err error,
+) (bool, string) {
 	if ctx.Err() != nil || errors.Is(err, context.Canceled) ||
 		errors.Is(err, context.DeadlineExceeded) {
-		return false
+		return false, ""
 	}
 	// A connection-level failure may have happened after the server accepted
 	// the request, so the same idempotency reasoning applies.
-	return idempotentMethods[method] || replayable
+	if idempotentMethods[method] || replayable {
+		return true, "network error"
+	}
+	return false, "non-idempotent request not replayed after a network error"
 }
 
 // backoff returns how long to wait before attempt n (1-based), honoring
-// Retry-After when the server sent one.
+// Retry-After when the server sent one, and what the server asked for.
 //
 // Jitter matters more than it looks: without it, every client throttled at the
 // same moment retries at the same moment, and the thundering herd re-creates
 // the overload that caused the 429.
-func backoff(attempt int, header http.Header, now time.Time, jitter float64) time.Duration {
+//
+// asked is the second return because wait is not always it. A Retry-After of an
+// hour is capped to maxDelay, which means retrying 120 times sooner than the
+// server instructed. That is a real decision, made on the caller's behalf, and
+// it used to be taken inside this function and forgotten there. The number the
+// server gave now leaves with the number this client chose, so the trace can
+// show both. It is zero when the server named none, which is every case where
+// there is no discrepancy to report.
+func backoff(
+	attempt int, header http.Header, now time.Time, jitter float64,
+) (wait, asked time.Duration) {
 	if d, ok := retryAfter(header, now); ok {
-		return min(d, maxDelay)
+		return min(d, maxDelay), d
 	}
 
 	exp := float64(baseDelay) * math.Pow(2, float64(attempt-1))
 	// Full jitter: uniform over [0, exp]. It spreads a herd better than
 	// adding a small fraction to a fixed delay.
 	d := time.Duration(exp * jitter)
-	return min(max(d, time.Millisecond), maxDelay)
+	return min(max(d, time.Millisecond), maxDelay), 0
 }
 
 // retryAfter parses the Retry-After header in either of its two forms: a count
