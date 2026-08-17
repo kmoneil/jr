@@ -116,6 +116,15 @@ func (s *session) connect(ctx context.Context) (*transport.Client, site.Info, er
 		MaxRequests: s.app.maxRequests,
 		UserAgent:   userAgent(),
 		Tracer:      s.app.tracer(),
+		// A private CA and a client certificate, from the context or the flag.
+		// The transport refuses what it cannot read rather than falling back to
+		// the system roots, so a bundle named here is used or the invocation
+		// fails saying why.
+		TLS: transport.TLSOptions{
+			CABundle:   s.resolved.CABundle,
+			ClientCert: s.resolved.ClientCert,
+			ClientKey:  s.resolved.ClientKey,
+		},
 	}
 	if rec != nil {
 		opts.RoundTripper = rec

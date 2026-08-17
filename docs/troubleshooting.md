@@ -530,6 +530,53 @@ would never be reported and never asked for again. This says the site answered
 that endpoint without a `serverTime`. There is no fallback to the local clock,
 which would be the guess the whole design exists to avoid.
 
+### `INVALID_CA_BUNDLE`
+
+The site is behind a TLS-intercepting proxy and the bundle you pointed at cannot
+be read, or holds no certificate this tool recognises.
+
+```console
+$ jr --ca-bundle /etc/ssl/corporate-root.pem issue list
+$ jr context edit onprem --ca-bundle /etc/ssl/corporate-root.pem
+$ export JIRA_CA_BUNDLE=/etc/ssl/corporate-root.pem
+```
+
+The file has to be PEM, the `-----BEGIN CERTIFICATE-----` form, rather than DER
+or a key. A bundle that cannot be read fails the invocation rather than falling
+back to the system roots, because that fallback produces the same verification
+error you were trying to fix with nothing saying the file was never read.
+
+**The bundle is added to the system roots, not swapped for them.** Trusting one
+more CA and trusting only one CA are different things, and the second breaks
+every public site on the same context.
+
+### `INCOMPLETE_CLIENT_CERT` / `INVALID_CLIENT_CERT`
+
+A client certificate is two files that have to agree. The first says you passed
+one and not the other; the second says the key does not belong to the
+certificate, or one of them is not PEM.
+
+```console
+$ jr context edit onprem --client-cert /etc/ssl/jira.pem --client-key /etc/ssl/jira.key
+```
+
+Both are refused here rather than at the handshake, where the error names the
+server and nothing names the file.
+
+### There is no `--insecure`
+
+Deliberately, and it is not coming. A private CA is trusted with `--ca-bundle`
+and mutual TLS is answered with a client certificate; those are the real needs
+behind corporate TLS. Turning verification off sends your credential to whoever
+answers the connection, and none of this tool's other guarantees — no credential
+in a log, no off-site URL, no absolute request path — mean anything on a
+connection nobody verified.
+
+If a certificate error is blocking you, the thing to find is the internal root
+your organisation signs with. It is usually already on the machine: on Linux,
+somewhere under `/etc/ssl/certs` or `/etc/pki`; on macOS, exportable from
+Keychain Access.
+
 ### `NO_ACCOUNT_TIMEZONE` / `UNKNOWN_ACCOUNT_TIMEZONE`
 
 An absolute `--since` on `jr issue activity` is a wall clock, and reading it

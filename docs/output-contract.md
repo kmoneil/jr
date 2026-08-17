@@ -397,6 +397,43 @@ the XML tree:
 
 TSV emits a header row and nothing else, no envelope, no counts, no site.
 
+### TLS, and what the context reports about it
+
+`context.get` and `context.list` moved to **v2** together, and everything the
+move added is optional: a consumer reading v1 reads v2 unchanged.
+
+- `ca-bundle`, `client-cert`, and `client-key` are **paths**, present only when
+  the context sets them. Absent means the system trust store and no client
+  certificate, which is every Cloud site and most Data Center ones; an attribute
+  restating that on every context would be noise on the common case. Nothing
+  here is a secret, and the path is what somebody has to check when a chain
+  fails.
+- `proxy` appears on the **effective** form only, from `HTTPS_PROXY` and
+  `NO_PROXY`. It is not a setting this tool has: the standard library has always
+  honored those variables, nothing said it was happening, and a request going
+  somewhere nobody chose looks like a fault at the site rather than a hop in
+  between. Any userinfo in it is stripped, on the same rule the trace applies to
+  a request URL.
+
+**There is no way to disable certificate verification.** Not a flag, not an
+environment variable, not a context setting. A private CA is trusted with
+`--ca-bundle` and mTLS is answered with a client certificate; those are the
+legitimate needs. Every tool that has shipped an `--insecure` has it in a wiki
+page somewhere as the standard fix for a certificate problem, and none of the
+header redaction, the off-site URL refusal, or the relative-path rule survives a
+connection nobody verified. It is stated here so it reads as a decision rather
+than an omission, and `TestNothingCanDisableCertificateVerification` is what
+keeps it one.
+
+**A TLS setting that was named is used or refused, never ignored.** A bundle
+that cannot be read, or that holds no certificate, exits 2 with
+`INVALID_CA_BUNDLE` naming the file. Falling back to the system roots would
+produce the same verification error the caller was trying to fix, with nothing
+saying the file was never read. Half a client certificate is
+`INCOMPLETE_CLIENT_CERT` and a key that does not match its certificate is
+`INVALID_CLIENT_CERT`, both refused before the request rather than at the
+handshake, where the error names the server instead of the file.
+
 ### Provenance
 
 `site` names the instance, because an answer outlives the shell that produced

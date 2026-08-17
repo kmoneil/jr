@@ -127,6 +127,15 @@ func contextSchema(resolved bool) *render.Schema {
 			// A one-way latch. Nothing in the output turns it off.
 			{Name: "readonly", Type: render.TypeBool},
 			{Name: "credential", Type: render.TypeString},
+			// The TLS settings, present only when the context sets them.
+			// Absent means the system trust store and no client certificate,
+			// which is every Cloud site and most Data Center ones, and an
+			// attribute stating that on every context would be noise on the
+			// common case. They are paths: nothing here is a secret, and the
+			// path is what somebody has to check when a chain fails.
+			{Name: "ca-bundle", Type: render.TypeString, Optional: true},
+			{Name: "client-cert", Type: render.TypeString, Optional: true},
+			{Name: "client-key", Type: render.TypeString, Optional: true},
 		},
 		Children: []render.Child{
 			{Schema: render.ListSchema("fields", "field",
@@ -141,7 +150,12 @@ func contextSchema(resolved bool) *render.Schema {
 			// Present only when --api-version or JIRA_API_VERSION forced one.
 			// Absent means the deployment probe decided, which is the case
 			// worth saying nothing about.
-			render.Field{Name: "api-version", Type: render.TypeInt, Optional: true})
+			render.Field{Name: "api-version", Type: render.TypeInt, Optional: true},
+			// The proxy the standard library would use for this site, from
+			// HTTPS_PROXY and NO_PROXY. It already worked and nothing said it
+			// was happening, which is its own class of confusion: a request
+			// going somewhere nobody chose looks like a network fault.
+			render.Field{Name: "proxy", Type: render.TypeString, Optional: true})
 		s.Children = append(s.Children,
 			render.Child{Schema: render.Leaf("config", render.TypeString)})
 	}
