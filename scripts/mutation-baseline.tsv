@@ -16,6 +16,30 @@
 # output contract, and site decides what a deployment is and resolves the names
 # every command takes. The sweep costs about four minutes on a developer
 # machine and considerably more on a runner, which is why it is scheduled.
-internal/jql	16	the only place a value is quoted; an unexercised branch is an injection
+#
+# `internal/jql` went 16 to 3 on 2026-08-17. Thirteen were killed by assertions
+# named in internal/jql/*_test.go; the three below are equivalent mutants, which
+# is a different claim from "no test notices" and is why they are written down
+# rather than left as a number somebody will try to lower.
+#
+#   date.go:367:12   `total > maxDuration-component`, boundary. The two forms
+#                    differ only when the sum lands exactly on MaxInt64
+#                    nanoseconds. Every unit in dateValueUnits is a whole number
+#                    of minutes, so every total is a multiple of 60e9, and
+#                    MaxInt64 is odd: the equality is unreachable by
+#                    construction rather than untested.
+#   token.go:217:10  `start+1 < len(src)`, the guard that reads two runes only
+#   token.go:217:13  when two remain. Both mutants make it read one rune past
+#                    the end at the end of a query. `src` is one `[]rune(query)`
+#                    and every lexer takes it whole with an index, so that rune
+#                    is allocator spare and reads as U+0000, which completes no
+#                    two-rune operator. The mutants differ from the original
+#                    only by an index-out-of-range panic when cap == len, and a
+#                    test that arranged that would be asserting Go's size
+#                    classes rather than this tokenizer.
+#
+# If one of those is ever killed honestly, delete its paragraph and lower the
+# count in the same change. The ledger only shrinks.
+internal/jql	3	the only place a value is quoted; an unexercised branch is an injection
 internal/render	13	the output contract itself, and the escaping rules under it
 internal/site	37	deployment detection, field and user resolution, the cache
