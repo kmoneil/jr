@@ -12,14 +12,19 @@ import (
 	"github.com/kmoneil/jr/internal/jctx"
 	"github.com/kmoneil/jr/internal/registry"
 	"github.com/kmoneil/jr/internal/render"
+	"github.com/kmoneil/jr/internal/transport"
 )
 
 // Output kinds owned by the context commands.
 const (
-	kindContextList    = "context.list"
-	kindContextGet     = "context.get"
-	versionContextList = 1
-	versionContextGet  = 1
+	kindContextList = "context.list"
+	kindContextGet  = "context.get"
+	// v2 on both: a context grew the TLS settings it can carry, and the
+	// effective form grew the proxy that was always in play and never stated.
+	// Every one of them is optional, so a consumer reading v1 reads v2
+	// unchanged, and the version moves because the shape did.
+	versionContextList = 2
+	versionContextGet  = 2
 )
 
 func (a *app) contextCommands() []*registry.Command {
@@ -82,6 +87,19 @@ Credentials are not stored here. Store one with "` + buildinfo.App + ` auth logi
 				Name: "readonly", Type: registry.TypeBool,
 				Usage: "refuse every command that would change Jira",
 			},
+			{
+				Name: "ca-bundle", Type: registry.TypeString,
+				Usage: "PEM file of certificates to trust in addition to the " +
+					"system roots, for a site behind a TLS-intercepting proxy",
+			},
+			{
+				Name: "client-cert", Type: registry.TypeString,
+				Usage: "PEM certificate to present when the site asks for one",
+			},
+			{
+				Name: "client-key", Type: registry.TypeString,
+				Usage: "key for --client-cert; both are needed or neither",
+			},
 		},
 		LocalState: true,
 		Outputs:    []registry.Output{{Kind: kindContextGet, Version: versionContextGet}},
@@ -104,6 +122,9 @@ func (a *app) runContextCreate(_ context.Context, inv *registry.Invocation) (*re
 		Fields:     inv.Flags.StringSlice("field"),
 		Credential: inv.Flags.String("credential"),
 		ReadOnly:   inv.Flags.Bool("readonly"),
+		CABundle:   inv.Flags.String("ca-bundle"),
+		ClientCert: inv.Flags.String("client-cert"),
+		ClientKey:  inv.Flags.String("client-key"),
 	}
 	if err := cfg.Set(name, ctx); err != nil {
 		return nil, err
@@ -121,7 +142,10 @@ func (a *app) runContextCreate(_ context.Context, inv *registry.Invocation) (*re
 // Site is not among them. A context without a site is not a context with one
 // fewer setting; it is one that cannot be used, and deleting it is the honest
 // way to say so.
-var unsettable = []string{"project", "board", "field", "credential", "readonly"}
+var unsettable = []string{
+	"project", "board", "field", "credential", "readonly",
+	"ca-bundle", "client-cert", "client-key",
+}
 
 func (a *app) contextEditCommand() *registry.Command {
 	return &registry.Command{
@@ -172,6 +196,19 @@ where it happens rather than by deleting and re-creating it.`),
 			{
 				Name: "readonly", Type: registry.TypeBool,
 				Usage: "refuse every command that would change Jira",
+			},
+			{
+				Name: "ca-bundle", Type: registry.TypeString,
+				Usage: "PEM file of certificates to trust in addition to the " +
+					"system roots, for a site behind a TLS-intercepting proxy",
+			},
+			{
+				Name: "client-cert", Type: registry.TypeString,
+				Usage: "PEM certificate to present when the site asks for one",
+			},
+			{
+				Name: "client-key", Type: registry.TypeString,
+				Usage: "key for --client-cert; both are needed or neither",
 			},
 			{
 				Name: "unset", Type: registry.TypeEnum, Enum: unsettable, Repeatable: true,
@@ -227,7 +264,10 @@ func validateContextEdit(_ context.Context, inv *registry.Invocation) error {
 }
 
 func editTouchesTheContext(inv *registry.Invocation) bool {
-	for _, name := range []string{"site", "project", "board", "credential"} {
+	for _, name := range []string{
+		"site", "project", "board", "credential",
+		"ca-bundle", "client-cert", "client-key",
+	} {
 		if inv.Flags.String(name) != "" {
 			return true
 		}
@@ -249,19 +289,38 @@ func (a *app) runContextEdit(_ context.Context, inv *registry.Invocation) (*rend
 		return nil, unknownContext(cfg, name)
 	}
 
-	// Only what was named. Everything absent from the invocation keeps the
-	// value it already had, which is the entire point of this command.
-	if v := inv.Flags.String("site"); v != "" {
-		ctx.Site = v
+	applyContextEdits(&ctx, inv)
+	clearContextSettings(&ctx, inv.Flags.StringSlice("unset"))
+
+	if err := cfg.Set(name, ctx); err != nil {
+		return nil, err
 	}
-	if v := inv.Flags.String("project"); v != "" {
-		ctx.Project = v
+	if err := cfg.Save(); err != nil {
+		return nil, err
 	}
-	if v := inv.Flags.String("board"); v != "" {
-		ctx.Board = v
-	}
-	if v := inv.Flags.String("credential"); v != "" {
-		ctx.Credential = v
+
+	saved, _ := cfg.Get(name)
+	return contextDoc(name, saved, cfg.Current == name, cfg.Path()), nil
+}
+
+// applyContextEdits sets only what the invocation named. Everything absent
+// keeps the value it already had, which is the entire point of this command.
+func applyContextEdits(ctx *jctx.Context, inv *registry.Invocation) {
+	for _, f := range []struct {
+		name string
+		set  func(string)
+	}{
+		{"site", func(v string) { ctx.Site = v }},
+		{"project", func(v string) { ctx.Project = v }},
+		{"board", func(v string) { ctx.Board = v }},
+		{"credential", func(v string) { ctx.Credential = v }},
+		{"ca-bundle", func(v string) { ctx.CABundle = v }},
+		{"client-cert", func(v string) { ctx.ClientCert = v }},
+		{"client-key", func(v string) { ctx.ClientKey = v }},
+	} {
+		if v := inv.Flags.String(f.name); v != "" {
+			f.set(v)
+		}
 	}
 	if v := inv.Flags.StringSlice("field"); len(v) > 0 {
 		ctx.Fields = v
@@ -269,8 +328,12 @@ func (a *app) runContextEdit(_ context.Context, inv *registry.Invocation) (*rend
 	if inv.Flags.Bool("readonly") {
 		ctx.ReadOnly = true
 	}
+}
 
-	for _, name := range inv.Flags.StringSlice("unset") {
+// clearContextSettings applies --unset. The names are the ones `unsettable`
+// declares, and validateContextEdit has already refused anything else.
+func clearContextSettings(ctx *jctx.Context, unset []string) {
+	for _, name := range unset {
 		switch name {
 		case "project":
 			ctx.Project = ""
@@ -282,18 +345,14 @@ func (a *app) runContextEdit(_ context.Context, inv *registry.Invocation) (*rend
 			ctx.Credential = ""
 		case "readonly":
 			ctx.ReadOnly = false
+		case "ca-bundle":
+			ctx.CABundle = ""
+		case "client-cert":
+			ctx.ClientCert = ""
+		case "client-key":
+			ctx.ClientKey = ""
 		}
 	}
-
-	if err := cfg.Set(name, ctx); err != nil {
-		return nil, err
-	}
-	if err := cfg.Save(); err != nil {
-		return nil, err
-	}
-
-	saved, _ := cfg.Get(name)
-	return contextDoc(name, saved, cfg.Current == name, cfg.Path()), nil
 }
 
 func (a *app) contextListCommand() *registry.Command {
@@ -497,7 +556,10 @@ func contextNode(name string, ctx jctx.Context, current bool) *render.Node {
 		Attr("project", ctx.Project).
 		Attr("board", ctx.Board).
 		Attr("readonly", strconv.FormatBool(ctx.ReadOnly)).
-		Attr("credential", ctx.CredentialRef())
+		Attr("credential", ctx.CredentialRef()).
+		AttrIf("ca-bundle", ctx.CABundle).
+		AttrIf("client-cert", ctx.ClientCert).
+		AttrIf("client-key", ctx.ClientKey)
 
 	fields := make([]*render.Node, 0, len(ctx.Fields))
 	for _, f := range ctx.Fields {
@@ -524,7 +586,13 @@ func resolvedDoc(r *jctx.Resolved, configPath string) *render.Doc {
 		Attr("board", r.Board).
 		Attr("readonly", strconv.FormatBool(r.ReadOnly)).
 		Attr("credential", r.CredentialRef).
-		Attr("effective", "true")
+		Attr("effective", "true").
+		AttrIf("ca-bundle", r.CABundle).
+		AttrIf("client-cert", r.ClientCert).
+		AttrIf("client-key", r.ClientKey).
+		// What is in effect rather than what was configured, which for the
+		// proxy is the whole difference: nobody configured it here.
+		AttrIf("proxy", transport.ProxyFor(r.Site))
 	if r.APIVersion != 0 {
 		// Only when forced. An absent attribute means the probe decided, which
 		// is the case worth saying nothing about.

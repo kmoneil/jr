@@ -81,6 +81,11 @@ var notAJrFlag = map[string]string{
 		"not have, because nothing emits ANSI and it would do nothing",
 	"--token": "README.md names it as the flag that cannot exist, because a " +
 		"token in a flag value reaches the shell history and the process list",
+	"--insecure": "docs/troubleshooting.md names it as the flag this tool " +
+		"refuses to have, under a heading saying so, because somebody hitting " +
+		"a certificate error will look for it first and has to be told what to " +
+		"reach for instead. TestNothingCanDisableCertificateVerification is " +
+		"what keeps the absence true",
 }
 
 // inlineLink strips a markdown link target, which is not prose and is where a

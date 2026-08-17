@@ -85,6 +85,8 @@ and go to stderr.`),
 		"board id, overriding the context's")
 	root.PersistentFlags().StringVar(&a.apiVersion, "api-version", "",
 		"force the REST version, 2 or 3, and skip the deployment probe")
+	root.PersistentFlags().StringVar(&a.caBundle, "ca-bundle", "",
+		"PEM file of certificates to trust in addition to the system roots")
 	root.PersistentFlags().BoolVar(&a.readOnly, "readonly", false,
 		"refuse any command that would change Jira")
 	root.PersistentFlags().BoolVar(&a.debug, "debug", false,

@@ -4,8 +4,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"net/http"
+	"net/url"
 	"os"
-	"time"
+	"strings"
 
 	"github.com/kmoneil/jr/internal/errs"
 )
@@ -29,7 +30,8 @@ import (
 // invocations.
 //
 // There is no field here for skipping verification, and there is no flag, env
-// var, or context setting for it either. See TestNothingCanDisableVerification.
+// var, or context setting for it either. See
+// TestNothingCanDisableCertificateVerification in internal/lint.
 type TLSOptions struct {
 	// CABundle is a PEM file of certificates to trust **in addition to** the
 	// system roots.
@@ -172,24 +174,38 @@ func (o TLSOptions) clientCertificate() (tls.Certificate, error) {
 	return cert, nil
 }
 
-// Expiry reports when the client certificate stops being usable, and whether
-// there is one at all.
+// ProxyFor reports the proxy the standard library would use for this site, or
+// empty when it would go direct.
 //
-// It is here so `context show` and the environment report can say it. A client
-// certificate that expired yesterday fails as a TLS handshake error from the
-// server's side, which is the least searchable failure this feature can
-// produce: nothing in it names the file, the context, or the date.
-func (o TLSOptions) Expiry() (time.Time, bool) {
-	if o.ClientCert == "" || o.ClientKey == "" {
-		return time.Time{}, false
+// It exists because the proxy already worked and nothing said it was happening.
+// HTTPS_PROXY and NO_PROXY are honored by http.DefaultTransport, so a request
+// can be going somewhere nobody in this tool chose, and from the outside that
+// looks like a network fault at the site rather than a hop in between. A
+// connection this tool cannot describe is the part of the transport's
+// guarantees that nothing here can assert.
+//
+// The URL is the caller's site. A malformed one reports no proxy rather than an
+// error: this is a line in a report about the connection, and failing the
+// report because the site is unparseable would replace a useful answer about
+// everything else with a complaint the caller has already been given.
+func ProxyFor(siteURL string) string {
+	if strings.TrimSpace(siteURL) == "" {
+		return ""
 	}
-	cert, err := tls.LoadX509KeyPair(o.ClientCert, o.ClientKey)
-	if err != nil || len(cert.Certificate) == 0 {
-		return time.Time{}, false
+	u, err := url.Parse(siteURL)
+	if err != nil || u.Host == "" {
+		return ""
 	}
-	leaf, err := x509.ParseCertificate(cert.Certificate[0])
-	if err != nil {
-		return time.Time{}, false
+	base, ok := http.DefaultTransport.(*http.Transport)
+	if !ok || base.Proxy == nil {
+		return ""
 	}
-	return leaf.NotAfter, true
+	proxy, err := base.Proxy(&http.Request{URL: u, Header: http.Header{}})
+	if err != nil || proxy == nil {
+		return ""
+	}
+	// Redacted: a proxy URL can carry userinfo, and this string goes to stdout
+	// as data. The same rule the trace applies to a request URL.
+	proxy.User = nil
+	return proxy.String()
 }

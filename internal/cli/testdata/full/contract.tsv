@@ -3,8 +3,8 @@ auth.status	2	auth.login,auth.logout,auth.status
 auth.token	1	auth.token
 board.get	1	board.get
 board.list	1	board.list
-context.get	1	context.create,context.delete,context.edit,context.show,context.use
-context.list	1	context.list
+context.get	2	context.create,context.delete,context.edit,context.show,context.use
+context.list	2	context.list
 contract	2	contract
 dry-run	2	epic.add,epic.remove,issue.assign,issue.attachment.upload,issue.clone,issue.comment.add,issue.comment.delete,issue.comment.edit,issue.create,issue.delete,issue.edit,issue.link.add,issue.link.remove,issue.move,issue.watch,issue.worklog.add,issue.worklog.delete,sprint.add,sprint.close,sprint.create,sprint.start
 epic.add	2	epic.add

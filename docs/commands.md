@@ -408,10 +408,13 @@ jr context create audit --site your-site.atlassian.net --readonly
 | `--field` | `string` | — | default field to request; repeat for several (repeatable) |
 | `--credential` | `string` | — | credential key to use, if not the site's host |
 | `--readonly` | `bool` | — | refuse every command that would change Jira |
+| `--ca-bundle` | `string` | — | PEM file of certificates to trust in addition to the system roots, for a site behind a TLS-intercepting proxy |
+| `--client-cert` | `string` | — | PEM certificate to present when the site asks for one |
+| `--client-key` | `string` | — | key for --client-cert; both are needed or neither |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `context.get` | v1 | always |
+| `context.get` | v2 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND
 
@@ -448,7 +451,7 @@ jr context delete work --yes
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `context.get` | v1 | always |
+| `context.get` | v2 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND, `10` BLOCKED
 
@@ -504,11 +507,14 @@ jr context edit work --unset board --unset field
 | `--field` | `string` | — | default field to request; replaces the whole set (repeatable) |
 | `--credential` | `string` | — | credential key to use, if not the site's host |
 | `--readonly` | `bool` | — | refuse every command that would change Jira |
-| `--unset` | `project\|board\|field\|credential\|readonly` | — | clear a setting; repeat for several (repeatable) |
+| `--ca-bundle` | `string` | — | PEM file of certificates to trust in addition to the system roots, for a site behind a TLS-intercepting proxy |
+| `--client-cert` | `string` | — | PEM certificate to present when the site asks for one |
+| `--client-key` | `string` | — | key for --client-cert; both are needed or neither |
+| `--unset` | `project\|board\|field\|credential\|readonly\|ca-bundle\|client-cert\|client-key` | — | clear a setting; repeat for several (repeatable) |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `context.get` | v1 | always |
+| `context.get` | v2 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND
 
@@ -537,7 +543,7 @@ jr context list
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `context.list` | v1 | always |
+| `context.list` | v2 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL
 
@@ -569,7 +575,7 @@ jr context show --project OPS
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `context.get` | v1 | always |
+| `context.get` | v2 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND
 
@@ -598,7 +604,7 @@ jr context use work
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `context.get` | v1 | always |
+| `context.get` | v2 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND
 

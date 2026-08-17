@@ -208,9 +208,10 @@ jr version | schema | contract | skill | completion
 Global: `--format tsv|xml|json|yaml`, plus `markdown` in a build with the
 `render` tag, for reading and never for parsing. Also `--context`, `--site`,
 `--project`, `--board`, `--readonly`, `--describe`, `--debug`, `--refresh`,
-`--retries`, `--max-requests`, `--api-version`, and `--limit` on collections.
-`JIRA_FORMAT`, `JIRA_CONTEXT`, `JIRA_SITE`, `JIRA_PROJECT`, `JIRA_BOARD`, and
-`JIRA_READONLY` set the same things from the environment.
+`--retries`, `--max-requests`, `--api-version`, `--ca-bundle`, and `--limit` on
+collections. `JIRA_FORMAT`, `JIRA_CONTEXT`, `JIRA_SITE`, `JIRA_PROJECT`,
+`JIRA_BOARD`, `JIRA_READONLY`, and `JIRA_CA_BUNDLE` set the same things from the
+environment.
 
 ```console
 $ jr schema --limit 3; echo "exit $?"

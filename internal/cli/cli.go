@@ -48,6 +48,7 @@ type app struct {
 	project     string
 	board       string
 	apiVersion  string
+	caBundle    string
 	readOnly    bool
 	debug       bool
 	refresh     bool

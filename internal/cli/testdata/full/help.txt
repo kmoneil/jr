@@ -34,6 +34,7 @@ Available Commands:
 Flags:
       --api-version string   force the REST version, 2 or 3, and skip the deployment probe
       --board string         board id, overriding the context's
+      --ca-bundle string     PEM file of certificates to trust in addition to the system roots
       --context string       use this context for one invocation, without selecting it
       --contract             dump the machine-readable output contract for every kind
       --debug                trace HTTP requests to stderr; credentials are redacted in the transport

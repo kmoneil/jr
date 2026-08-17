@@ -19,6 +19,10 @@ const (
 	// EnvAPIVersion forces the REST version for every command in a shell, which
 	// is the only bearable way to work with an instance whose probe cannot run.
 	EnvAPIVersion = "JIRA_API_VERSION"
+	// EnvCABundle is --ca-bundle for a whole shell, which is what a CI job
+	// wants: the bundle is a property of the network the job runs on rather
+	// than of any one command.
+	EnvCABundle = "JIRA_CA_BUNDLE"
 )
 
 // Overrides are the per-invocation flag values that take precedence over the
@@ -33,6 +37,13 @@ type Overrides struct {
 	ReadOnly bool
 	// APIVersion forces the REST version, skipping the deployment probe.
 	APIVersion string
+	// CABundle is --ca-bundle, overriding the context's.
+	//
+	// There is no override for the client certificate: a certificate and its
+	// key are two paths that have to agree, and a flag that set one of them
+	// while the context supplied the other is a combination nobody meant. They
+	// are a context setting only.
+	CABundle string
 }
 
 // Resolved is the effective configuration for one invocation.
@@ -59,6 +70,17 @@ type Resolved struct {
 	// APIVersion is the REST version an operator forced, or zero for the
 	// probe's answer. See site.Declare for why a declaration is not a guess.
 	APIVersion int
+
+	// CABundle, ClientCert and ClientKey are the TLS settings in effect. See
+	// Context for why they are paths and why they are per context.
+	CABundle   string
+	ClientCert string
+	ClientKey  string
+
+	// CABundleSource says where CABundle came from, on the same terms as
+	// SiteSource: a chain that fails to verify is the least searchable failure
+	// this tool has, and "which bundle, from where" is the first question.
+	CABundleSource Source
 
 	// SiteSource says where Site came from, so an error about it can be acted
 	// on without a second command.
@@ -131,6 +153,11 @@ func Resolve(cfg *Config, over Overrides, getenv Getenv) (*Resolved, error) {
 		// Read-only latches on from any source and never off.
 		ReadOnly:      over.ReadOnly || truthy(getenv(EnvReadOnly)) || ctx.ReadOnly,
 		CredentialRef: ctx.Credential,
+
+		CABundle:       firstNonEmpty(over.CABundle, getenv(EnvCABundle), ctx.CABundle),
+		CABundleSource: sourceOf(over.CABundle, getenv(EnvCABundle), ctx.CABundle),
+		ClientCert:     ctx.ClientCert,
+		ClientKey:      ctx.ClientKey,
 	}
 
 	// Fields come from the context and from nowhere else at this layer.

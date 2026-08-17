@@ -61,6 +61,7 @@ func (a *app) resolve(cfg *jctx.Config) (*jctx.Resolved, error) {
 		Board:      a.board,
 		APIVersion: a.apiVersion,
 		ReadOnly:   a.readOnly,
+		CABundle:   a.caBundle,
 	}, a.getenv)
 }
 

@@ -3,8 +3,8 @@ auth.status	2	auth.login,auth.logout,auth.status
 auth.token	1	auth.token
 board.get	1	board.get
 board.list	1	board.list
-context.get	1	context.create,context.delete,context.edit,context.show,context.use
-context.list	1	context.list
+context.get	2	context.create,context.delete,context.edit,context.show,context.use
+context.list	2	context.list
 contract	2	contract
 epic.get	1	epic.get
 epic.list	1	epic.list

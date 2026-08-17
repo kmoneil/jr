@@ -35,6 +35,26 @@ type Context struct {
 	// ReadOnly bakes read-only mode into the context. It is a one-way latch:
 	// see Resolved.ReadOnly.
 	ReadOnly bool `toml:"readonly,omitempty"`
+
+	// CABundle is a PEM file of certificates to trust in addition to the
+	// system roots, for a site behind a TLS-intercepting proxy.
+	//
+	// Per context rather than per machine, because one login and many contexts
+	// is the model: somebody with a Cloud site and a Data Center site behind an
+	// internal CA would otherwise have to change their environment between
+	// invocations. SSL_CERT_FILE is the environment's answer and it is global,
+	// works by accident of Go's behaviour on Linux, and does not work at all on
+	// macOS.
+	CABundle string `toml:"ca-bundle,omitempty"`
+	// ClientCert and ClientKey are a PEM certificate and its key, presented
+	// when the server asks for one. Data Center behind mTLS is ordinary in
+	// regulated environments.
+	//
+	// Paths rather than contents, deliberately: a key belongs in a file with
+	// the permissions its owner chose, and config.toml is the file this project
+	// tells people is safe to keep in a dotfiles repository.
+	ClientCert string `toml:"client-cert,omitempty"`
+	ClientKey  string `toml:"client-key,omitempty"`
 }
 
 // nameFormat is what a context may be called. It is deliberately narrow: a
