@@ -15,6 +15,18 @@
 #
 # The timeout coefficient is not a tuning knob, it is a correctness fix. See
 # TIMEOUT_COEFFICIENT below.
+#
+# Two failures live here and they are not the same failure, so they do not share
+# an exit code:
+#
+#   0  every package matched its baseline
+#   1  a count disagreed with the baseline, in either direction
+#   2  no count could be produced, so nothing was compared
+#
+# The distinction is for whoever reads the report. A 1 is a finding about the
+# tests and somebody writes one or lowers a number. A 2 is a finding about the
+# run, and saying anything about the tests on the strength of it would be this
+# script inventing a result it does not have.
 set -euo pipefail
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -35,14 +47,15 @@ TIMEOUT_COEFFICIENT=${TIMEOUT_COEFFICIENT:-60}
 
 if [ ! -x "$gremlins" ]; then
 	echo "no gremlins at $gremlins. Run 'make tools', or set GREMLINS." >&2
-	exit 1
+	exit 2
 fi
 if [ ! -f "$baseline" ]; then
 	echo "no baseline at $baseline" >&2
-	exit 1
+	exit 2
 fi
 
-status=0
+moved=0
+broken=0
 printf '%-24s %8s %8s %s\n' package lived baseline verdict
 
 while IFS=$'\t' read -r pkg want _note; do
@@ -58,19 +71,19 @@ while IFS=$'\t' read -r pkg want _note; do
 	# not build its own mutants reports itself.
 	got=$(printf '%s\n' "$out" | sed -n 's/.*Lived: \([0-9]*\).*/\1/p' | tail -1)
 	if [ -z "$got" ]; then
-		printf '%-24s %8s %8s %s\n' "$pkg" "?" "$want" "no summary: the run failed"
+		printf '%-24s %8s %8s %s\n' "$pkg" "?" "$want" "NO COUNT: the run produced no summary"
 		printf '%s\n' "$out" | tail -20 >&2
-		status=1
+		broken=1
 		continue
 	fi
 
 	verdict=ok
 	if [ "$got" -gt "$want" ]; then
 		verdict="REGRESSED: $((got - want)) more mutant(s) survive"
-		status=1
+		moved=1
 	elif [ "$got" -lt "$want" ]; then
 		verdict="IMPROVED: lower the baseline to $got in this change"
-		status=1
+		moved=1
 	fi
 	printf '%-24s %8s %8s %s\n' "$pkg" "$got" "$want" "$verdict"
 
@@ -81,4 +94,11 @@ while IFS=$'\t' read -r pkg want _note; do
 	fi
 done <"$baseline"
 
-exit "$status"
+# A sweep that could not measure a package outranks one that measured a move,
+# because the headline it earns is different: the counts this run does have are
+# a partial sweep's counts, and the first thing to fix is that it ran at all.
+# Both are in the table either way.
+if [ "$broken" -eq 1 ]; then
+	exit 2
+fi
+exit "$moved"

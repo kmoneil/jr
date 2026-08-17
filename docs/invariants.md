@@ -214,6 +214,19 @@ do not catch, add the test in the same change and cite it here.
   reported no targets in `internal/workflow` and swept happily over code it could
   not compile. A green sweep that ran nothing is worse than no sweep.
   **Enforced by:** `TestTheDocumentedFuzzCountsAreTheOnesInTheTree`.
+- **A scheduled sweep reports what it measured, not what it was built to
+  find.** `if: failure()` fires for a finding, for a tool that could not run,
+  and for a runner that was reclaimed. The weekly mutation sweep's first
+  scheduled run was the third of those, and it filed an issue saying the
+  baseline had moved against a run that compared nothing to anything. Its sweep
+  step also piped `make mutate` into `tee` under a shell with no `pipefail`, so
+  a real finding would have gone green. `scripts/mutate.sh` now gives a moved
+  count and an unmeasurable one different exit codes, and the workflow titles
+  the issue from the verdict the sweep recorded rather than from the fact that
+  the job went red.
+  **Enforced by:** `TestTheMutationSweepExitCodesSayWhichFailureItWas`,
+  `TestTheMutationWorkflowKeepsTheSweepsOwnStatus`,
+  `TestTheMutationReportNamesWhatActuallyFailed`.
 
 ## Credentials and safety
 

@@ -40,6 +40,12 @@ jobs:
     # a sweep killed halfway reports fewer mutants tried, and this is a job
     # whose whole output is a count.
     timeout-minutes: 60
+    outputs:
+      # What the sweep decided, as opposed to whether the job survived. These
+      # two are not the same fact and the report job needs the first one; see
+      # the note on `report` below for what happened when it read the second.
+      verdict: ${{ steps.sweep.outputs.verdict }}
+      table: ${{ steps.sweep.outputs.table }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
@@ -50,8 +56,34 @@ jobs:
       # anybody changing a test.
       - name: gremlins
         run: go install github.com/go-gremlins/gremlins/cmd/gremlins@$(make -s print-GREMLINS_VERSION)
+      # PIPESTATUS, not the pipeline's status, and the reason is that a `run:`
+      # block is `bash -e {0}` with no pipefail. `make mutate | tee` exits with
+      # tee's zero, so as first written this step could not go red on a moved
+      # baseline at all: the sweep's own exit code was discarded one character
+      # after it was produced. The only red it ever produced was the runner
+      # being reclaimed underneath it on 2026-08-17.
       - name: sweep
-        run: make mutate | tee mutation.log
+        id: sweep
+        run: |
+          set +e
+          make mutate | tee mutation.log
+          status=${PIPESTATUS[0]}
+          case "$status" in
+            0) verdict=matched ;;
+            1) verdict=moved ;;
+            2) verdict=broken ;;
+            *) verdict=broken ;;
+          esac
+          # The verdict rows, without the per-survivor lines indented under
+          # them: four lines somebody reads in an issue body. The artifact
+          # below carries every survivor by file, line, and mutator.
+          {
+            echo "verdict=$verdict"
+            echo "table<<END_OF_MUTATION_TABLE"
+            grep -v '^ ' mutation.log | grep -v '^END_OF_MUTATION_TABLE$'
+            echo "END_OF_MUTATION_TABLE"
+          } >> "$GITHUB_OUTPUT"
+          exit "$status"
       # The log carries the file, line, and mutator of every survivor, which is
       # the part somebody acts on. Kept whether the run passed or failed,
       # because the standing list is what the next test is written from.
@@ -63,6 +95,17 @@ jobs:
           path: mutation.log
           if-no-files-found: warn
 
+  # `failure()` is the trigger and it is not the finding. It fires for a moved
+  # baseline, for a sweep that could not build a mutant, and for a runner that
+  # went away, and the first scheduled run of this workflow was the third of
+  # those: SIGTERM 80 seconds in, after the header row and before a single
+  # package finished. The report said "the weekly sweep moved off its baseline"
+  # and linked an artifact the dead runner never uploaded. Nothing had been
+  # compared to anything.
+  #
+  # So the trigger stays failure() and the claim comes from what the sweep
+  # recorded about itself. An empty verdict is its own report: the step did not
+  # live long enough to write one.
   report:
     name: report a regression
     needs: mutate
@@ -88,16 +131,41 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA: ${{ github.sha }}
+          VERDICT: ${{ needs.mutate.outputs.verdict }}
+          TABLE: ${{ needs.mutate.outputs.table }}
         run: |
+          case "$VERDICT" in
+            moved)
+              title="mutation: the weekly sweep moved off its baseline"
+              detail="A package's surviving-mutant count did not match scripts/mutation-baseline.tsv. More mutants surviving means a test stopped noticing a change it used to catch. Fewer means somebody wrote one and the baseline owes an update in the same change."
+              ;;
+            broken)
+              title="mutation: the weekly sweep could not produce a count"
+              detail="A package produced no summary line, which is how gremlins reports that it could not build or run its mutants. This says nothing about the tests in that package. It says the sweep did not measure them, so no count from this run is a count."
+              ;;
+            *)
+              title="mutation: the weekly sweep did not finish"
+              detail="The sweep recorded no verdict, so the job ended before make mutate returned. A reclaimed runner and an exhausted timeout both land here. Nothing was compared against scripts/mutation-baseline.tsv, and no conclusion about the tests follows from this run."
+              ;;
+          esac
+
+          if [ -n "$TABLE" ]; then
+            table=$(printf '```\n%s\n```' "$TABLE")
+          else
+            table="The sweep wrote no verdict table."
+          fi
+
           gh issue create \
             --repo "${{ github.repository }}" \
-            --title "mutation: the weekly sweep moved off its baseline" \
+            --title "$title" \
             --label mutation \
             --body "$(printf '%s\n' \
-              "The weekly mutation sweep did not match scripts/mutation-baseline.tsv on ${{ github.sha }}." \
+              "$detail" \
               "" \
+              "Commit: $SHA" \
               "Run: $RUN" \
               "" \
-              "More mutants surviving means a test stopped noticing a change it used to catch." \
-              "Fewer means somebody wrote one and the baseline owes an update in the same change." \
-              "The mutation-report artifact lists every survivor by file, line, and mutator.")"
+              "$table" \
+              "" \
+              "When the sweep got far enough to write one, the mutation-report artifact on that run lists every survivor by file, line, and mutator.")"
