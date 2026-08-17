@@ -227,6 +227,16 @@ do not catch, add the test in the same change and cite it here.
   **Enforced by:** `TestTheMutationSweepExitCodesSayWhichFailureItWas`,
   `TestTheMutationWorkflowKeepsTheSweepsOwnStatus`,
   `TestTheMutationReportNamesWhatActuallyFailed`.
+- **A mutant runs under a memory bound, because some of them do not
+  terminate.** Four mutants of `internal/jql/token.go` turn its scan loop into
+  an unbounded append, and gremlins' per-mutant timeout is the coefficient times
+  a measured suite time that includes a cold build: 1.74s on a runner against
+  79.77ms locally, so the same mutant gets 104 seconds there rather than 4.8 and
+  takes the machine. `scripts/mutate.sh` caps the address space of `go` through
+  a PATH shim, not of its own shell, because capping the shell caps gremlins,
+  which sizes itself from `NumCPU` and then dies copying the source tree per
+  worker. The bound is on the children that run away.
+  **Enforced by:** `TestTheMutationSweepBoundsARunawayMutant`.
 
 ## Credentials and safety
 

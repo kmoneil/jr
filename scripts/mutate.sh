@@ -54,6 +54,73 @@ if [ ! -f "$baseline" ]; then
 	exit 2
 fi
 
+# A mutant that does not terminate is not hypothetical. Four of them live in
+# internal/jql/token.go, whose scan loop carries no post statement, so every
+# case advances `i` itself. INCREMENT_DECREMENT flips one of those `i++` to
+# `i--`, it oscillates against the unmutated `i++` in a neighbouring case, and
+# `out = append(out, ...)` grows on every cycle forever.
+#
+# Gremlins handles those correctly on its own terms: the per-mutant timeout
+# fires and the mutant is recorded as timed out. What it cannot do is survive
+# the wait. That timeout is the coefficient times the measured suite time, and
+# the measurement is of a cold build as much as of a suite: 1.74 seconds on a CI
+# runner against 79.77 milliseconds here. The same mutant therefore gets about
+# 104 seconds there rather than 4.8, which is enough to take sixteen gigabytes
+# and the machine with them. It killed three scheduled sweeps, and every arm of
+# a probe that tried to fix it by lowering the worker count, one worker
+# included: a single runaway is sufficient.
+#
+# So the bound belongs on the process and not on the concurrency. Measured on
+# arm64 and amd64 alike, and the floor is sharp because thread stacks count
+# against this limit: below 3 GiB the Go runtime cannot start, dying with
+# "pthread_create failed: Resource temporarily unavailable" before any mutant
+# runs. At 3 GiB a runner completed the sweep for the first time, reporting
+# Killed: 203, Lived: 16, Timed out: 0 and never dropping below 11.8 GB free.
+# 4 GiB reports exactly the same counts and bottoms out at 8.0 GB, so 3 GiB is
+# the same answer with twice the headroom.
+#
+# The baseline does not move: `lived` is what it records, and a runaway that
+# used to exhaust its timeout now dies at the cap and is counted as killed.
+# The cap goes on `go` and not on this shell, which is the difference between a
+# fix and a second bug. Capping the shell caps gremlins too, and gremlins sizes
+# itself from NumCPU: at 3 GiB a four-core runner is fine and a twelve-core
+# machine dies inside `filepath.Walk`, copying the source tree per worker, while
+# below 3 GiB gremlins cannot start at all and aborts with
+# "pthread_create failed: Resource temporarily unavailable" because thread
+# stacks count against this limit. None of that is about the mutants. The
+# processes that run away are the `go test` children, so they are what to bound,
+# and with the cap in the right place gremlins is free to size itself however
+# the machine warrants.
+#
+# gremlins resolves `go` from PATH (`exec.CommandContext(ctx, "go", ...)`), so a
+# shim ahead of it reaches every child and nothing else. This script calls
+# gremlins by absolute path and is unaffected by its own shim.
+#
+# 3 GiB rather than less: a four-core runner completes the full sweep at 2 GiB
+# too, never touching swap and bottoming out at 14.1 GB free against 12.2 GB at
+# 3 GiB, so the lower value is not wrong. 3 GiB is what has also been run
+# against twelve workers here, and it leaves room for a package larger than the
+# three swept today without anybody having to rediscover this comment.
+MUTATION_ADDRESS_SPACE_KIB=${MUTATION_ADDRESS_SPACE_KIB:-3145728}
+realgo=$(command -v go) || {
+	echo "no go on PATH" >&2
+	exit 2
+}
+shim=$(mktemp -d)
+trap 'rm -rf "$shim"' EXIT
+cat >"$shim/go" <<EOF
+#!/bin/sh
+# Bound the address space a mutated test may claim, then hand over to the real
+# toolchain. macOS does not implement this limit, so the failure is ignored: a
+# sweep that refuses to run is worse than one that can still be taken down by a
+# mutant, and the machines this protects are the CI ones.
+ulimit -v $MUTATION_ADDRESS_SPACE_KIB 2>/dev/null || true
+exec $realgo "\$@"
+EOF
+chmod +x "$shim/go"
+PATH="$shim:$PATH"
+export PATH
+
 moved=0
 broken=0
 printf '%-24s %8s %8s %s\n' package lived baseline verdict
