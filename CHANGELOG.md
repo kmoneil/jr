@@ -20,6 +20,113 @@ accident.
 
 Nothing yet.
 
+## [0.6.0] - 2026-08-17
+
+A refusal now tells you what to do about it. It names the record it refused, it
+names the flag or the verb you probably meant, and when a streamed collection
+fails partway it says how many rows are already on stdout.
+
+**Nothing changed shape.** No kind moved a schema version, no default column set
+gained a field, no exit code or error `code` changed meaning, and no input that
+used to be accepted is refused now.
+
+Minor rather than a patch, and the row that decides it is
+[adding a new optional element](docs/output-contract.md#stability-policy):
+`INVALID_USAGE` and `UNKNOWN_COMMAND` carry a `detail` they never carried
+before. The near misses for two of those paths also moved out of `remedy`,
+where a consumer may have learned to read them, into `detail`, which is the
+field this contract tells you candidates live in.
+
+### Added
+
+- **A mistyped flag, verb, or command name comes back with the near miss.**
+
+  ```console
+  $ jr issue list --assignne ada
+  # before: unknown flag: --assignne, and nothing else
+  # now:    detail: did you mean: --assignee
+  ```
+
+  Mistyping a field name and mistyping a flag name are the same mistake, and
+  only the first was answered. The second has the cheapest candidate set in the
+  tool: a field costs a request and a catalogue, and a flag is the command's own
+  declaration, already in memory and a few dozen strings long.
+
+  Four refusals of a mistyped name existed and three of them ranked candidates
+  differently. `jr schema list` matched on substring, so it offered every command
+  containing the word; an unknown subcommand used cobra's own suggester; a field
+  used edit distance. They are one rule now, `internal/nearest`, and a caller
+  gets the same idea of "close" wherever they mistype something.
+
+  **Nothing close still means nothing said.** A refusal listing three unrelated
+  candidates reads as an answer and costs a turn to rule out, which is what the
+  substring rule was doing. Shorthand flags are not ranked at all: `-q` is one
+  character and every other shorthand is one edit from it.
+
+  The candidates go in `detail` and the remedy stays put. Both command paths
+  used to return the guess *as* the remedy, so a caller offered a wrong
+  suggestion lost the pointer to the command that lists everything.
+
+### Fixed
+
+- **A refusal names the record it refused.** A value that no output format can
+  carry is still refused, and the refusal now says which record holds it:
+
+  ```console
+  $ jr issue comment list ENG-101
+  # message stays: the text of issue.comment.list/comments/comment/body holds
+  #                a character no output format can carry
+  # before: detail: U+001B at byte 5
+  # now:    detail: U+001B at byte 5; in comment id=10234
+  ```
+
+  Reported from a Data Center site where one raw `U+001B` in one comment made
+  every comment-reading command against a whole project exit 1. The refusal was
+  correct and named a schema path, which is the same string for every comment in
+  the thread, so finding the offending record meant bisecting `--limit` across a
+  few hundred issues. The identity was on the record the whole time.
+
+  It works one layer in as well: a comment inlined by `issue get
+  --with-comments` names the comment and the issue both. Where a kind's records
+  carry no `key`, `id`, or `name`, every attribute is named instead, which is
+  what an activity event needs, since it is identified by the issue it happened
+  on together with what kind of event it was.
+
+- **A streamed collection that fails partway says what it left on stdout.**
+
+  ```console
+  $ jr issue comment list ENG-101 > out.tsv
+  # remedy: ... 2 rows of this collection reached stdout before it failed: TSV
+  # streams, so a row is bytes the moment it is written. What is there is the
+  # answer up to the failure and not a complete one.
+  ```
+
+  `--format tsv` emits each row as it arrives, which is what makes a long list
+  pipeable, so a failure on the fortieth row cannot unwrite the thirty-nine
+  before it. The same collection refused for the same reason writes nothing at
+  all under `xml`, `json`, and `yaml`, which buffer until the last page lands.
+  That split is stated now rather than left to be discovered: closing it would
+  mean buffering every format, and a collection that has to be complete before
+  it is emitted cannot be piped into anything while it runs.
+
+  It applies to any mid-stream failure, not only a refused value. A transport
+  error on page three leaves the same partial feed.
+
+### Output contract
+
+- No kind moved. Every schema version is unchanged from 0.5.0.
+- No new error `code`, and none changed meaning. `INVALID_USAGE` and
+  `UNKNOWN_COMMAND` gain a `detail` where they had none, and
+  `UNRENDERABLE_VALUE`'s `detail` gains the record's identity after the byte
+  offset. Both are prose in a field this contract already declared optional and
+  already told you not to branch on.
+- **"A failing command writes nothing at all to stdout" now has two exceptions
+  written down where it had one.** The half-applied mutation was always there.
+  The second is the streamed collection above, which is not new behaviour: it is
+  behaviour that was true for as long as TSV has streamed and was described
+  nowhere. A consumer that treats a zero exit as the condition for reading
+  stdout is unaffected by either.
+
 ## [0.5.0] - 2026-08-17
 
 `--jql` asks Jira what a raw fragment means before sending it, rather than
@@ -751,7 +858,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.5.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.6.0...main
+[0.6.0]: https://github.com/kmoneil/jr/releases/tag/v0.6.0
 [0.5.0]: https://github.com/kmoneil/jr/releases/tag/v0.5.0
 [0.4.0]: https://github.com/kmoneil/jr/releases/tag/v0.4.0
 [0.3.3]: https://github.com/kmoneil/jr/releases/tag/v0.3.3
