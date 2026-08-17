@@ -456,6 +456,15 @@ coefficient, `internal/lint/mutation_test.go` holds it above the range where
 that happens, and the workflow goes through `make mutate` so the scheduled sweep
 cannot pick up a different one.
 
+Those figures are v0.5.0's. The bump to v0.6.0 on 2026-08-17 was checked against
+the same claim rather than assumed to have fixed it, and it has not: at the tool
+default the same package reports `Killed: 16, Lived: 0, Timed out: 203` and
+`Test efficacy: 100.00%` at 26.67% mutator coverage. A perfect score over a
+quarter of the work is still what the out-of-the-box configuration produces, so
+the coefficient stays where it is. The bump moved no count in
+`scripts/mutation-baseline.tsv`, which is the other thing a tool change is
+capable of doing and the reason the two were re-measured together.
+
 **The complexity limit is enforced, and its one exception is written down.**
 15 was the number every complexity card in this project had been measured
 against, and nothing read it: not `.golangci.yml`, not a `make` target, not a
