@@ -2,7 +2,10 @@
 #
 # package	lived	why this package is swept
 #
-# Measured 2026-08-16 with gremlins v0.5.0 at --timeout-coefficient 60. A count
+# Measured 2026-08-16 with gremlins v0.5.0 at --timeout-coefficient 60, and
+# re-measured 2026-08-17 under v0.6.0 at the same coefficient. Every count below
+# is unchanged across the two, which is the answer to the question a tool bump
+# always raises here and the reason none of these numbers moved with it. A count
 # here is a promise that this many tests are missing, not a target: every one of
 # them is a change to a line that no assertion notices. Lower it as they are
 # killed, and never raise it without saying what got worse.
