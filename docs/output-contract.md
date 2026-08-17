@@ -13,12 +13,32 @@ against; `jr contract` emits the machine-readable form of the same thing.
 a warning, never a "Fetching…". A command that fails writes nothing at all to
 stdout, so a consumer piping stdout never parses a half-result.
 
-There is exactly one exception, and it is a write that half-happened: a
-multi-request mutation that applied some of what it was asked writes its result
-document and _then_ exits non-zero, because the failure alone cannot say which
-part was applied and "nothing happened" is the dangerous assumption to leave a
-caller with. See [Mutations](#mutations). Nothing else does this, and a document
-that arrives with a non-zero exit is always one of those.
+There are exactly two exceptions, and both are cases where something had already
+happened by the time the failure arrived.
+
+The first is a write that half-happened: a multi-request mutation that applied
+some of what it was asked writes its result document and _then_ exits non-zero,
+because the failure alone cannot say which part was applied and "nothing
+happened" is the dangerous assumption to leave a caller with. See
+[Mutations](#mutations). A _document_ that arrives with a non-zero exit is always
+one of those.
+
+The second is a streamed collection. `--format tsv` emits each row as it
+arrives, which is what makes a long list pipeable at all, so a failure on the
+fortieth row leaves thirty-nine rows and a header on stdout and no way to
+retract them. The rows that are there are the answer up to the failure and not a
+complete one, and **the exit code is the only thing that says so**, because TSV
+has no envelope to carry `complete="false"`. The error on stderr says how many
+rows went out, so a caller reading it knows what the bytes it already has are
+worth.
+
+This is a split along `--format`: the same collection, refused for the same
+reason, writes nothing at all under `xml`, `json`, and `yaml`, because those
+buffer until the last page lands. It is stated rather than closed, because
+closing it means buffering every format, and a collection that has to be
+complete before it is emitted cannot be piped into anything while it runs. A
+consumer that treats a zero exit as the condition for reading stdout is
+unaffected by any of it.
 
 **stderr carries everything else**, always structured, always in the requested
 format: errors, and the truncation warning that accompanies exit 3.
@@ -1112,7 +1132,7 @@ did not happen.
 | `OFF_SITE_URL`             | 1    | A URL the server supplied points outside the configured site, another host, another scheme, or outside the context path, and this tool will not follow it. Data Center reports an attachment's content as an absolute URL; following it on trust is how a credential reaches a host nobody chose. The check does not depend on how the URL is spelled: `//host/path` names a host while carrying no scheme, and a path beginning with `/` is resolved against the site's origin, so both are held to the same rule as an absolute URL. The refusal never echoes the URL, one can carry userinfo or a signed parameter, and names only the part that differs.                            |
 | `UNBOUNDED_RESPONSE`       | 1    | A streamed response ran past 2 GiB without ever declaring a length. A body carrying a `Content-Length` is limited to it by the HTTP client, and one that ends early fails — so a download either arrives whole or fails, and neither needs this. A response with no declared length is bounded by nothing at any layer, and it also cannot be checked for completeness, so it is refused rather than written. Not retryable: a server that streams without declaring a length will do the same next time. The ceiling does not apply to a _declared_ length, because capping one would refuse an attachment somebody legitimately stored.                                               |
 | `RESPONSE_TOO_LARGE`       | 1    | A buffered response body is larger than the 64 MiB this client will hold. It is refused rather than clipped: reading to a limit and stopping returns the first 64 MiB with no error at all, so the caller would be handed part of an answer presented as the whole of one, and a JSON consumer would then report that Jira sent something unreadable when what happened is that this client stopped reading. Not retryable, for the reason `UNBOUNDED_RESPONSE` gives: a body too large once is too large again. Narrow the request, or ask for the resource that streams.                                                                                                              |
-| `UNRENDERABLE_VALUE`       | 1    | A value in the result holds a character no output format can carry, most of C0, `U+FFFE`, `U+FFFF`, or a byte that is not valid UTF-8. XML 1.0 forbids these outright, so escaping is not available: `&#1;` is no more legal than the raw byte. The refusal does not depend on `--format`, even though JSON and YAML could encode one, because the flag chooses an encoding and not what this tool is willing to say. Distinct from `INVALID_ENCODING`, which is exit 2 and is a value the _caller_ supplied: this one comes back from Jira, so the caller has done nothing to correct. The message names the field and `detail` names the record holding it, by `key`, `id`, or `name`, or by every attribute it carries where a kind has none of those. |
+| `UNRENDERABLE_VALUE`       | 1    | A value in the result holds a character no output format can carry, most of C0, `U+FFFE`, `U+FFFF`, or a byte that is not valid UTF-8. XML 1.0 forbids these outright, so escaping is not available: `&#1;` is no more legal than the raw byte. The refusal does not depend on `--format`, even though JSON and YAML could encode one, because the flag chooses an encoding and not what this tool is willing to say. Distinct from `INVALID_ENCODING`, which is exit 2 and is a value the _caller_ supplied: this one comes back from Jira, so the caller has done nothing to correct. The message names the field and `detail` names the record holding it, by `key`, `id`, or `name`; in a streamed collection the rows before it are already on stdout and `remedy` says how many. |
 | `UNSAFE_FILENAME`          | 1    | A download with no `--output` takes its destination from the filename the server reports, and that filename is not one. A name carrying a directory separator, a parent reference, or an absolute path would put the bytes somewhere nobody asked for; Data Center reports the filename on the attachment itself, so the value is the server's rather than the caller's. The name is still reported in full by `issue attachment list`, refusing to _write_ it is not refusing to _say_ it. Pass `--output <path>` to name the destination yourself. Exit 1 and not 9: the server returns the same filename next time, so retrying cannot help, and 9 publishes a refusal as retryable. |
 | `BODY_NOT_REPLAYABLE`      | 1    | A retry needed the request body again and could not get it, a body read from a pipe cannot be sent twice. The request fails rather than going out short, because a second attempt carrying nothing would be accepted as a successful upload of an empty file.                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `SPRINT_NOT_ACTIVE`        | 7    | Only a running sprint can be closed. The sprint is read first, so the wrong state costs one read and no mutation.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |

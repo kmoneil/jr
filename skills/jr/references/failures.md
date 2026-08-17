@@ -132,7 +132,9 @@ a character no output format can carry, and it is refused rather than replaced
 with U+FFFD, which would put something in the output nobody wrote. One such value
 fails the whole command, so a single bad comment can deny a whole project's
 comment feed. `detail` names the record holding it, as `in comment id=10234`, and
-that record is the one to correct in Jira.
+that record is the one to correct in Jira. Under `tsv` the rows before it are
+already on stdout and `remedy` says how many; they are the answer up to the
+failure and not a complete one.
 
 ## When a write failed and you cannot tell whether it landed
 

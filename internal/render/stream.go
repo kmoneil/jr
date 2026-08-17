@@ -213,6 +213,22 @@ func (s *Stream) itemName() string {
 // Count returns how many items have been written.
 func (s *Stream) Count() int { return s.count }
 
+// Emitted returns how many rows have already reached the writer.
+//
+// It is zero for a format that buffers, whatever Count says: those rows are
+// still held here, and a failure now writes nothing at all. For TSV it is the
+// rows a consumer piping stdout has already read, and the header went out ahead
+// of the first of them.
+//
+// A caller needs the distinction because it is the one place stdout is not empty
+// after a failure, and only this type knows which of the two it is doing.
+func (s *Stream) Emitted() int {
+	if !s.streaming {
+		return 0
+	}
+	return s.count
+}
+
 // Close finishes the collection.
 //
 // complete is the answer to the only question that matters about a result set,

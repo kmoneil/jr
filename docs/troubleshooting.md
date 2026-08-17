@@ -438,23 +438,25 @@ byte can make every query that reaches back far enough exit 1. `detail` names
 the record it is in, which is the record to go and correct in Jira:
 
 ```console
-$ jr issue comment list ENG-101
+$ jr issue comment list ENG-101 > out.tsv
 <?xml version="1.0" encoding="UTF-8"?>
 <error v="1">
   <code>UNRENDERABLE_VALUE</code>
   <message>the text of issue.comment.list/comments/comment/body holds a character no output format can carry</message>
   <detail>U+001B at byte 5; in comment id=10234</detail>
-  <remedy>this is what Jira returned; the field has to be corrected there</remedy>
+  <remedy>this is what Jira returned; the field has to be corrected there. 2 rows of this collection reached stdout before it failed: TSV streams, so a row is bytes the moment it is written. What is there is the answer up to the failure and not a complete one.</remedy>
   <retryable>false</retryable>
   <exit>1</exit>
   <exit-name>ERROR</exit-name>
 </error>
 ```
 
-The identity is whichever of `key`, `id`, or `name` the record carries, and
-every attribute it carries where a kind has none of those. A record inside
-another record names both, innermost first, so a comment inlined by
-`jr issue get --with-comments` says which comment and which issue.
+Note what that `remedy` says about `out.tsv`. Under `tsv` the rows before the
+refused one are already on stdout, because a TSV collection streams, and there
+is no envelope to mark them incomplete: the exit code is the only thing that
+says so. The other three formats buffer until the last page lands, so a refusal
+there leaves stdout empty. Either way the fix is the same, and it is in Jira
+rather than here.
 
 ### `SPRINTS_REFUSED`
 

@@ -179,6 +179,154 @@ func TestValidateRunsBeforeAnyOutput(t *testing.T) {
 	}
 }
 
+// failingStream registers a streaming command that emits good rows and then
+// fails, which is the only arrangement in which a failure can arrive after bytes
+// are already on stdout.
+func failingStream(t *testing.T, good int, fail func(*render.Stream) error) *registry.Registry {
+	t.Helper()
+	r := registry.New()
+	r.Register(&registry.Command{
+		Path:           []string{"fake", "list"},
+		Summary:        "Emit rows and then fail",
+		Example:        "jr fake list",
+		Paginated:      true,
+		CollectionName: "things",
+		Columns: []render.Column{
+			{Header: "key", Path: "@key"},
+			{Header: "name", Path: "name"},
+		},
+		Outputs:   []registry.Output{{Kind: "fake.list", Version: 1}},
+		ExitCodes: []exitcode.Code{exitcode.Partial},
+		Stream: func(
+			_ context.Context, _ *registry.Invocation, out *render.Stream,
+		) (registry.StreamResult, error) {
+			for i := range good {
+				node := render.El("thing").
+					Attr("key", "K-"+string(rune('A'+i))).
+					Leaf("name", "row")
+				if err := out.Write(node); err != nil {
+					return registry.StreamResult{}, err
+				}
+			}
+			return registry.StreamResult{}, fail(out)
+		},
+	})
+	return r
+}
+
+// TestAStreamedFailureLeavesTheRowsItAlreadyWroteAndSaysSo is the case the
+// stdout invariant was never tested at.
+//
+// "A failing command writes nothing at all to stdout" had two tests behind it
+// and every case in both was a failure *before* execution: an unknown command, a
+// bad flag, a limit that would not parse. All of them fail before a row exists,
+// so the rule was asserted only where it could not break.
+//
+// It breaks here. TSV streams, so a failure on the fourth row cannot unwrite the
+// three before it, and the same collection refused for the same reason writes
+// nothing at all under the three formats that buffer. That is the contract
+// splitting along --format, and it is not fixable without buffering everything,
+// which is what streaming exists not to do. So it is stated: the rows stay, the
+// exit is non-zero, and the error on stderr says how many rows a consumer
+// already has and what they are worth.
+//
+// Both shapes of mid-stream failure are covered. A refused row is the one a
+// field report raised; an upstream error on the second page is the same
+// arrangement and is far more likely.
+func TestAStreamedFailureLeavesTheRowsItAlreadyWroteAndSaysSo(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		code string
+		// names is what the error has to say about the record, for a failure
+		// that has one. It is the other half of the same report, asserted here
+		// because internal/render can only show that the refusal carries it and
+		// not that it survives to the caller.
+		names string
+		fail  func(*render.Stream) error
+	}{{
+		name:  "a row no format can carry",
+		code:  "UNRENDERABLE_VALUE",
+		names: "in thing key=K-BAD",
+		fail: func(out *render.Stream) error {
+			return out.Write(render.El("thing").
+				Attr("key", "K-BAD").
+				Leaf("name", "a bell\x07here"))
+		},
+	}, {
+		name: "the site stops answering mid-collection",
+		code: "NETWORK",
+		fail: func(*render.Stream) error {
+			return errs.Remote("NETWORK", "the site stopped answering")
+		},
+	}} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := runStream(t, failingStream(t, 3, tc.fail),
+				"fake", "list", "--format", "tsv")
+
+			if got.exit == exitcode.OK {
+				t.Fatalf("a failed collection exited 0\nstderr: %s", got.stderr)
+			}
+			if want := "key\tname\nK-A\trow\nK-B\trow\nK-C\trow\n"; got.stdout != want {
+				t.Errorf("stdout = %q, want %q", got.stdout, want)
+			}
+			if !strings.Contains(got.stderr, tc.code) {
+				t.Errorf("stderr does not carry %s:\n%s", tc.code, got.stderr)
+			}
+			// The count and the fact are both on stderr, because a caller
+			// holding three rows has no way to tell that from a complete answer.
+			if !strings.Contains(got.stderr, "3 rows of this collection reached stdout") {
+				t.Errorf("the error does not say what is already on stdout:\n%s", got.stderr)
+			}
+			if tc.names != "" && !strings.Contains(got.stderr, tc.names) {
+				t.Errorf("the error does not name the record it refused:\n"+
+					"want %q in\n%s", tc.names, got.stderr)
+			}
+
+			// The buffered formats hold the rule intact, and say nothing about
+			// stdout because there is nothing on it.
+			for _, format := range []string{"xml", "json", "yaml"} {
+				buffered := runStream(t, failingStream(t, 3, tc.fail),
+					"fake", "list", "--format", format)
+				if buffered.exit == exitcode.OK {
+					t.Errorf("%s: a failed collection exited 0", format)
+				}
+				if buffered.stdout != "" {
+					t.Errorf("%s: a buffered failure wrote to stdout:\n%s",
+						format, buffered.stdout)
+				}
+				if strings.Contains(buffered.stderr, "reached stdout") {
+					t.Errorf("%s: a buffered failure claimed rows were emitted:\n%s",
+						format, buffered.stderr)
+				}
+			}
+		})
+	}
+}
+
+// TestAFailureBeforeTheFirstRowStillWritesNothing is the boundary of the rule
+// above, and the control on it.
+//
+// A streamed collection writes its header with the first row rather than at
+// Close, so a command that fails before producing one is the ordinary case and
+// stdout stays empty. An implementation that emitted the header up front would
+// pass every assertion in this file except this one.
+func TestAFailureBeforeTheFirstRowStillWritesNothing(t *testing.T) {
+	fail := func(*render.Stream) error {
+		return errs.Remote("NETWORK", "the site stopped answering")
+	}
+	got := runStream(t, failingStream(t, 0, fail), "fake", "list", "--format", "tsv")
+
+	if got.stdout != "" {
+		t.Errorf("a failure before the first row wrote to stdout:\n%q", got.stdout)
+	}
+	if strings.Contains(got.stderr, "reached stdout") {
+		t.Errorf("the error claimed rows were emitted:\n%s", got.stderr)
+	}
+	if !strings.Contains(got.stderr, "NETWORK") {
+		t.Errorf("stderr does not carry the failure:\n%s", got.stderr)
+	}
+}
+
 // TestStdoutOwnerEmitsNoDocument covers the layer the MCP protocol tests
 // missed.
 //
