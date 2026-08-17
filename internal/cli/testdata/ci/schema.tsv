@@ -18,6 +18,7 @@ field.list	List every field this site has	false	false	field.list
 issue.activity	List what happened across issues, as events rather than rows	false	false	issue.activity
 issue.attachment.download	Download an attachment	false	false	issue.attachment.download
 issue.attachment.list	List the files attached to an issue	false	false	issue.attachment.list
+issue.changes	Report what changed since the last poll, and where to resume	false	false	issue.changes
 issue.comment.list	List an issue's comments	false	false	issue.comment.list
 issue.get	Fetch one issue in full	false	false	issue.get
 issue.history	List what changed on an issue, and who changed it	false	false	issue.history

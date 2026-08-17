@@ -1,0 +1,37 @@
+      <element name="change">
+        <attributes count="5">
+          <attribute name="issue" type="string" optional="false"/>
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="field" type="string" optional="false"/>
+          <attribute name="field-id" type="string" optional="true"/>
+          <attribute name="field-type" type="string" optional="true"/>
+        </attributes>
+        <elements count="4">
+          <element name="author" optional="false" repeated="false">
+            <attributes count="2">
+              <attribute name="id" type="string" optional="true"/>
+              <attribute name="display" type="string" optional="false"/>
+            </attributes>
+            <elements count="0"/>
+          </element>
+          <element name="created" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="timestamp" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="from" optional="true" repeated="false">
+            <attributes count="1">
+              <attribute name="id" type="string" optional="true"/>
+            </attributes>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="to" optional="true" repeated="false">
+            <attributes count="1">
+              <attribute name="id" type="string" optional="true"/>
+            </attributes>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

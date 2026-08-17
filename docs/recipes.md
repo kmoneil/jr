@@ -271,6 +271,56 @@ Two things it will not pretend about:
   at forty saves, and this feed does not yet fetch the rest, so a heavily edited
   issue is reported clipped instead.
 
+### Polling for what changed
+
+`issue activity` answers "what happened lately" once. `issue changes` answers it
+repeatedly without gaps or repeats, which is a different problem: each answer
+carries the cursor the next one starts from.
+
+```console
+$ jr issue changes --since -1h --format json
+```
+
+```json
+{
+  "kind": "issue.changes",
+  "v": 1,
+  "complete": true,
+  "count": 2,
+  "changes": [ … ],
+  "next-since-token": "eyJkIjoiY2xvdWQiLCJ0IjoiMjAyNi0wOC0xN1QxNDozMDowMFoifQ"
+}
+```
+
+A poller keeps that token and passes it back:
+
+```bash
+token=$(jr issue changes --since -1h --format json | jq -r '."next-since-token"')
+while sleep 60; do
+  out=$(jr issue changes --since "$token" --format json) || continue
+  echo "$out" | jq -c '.changes[]'
+  # Only advance when the answer was whole. An empty token means this poll did
+  # not cover its window, and the next one has to ask for the same window again.
+  next=$(echo "$out" | jq -r '."next-since-token" // empty')
+  [ -n "$next" ] && token=$next
+done
+```
+
+Three things worth knowing:
+
+- **Do not build the cursor yourself.** `updated >= <the last timestamp>` is the
+  obvious poll and it is wrong on both deployments: JQL cannot express a bound
+  finer than a minute and neither operator can bisect one, so that query either
+  repeats a minute of changes every poll or skips whatever landed inside the
+  minute it rounded past. The token names a window instead, and two consecutive
+  windows cover every instant exactly once.
+- **A poll wants a structured format.** The cursor is in the envelope and TSV has
+  none.
+- **No token means poll again with the same `--since`.** A run cut short by
+  `--limit`, by the request budget, or by a clipped changelog exits 3 and issues
+  no cursor, because advancing past a window it did not fully report is how a
+  feed loses a change quietly.
+
 ## Reading an issue
 
 ```console

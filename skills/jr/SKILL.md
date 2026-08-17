@@ -174,7 +174,7 @@ Generated from the registry of the binary that printed this, so it is the truth
 about that binary and not about the project. A reader build lists no mutating
 commands because it contains none.
 
-65 commands, profile `full`, tags `prompt, render, mcp, write, admin`.
+66 commands, profile `full`, tags `prompt, render, mcp, write, admin`.
 
 | Command | | Does |
 | --- | --- | --- |
@@ -202,6 +202,7 @@ commands because it contains none.
 | `issue attachment download` |  | Download an attachment |
 | `issue attachment list` |  | List the files attached to an issue |
 | `issue attachment upload` | `M` | Attach a file to an issue |
+| `issue changes` |  | Report what changed since the last poll, and where to resume |
 | `issue clone` | `M` | Create a copy of an issue |
 | `issue comment add` | `M` | Add a comment to an issue |
 | `issue comment delete` | `M D` | Delete a comment |

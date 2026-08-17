@@ -176,10 +176,10 @@ func TestAPagingFlagIsBoundedBeforeTheProbe(t *testing.T) {
 		}
 	}
 
-	// Five commands declare --page-size and one declares --page-token, in
+	// Six commands declare --page-size and one declares --page-token, in
 	// every profile: none of them is behind a tag.
-	if checked != 6 {
-		t.Errorf("checked %d paging flags, want 6; the declarations moved and "+
+	if checked != 7 {
+		t.Errorf("checked %d paging flags, want 7; the declarations moved and "+
 			"this test is now asserting something else", checked)
 	}
 
@@ -249,8 +249,8 @@ func TestAnOmittedPageSizeStillPagesAtTheDefault(t *testing.T) {
 			}
 		})
 	}
-	if checked != 5 {
-		t.Errorf("checked %d commands, want the 5 that declare --page-size", checked)
+	if checked != 6 {
+		t.Errorf("checked %d commands, want the 6 that declare --page-size", checked)
 	}
 }
 

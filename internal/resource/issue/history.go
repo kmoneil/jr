@@ -104,8 +104,19 @@ type Change struct {
 }
 
 // Node renders one change.
-func (c Change) Node() *render.Node {
+func (c Change) Node() *render.Node { return c.node("") }
+
+// node renders one change, naming the issue it happened to when there is one to
+// name.
+//
+// `issue history` has no key on a row, because every row came from the one in
+// the argument. `issue changes` merges rows from many issues and every one of
+// them needs it. They share this builder so the two kinds cannot drift in what a
+// change looks like, and the attribute is first when it is there, which is the
+// order FeedChangeSchema declares.
+func (c Change) node(issue string) *render.Node {
 	n := render.El("change").
+		AttrIf("issue", issue).
 		Attr("id", c.ID).
 		Attr("field", c.Field).
 		AttrIf("field-id", c.FieldID).
