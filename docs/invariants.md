@@ -83,6 +83,21 @@ do not catch, add the test in the same change and cite it here.
   was true once.
   **Enforced by:** `TestTheProfileTableMatchesTheBinaries`,
   `TestTheGatesTodayColumnMatchesTheBinaries`.
+- **Every command and flag in a worked example is one the build has.** The
+  generated documents are regenerated and compared; the hand-written on-ramp is
+  1,890 lines of commands somebody will paste, and `CLAUDE.md` asked for it to
+  be grepped by hand on every change that alters what an invocation does. That
+  is a rule with a half-life, and it had expired: the README illustrated date
+  validation with `--created 2020-13-45`, which is not a flag. The real ones are
+  `--created-after` and `--created-before`, so the line a reader pastes answers
+  `unknown flag: --created` rather than the `month 13 is out of range` the
+  sentence beside it promises. It demonstrated the opposite of its own point.
+  Flags are checked as a union across every command, because a flag named in
+  prose often belongs to a different command than the example beside it; a
+  command is checked where it is invoked. Another tool's flag, and one of this
+  tool's deliberate absences, go in `notAJrFlag` with the reason.
+  **Enforced by:** `TestEveryFlagInAWorkedExampleExists`,
+  `TestEveryCommandInAWorkedExampleExists`.
 
 ## Queries and pagination
 
