@@ -234,11 +234,101 @@ func (n *Node) validate(where string) error {
 
 	for _, c := range n.Children {
 		if err := c.validate(here); err != nil {
+			if n.ListOf != "" && c.Name == n.ListOf {
+				// A member of a list is one record among many, and here names
+				// its element rather than it: an issue carrying its comment
+				// thread reports the eightieth comment exactly as it reports
+				// the first. See identify.
+				return identify(c, err)
+			}
 			return err
 		}
 	}
 	return nil
 }
+
+// identify names the record a failure came from.
+//
+// A validation path is built from element names, so
+// issue.comment.list/comments/comment/body is the same string for every comment
+// in the thread: it says which *field* was refused and not which *record* holds
+// it. The field report that raised this had to bisect --limit across a few
+// hundred issues to find the row, and never did learn the comment id, because
+// the identity was on the item all along and nothing read it.
+//
+// It is attached at the boundaries that hold a whole item, which are the two
+// collection checks and the list-member step of validate's own recursion, rather
+// than threaded through that recursion: the item is where the identity lives,
+// and there is one of it per record rather than one per element.
+//
+// The error is annotated in place and the caller's own error is what goes back.
+// Every caller here has just built it, and an *Error reached through a wrapper
+// is still the thing carrying the detail, so returning it bare would drop
+// whatever wrapped it.
+func identify(item *Node, err error) error {
+	if err == nil {
+		return nil
+	}
+	id := item.identity()
+	if id == "" {
+		return err
+	}
+	e, ok := errs.AsError(err)
+	if !ok {
+		return err
+	}
+	if e.Detail == "" {
+		e.Detail = "in " + id
+	} else {
+		e.Detail += "; in " + id
+	}
+	return err
+}
+
+// identifyingAttrs are the attributes that name one record among many, in the
+// order they are preferred. Every kind in the tree but two carries one of them.
+var identifyingAttrs = []string{"key", "id", "name"}
+
+// identity is how a record names itself: its element, and the attribute that
+// tells it apart from its siblings.
+//
+// Two kinds carry none of identifyingAttrs, and for both the identity is a
+// combination rather than a field: an activity event is identified by the issue
+// it happened on together with what kind of event it was, and a project status
+// by the issue type it belongs to. So where there is no identifying attribute
+// every attribute is named, because choosing one of them would be choosing
+// wrong. A record with no attributes at all names nothing, and the error is left
+// exactly as it was rather than annotated with an empty identity.
+//
+// An attribute no format can carry is skipped rather than escaped. This
+// annotates an error that goes to stderr as a document, and a raw control
+// character there would produce a diagnostic the caller cannot parse either,
+// which is this same failure one layer out. Where that attribute is itself what
+// was refused, the error already names it.
+func (n *Node) identity() string {
+	for _, name := range identifyingAttrs {
+		if v, ok := n.AttrValue(name); ok && v != "" && carriable(v) {
+			return n.Name + " " + name + "=" + v
+		}
+	}
+
+	parts := make([]string, 0, len(n.Attrs))
+	for _, a := range n.Attrs {
+		if a.Value == "" || !carriable(a.Value) {
+			continue
+		}
+		parts = append(parts, a.Name+"="+a.Value)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return n.Name + " " + strings.Join(parts, " ")
+}
+
+// carriable reports whether every rune in s is one the output formats can carry.
+// It borrows renderable's answer rather than restating the rule, so the two
+// cannot drift.
+func carriable(s string) bool { return renderable(s, "", "") == nil }
 
 // validateNames checks that attributes are named, unique, carriable, and do not
 // collide with a child element.

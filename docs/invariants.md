@@ -49,6 +49,15 @@ do not catch, add the test in the same change and cite it here.
   failing command writes nothing at all to stdout.
   **Enforced by:** `TestErrorsGoToStderrAndLeaveStdoutClean`,
   `TestStdoutOwnersEmitNothingElse`.
+- **A refusal names the record it refused.** A validation path is built from
+  element names, so it is the same string for every row in a collection: without
+  this a caller is told which field was refused and has to bisect `--limit` to
+  find which of a few hundred records holds it. The identity goes in the error's
+  `detail`, from the item's `key`, `id`, or `name`, and from every attribute it
+  carries where a kind has none of those.
+  **Enforced by:** `TestARefusalNamesTheRecordItRefused`,
+  `TestAnIdentityNoFormatCanCarryIsNotCopiedIntoTheError`,
+  `TestEveryCollectionKindCanNameItsRows`.
 - **Collections stream in TSV and buffer in everything else.** A streamed result
   is byte-identical to a buffered one. A command writes rows to a
   `render.Stream` and never branches on format. Declare `CollectionName` and

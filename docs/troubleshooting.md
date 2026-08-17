@@ -433,6 +433,29 @@ names the field; the value holds a character no output format can carry, and it
 is refused rather than replaced with U+FFFD, which would put something in your
 output that nobody wrote.
 
+One bad value fails the whole command, so a single comment holding one stray
+byte can make every query that reaches back far enough exit 1. `detail` names
+the record it is in, which is the record to go and correct in Jira:
+
+```console
+$ jr issue comment list ENG-101
+<?xml version="1.0" encoding="UTF-8"?>
+<error v="1">
+  <code>UNRENDERABLE_VALUE</code>
+  <message>the text of issue.comment.list/comments/comment/body holds a character no output format can carry</message>
+  <detail>U+001B at byte 5; in comment id=10234</detail>
+  <remedy>this is what Jira returned; the field has to be corrected there</remedy>
+  <retryable>false</retryable>
+  <exit>1</exit>
+  <exit-name>ERROR</exit-name>
+</error>
+```
+
+The identity is whichever of `key`, `id`, or `name` the record carries, and
+every attribute it carries where a kind has none of those. A record inside
+another record names both, innermost first, so a comment inlined by
+`jr issue get --with-comments` says which comment and which issue.
+
 ### `SPRINTS_REFUSED`
 
 Jira refused a sprint listing for that board. Usually the board is a kanban

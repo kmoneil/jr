@@ -172,11 +172,14 @@ func (s *Stream) check(item *Node, want string) error {
 	if item == nil {
 		return errs.Runtime("INVALID_DOC", "stream kind %q was given a nil item", s.spec.Kind)
 	}
+	// Annotated with the row's own identity, for the same reason the buffered
+	// path annotates it: a refusal that names only the element names the whole
+	// collection, and the caller is left bisecting --limit to find the row.
 	if err := item.validate(s.spec.Kind + "/" + s.spec.Name); err != nil {
-		return err
+		return identify(item, err)
 	}
 	if err := conformTo(s.spec.Kind, item); err != nil {
-		return err
+		return identify(item, err)
 	}
 	if want != "" && item.Name != want {
 		return errs.Runtime("INVALID_DOC",
