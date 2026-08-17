@@ -621,6 +621,63 @@ func TestEveryColumnNamesAValue(t *testing.T) {
 	}
 }
 
+// TestEveryCollectionKindCanNameItsRows sweeps the kinds rather than the
+// fixtures.
+//
+// internal/render asserts that a refusal names the record it refused, against
+// four shapes written by hand. That is the mechanism; this is the coverage. A
+// caller reading "the text of issue.comment.list/comments/comment/body was
+// refused" has been told which field and not which of three hundred records, and
+// the identity comes off the row's own attributes. A kind whose rows carry no
+// attribute to name them with would reintroduce the whole defect for that one
+// command, silently, and no test written against `comment` would notice.
+//
+// The row is built from the declared shape rather than from a sample, so a kind
+// added tomorrow is covered the day its schema is registered.
+func TestEveryCollectionKindCanNameItsRows(t *testing.T) {
+	seen := map[string]bool{}
+	for _, cmd := range registry.All() {
+		kind := cmd.Kind()
+		if len(cmd.Columns) == 0 || seen[kind] {
+			continue
+		}
+		schema, ok := render.SchemaFor(kind)
+		if !ok || schema == nil {
+			continue // Kinds without a registered schema are a separate check.
+		}
+		seen[kind] = true
+
+		t.Run(kind, func(t *testing.T) {
+			// One row of the declared shape, carrying a value no format can
+			// carry: the refusal it produces is the one a caller would read.
+			row := render.El(schema.Element).SetText("a bell\x07here")
+			for _, a := range schema.Attrs {
+				if !a.Optional {
+					row.Attr(a.Name, "probe")
+				}
+			}
+
+			var out strings.Builder
+			err := render.Write(&out, render.List(kind, 1, &render.Collection{
+				Name:     "rows",
+				Items:    []*render.Node{row},
+				Complete: true,
+				Columns:  []render.Column{{Header: "probe", Path: "@probe"}},
+			}), render.XML)
+			if err == nil {
+				t.Fatalf("a row no format can carry was accepted:\n%s", out.String())
+			}
+			if want := "in " + schema.Element + " "; !strings.Contains(err.Error(), want) {
+				t.Errorf("the refusal cannot name a row of %s.\n"+
+					"want %q in: %v\n"+
+					"the rows of this kind declare no required attribute to "+
+					"name one with, so every refusal reads the same for every row",
+					kind, want, err)
+			}
+		})
+	}
+}
+
 // TestNoFlagUsageCarriesABackquote stops cobra renaming a flag's argument.
 //
 // cobra's UnquoteUsage reads the first backquoted run in a flag's usage string

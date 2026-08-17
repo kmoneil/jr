@@ -129,7 +129,10 @@ processing, or an explicit idempotency key allows a POST retry.
 `INVALID_ENCODING` (2) is text you supplied that is not valid UTF-8; correct it.
 `UNRENDERABLE_VALUE` (1) came back from Jira and names the field: the value holds
 a character no output format can carry, and it is refused rather than replaced
-with U+FFFD, which would put something in the output nobody wrote.
+with U+FFFD, which would put something in the output nobody wrote. One such value
+fails the whole command, so a single bad comment can deny a whole project's
+comment feed. `detail` names the record holding it, as `in comment id=10234`, and
+that record is the one to correct in Jira.
 
 ## When a write failed and you cannot tell whether it landed
 

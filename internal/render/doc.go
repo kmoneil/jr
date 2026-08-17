@@ -206,11 +206,13 @@ func validateCollectionItems(kind string, c *Collection) error {
 			return errs.Runtime("INVALID_DOC",
 				"result kind %q mixes item elements %q and %q", kind, itemName, it.Name)
 		}
+		// Annotated with the row's own identity: the path both checks report is
+		// built from element names, so it is the same string for every row.
 		if err := it.validate(kind + "/" + c.Name); err != nil {
-			return err
+			return identify(it, err)
 		}
 		if err := conformTo(kind, it); err != nil {
-			return err
+			return identify(it, err)
 		}
 	}
 	return nil
