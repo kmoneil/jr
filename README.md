@@ -707,8 +707,8 @@ caller can see.
 
 Queries are inspected by tokenizing, never by regex. `summary ~ "project = FOO"`
 does not constrain the project, and a regex says it does. Dates are
-validated, so `--created 2020-13-45` is exit 2 with `month 13 is out of range`
-rather than an empty result set that reads like "no matching issues".
+validated, so `--created-after 2020-13-45` is exit 2 with `month 13 is out of
+range` rather than an empty result set that reads like "no matching issues".
 
 Reading a value back is the same package's job. `jql.Unquote` is the inverse of
 that renderer, and it exists because Jira answers in JQL's own spelling: ask its
