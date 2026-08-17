@@ -1120,8 +1120,25 @@ func endsWithLiveOf(prefix, suffix string) byte {
 //
 // A neighbouring node carrying emphasis renders starting with its own
 // delimiter, which is the collision this exists to see; anything else is that
-// node's first character. An escaped one begins with a backslash, so reading
-// the unescaped text is conservative in the direction that matters.
+// node's first character **as it will be written**, which is not the same as
+// the character the node holds.
+//
+// It used to be the raw one, over a comment claiming that reading the
+// unescaped text was "conservative in the direction that matters". It is
+// conservative in the direction that produces more refusals, and a refusal here
+// is not free: renderChoices answers it by writing a narrower span, and a
+// narrower span puts this span's closing delimiter against the next one's
+// opening delimiter. `~~00*a*\*~~` is the document that showed it. The `*` is a
+// literal asterisk, so it is written `\*` and merges with nothing, but the raw
+// rune said `*` and the emphasis inside refused to close against it. The strike
+// was cut in two and written `~~00*a*~~~~\*~~`, and **a reader takes `~~~~` for
+// four literal tildes**, so the text no longer said what the document said. The
+// fuzzer saw it as drift on the pass after that, when those tildes came back
+// escaped.
+//
+// Asking escapeText rather than keeping a second list of what it escapes: the
+// answer has to be the escaper's, and a list beside it is the drift this
+// package has already paid for twice.
 func after(rest []Node, applied []Mark) rune {
 	if len(rest) == 0 || rest[0].Type != "text" {
 		return 0
@@ -1144,6 +1161,13 @@ func after(rest []Node, applied []Mark) rune {
 	}
 	if size == 0 {
 		return 0
+	}
+	if written := escapeText(string(first), false); written[0] == '\\' {
+		// It goes out escaped, so the character against the delimiter is the
+		// backslash. Mid-line by construction: a span's delimiter precedes it,
+		// which is why lineStart is false and why the line-start-only escapes
+		// are correctly absent from the answer.
+		return '\\'
 	}
 	return first
 }

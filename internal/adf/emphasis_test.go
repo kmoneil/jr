@@ -132,27 +132,32 @@ func TestEmphasisFollowsCommonMark(t *testing.T) {
 // TestEmphasisTheWriterCannotSpellIsRefused covers the boundary the table above
 // runs into, so the next reader does not mistake it for a parser bug.
 //
-// Both of these are read correctly. What refuses them is ToMarkdown, which
-// FromMarkdown runs before it returns: a span has two spellings, each of them
-// is read as something the document does not say, and there is no third. The
-// asterisk merges into a run with the delimiter beside it; the underscore is
-// inert where it lands, because a run against punctuation cannot close in front
-// of a word character. `after` reads the neighbouring text unescaped on
-// purpose, which makes the refusal wider than it strictly has to be and never
-// narrower.
+// It is read correctly. What refuses it is ToMarkdown, which FromMarkdown runs
+// before it returns: the span has two spellings, each of them is read as
+// something the document does not say, and there is no third. The asterisk
+// merges into a run with the delimiter beside it; the underscore is inert where
+// it lands, because a run against punctuation cannot close in front of a word
+// character.
 //
-// Neither is rescued by writing the span narrower, which is what renderChoices
+// It is not rescued by writing the span narrower, which is what renderChoices
 // does with `*0*~~*0*~~0` in the test below: the cut in `**a *b***c` falls on a
 // space the mark covers, and a narrower span there would come back with the
 // space unmarked.
 //
 // The alternative is what this package exists not to do: write it down anyway
 // and hope. A refusal names the construct and offers --raw-body; the shape the
-// old scanner produced for these was a paragraph full of asterisks and exit 0.
+// old scanner produced for this was a paragraph full of asterisks and exit 0.
+//
+// `foo******bar*********baz` used to be here and is not a refusal. It was one
+// only because `after` read the neighbouring text unescaped, which made every
+// refusal wider than it had to be — the three asterisks after the strong span
+// are literal, they go out as `\*\*\*`, and a backslash merges with nothing. It
+// is written `foo**bar**\*\*\*baz` and reads back as what it came from. See
+// TestADelimiterIsWrittenOnlyWhereItCanBeRead, "a literal delimiter after a
+// span is not a collision".
 func TestEmphasisTheWriterCannotSpellIsRefused(t *testing.T) {
 	for _, src := range []string{
 		"**a *b***c",
-		"foo******bar*********baz",
 	} {
 		t.Run(src, func(t *testing.T) {
 			if got := sketch(t, src); got != "REFUSED" {
@@ -234,6 +239,35 @@ func TestADelimiterIsWrittenOnlyWhereItCanBeRead(t *testing.T) {
 		adf:  para(`{"type":"text","text":"\u0000","marks":[{"type":"em"}]}`),
 		want: "*\x00*",
 		says: "[em:\x00]",
+	}, {
+		// The find of 2026-08-17, nineteen seconds into the fuzz job on a push
+		// that changed nothing in this package.
+		//
+		// The literal asterisk after the emphasis is written `\*`, and a
+		// backslash merges with nothing, so the emphasis can close against it.
+		// `after` read the *unescaped* text and saw an asterisk, so the span was
+		// refused, renderChoices answered by cutting the strike in two, and the
+		// two halves came out as `~~00*a*~~~~\*~~`. A reader takes `~~~~` for
+		// four literal tildes, so the output said something the document did
+		// not, and the fuzzer saw it on the pass after that, when those tildes
+		// came back escaped.
+		name: "a literal delimiter after a span is not a collision",
+		adf: para(`{"type":"text","text":"00","marks":[{"type":"strike"}]},` +
+			`{"type":"text","text":"a","marks":[{"type":"strike"},{"type":"em"}]},` +
+			`{"type":"text","text":"*","marks":[{"type":"strike"}]}`),
+		want: `~~00*a*\*~~`,
+		says: "[strike:00][em+strike:a][strike:*]",
+	}, {
+		// The same rule from the other side: two spans of one mark with nothing
+		// between them are one span, and writing them as two puts their
+		// delimiters against each other. That is what the cut above produced, so
+		// it is asserted directly — a future change that brings the cut back
+		// fails here rather than in a fuzz sweep somebody has to reproduce.
+		name: "adjacent strikes are one span",
+		adf: para(`{"type":"text","text":"a","marks":[{"type":"strike"}]},` +
+			`{"type":"text","text":"b","marks":[{"type":"strike"}]}`),
+		want: "~~ab~~",
+		says: "[strike:ab]",
 	}}
 
 	for _, c := range cases {
