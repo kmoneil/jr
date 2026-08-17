@@ -254,8 +254,11 @@ The servers also bound what they inline, differently and in different
 directions. Cloud returns the newest 20 comments of a longer thread and Data
 Center returns all of them; both return the *oldest* 20 worklogs, which for a
 feed about recent work is the wrong twenty, so an issue with more than that
-costs one further request to read them properly. Anything still clipped is
-reported: the run exits 3 and the rows say which issue and which source.
+costs one further request to read them properly. Cloud bounds the changelog at
+40 entries and reports how many it holds, and this feed does not yet fetch the
+rest, so an issue with more saves than that is reported clipped rather than
+topped up. Anything still clipped is reported: the run exits 3 and the rows say
+which issue and which source.
 
 Exit 3 is sharper than it looks when --user is given. It means some events were
 not sent, so it also means this person may have events here that you cannot
@@ -568,10 +571,20 @@ var errStopPaging = errors.New("stop paging")
 // eventsForPage turns one page of issues into the events the caller asked for,
 // topping up the worklogs that the projection cut off.
 //
-// It reports whether anything is still missing after that. Comments are the one
-// source with no second request available here — `issue comment list` is the
-// command for that — so a clipped Cloud thread makes the run incomplete rather
-// than costing another round trip per issue.
+// It reports whether anything is still missing after that. Two of the three
+// sources have no second request available here and are reported rather than
+// resolved:
+//
+//   - **Comments.** `issue comment list` is the command for those, so a clipped
+//     Cloud thread makes the run incomplete rather than costing another round
+//     trip per issue.
+//   - **The changelog.** Cloud's projection is a paged bean bounded at forty and
+//     this said nothing about it until 2026-08-17, so any Cloud issue with more
+//     than forty saves lost its oldest ones and the feed reported itself
+//     complete at exit 0. Saying so is the fix; topping it up from Cloud's paged
+//     /issue/{key}/changelog is a second one, and it cannot land until the
+//     recording this replays holds that request. See
+//     _plans/backlog/ready/cloud-clips-the-changelog-projection-at-forty.md.
 func eventsForPage(
 	ctx context.Context, client *Client, page []Issue, want activityWant,
 ) ([]Event, bool, error) {
@@ -582,7 +595,9 @@ func eventsForPage(
 		if err != nil {
 			return nil, false, err
 		}
-		if clipped || (i.HasThread && !i.ThreadComplete()) {
+		if clipped ||
+			(i.HasThread && !i.ThreadComplete()) ||
+			(i.HasChanges && !i.ChangesComplete()) {
 			short = true
 		}
 		for _, e := range eventsFrom(i) {
