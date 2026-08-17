@@ -1,0 +1,36 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/serverInfo"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"baseUrl\":\"https://recorded.invalid\",\"displayUrl\":\"https://recorded.invalid\",\"displayUrlServicedeskHelpCenter\":\"https://recorded.invalid\",\"displayUrlCSMHelpSeeker\":\"https://recorded.invalid\",\"displayUrlConfluence\":\"https://recorded.invalid\",\"version\":\"1001.0.0-SNAPSHOT\",\"versionNumbers\":[1001,0,0],\"deploymentType\":\"Cloud\",\"buildNumber\":100293,\"buildDate\":\"2026-08-14T02:42:04.000-0500\",\"serverTime\":\"2026-08-17T09:44:39.603-0500\",\"scmInfo\":\"56412dadeaf927dd37709c84cb8df7dee7ac7123\",\"serverTitle\":\"Jira\",\"defaultLocale\":{\"locale\":\"en_US\"},\"serverTimeZone\":\"Etc/UTC\"}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/myself"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000:00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"accountType\":\"atlassian\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"locale\":\"en_US\",\"groups\":{\"size\":6,\"items\":[]},\"applicationRoles\":{\"size\":1,\"items\":[]},\"expand\":\"groups,applicationRoles\"}"
+      }
+    }
+  ]
+}

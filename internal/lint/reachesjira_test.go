@@ -25,15 +25,18 @@ var deployments = []string{"cloud", "datacenter"}
 // until 2026-08-11, and it is the package where every deployment difference in
 // the tool lives. Two of the three bugs this project keeps citing were in its
 // code, found through resources whose own fixtures were hand-written.
-var noCassettes = map[string]string{
-	// One recording pays this: `jr user me --refresh` against the Cloud
-	// sandbox, which records the probe and the account. It needs the sandbox
-	// credential and nothing else — no local instance, no licence, no seed —
-	// so it is the cheapest outstanding row in this tree.
-	"internal/site cloud": "the Cloud half of the deployment probe and the " +
-		"account fetch have no cassette of their own; recordable from the Cloud " +
-		"sandbox with `jr user me --refresh`",
-}
+//
+// It is empty, and that is the state to keep it in. The one entry it opened
+// with was `internal/site cloud`, and it was paid off on 2026-08-17 by
+// probe-recorded.cloud.json: `jr user me --refresh` against the Cloud sandbox,
+// which records the deployment probe and the account fetch in one invocation.
+// It had needed the sandbox credential and nothing else, no local instance, no
+// licence, no seed, which made it the cheapest outstanding row in this tree and
+// also the easiest to keep not doing.
+//
+// Every package that builds a Jira request now has a recording behind both
+// APIs it claims to speak.
+var noCassettes = map[string]string{}
 
 // TestEveryPackageThatReachesJiraHasAConversation asks whether a package that
 // talks to Jira has any evidence at all, per deployment.
