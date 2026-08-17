@@ -33,6 +33,15 @@ import (
 // Jira refuses on most Cloud projects for two releases, and the recording that
 // replaced it is the only thing that makes the refusal beside it legible.
 var recordedFixtures = map[string][]string{
+	// The deployment probe, which has the strongest claim in the tree. It is
+	// the one request made before anything else about the site is known, so it
+	// cannot be informed by a later answer, and everything downstream branches
+	// on what it returns: the API version, the pagination model, and whether a
+	// page token from one deployment is refused against the other. Being wrong
+	// about its shape sends v3 to a v2 server. A hand-written cassette here
+	// would be somebody's belief about what Cloud calls itself, standing in for
+	// the field this tool refuses to guess.
+	"internal/site": {"probe-recorded.cloud.json"},
 	"internal/resource/project": {
 		"projects.cloud.json", "project.cloud.json", "statuses.cloud.json",
 		"versions-empty.cloud.json", "components-empty.cloud.json",
