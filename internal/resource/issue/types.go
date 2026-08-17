@@ -292,17 +292,6 @@ func (u *rawUser) convert() User {
 	return User{ID: id, Display: u.DisplayName}
 }
 
-// jiraTimeLayouts are the timestamp formats Jira serves. The first is what both
-// deployments actually send; the rest are there because a proxy or a plugin
-// occasionally normalizes them.
-var jiraTimeLayouts = []string{
-	"2006-01-02T15:04:05.000-0700",
-	"2006-01-02T15:04:05.999-0700",
-	"2006-01-02T15:04:05-0700",
-	time.RFC3339Nano,
-	time.RFC3339,
-}
-
 // normalizeTime converts a Jira timestamp to RFC 3339 in UTC.
 //
 // A timestamp that cannot be parsed is an error rather than a value passed
@@ -313,10 +302,8 @@ func normalizeTime(field, value string) (string, error) {
 	if value == "" {
 		return "", nil
 	}
-	for _, layout := range jiraTimeLayouts {
-		if t, err := time.Parse(layout, value); err == nil {
-			return t.UTC().Format(time.RFC3339), nil
-		}
+	if t, ok := site.ParseTime(value); ok {
+		return t.Format(time.RFC3339), nil
 	}
 	return "", errs.Remote("MALFORMED_TIMESTAMP",
 		"Jira returned a %s timestamp this tool cannot parse", field).

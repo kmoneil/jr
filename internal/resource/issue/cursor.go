@@ -1,14 +1,12 @@
 package issue
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"time"
 
 	"github.com/kmoneil/jr/internal/errs"
 	"github.com/kmoneil/jr/internal/site"
-	"github.com/kmoneil/jr/internal/transport"
 )
 
 // A change feed resumes from a window, not from a row.
@@ -256,62 +254,4 @@ const jqlMinuteLayout = "2006-01-02 15:04"
 // Cursor is the resume point a poll over this window ends at.
 func (w ChangeWindow) Cursor(kind site.Kind) ChangeCursor {
 	return NewChangeCursor(kind, w.Through)
-}
-
-// ServerNow reads the site's own clock.
-//
-// A feed's upper bound has to come from the server, because every timestamp it
-// will be compared against was written by the server. Using this process's clock
-// makes the bound wrong by the skew between the two, and wrong in a direction
-// that loses changes: a client running behind the site claims to have reported
-// through an instant the site had not reached when the walk started, so anything
-// written in between is never reported and never asked for again.
-//
-// It costs one request per poll and reuses the deployment probe's endpoint,
-// which is the one route this tool already knows both deployments serve, under a
-// context path and behind a proxy. The probe's own answer is cached for hours
-// and cannot be used: a cached clock is not a clock.
-func ServerNow(ctx context.Context, client Doer, info site.Info) (time.Time, error) {
-	resp, err := client.Do(ctx, transport.Request{
-		Method: transport.MethodGet,
-		Path:   site.ProbePath,
-	})
-	if err != nil {
-		return time.Time{}, err
-	}
-	if err := transport.Err(resp); err != nil {
-		return time.Time{}, err
-	}
-
-	var body struct {
-		ServerTime string `json:"serverTime"`
-	}
-	if err := json.Unmarshal(resp.Body, &body); err != nil {
-		return time.Time{}, errs.Remote("MALFORMED_SERVER_INFO",
-			"%s did not return usable server information", site.ProbePath).
-			WithRequestID(resp.RequestID).
-			Wrap(err)
-	}
-	if body.ServerTime == "" {
-		// Both deployments send it, and a site that does not is one this tool
-		// cannot bound a feed on. Falling back to the local clock here would be
-		// the guess this whole file exists to avoid, and it would be invisible.
-		return time.Time{}, errs.Remote("NO_SERVER_TIME",
-			"%s did not report the site's clock", site.ProbePath).
-			WithRequestID(resp.RequestID).
-			WithDetail("a change feed bounds its window with the server's clock, " +
-				"because the timestamps it compares were written by the server").
-			WithRemedy("report this: the feed cannot be bounded on this site")
-	}
-
-	for _, layout := range jiraTimeLayouts {
-		if t, err := time.Parse(layout, body.ServerTime); err == nil {
-			return t.UTC(), nil
-		}
-	}
-	return time.Time{}, errs.Remote("MALFORMED_TIMESTAMP",
-		"Jira returned a serverTime this tool cannot parse").
-		WithRequestID(resp.RequestID).
-		WithDetail("%q", body.ServerTime).
-		WithRemedy("report this: the timestamp format changed")
 }
