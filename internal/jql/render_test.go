@@ -479,3 +479,54 @@ func assertUsageError(t *testing.T, err error, wantCode string) {
 		t.Errorf("%s exits %v, want %v", e.Code, e.Exit, exitcode.Usage)
 	}
 }
+
+// TestACustomFieldIdIsDigitsOnly pins the test that decides whether `cf[10009]`
+// is a field reference or a string.
+//
+// A custom field id is `cf[` then digits then `]`, and the digit test is a pair
+// of bounds. Moving either one by a character makes `0` or `9` stop being a
+// digit, and every custom field id in this package's tests happened to be
+// spellable without one of them. The consequence is not cosmetic: a field
+// reference that gets quoted is sent to Jira as a string, and the query then
+// asks about a value nobody stored.
+func TestACustomFieldIdIsDigitsOnly(t *testing.T) {
+	for _, tc := range []struct {
+		field string
+		want  string
+	}{
+		{"cf[10009]", `cf[10009] = "x"`},
+		{"cf[123]", `cf[123] = "x"`},
+		{"cf[1x]", `"cf[1x]" = "x"`},
+		{"cf[]", `"cf[]" = "x"`},
+		{"cf[abc]", `"cf[abc]" = "x"`},
+	} {
+		t.Run(tc.field, func(t *testing.T) {
+			if got := jql.New().Eq(tc.field, "x").String(); got != tc.want {
+				t.Errorf("Eq(%q) = %q, want %q", tc.field, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestAQueryWithNoConditionsHasNoWhere is the difference between a query that
+// asks for everything in an order and a query that asks for everything matching
+// nothing in particular.
+//
+// The builder decides on the count of conditions it accumulated, and a bound
+// moved by one turns zero conditions into an empty `And`. Nothing here built a
+// query with an order and no conditions, which is exactly what `--order` on its
+// own produces.
+func TestAQueryWithNoConditionsHasNoWhere(t *testing.T) {
+	q := jql.New().OrderBy("updated", jql.Desc).Query()
+	if q.Where != nil {
+		t.Errorf("a builder with no conditions produced a WHERE: %#v", q.Where)
+	}
+
+	got, err := jql.Render(q)
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if want := "ORDER BY updated DESC"; got != want {
+		t.Errorf("render = %q, want %q", got, want)
+	}
+}

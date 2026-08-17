@@ -4,8 +4,10 @@
 #
 # A mutation score is not a number to chase. What it is good for is the
 # question a coverage number cannot ask: for this change to this line, does any
-# test notice? `internal/jql` answers "no" sixteen times while sitting at 100%
+# test notice? `internal/jql` answered "no" sixteen times while sitting at 100%
 # statement coverage, which is the whole argument for running this at all.
+# Thirteen of those sixteen are now assertions in internal/jql; the three left
+# are equivalent mutants and the baseline file says why each one is.
 #
 # So this is a ratchet and not a threshold. Each package carries the number of
 # mutants that survive today; more than that fails, fewer than that fails too,

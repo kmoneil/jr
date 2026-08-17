@@ -463,3 +463,158 @@ func TestValidateFragmentInheritsValidate(t *testing.T) {
 		t.Errorf("Validate refused a valid query: %v", err)
 	}
 }
+
+// The assertions below were written from the mutation sweep of 2026-08-16,
+// which found sixteen surviving mutants in a package held at 100% statement
+// coverage with four fuzz targets. Every line ran; for sixteen changes to those
+// lines, nothing noticed. Each test here names the decision it pins rather than
+// the mutant, because the mutant is the evidence and the decision is the point.
+
+// TestEveryKindOfTokenReportsItsOwnPosition covers what
+// TestTokenizeReportsPositions does not.
+//
+// That one tokenizes `project = ENG`, so it exercises the position arithmetic
+// on an identifier and an operator. A comma, a string, and a parenthesis each
+// compute their own, and turning `i + 1` into `i - 1` on the comma survived
+// every test in this package. A position is what a refusal points a caller at
+// in their own query, so being off by two there is a caller counting characters
+// to a place nothing is wrong.
+//
+// Positions are 1-based, and a string's is its opening quote.
+func TestEveryKindOfTokenReportsItsOwnPosition(t *testing.T) {
+	const query = `status IN ("Done", 'In Progress')`
+
+	tokens, err := jql.Tokenize(query)
+	if err != nil {
+		t.Fatalf("tokenize: %v", err)
+	}
+
+	want := []struct {
+		text string
+		pos  int
+	}{
+		{"status", 1},
+		{"IN", 8},
+		{"(", 11},
+		{"Done", 12},
+		{",", 18},
+		{"In Progress", 20},
+		{")", 33},
+	}
+	if len(tokens) != len(want) {
+		t.Fatalf("got %d tokens, want %d: %+v", len(tokens), len(want), tokens)
+	}
+	for i, w := range want {
+		if tokens[i].Text != w.text || tokens[i].Pos != w.pos {
+			t.Errorf("token %d is %q at %d, want %q at %d",
+				i, tokens[i].Text, tokens[i].Pos, w.text, w.pos)
+		}
+	}
+}
+
+// TestASyntaxErrorNamesThePositionItFoundIt is the same rule for the two
+// refusals the tokenizer raises itself. Both build their position by hand, and
+// both survived a mutation that moved it.
+func TestASyntaxErrorNamesThePositionItFoundIt(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		query string
+		want  string
+	}{
+		{"trailing backslash", `x ~ "ab\`, "position 8"},
+		{"an operator that is not one", `a ! b`, "position 3"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := jql.Tokenize(tc.query)
+			if err == nil {
+				t.Fatalf("%q was accepted", tc.query)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("error does not say %q: %s", tc.want, err.Error())
+			}
+		})
+	}
+}
+
+// TestAnOperatorAtTheEndOfTheQueryDoesNotOverrun pins the bounds check that
+// lets `!=` be matched before `!`.
+//
+// It reads two runes when there are two to read, and the query ending in a
+// single-rune operator is the case where there are not. Both mutations of that
+// check index past the end of the input, so this is a panic rather than a wrong
+// answer, and nothing in the package ended a query on an operator.
+func TestAnOperatorAtTheEndOfTheQueryDoesNotOverrun(t *testing.T) {
+	tokens, err := jql.Tokenize("status =")
+	if err != nil {
+		t.Fatalf("tokenize: %v", err)
+	}
+	if len(tokens) != 2 {
+		t.Fatalf("got %d tokens, want 2: %+v", len(tokens), tokens)
+	}
+	if tokens[1].Text != "=" || tokens[1].Pos != 8 {
+		t.Errorf("final token is %q at %d, want %q at 8", tokens[1].Text, tokens[1].Pos, "=")
+	}
+}
+
+// TestAWordOperatorIsNeverAField is what `Fields` and `ReferencesField` are
+// for, and the guard that makes it true had nothing asserting it.
+//
+// A word operator sitting where a field could be read is the case: in
+// `status WAS IN (Done)` the token after `WAS` is `IN`, which is exactly the
+// shape that makes the token before it a field. Without the guard, `was` is
+// reported as a field the query constrains, and `--jql` scope checks read that
+// list to decide whether a query is already bounded.
+func TestAWordOperatorIsNeverAField(t *testing.T) {
+	for _, tc := range []struct {
+		query string
+		want  []string
+	}{
+		{"status WAS IN (Done)", []string{"status"}},
+		{"status IS NOT EMPTY", []string{"status"}},
+		{"assignee WAS NOT ada", []string{"assignee"}},
+		{"status = Done AND priority = High", []string{"status", "priority"}},
+	} {
+		t.Run(tc.query, func(t *testing.T) {
+			got, err := jql.Fields(tc.query)
+			if err != nil {
+				t.Fatalf("Fields: %v", err)
+			}
+			if len(got) != len(tc.want) {
+				t.Fatalf("Fields(%q) = %v, want %v", tc.query, got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Errorf("Fields(%q) = %v, want %v", tc.query, got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+// TestAnUnclosedParenthesisNamesTheOneStillOpen pins which parenthesis the
+// refusal points at.
+//
+// The balance check keeps a stack of open positions and pops it on every close,
+// and the position it reports is the first entry left on it. A pop that removes
+// the wrong element, or none, reports a parenthesis that was closed several
+// characters ago, and both mutations of that pop survived: nothing here had two
+// parenthesised groups where only the second was open.
+func TestAnUnclosedParenthesisNamesTheOneStillOpen(t *testing.T) {
+	for _, tc := range []struct {
+		query string
+		want  string
+	}{
+		{"(a) AND (b", "position 9"},
+		{"((a)", "position 1"},
+	} {
+		t.Run(tc.query, func(t *testing.T) {
+			err := jql.Validate(tc.query)
+			if err == nil {
+				t.Fatalf("%q was accepted", tc.query)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("error does not say %q: %s", tc.want, err.Error())
+			}
+		})
+	}
+}

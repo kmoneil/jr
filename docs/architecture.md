@@ -429,7 +429,12 @@ outlives the bug otherwise.
 **Mutation testing is a ratchet, and its timeout is a correctness setting.**
 Coverage says a line ran; a surviving mutant says nothing noticed when the line
 changed. `internal/jql` sits at 100% statement coverage with four fuzz targets
-and lets sixteen mutants live, which is what the sweep is for. It runs weekly
+and let sixteen mutants live when the sweep was first run, which is what the
+sweep is for. Thirteen of those are killed as of 2026-08-17 and three are
+equivalent, meaning no input can tell the mutant from the original;
+`scripts/mutation-baseline.tsv` names each of the three and why, because "no
+test notices this" and "nothing could" are different claims and only the first
+is a debt. It runs weekly
 rather than per pull request, because the sweep takes minutes and a score moves
 when a test is added anywhere, so a threshold on it would redden a change that
 touched nothing near the mutant. `scripts/mutation-baseline.tsv` carries the

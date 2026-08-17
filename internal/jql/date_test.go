@@ -472,3 +472,62 @@ func TestDateHasTimeOfDay(t *testing.T) {
 		}
 	}
 }
+
+// TestARelativeOffsetAtTheDurationLimitStillResolves pins the boundary the
+// overflow guard is written against.
+//
+// A `time.Duration` is nanoseconds in an int64, which runs out at about 292
+// years, and Jira answers a query for `-1000000d` happily. So the resolver
+// refuses a period it cannot hold rather than multiplying it into a negative
+// and naming an instant in the future. 106751 days is the largest whole number
+// of days that fits, and it is the value a bound moved by one would refuse:
+// nothing here resolved a period anywhere near the limit, so the guard was free
+// to be off by exactly one day.
+func TestARelativeOffsetAtTheDurationLimitStillResolves(t *testing.T) {
+	now := time.Date(2026, 8, 17, 12, 0, 0, 0, time.UTC)
+
+	if _, ok := jql.ResolveDate("-106751d", time.UTC, now); !ok {
+		t.Error("the largest period a duration can hold was refused")
+	}
+	if got, ok := jql.ResolveDate("-106752d", time.UTC, now); ok {
+		t.Errorf("a period larger than a duration resolved to %s", got)
+	}
+}
+
+// TestADateFunctionNeedsANameBeforeItsParenthesis covers the one input where
+// the two refusals in parseDateFunction disagree about what is wrong.
+//
+// `(x)` has a parenthesis at index zero, so the search that decides "this is
+// not a function call at all" finds it and the input goes on to be judged on
+// its name, which is empty. A bound moved by one turns that into "not a date
+// function", which is a different sentence about a different mistake: one says
+// the call has no name, the other says there is no call.
+func TestADateFunctionNeedsANameBeforeItsParenthesis(t *testing.T) {
+	_, err := jql.ParseDate("(x)")
+	if err == nil {
+		t.Fatal(`"(x)" was accepted as a date`)
+	}
+	if !strings.Contains(err.Error(), "is not a known date function") {
+		t.Errorf("the refusal does not say the name is the problem: %s", err.Error())
+	}
+}
+
+// TestTheUnitFoldCoversTheWholeRangeItClaims drives the ASCII fold at both
+// ends.
+//
+// Its one caller passes a unit letter, and `relativePattern` generates its
+// character class from `dateValueUnits`, so `w`, `d`, `h`, and `m` are the only
+// letters that reach it through a query. The function does not say that: it
+// says it folds ASCII uppercase, and a bound moved by one leaves `A` or `Z`
+// unfolded. The next unit letter this table gains is the day that matters, so
+// the contract is asserted rather than the current callers.
+func TestTheUnitFoldCoversTheWholeRangeItClaims(t *testing.T) {
+	for in, want := range map[byte]byte{
+		'A': 'a', 'Z': 'z', 'M': 'm', 'W': 'w',
+		'a': 'a', 'z': 'z', '0': '0', '[': '[', '{': '{',
+	} {
+		if got := jql.ToLowerASCII(in); got != want {
+			t.Errorf("ToLowerASCII(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
