@@ -436,6 +436,17 @@ touched nothing near the mutant. `scripts/mutation-baseline.tsv` carries the
 surviving count per package: more fails, and fewer fails too, asking for the
 baseline to be lowered in the same change.
 
+A sweep has a third outcome and it is not a finding. A package that printed no
+summary line produced no count, so there is nothing to compare and nothing to
+conclude about its tests, and `scripts/mutate.sh` exits 2 for it where a moved
+count exits 1. The weekly workflow reads that verdict to decide what its issue
+says. It used to read `if: failure()` instead, which is a trigger rather than a
+result: the first scheduled run was killed by a reclaimed runner 80 seconds in,
+and the issue it filed announced a baseline regression from a run that had
+printed one header row. The same step piped `make mutate` into `tee` under
+`bash -e` with no `pipefail`, so the sweep's exit code was discarded and a real
+regression could not have reddened the job at all.
+
 Gremlins derives its per-mutant timeout by multiplying the measured suite time,
 and its default coefficient is unusable here rather than merely tight. The
 `internal/jql` suite runs in 15 milliseconds, so the derived timeout lands below
