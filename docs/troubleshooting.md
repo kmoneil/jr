@@ -33,9 +33,11 @@ Four fields do most of the work:
 
 - **`code`** is stable forever. Branch on it in a script; never parse `message`.
 - **`remedy`** is what to do about it, when there is a single sensible answer.
-- **`detail`** carries the candidates — the near-miss field names, the
-  transitions the issue actually offers, the phrases your site uses for links.
-  A refusal that lists alternatives is usually a typo you can fix by reading it.
+- **`detail`** carries the candidates: the near-miss field names, the flag or
+  the verb you probably meant, the transitions the issue actually offers, the
+  phrases your site uses for links. A refusal that lists alternatives is usually
+  a typo you can fix by reading it, and one that lists none is saying it has
+  nothing close rather than that it did not look.
 - **`retryable`** is `true` only for `RATE_LIMIT` and `REMOTE`. Everything else
   will fail identically if you run it again.
 

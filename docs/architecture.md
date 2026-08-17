@@ -6,6 +6,7 @@ internal/
   buildinfo/               # what this binary is and what it can do
   exitcode/                # the frozen exit code table
   errs/                    # the structured error every failure carries
+  nearest/                 # ranks candidates against what somebody typed
   render/                  # xml | json | tsv | yaml writers, the output contract
   registry/                # command metadata → cobra, MCP, schema, docs
   cli/                     # the cobra tree, stdout/stderr split, exit codes
@@ -31,7 +32,7 @@ either.
 ## The dependency rule
 
 `resource/*` may import `registry`, `transport`, `auth`, `site`, `jql`, `adf`,
-`render`, `errs`.
+`render`, `errs`, `nearest`.
 
 **Nothing may import `resource/*`** except `cmd`, `mcp`, `workflow`, and
 `internal/commands`, which exists only to blank-import resources so their init

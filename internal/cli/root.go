@@ -9,6 +9,7 @@ import (
 
 	"github.com/kmoneil/jr/internal/buildinfo"
 	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/nearest"
 	"github.com/kmoneil/jr/internal/registry"
 	"github.com/kmoneil/jr/internal/render"
 	"github.com/kmoneil/jr/internal/transport"
@@ -69,9 +70,7 @@ and go to stderr.`),
 	// pflag's own parse errors carry no code and no exit status. Wrapping them
 	// here is what makes an unknown flag a structured exit 2 rather than a bare
 	// line on stderr.
-	root.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
-		return usageError(cmd, "%s", err.Error())
-	})
+	root.SetFlagErrorFunc(flagError)
 
 	root.PersistentFlags().StringVar(&a.requestedFormat, "format", "", formatUsage())
 	root.PersistentFlags().BoolVar(&a.describe, "describe", false,
@@ -162,11 +161,22 @@ func rejectUnknownSubcommand(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return nil
 	}
-	e := errs.Usage("UNKNOWN_COMMAND", "unknown command %q for %q", args[0], cmd.CommandPath())
-	if near := cmd.SuggestionsFor(args[0]); len(near) > 0 {
-		return e.WithRemedy("did you mean: %s", strings.Join(near, ", "))
+	e := errs.Usage("UNKNOWN_COMMAND", "unknown command %q for %q", args[0], cmd.CommandPath()).
+		WithRemedy("run `%s --help` for the available commands", cmd.CommandPath())
+
+	// The candidates go in `detail` and the remedy stays put, which is the
+	// shape UNKNOWN_FIELD already uses and what docs/troubleshooting.md tells a
+	// reader `detail` is for. This used to replace the remedy with the
+	// suggestions, so a caller who was offered a wrong guess lost the pointer to
+	// --help along with it.
+	//
+	// Ranked here rather than by cobra's SuggestionsFor: that has its own
+	// distance and its own prefix rule, and a tool with four refusals of the
+	// same shape should not have four opinions about what "close" means.
+	if near := nearest.Strings(args[0], subcommandNames(cmd), nearLimit); len(near) > 0 {
+		return e.WithDetail("did you mean: %s", strings.Join(near, ", "))
 	}
-	return e.WithRemedy("run `%s --help` for the available commands", cmd.CommandPath())
+	return e
 }
 
 // newLeaf builds the cobra command for one registered command.
@@ -401,4 +411,18 @@ func presentationalName() (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// subcommandNames is what this command's children are called, for ranking a
+// verb the caller typed. Hidden and generated commands are left out: offering a
+// name that does not appear in --help sends somebody looking for it there.
+func subcommandNames(cmd *cobra.Command) []string {
+	var out []string
+	for _, c := range cmd.Commands() {
+		if c.Hidden || !c.IsAvailableCommand() {
+			continue
+		}
+		out = append(out, c.Name())
+	}
+	return out
 }

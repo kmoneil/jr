@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/nearest"
 	"github.com/kmoneil/jr/internal/transport"
 )
 
@@ -215,47 +216,14 @@ func (c *Catalogue) NearMatches(input string, n int) []Field {
 	return fields
 }
 
-// threshold is how wrong an input may be and still be worth suggesting. It
-// scales with length, because two wrong letters in "due" is a different word
-// and two wrong letters in "Story Points Estimate" is a typo.
-func threshold(s string) int {
-	if d := len(s) / 4; d > 2 {
-		return d
-	}
-	return 2
-}
+// threshold and distance are internal/nearest's, which is where this rule
+// lives now. It was written here first, for the field catalogue, and three
+// other refusals in this tree then invented their own idea of "close": a
+// substring match for a command name, cobra's suggester for a subcommand, and
+// nothing at all for a flag. One rule, one package, four callers.
+func threshold(s string) int { return nearest.Threshold(s) }
 
-// distance is the Levenshtein edit distance, on two rows rather than a full
-// matrix because the catalogue can run to hundreds of fields and only the
-// number matters.
-func distance(a, b string) int {
-	ar, br := []rune(a), []rune(b)
-	if len(ar) == 0 {
-		return len(br)
-	}
-	if len(br) == 0 {
-		return len(ar)
-	}
-
-	prev := make([]int, len(br)+1)
-	curr := make([]int, len(br)+1)
-	for j := range prev {
-		prev[j] = j
-	}
-
-	for i := 1; i <= len(ar); i++ {
-		curr[0] = i
-		for j := 1; j <= len(br); j++ {
-			cost := 1
-			if ar[i-1] == br[j-1] {
-				cost = 0
-			}
-			curr[j] = min(curr[j-1]+1, min(prev[j]+1, prev[j-1]+cost))
-		}
-		prev, curr = curr, prev
-	}
-	return prev[len(br)]
-}
+func distance(a, b string) int { return nearest.Distance(a, b) }
 
 // describe renders candidates for an error detail: the name is what the caller
 // typed and the id is what they need instead, so both have to be there.

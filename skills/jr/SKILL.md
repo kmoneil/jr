@@ -26,6 +26,7 @@ have. Report it or act on what it tells you. Do not reach for a way past it.
 | `UNCONSTRAINED_QUERY` | Add `--jql 'project is not empty'` to satisfy the filter check | Scope it (`--project`, `--status`, a date bound) or pass `--all-projects` if a whole-instance sweep is genuinely intended |
 | Exit 3, `RESULT_TRUNCATED` | Report the rows you got as the answer | Resume with `--page-token`, or say the result is partial and how much you saw |
 | `UNKNOWN_USER`, `UNKNOWN_FIELD`, `UNKNOWN_TRANSITION` | Guess another spelling and retry | Read `detail`. It lists the real candidates with their ids. Pass an id |
+| `INVALID_USAGE`, `UNKNOWN_COMMAND` | Re-read the help output and guess again | Read `detail`. A mistyped flag, verb, or command name carries the near misses; an empty `detail` means nothing is close, so check `jr schema` rather than trying another spelling |
 | `READ_ONLY` (exit 10) | Look for another command that writes | Stop. The caller chose a read-only context. Tell them |
 | `CONFIRMATION_REQUIRED` (exit 10) | Append `--yes` and rerun | `--yes` is the user's decision. Ask for it, once, for the specific action |
 | `STALE_WRITE` (exit 7) | Drop `--if-unchanged` and force it | Re-read, recompute the change against what is there now, retry |
