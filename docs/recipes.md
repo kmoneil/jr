@@ -267,7 +267,9 @@ Two things it will not pretend about:
   whole. Cloud sends the newest twenty comments of a longer thread; both
   deployments send the *oldest* twenty worklogs, which for a feed about recent
   work is the wrong twenty, so an issue with more than that costs one extra
-  request to read properly and gets it.
+  request to read properly and gets it. Cloud also caps the changelog it inlines
+  at forty saves, and this feed does not yet fetch the rest, so a heavily edited
+  issue is reported clipped instead.
 
 ## Reading an issue
 

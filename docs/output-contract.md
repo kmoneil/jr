@@ -156,6 +156,19 @@ issues, so the clipped container is not in the document at all — the comments 
 could not read were never rendered — and the warning names `event` to say the
 feed is missing some of what it merged.
 
+**Three sources can clip it, not one.** The comment thread above is the first.
+The second is worklogs, which both deployments inline oldest-first and cap at
+twenty, so the feed spends one request per issue that has more and reports what
+is still short. The third is the changelog, and it was reported as nothing at
+all until 2026-08-17: `expand=changelog` on the Cloud search is a paged bean
+bounded at forty entries, it says so in every response, and this tool read
+neither the bound nor the count. An issue with more than forty saves lost its
+oldest ones and the feed exited 0 with `complete="true"`. It is now counted like
+the other two, in saves rather than in the rows they flatten into, so a run over
+a busy Cloud issue exits 3 where it used to be silently short. Data Center
+reports a `maxResults` that mirrors what it sent, so its projection says nothing
+about a bound and nothing there has been observed to clip.
+
 ### An absent `total` means the thread's length is unknown
 
 `total` is optional, and its absence is an answer rather than a gap. A server

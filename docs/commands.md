@@ -899,8 +899,11 @@ The servers also bound what they inline, differently and in different
 directions. Cloud returns the newest 20 comments of a longer thread and Data
 Center returns all of them; both return the *oldest* 20 worklogs, which for a
 feed about recent work is the wrong twenty, so an issue with more than that
-costs one further request to read them properly. Anything still clipped is
-reported: the run exits 3 and the rows say which issue and which source.
+costs one further request to read them properly. Cloud bounds the changelog at
+40 entries and reports how many it holds, and this feed does not yet fetch the
+rest, so an issue with more saves than that is reported clipped rather than
+topped up. Anything still clipped is reported: the run exits 3 and the rows say
+which issue and which source.
 
 Exit 3 is sharper than it looks when --user is given. It means some events were
 not sent, so it also means this person may have events here that you cannot

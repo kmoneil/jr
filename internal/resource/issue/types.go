@@ -133,11 +133,31 @@ type Issue struct {
 	Work      []Worklog
 	HasWork   bool
 	WorkTotal *int
-	// Changes is the whole changelog on both deployments, which is why it
-	// carries no total: nothing observed clips it. It arrives in opposite
-	// orders on the two deployments and is sorted by whoever consumes it.
-	Changes    []Change
-	HasChanges bool
+	// Changes is the changelog projection. It arrives in opposite orders on the
+	// two deployments and is sorted by whoever consumes it.
+	//
+	// **Cloud clips it at forty and says so; nothing here used to listen.** The
+	// projection is a paged bean, and the recorded Cloud conversation in
+	// testdata/activity-recorded.cloud.json has carried
+	// `startAt=0 maxResults=40 total=58 histories=40` since it was made: 18 of
+	// that issue's saves are not in the response. This field said the opposite in
+	// a comment for as long as the recording sat beside it, `attachChanges` threw
+	// the count away, and `issue activity` therefore dropped the oldest saves of
+	// any Cloud issue with more than forty and reported `complete="true"` at exit
+	// 0. Data Center reports `maxResults` mirroring the count, so its number says
+	// nothing about a bound and everything it sent is everything it has, which is
+	// the same shape `issue history` measured there.
+	//
+	// ChangeSaves is what the projection sent and ChangeTotal what the server
+	// says it holds. Both count *saves*, not the flattened rows in Changes: one
+	// save that moved three fields is one entry and three rows, so comparing
+	// len(Changes) against the total would call a clipped changelog complete.
+	// ChangeTotal is nil on the same terms as ThreadTotal, and for the same
+	// reason.
+	Changes     []Change
+	HasChanges  bool
+	ChangeSaves int
+	ChangeTotal *int
 
 	// URL is where a person opens this issue, set by --url and empty
 	// otherwise.
@@ -540,6 +560,7 @@ func attachChanges(issue *Issue, data json.RawMessage) error {
 		Changelog *struct {
 			Histories []rawHistory `json:"histories"`
 			Values    []rawHistory `json:"values"`
+			Total     *int         `json:"total"`
 		} `json:"changelog"`
 	}
 	if err := json.Unmarshal(data, &envelope); err != nil {
@@ -556,6 +577,8 @@ func attachChanges(issue *Issue, data json.RawMessage) error {
 	if len(saves) == 0 {
 		saves = envelope.Changelog.Values
 	}
+	issue.ChangeSaves = len(saves)
+	issue.ChangeTotal = envelope.Changelog.Total
 	for _, save := range saves {
 		changes, err := save.flatten()
 		if err != nil {
@@ -572,6 +595,19 @@ func attachChanges(issue *Issue, data json.RawMessage) error {
 // is not complete. There is no request to make that would settle it here: the
 // projection came inside a search response.
 func (i Issue) WorkComplete() bool { return exhausted(len(i.Work), i.WorkTotal) }
+
+// ChangesComplete reports whether every save arrived.
+//
+// It counts saves rather than the rows they flattened into, because the total
+// the server sends counts saves: a page of forty entries holding sixty field
+// moves is forty against the count, and comparing sixty against it would report
+// a clipped changelog as whole.
+//
+// A projection that carried no count has not said the changelog is whole, so it
+// is not complete, on the same terms as WorkComplete. That is not the same as an
+// issue nobody has ever edited: an issue with no changelog at all leaves
+// HasChanges false and never reaches here.
+func (i Issue) ChangesComplete() bool { return exhausted(i.ChangeSaves, i.ChangeTotal) }
 
 // attachThread reads the comment projection a search returns when `comment` is
 // among the requested fields.
