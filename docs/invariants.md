@@ -273,6 +273,16 @@ do not catch, add the test in the same change and cite it here.
   reported no targets in `internal/workflow` and swept happily over code it could
   not compile. A green sweep that ran nothing is worse than no sweep.
   **Enforced by:** `TestTheDocumentedFuzzCountsAreTheOnesInTheTree`.
+- **The set of markdown this converter refuses does not move unnoticed.**
+  `FuzzMarkdownRoundTrips` returns early on a refusal, so refusing more always
+  looks greener and a converter that refused everything would leave it
+  permanently, silently happy. Two refusal regressions have shipped under it:
+  `flanks` once refused 25 inputs the converter had written correctly the day
+  before, through two 600-second sweeps that said nothing, and a three-line
+  change to `after` moved 95 verdicts with the whole suite green. The verdict for
+  every corpus input is a golden, so a refusal moving in either direction is a
+  reviewable line in a pull request rather than a number nobody computed.
+  **Enforced by:** `TestTheRefusalSetIsPinned`.
 - **A scheduled sweep reports what it measured, not what it was built to
   find.** `if: failure()` fires for a finding, for a tool that could not run,
   and for a runner that was reclaimed. The weekly mutation sweep's first
