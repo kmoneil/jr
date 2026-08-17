@@ -20,6 +20,107 @@ accident.
 
 Nothing yet.
 
+## [0.7.0] - 2026-08-17
+
+`jr issue changes` answers "what changed since last time" without gaps or
+repeats. Every other Jira poller answers it by listing everything and diffing,
+which cannot see a change that reverted, cannot say _what_ moved, is blind to
+every field the columns do not project, and re-fetches five thousand issues to
+discover that three moved.
+
+**The cursor is a window, not a row, and that is the whole design.** The obvious
+resume point is the last row's timestamp and key. It cannot be exact: JQL cannot
+express a bound finer than a minute and neither comparison operator bisects one
+— measured on both deployments — so a pair cursor has to be applied by this
+client, comparing timestamps as this tool publishes them, to the second, against
+the order the server walked at whatever precision it stores. Two rows inside one
+second sort one way here and possibly the other way there, and the row on a page
+boundary is then skipped or repeated. A poller built that way passes every test
+anybody writes and drops a transition once a week under load.
+
+So a poll reports `(previous bound, this walk's start]`. Both ends are instants
+this tool chose rather than rows it saw, and the next poll compares against the
+same instant with `>` where this one used `<=`. Two consecutive answers cover
+every instant exactly once, and a bulk edit that stamps four hundred changes with
+one timestamp falls entirely inside one or entirely inside the next.
+
+Minor rather than a patch on three counts, all additive: a new command, a new
+kind, and a new optional element on the envelope. **No existing kind moved a
+schema version**, no default column set changed, and no exit code or error
+`code` changed meaning.
+
+### Added
+
+- **`jr issue changes --since <cursor|date>`**, an incremental feed of recorded
+  changes across every issue in scope, oldest first.
+
+  ```console
+  $ jr issue changes --since -1h --format json
+  ```
+
+  ```json
+  {
+    "kind": "issue.changes",
+    "v": 1,
+    "complete": true,
+    "count": 2,
+    "changes": [ … ],
+    "next-since-token": "eyJkIjoiY2xvdWQiLCJ0IjoiMjAyNi0wOC0xN1QxNDozMDowMFoifQ"
+  }
+  ```
+
+  Pass that token back as `--since` for the next poll. A date or an offset
+  starts a new feed. `docs/recipes.md` has the shell loop.
+
+- **`next-since-token`, a new envelope element, and it is not
+  `next-page-token`.** A page token says the answer was cut short; a since token
+  says it was whole and names where the next answer starts, so it appears on a
+  **complete** result — the combination that is refused for a page token. A feed
+  carrying its cursor in the existing field would tell every consumer the answer
+  was truncated, and exit 3 forever.
+
+- **A poll that was not whole issues no cursor at all.** Cut short by `--limit`,
+  by `--max-requests`, or by a changelog the server would not send in full, the
+  run exits 3 and carries no token, because advancing past a window that was only
+  partly reported is how a feed loses a change silently. Poll again with the same
+  `--since`.
+
+### Fixed
+
+- **`jr issue activity` no longer reports a clipped changelog as a complete
+  feed.** Cloud's `expand=changelog` on the search is a paged bean bounded at
+  forty entries and says so in every response; this tool read neither the bound
+  nor the count. An issue with more than forty saves lost its oldest ones and the
+  run exited 0 with `complete="true"`.
+
+  It went unmet because the clip lands on the oldest saves — Cloud returns that
+  projection newest-first, so a feed about the last week is _usually_ inside the
+  newest forty.
+
+  A clipped changelog now makes the run incomplete, exit 3, with the warning
+  naming `event` as it already did for a clipped comment thread. **A run over a
+  heavily edited Cloud issue that used to exit 0 will now exit 3**, which is the
+  answer it should have been giving; a script branching on `$?` will see it.
+  Fetching the rest is a further change and is not in this release.
+
+### Output contract
+
+- `issue.changes` v1 is new. No existing kind moved: every schema version is
+  unchanged from 0.6.0.
+- `next-since-token` is a new optional element on a collection envelope, present
+  only on `issue.changes` and only when the poll covered its window. Adding an
+  optional element is a minor change under the
+  [stability policy](docs/output-contract.md#stability-policy), and no consumer
+  that does not read it is affected. TSV carries it no more than it carries
+  `site` or `complete`: it has no envelope.
+- No new error `code` on an existing command. `issue changes` introduces
+  `INVALID_SINCE_TOKEN`, `SINCE_AFTER_NOW`, and `NO_SERVER_TIME`, all on itself
+  and all documented in `docs/troubleshooting.md`.
+- **`issue.activity` v1 is unchanged in shape and changed in when it is
+  complete.** Nothing about the document moved; a run that was silently missing
+  changelog entries now says so. That is the truncation rule this contract
+  already states, applied to a source that was not counted.
+
 ## [0.6.0] - 2026-08-17
 
 A refusal now tells you what to do about it. It names the record it refused, it
@@ -858,7 +959,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.6.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.7.0...main
+[0.7.0]: https://github.com/kmoneil/jr/releases/tag/v0.7.0
 [0.6.0]: https://github.com/kmoneil/jr/releases/tag/v0.6.0
 [0.5.0]: https://github.com/kmoneil/jr/releases/tag/v0.5.0
 [0.4.0]: https://github.com/kmoneil/jr/releases/tag/v0.4.0
