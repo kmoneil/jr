@@ -54,6 +54,21 @@ type Collection struct {
 	// NextPageToken resumes a truncated result set. It is set if and only if
 	// Complete is false and the server offered a cursor.
 	NextPageToken string
+
+	// NextSinceToken resumes a *feed* from where this answer ended, and it is a
+	// different thing from NextPageToken in every way that matters.
+	//
+	// A page token says "this answer was cut short, and here is the rest". A
+	// since token says "this answer is whole, and here is where the next one
+	// starts". So it is emitted on a **complete** result, which is exactly the
+	// combination validateCollectionShape refuses for a page token, and the two
+	// cannot share a field without one of them lying: a feed carrying its cursor
+	// in NextPageToken would tell every existing consumer the result was
+	// truncated, and exit 3 forever.
+	//
+	// Only a feed sets it. An ordinary listing has no next answer to point at,
+	// and a result set that ran out is simply over.
+	NextSinceToken string
 }
 
 // Column is one TSV column: a header and the path that extracts it from an item.

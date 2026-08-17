@@ -23,6 +23,7 @@ issue.assign	Set or clear an issue's assignee	true	false	issue.assign
 issue.attachment.download	Download an attachment	false	false	issue.attachment.download
 issue.attachment.list	List the files attached to an issue	false	false	issue.attachment.list
 issue.attachment.upload	Attach a file to an issue	true	false	issue.attachment.upload
+issue.changes	Report what changed since the last poll, and where to resume	false	false	issue.changes
 issue.clone	Create a copy of an issue	true	false	issue.clone
 issue.comment.add	Add a comment to an issue	true	false	issue.comment.add
 issue.comment.delete	Delete a comment	true	true	issue.comment.delete

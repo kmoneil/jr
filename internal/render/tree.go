@@ -94,6 +94,9 @@ func docValue(d *Doc) map[string]any {
 	if c.NextPageToken != "" {
 		out["next-page-token"] = c.NextPageToken
 	}
+	if c.NextSinceToken != "" {
+		out["next-since-token"] = c.NextSinceToken
+	}
 	return out
 }
 

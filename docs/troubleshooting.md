@@ -493,11 +493,53 @@ The version that shipped before did neither: the function reached the query, the
 events were compared against nothing, and the feed reported `complete="true"` at
 exit 0 with events from outside the window in it.
 
+The same refusal reaches `jr issue changes` for the same reason: its window is
+compared here, so a boundary only Jira can compute cannot be one of its ends.
+
+### `INVALID_SINCE_TOKEN`
+
+`jr issue changes --since <token>` was given something that is not a cursor this
+tool issued, or one issued against the other deployment. A cursor names a window
+of one site's changelog, and replaying it against a different site would report
+somebody else's history as this one's.
+
+Pass the `next-since-token` from the previous answer, which is in the envelope
+of any structured format:
+
+```console
+$ jr issue changes --since -1h --format json | jq -r '."next-since-token"'
+```
+
+To start over, pass a date or an offset instead. `--since -1h` and
+`--since 2026-08-10` are both first polls.
+
+### `SINCE_AFTER_NOW`
+
+The cursor names a time the site's clock has not reached. It is not rounded away,
+because the two ways to get here are both worth knowing about: the token came
+from a different site, or the site's clock moved backwards. Either way this tool
+cannot say what happened in between, so it says that instead of guessing.
+
+### `NO_SERVER_TIME`
+
+`jr issue changes` bounds every poll with the site's own clock, read from
+`/rest/api/2/serverInfo`, because the timestamps it compares were written by the
+server. A client running behind the site would otherwise claim to have reported
+through an instant the site had not reached, and anything written in between
+would never be reported and never asked for again. This says the site answered
+that endpoint without a `serverTime`. There is no fallback to the local clock,
+which would be the guess the whole design exists to avoid.
+
 ### `NO_ACCOUNT_TIMEZONE` / `UNKNOWN_ACCOUNT_TIMEZONE`
 
 An absolute `--since` on `jr issue activity` is a wall clock, and reading it
 means knowing the account's zone, which is one request to `/myself`. These say
 the site did not report a zone, or reported one that is not a zone.
+
+`jr issue changes` needs the zone on **every** poll, not only for an absolute
+date: it mints an absolute JQL bound from its window so that every page of one
+walk is filtered by the same instant, and a literal is read in the account's
+zone.
 
 Both deployments send one, so this is unusual. Reading the literal as UTC anyway
 would put the bound five or nine hours off with nothing in the output to say so.

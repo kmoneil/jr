@@ -34,7 +34,7 @@ contains what.
 - **[contract](#contract)** — [`contract`](#jr-contract)
 - **[epic](#epic)** — [`epic add`](#jr-epic-add), [`epic get`](#jr-epic-get), [`epic list`](#jr-epic-list), [`epic remove`](#jr-epic-remove)
 - **[field](#field)** — [`field list`](#jr-field-list)
-- **[issue](#issue)** — [`issue activity`](#jr-issue-activity), [`issue assign`](#jr-issue-assign), [`issue attachment download`](#jr-issue-attachment-download), [`issue attachment list`](#jr-issue-attachment-list), [`issue attachment upload`](#jr-issue-attachment-upload), [`issue clone`](#jr-issue-clone), [`issue comment add`](#jr-issue-comment-add), [`issue comment delete`](#jr-issue-comment-delete), [`issue comment edit`](#jr-issue-comment-edit), [`issue comment list`](#jr-issue-comment-list), [`issue create`](#jr-issue-create), [`issue delete`](#jr-issue-delete), [`issue edit`](#jr-issue-edit), [`issue get`](#jr-issue-get), [`issue history`](#jr-issue-history), [`issue link add`](#jr-issue-link-add), [`issue link list`](#jr-issue-link-list), [`issue link remove`](#jr-issue-link-remove), [`issue list`](#jr-issue-list), [`issue move`](#jr-issue-move), [`issue watch`](#jr-issue-watch), [`issue worklog add`](#jr-issue-worklog-add), [`issue worklog delete`](#jr-issue-worklog-delete), [`issue worklog list`](#jr-issue-worklog-list)
+- **[issue](#issue)** — [`issue activity`](#jr-issue-activity), [`issue assign`](#jr-issue-assign), [`issue attachment download`](#jr-issue-attachment-download), [`issue attachment list`](#jr-issue-attachment-list), [`issue attachment upload`](#jr-issue-attachment-upload), [`issue changes`](#jr-issue-changes), [`issue clone`](#jr-issue-clone), [`issue comment add`](#jr-issue-comment-add), [`issue comment delete`](#jr-issue-comment-delete), [`issue comment edit`](#jr-issue-comment-edit), [`issue comment list`](#jr-issue-comment-list), [`issue create`](#jr-issue-create), [`issue delete`](#jr-issue-delete), [`issue edit`](#jr-issue-edit), [`issue get`](#jr-issue-get), [`issue history`](#jr-issue-history), [`issue link add`](#jr-issue-link-add), [`issue link list`](#jr-issue-link-list), [`issue link remove`](#jr-issue-link-remove), [`issue list`](#jr-issue-list), [`issue move`](#jr-issue-move), [`issue watch`](#jr-issue-watch), [`issue worklog add`](#jr-issue-worklog-add), [`issue worklog delete`](#jr-issue-worklog-delete), [`issue worklog list`](#jr-issue-worklog-list)
 - **[jql](#jql)** — [`jql explain`](#jr-jql-explain), [`jql validate`](#jr-jql-validate)
 - **[mcp](#mcp)** — [`mcp serve`](#jr-mcp-serve)
 - **[meta](#meta)** — [`meta createmeta`](#jr-meta-createmeta), [`meta transitions`](#jr-meta-transitions)
@@ -1141,6 +1141,77 @@ jr issue attachment upload ENG-101 ./out.log --name run-42.log
 | `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
+
+### `jr issue changes`
+
+Report what changed since the last poll, and where to resume
+
+- **paginated** — bounded by `--limit`; a truncated result exits 3
+
+```
+jr issue changes [flags]
+```
+
+An incremental feed of recorded changes: every field that moved on every issue in
+scope, oldest first, with a cursor to poll again from.
+
+This is the question a diff of two listings cannot answer. A listing says what an
+issue is now, so polling one and comparing shows that something moved without
+saying what, misses a change that was reverted between polls, is blind to every
+field the columns do not project, and re-fetches five thousand issues to discover
+that three moved. All four are properties of the method rather than of how often
+it runs.
+
+--since takes the `next-since-token` from the previous answer, or a date or
+offset for a first poll. **The token is the only correct way to poll.** It names
+a window rather than a row, and the reason is measured: JQL cannot express a
+bound finer than a minute and neither of its comparison operators can bisect one,
+so `updated >= <the last timestamp>` either re-reports a minute's worth of
+changes on every poll or skips whatever landed inside the minute it rounded past.
+There is no third query. A poller built the obvious way passes every test anybody
+writes and drops a transition once a week under load.
+
+Each answer reports the changes created after the previous poll's bound and at or
+before this poll's start, which is read from the site's own clock rather than
+this machine's. Two consecutive polls therefore cover every instant exactly once,
+whatever the server does with ties: a bulk edit that stamps four hundred changes
+with one timestamp falls entirely inside one answer or entirely inside the next.
+
+**The cursor is only issued when the answer was whole.** A run cut short by
+--limit, by the request budget, or by a changelog the server would not send in
+full exits 3 and carries no `next-since-token`, because advancing past a window
+that was not fully reported is how a feed loses a change and says nothing. Poll
+again with the same --since.
+
+The cursor is in the envelope, so a poll wants a structured format: TSV has no
+envelope and carries no token, exactly as it carries no site and no completeness.
+
+One row is one field, as in `issue history`, and rows from one save share its id
+and timestamp. Comments are not here: Jira writes a field transition to the
+changelog and a comment is not a field transition.
+
+Examples:
+
+```console
+jr issue changes --since -1h --format json
+jr issue changes --since eyJkIjoiY2xvdWQi… --format json
+jr issue changes --since -1d --jql "project = ENG" --format json
+```
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--since` | `string` | — | the next-since-token from a previous answer, or a date or offset like -1h for a first poll; required, and a date function like startOfWeek() is refused because this command has to resolve the bound itself (required) |
+| `--jql` | `string` | — | raw JQL narrowing the issues watched, combined with the window bound and always parenthesized |
+| `--page-size` | `int` | — | issues per HTTP request, 1 to 100; transport tuning only |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
+
+| Emits | Schema | When |
+| --- | --- | --- |
+| `issue.changes` | v1 | always |
+
+Default TSV columns: `created`, `issue`, `author`, `field`, `from`, `to`
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
 ### `jr issue clone`
 

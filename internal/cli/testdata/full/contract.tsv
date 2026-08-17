@@ -17,6 +17,7 @@ issue.assign	2	issue.assign
 issue.attachment.download	1	issue.attachment.download
 issue.attachment.list	1	issue.attachment.list
 issue.attachment.upload	1	issue.attachment.upload
+issue.changes	1	issue.changes
 issue.clone	1	issue.clone
 issue.comment.add	2	issue.comment.add
 issue.comment.delete	1	issue.comment.delete

@@ -840,6 +840,12 @@ func (rt *recordingTransport) RoundTrip(r *http.Request) (*http.Response, error)
 // field this file is quietly asserting Jira sends.
 func sweepResponse(path string, kind site.Kind) string {
 	switch {
+	// A fixed clock. `issue changes` bounds its window with the site's own
+	// time and mints an absolute JQL bound from it, so a moving one would put
+	// a different date in every request and make every flag on that command
+	// read as alive.
+	case strings.HasSuffix(path, "/serverInfo"):
+		return `{"serverTime":"2026-08-17T09:30:00.000-0500"}`
 	// Before everything, because a raw --jql is checked against the server in
 	// Validate now and a clean verdict is what a site with nothing to complain
 	// about answers. Data Center has no parse endpoint and asks the bounded
@@ -1036,7 +1042,10 @@ func sweepIssueKeyed(kind site.Kind, id, key string) string {
 			 "updated":"2026-01-01T00:00:00.000+0000",
 			 "author":{"name":"ada","accountId":"1","displayName":"Ada Lovelace"},
 			 "body":` + sweepBody(kind) + `}]},
-		"customfield_10042":7}}`
+		"customfield_10042":7},
+		"changelog":{"startAt":0,"maxResults":2,"total":2,"histories":[` +
+		sweepHistory("30001", "In Progress") + `,` +
+		sweepHistory("30002", "Done") + `]}}`
 }
 
 // sweepBody is the markup each deployment sends, and the difference is the

@@ -161,11 +161,18 @@ func holdsDocuments(c *Collection) bool {
 func countLine(c *Collection) string {
 	n := strconv.Itoa(len(c.Items))
 	if c.Complete {
-		return n + " rows, complete."
+		line := n + " rows, complete."
+		if c.NextSinceToken != "" {
+			line += " Poll again with `--since " + c.NextSinceToken + "`."
+		}
+		return line
 	}
 	line := "**" + n + " rows, TRUNCATED** — this is not the whole result set."
 	if c.NextPageToken != "" {
 		line += " Resume with `--page-token " + c.NextPageToken + "`."
+	}
+	if c.NextSinceToken != "" {
+		line += " Poll again with `--since " + c.NextSinceToken + "`."
 	}
 	return line
 }

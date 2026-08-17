@@ -52,6 +52,10 @@ type Stream struct {
 	count  int
 	closed bool
 
+	// nextSinceToken is where a feed's next poll starts, set by
+	// SetNextSinceToken and read once at Close.
+	nextSinceToken string
+
 	// failed is the first refusal this stream produced.
 	//
 	// Once a row has been refused the collection is not a collection any more,
@@ -229,6 +233,19 @@ func (s *Stream) Emitted() int {
 	return s.count
 }
 
+// SetNextSinceToken records where a feed's next poll starts.
+//
+// It is a separate call rather than a third argument to Close for two reasons.
+// Close is the same two questions for every collection in this tool and a third
+// positional value on twenty-odd call sites is a transposition waiting to
+// happen, between two strings that mean opposite things: one says this answer
+// was cut short and the other says it was whole. And only one command has a next
+// answer to name, so every other caller would be passing an empty string to say
+// "not me".
+//
+// See Collection.NextSinceToken for why it is not the page token.
+func (s *Stream) SetNextSinceToken(token string) { s.nextSinceToken = token }
+
 // Close finishes the collection.
 //
 // complete is the answer to the only question that matters about a result set,
@@ -256,11 +273,12 @@ func (s *Stream) Close(complete bool, nextPageToken string) error {
 		// The envelope needs the count and the completeness, so everything was
 		// held until now.
 		doc := List(s.spec.Kind, s.spec.Version, &Collection{
-			Name:          s.spec.Name,
-			Items:         s.items,
-			Complete:      complete,
-			NextPageToken: nextPageToken,
-			Columns:       s.spec.Columns,
+			Name:           s.spec.Name,
+			Items:          s.items,
+			Complete:       complete,
+			NextPageToken:  nextPageToken,
+			NextSinceToken: s.nextSinceToken,
+			Columns:        s.spec.Columns,
 		})
 		doc.Site = s.spec.Site
 		return Write(s.w, doc, s.format)

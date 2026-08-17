@@ -42,6 +42,15 @@ do not catch, add the test in the same change and cite it here.
   structured stderr warning plus exit 3.
   **Enforced by:** `TestOnlyOnePlaceDecidesWhetherAResultIsComplete`,
   `TestStreamedTruncationStillExitsPartial`.
+- **A feed issues no cursor for an answer that was not whole.** `issue changes`
+  reports a window and hands back the boundary the next poll starts from, so a
+  cursor issued after a run cut short by `--limit`, by the request budget, or by
+  a changelog the server would not send in full would move the next poll past
+  changes this one never reported. Truncation is already visible three ways; this
+  is the fourth thing it has to do, and it is the one that would lose data rather
+  than merely understate it.
+  **Enforced by:** `TestTheFeedIssuesNoCursorWhenItWasCutShort`,
+  `TestTheFeedIssuesNoCursorWhenTheChangelogWasClipped`.
 - **Exit codes never change meaning.** New conditions get new codes. The table
   is frozen in `internal/exitcode/`.
   **Enforced by:** `TestCodesAreFrozen`.

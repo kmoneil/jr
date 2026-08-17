@@ -350,6 +350,36 @@ Every successful XML response:
   truncated it, `complete="false"` and `<next-page-token>` is present. There is
   no third state and no way to get a truncated set that claims to be complete.
   This is the single most important attribute in the format.
+- `next-since-token`, where the **next answer** starts. Only a feed emits one;
+  see below.
+
+### `next-since-token` is not `next-page-token`
+
+They look alike and mean opposite things, so a consumer must not treat one as
+the other.
+
+| | `next-page-token` | `next-since-token` |
+| --- | --- | --- |
+| Says | this answer was cut short | this answer was whole |
+| Present when | `complete="false"` | the poll covered its whole window |
+| Passed back as | `--page-token` | `--since` |
+| Emitted by | any paged collection | `issue changes` |
+
+A page token resumes a result set that was not finished. A since token names the
+boundary between this answer and the next one, so it appears on a **complete**
+result — the combination that is rejected before writing for a page token, which
+is exactly why it cannot be the same field. A feed carrying its cursor in
+`next-page-token` would tell every existing consumer that the answer was
+truncated, and exit 3 forever.
+
+**A feed that was cut short carries neither.** `issue changes` issues no cursor
+when `--limit`, the request budget, or a changelog the server would not send in
+full stopped it covering the window it opened, because advancing past a window
+that was only partly reported is how a feed drops a change and says nothing. The
+run exits 3 and the caller polls again with the same `--since`.
+
+**TSV carries no token**, as it carries no `site` and no `complete`: it has no
+envelope. A polling consumer asks for a structured format.
 
 JSON and YAML hoist the envelope to the top level rather than transliterating
 the XML tree:

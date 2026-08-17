@@ -35,6 +35,9 @@ func writeXML(w *writer, d *Doc) {
 		// Present if and only if the result set was truncated and the server
 		// offered a cursor to resume from.
 		container.LeafIf("next-page-token", c.NextPageToken)
+		// And this one is present when there is a *next answer* to ask for,
+		// which a complete result can have and a truncated one still does.
+		container.LeafIf("next-since-token", c.NextSinceToken)
 		root.Child(container)
 	}
 
