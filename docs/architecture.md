@@ -447,6 +447,17 @@ printed one header row. The same step piped `make mutate` into `tee` under
 `bash -e` with no `pipefail`, so the sweep's exit code was discarded and a real
 regression could not have reddened the job at all.
 
+The nightly fuzz sweep had the same trigger and cannot have the same answer.
+`fuzz` is a matrix, so every leg writes to one job-output namespace and there is
+no single verdict to publish. Its report reads the run's own jobs back instead,
+and separates the legs whose `fuzz` step failed from the ones that never reached
+it, which is the difference between a crasher and a leg that died fetching
+`actions/setup-go`. Only the first is a find, and the issue it files used to say
+so either way, down to telling the reader to commit an input that does not
+exist. `TestAScheduledSweepReportsWhatItMeasured` discovers both workflows
+rather than naming them, so a third scheduled sweep that files an issue is held
+to the same rule the day it is added.
+
 Gremlins derives its per-mutant timeout by multiplying the measured suite time,
 and its default coefficient is unusable here rather than merely tight. The
 `internal/jql` suite runs in 15 milliseconds, so the derived timeout lands below

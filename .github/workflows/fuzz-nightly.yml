@@ -91,6 +91,20 @@ jobs:
           path: ${{ matrix.package }}/testdata/fuzz/
           if-no-files-found: warn
 
+  # `failure()` is the trigger and it is not the finding, which is the rule
+  # docs/invariants.md states for every scheduled sweep and the mutation
+  # workflow was the first to learn. It fires for a target that crashed, for a
+  # leg that died in `actions/setup-go` before fuzzing anything, and for the
+  # `packages` job failing so that no leg ran at all. Only the first of those is
+  # a find, and the issue this job files says a crasher exists and tells the
+  # reader to commit the input as an `f.Add` seed.
+  #
+  # The mutation sweep answers this by publishing what it measured as a job
+  # output. That is not available here: `fuzz` is a matrix, and every leg writes
+  # to one output namespace, so the value that survives is a race. What is
+  # available is the run's own record, so the report asks the API which job
+  # failed and at which step, which is what a person does when they open a red
+  # run.
   report:
     name: report a find
     needs: fuzz
@@ -99,6 +113,10 @@ jobs:
     permissions:
       contents: read
       issues: write
+      # For reading this run's own jobs, below. Without it the query 403s and
+      # the step fails, which is loud rather than wrong, and the point is to be
+      # neither.
+      actions: read
     steps:
       # `gh issue create` refuses the whole issue over a label it cannot find,
       # so the label has to exist before the report does. It did not on
@@ -117,6 +135,45 @@ jobs:
             --color 5319e7 \
             --description "Found by the nightly fuzz sweep" \
             --force
+      # Which legs actually reported a crasher, and which went red for some
+      # other reason. A leg that never reached its `fuzz` step measured nothing,
+      # and saying otherwise is the whole defect this job had.
+      - name: read what this run did
+        id: what
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          jobs=$(gh api \
+            "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100")
+
+          # `steps` is absent for a job that never started, so every filter
+          # defaults it rather than indexing into null.
+          found=$(printf '%s' "$jobs" | jq -r '
+            [ .jobs[]
+              | select(.name | startswith("fuzz ("))
+              | select(any((.steps // [])[]; .name == "fuzz" and .conclusion == "failure"))
+              | .name ] | join(", ")')
+
+          # Anything red whose `fuzz` step did not fail: the packages job, a
+          # checkout, a setup-go that could not reach the proxy. A job still
+          # running has a null conclusion and is not one of these, which is also
+          # how this job leaves itself out: it is in progress while it asks, and
+          # the endpoint returns the latest attempt of each job rather than a
+          # previous one.
+          broke=$(printf '%s' "$jobs" | jq -r '
+            [ .jobs[]
+              | select(.conclusion == "failure")
+              | select(any((.steps // [])[]; .name == "fuzz" and .conclusion == "failure") | not)
+              | "\(.name) at \([ (.steps // [])[] | select(.conclusion == "failure") | .name ] | join(", "))" ]
+            | join("; ")')
+
+          {
+            echo "found=$found"
+            echo "broke=$broke"
+          } >> "$GITHUB_OUTPUT"
+          echo "found: ${found:-none}"
+          echo "broke: ${broke:-none}"
+
       # One issue per run rather than one per package, because a crasher in a
       # shared helper lights up several at once and ten issues describing one
       # bug is worse than one issue naming ten packages.
@@ -124,16 +181,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA: ${{ github.sha }}
+          FOUND: ${{ steps.what.outputs.found }}
+          BROKE: ${{ steps.what.outputs.broke }}
         run: |
-          gh issue create \
-            --repo "${{ github.repository }}" \
-            --title "fuzz: the nightly sweep found something" \
-            --label fuzz \
-            --body "$(printf '%s\n' \
-              "The nightly fuzz sweep failed on ${{ github.sha }}." \
-              "" \
-              "Run: $RUN" \
-              "" \
+          if [ -n "$FOUND" ]; then
+            title="fuzz: the nightly sweep found something"
+            detail="A fuzz target failed in: $FOUND."
+            action="$(printf '%s\n' \
               "The failing input is attached to that run as an artifact. Commit it" \
               "under the target's testdata/fuzz directory **and** add it as an" \
               "\`f.Add\` seed in the same change, so the regression is visible in the" \
@@ -142,3 +197,30 @@ jobs:
               "A red here is sometimes golang/go#75804 rather than a real find:" \
               "scripts/fuzz-verdict.sh classifies it, and the job log says which" \
               "verdict it reached.")"
+            if [ -n "$BROKE" ]; then
+              action="$(printf '%s\n' "$action" "" \
+                "Part of the sweep did not run: $BROKE. The find above stands, and" \
+                "the packages behind those legs were not fuzzed tonight, so a clean" \
+                "result for them is not a result.")"
+            fi
+          else
+            title="fuzz: the nightly sweep did not finish"
+            detail="No target reported a crasher. What went red is: ${BROKE:-nothing this run attributed to a job, which is a cancellation or a leg that ended before its status was written}."
+            action="$(printf '%s\n' \
+              "**There is nothing to commit as a seed.** No fuzzing happened in the" \
+              "legs named above, so this run says nothing about the code, and a" \
+              "green run tomorrow does not clear anything either: the packages" \
+              "behind those legs simply went unswept. Re-run the workflow.")"
+          fi
+
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "$title" \
+            --label fuzz \
+            --body "$(printf '%s\n' \
+              "$detail" \
+              "" \
+              "Commit: $SHA" \
+              "Run: $RUN" \
+              "" \
+              "$action")"
