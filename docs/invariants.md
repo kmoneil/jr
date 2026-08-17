@@ -262,10 +262,14 @@ do not catch, add the test in the same change and cite it here.
   a real finding would have gone green. `scripts/mutate.sh` now gives a moved
   count and an unmeasurable one different exit codes, and the workflow titles
   the issue from the verdict the sweep recorded rather than from the fact that
-  the job went red.
+  the job went red. The nightly fuzz sweep had the same shape and could not use
+  the same answer: `fuzz` is a matrix, and every leg writes to one job-output
+  namespace, so it reads the run's own jobs back and reports which legs failed
+  at their `fuzz` step and which never reached it.
   **Enforced by:** `TestTheMutationSweepExitCodesSayWhichFailureItWas`,
   `TestTheMutationWorkflowKeepsTheSweepsOwnStatus`,
-  `TestTheMutationReportNamesWhatActuallyFailed`.
+  `TestTheMutationReportNamesWhatActuallyFailed`,
+  `TestAScheduledSweepReportsWhatItMeasured`.
 - **A mutant runs under a memory bound, because some of them do not
   terminate.** Four mutants of `internal/jql/token.go` turn its scan loop into
   an unbounded append, and gremlins' per-mutant timeout is the coefficient times
