@@ -116,7 +116,9 @@ Invert that and you get the whole design:
   does not recognise: each is a refusal with a code and a remedy, never a
   plausible substitute.
 - **stdout is data.** Warnings, progress, and errors are structured and go to
-  stderr. A failing command writes nothing at all to stdout.
+  stderr. A failing command writes nothing at all to stdout, with two exceptions
+  the contract names: a write that half-happened, and the rows a streamed TSV
+  collection had already sent when it failed.
 - **Exit codes never change meaning.** New conditions get new numbers, and the
   table is frozen by test.
 - **Credentials stay out of the places they leak from.** Never a flag value,

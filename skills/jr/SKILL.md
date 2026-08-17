@@ -62,7 +62,10 @@ discovery.
 ## Reading what comes back
 
 - **stdout is data only.** Never a warning, never a progress line. A failed
-  command writes nothing at all to stdout.
+  command writes nothing at all to stdout, with one exception to handle: a TSV
+  collection streams, so a command that fails partway has already written the
+  rows before the failure. A non-zero exit means the rows you have are not the
+  answer, however many of them arrived.
 - **stderr is structured.** Errors and truncation warnings, in the format you
   asked for.
 - **Default formats**: TSV for lists, XML for single records. `--format` takes

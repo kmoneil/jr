@@ -46,9 +46,24 @@ do not catch, add the test in the same change and cite it here.
   is frozen in `internal/exitcode/`.
   **Enforced by:** `TestCodesAreFrozen`.
 - **stdout is data only.** Never a spinner, a warning, or a progress line. A
-  failing command writes nothing at all to stdout.
+  failing command writes nothing at all to stdout, and there are exactly two
+  exceptions, both where the alternative is a caller misled about something that
+  already happened. A half-applied mutation writes its result document and then
+  exits non-zero, because "nothing happened" is the dangerous assumption to leave
+  somebody with. A streamed TSV collection that fails after its first row keeps
+  the rows it had already written, because TSV puts a row on the wire the moment
+  it arrives and no failure can unwrite it; the error on stderr says how many are
+  out there. Both are named in `docs/output-contract.md`. The second is a split
+  along `--format`, because the same collection refused for the same reason
+  writes nothing at all under XML, JSON, and YAML, and it is stated rather than
+  closed: closing it means buffering every format, which is what streaming exists
+  not to do.
   **Enforced by:** `TestErrorsGoToStderrAndLeaveStdoutClean`,
-  `TestStdoutOwnersEmitNothingElse`.
+  `TestStdoutOwnersEmitNothingElse`,
+  `TestAStreamedFailureLeavesTheRowsItAlreadyWroteAndSaysSo`,
+  `TestAFailureBeforeTheFirstRowStillWritesNothing`,
+  `TestAHalfAppliedWriteReachesStdoutAndStillFails`,
+  `TestAnOrdinaryFailureStillWritesNothingToStdout`.
 - **A refusal names the record it refused.** A validation path is built from
   element names, so it is the same string for every row in a collection: without
   this a caller is told which field was refused and has to bisect `--limit` to
