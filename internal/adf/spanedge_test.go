@@ -90,3 +90,59 @@ func TestSplitHelpersMatchJoinedOnTheSeeds(t *testing.T) {
 		}
 	}
 }
+
+// TestInsideLiveReadsEscapesFromTheStart pins the third member of the
+// "which delimiter is live" family, which is here because it is the same
+// parity question the two above it answer and it got the answer wrong.
+//
+// insideLive reports a delimiter that would close a span early, and it excludes
+// the two ends because a delimiter flush against either of them is the flush
+// check's question instead. It used to start its scan at the first byte
+// strictly inside as well, so a backslash at index 0 was never consumed and the
+// character it escapes was counted as live. `\*0` is what an emphasised node
+// holding `*0` renders to, and reading its asterisk as a delimiter cost that
+// span both of its spellings. See the 2026-08-18 cases in
+// TestADelimiterIsWrittenOnlyWhereItCanBeRead for what the writer did next.
+func TestInsideLiveReadsEscapesFromTheStart(t *testing.T) {
+	for _, c := range []struct {
+		s    string
+		char byte
+		want bool
+	}{
+		// The find: an escape whose backslash is the first byte.
+		{`\*0`, '*', false},
+		{`\_0`, '_', false},
+		{`\**`, '*', false},
+
+		// The parity, which continues to hold from index 0. An escaped
+		// backslash escapes nothing, so the delimiter behind it is live.
+		{`\\*0`, '*', true},
+		{`\\\*0`, '*', false},
+		{`\\\\*0`, '*', true},
+
+		// An escape anywhere else, which is what the scan already read.
+		{`0\*0`, '*', false},
+		{`0\\*0`, '*', true},
+
+		// A live delimiter strictly inside is the whole point.
+		{"0*0", '*', true},
+		{"a_b", '_', true},
+
+		// Neither end counts: both belong to the flush check.
+		{"*0*", '*', false},
+		{"*0", '*', false},
+		{"0*", '*', false},
+		{"**", '*', false},
+		{"*", '*', false},
+		{"", '*', false},
+		{`\*`, '*', false},
+
+		// The character asked about is the only one that answers.
+		{"0_0", '*', false},
+		{"0*0", '_', false},
+	} {
+		if got := insideLive(c.s, c.char); got != c.want {
+			t.Errorf("insideLive(%q, %q) = %v, want %v", c.s, string(c.char), got, c.want)
+		}
+	}
+}

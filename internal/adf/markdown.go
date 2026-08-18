@@ -572,7 +572,7 @@ func renderChoices(choices []spanChoice, nodes []Node, i int, applied []Mark,
 			// a mark and there is no cut where the mark itself ends. So every
 			// choice reaches renderSpan at least once, and the caller always
 			// has either a span or a reason.
-			if j < c.j && strands(nodes, j) {
+			if j < c.j && (strands(nodes, j) || cutRunsTogether(c.mark)) {
 				continue
 			}
 			span, err := renderSpan(nodes, i, j, c.mark, applied, written, b, where)
@@ -601,6 +601,34 @@ func renderChoices(choices []spanChoice, nodes []Node, i int, applied []Mark,
 func strands(nodes []Node, j int) bool {
 	return strings.TrimRight(nodes[j-1].Text, edgeSpace) != nodes[j-1].Text ||
 		strings.TrimLeft(nodes[j].Text, edgeSpace) != nodes[j].Text
+}
+
+// cutRunsTogether reports a mark whose delimiter cannot be written twice in a
+// row, so a span of it is written at its full extent or not at all.
+//
+// A strike is `~~` whatever sits beside it: GFM gives it no flanking rules, so
+// nothing outside it can make it inert the way an underscore goes inert inside
+// a word. What can is another `~~` flush against it, because a reader takes
+// four tildes for text. A cut leaves the rest of the mark to open its own span
+// at the cut with nothing in between, so `~~a~~~~b~~` is what a cut strike
+// writes, and the one thing that would hold the two runs apart is whitespace
+// at the cut, which strands has already refused for its own reason.
+//
+// Refusing the cut is not refusing the document. renderChoices answers it the
+// way it answers any refused spelling, by opening the span with the next mark
+// instead, and where the node carries one that reaches as far the document
+// comes out written the other way round: a strike over emphasised `a.` and a
+// word is `*~~a.~~*~~b~~`, both marks where the document put them. Only a span
+// whose first node carries nothing else has no spelling left, and that one is
+// refused, which is the answer every unwritable document gets.
+//
+// The fuzzer reported this shape three times in two days, twice as a span
+// inside the strike refused over a collision that was not there and once with
+// nothing wrong upstream of it at all. Both of those causes are fixed. This is
+// the ending they shared, and it is the one that made them wrong documents
+// rather than refusals.
+func cutRunsTogether(m Mark) bool {
+	return m.Type == "strike"
 }
 
 // isNoSpelling reports a span refused for the way it was about to be written
@@ -985,13 +1013,31 @@ func merges(char byte, inner string, prev rune, prevLive byte, next rune) bool {
 }
 
 // insideLive reports an unescaped delimiter somewhere other than the two ends.
+//
+// The two ends are excluded because a delimiter flush against either of them is
+// the flush check's question, not this one. Which characters are escaped is a
+// separate matter, and it is read from the start of the string: the scan used
+// to begin at the first interior byte, so a backslash sitting at index 0 was
+// never consumed and the character it escaped was counted as live.
+//
+// That is one byte of state and it cost a span. `\*0` is an escaped asterisk
+// and a digit, and it is what an emphasised text node holding `*0` renders to.
+// Reading its `*` as live said the asterisk spelling would close the span
+// early, so the span was refused, and the only other spelling is `_`, which
+// cannot close in front of the digit that followed. With no spelling for the
+// emphasis, the strike around it was cut back to the first of its two nodes,
+// and a cut strike writes its closing `~~` against the next one's opening
+// `~~`. A reader takes `~~~~` for four literal tildes. Same ending as the
+// `after` bug of the day before, which is further down this file, reached from
+// the other side of one question: what is actually written where the delimiter
+// goes.
 func insideLive(s string, char byte) bool {
-	for i := 1; i < len(s)-1; i++ {
+	for i := 0; i < len(s); i++ {
 		if s[i] == '\\' {
 			i++
 			continue
 		}
-		if s[i] == char {
+		if i > 0 && i < len(s)-1 && s[i] == char {
 			return true
 		}
 	}
@@ -1118,10 +1164,21 @@ func endsWithLiveOf(prefix, suffix string) byte {
 
 // after is the character a span will sit against on its right.
 //
-// A neighbouring node carrying emphasis renders starting with its own
+// A neighbouring node carrying a mark renders starting with that mark's
 // delimiter, which is the collision this exists to see; anything else is that
 // node's first character **as it will be written**, which is not the same as
 // the character the node holds.
+//
+// Which mark's delimiter lands there is spanMarks' answer, because spanMarks is
+// the order the writer opens them in and the outermost one is written first.
+// Asking it rather than naming two of the four is the third version of this
+// function and the second bug in it: it knew about emphasis and not about a
+// link, which is written starting with a bracket. A bracket is punctuation and
+// the link's text usually is not, and emphasis ending in punctuation can close
+// in front of the first and not the second, so `*a.*` in front of a link was
+// refused. The sweep of 2026-08-18 reported it as this package refusing to
+// write a document it had produced itself, one conversion earlier, from an
+// inlineCard.
 //
 // It used to be the raw one, over a comment claiming that reading the
 // unescaped text was "conservative in the direction that matters". It is
@@ -1150,14 +1207,8 @@ func after(rest []Node, applied []Mark) rune {
 	if size > 0 && unicode.IsSpace(first) {
 		return first
 	}
-	for _, m := range rest[0].Marks {
-		// A mark already open around both nodes is not written between them.
-		// Which delimiter the next span picks is not known yet, so the
-		// asterisk is assumed: it is the one this span then avoids, and the
-		// next span sees an underscore beside it and keeps the asterisk.
-		if (m.Type == "strong" || m.Type == "em") && !carriesAll(applied, m) {
-			return '*'
-		}
+	if d := opensWith(rest[0], applied); d != 0 {
+		return d
 	}
 	if size == 0 {
 		return 0
@@ -1170,6 +1221,36 @@ func after(rest []Node, applied []Mark) rune {
 		return '\\'
 	}
 	return first
+}
+
+// opensWith is the delimiter a node's own marks put in front of its text, or
+// zero where its text is written first.
+//
+// spanMarks is the order the writer opens marks in, so the outermost mark the
+// node does not already sit inside is the one whose delimiter lands against
+// whatever is on its left. A mark already open around both nodes is not written
+// between them, which is what applied says.
+func opensWith(n Node, applied []Mark) rune {
+	for _, name := range spanMarks {
+		for _, m := range n.Marks {
+			if m.Type != name || carriesAll(applied, m) {
+				continue
+			}
+			switch name {
+			case "link":
+				return '['
+			case "strong", "em":
+				// Which delimiter that span will pick is not known yet, so the
+				// asterisk is assumed: it is the one this span then avoids, and
+				// the next span sees an underscore beside it and keeps the
+				// asterisk.
+				return '*'
+			case "strike":
+				return '~'
+			}
+		}
+	}
+	return 0
 }
 
 // leaf writes one text node, with every span mark already open around it.

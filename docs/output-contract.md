@@ -679,6 +679,15 @@ run together with a neighbouring span's. Where neither spelling would be read
 back as what the document says, the conversion is refused rather than written
 down and hoped over.
 
+Strikethrough has no such choice: it is `~~`, and two of them with nothing
+between them are four tildes to a reader rather than the end of one span and
+the start of another. So a strike is never written narrower than the mark it
+came from. Where that leaves no way to write it, the document is spelled with
+another mark on the outside instead, `*~~a.~~*~~b~~` rather than a strike cut
+in two, and where the span has no other mark to put there it is refused. What
+reaches this is a strike over emphasis markdown itself cannot spell: emphasis
+ending in punctuation with a word character after it.
+
 ## Types
 
 XML has no attribute types, so **every attribute is a string** in JSON and YAML,
