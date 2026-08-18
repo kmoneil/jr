@@ -92,3 +92,58 @@ func requireCode(t *testing.T, err error, code string) *errs.Error {
 	}
 	return structured
 }
+
+// TestTheRateLimitDisclosureRidesTheClockRequest is why ReadStatus exists at
+// all: the headers are on the response the clock already costs, so asking for
+// them separately would be a second round trip for something already in hand.
+func TestTheRateLimitDisclosureRidesTheClockRequest(t *testing.T) {
+	doer := &stubDoer{
+		body: `{"deploymentType":"Cloud","serverTime":"2019-03-04T05:06:07.891-0600"}`,
+		// The canonical spelling is what http.Header.Get matches, and the wire
+		// spelling of the fourth differs from it by case: a map keyed the other
+		// way would silently read nothing.
+		header: map[string][]string{
+			"Ratelimit":             {`"jira-burst-based";r=348;t=1`},
+			"Ratelimit-Policy":      {`"jira-burst-based";q=100;w=1`},
+			"X-Ratelimit-Limit":     {"350"},
+			"X-Ratelimit-Remaining": {"348"},
+		},
+	}
+
+	status, err := site.ReadStatus(t.Context(), doer, site.Info{Kind: site.Cloud})
+	if err != nil {
+		t.Fatalf("read status: %v", err)
+	}
+	if doer.calls != 1 {
+		t.Errorf("calls = %d, want 1: the clock and the limits are one response", doer.calls)
+	}
+	if !status.Limits.Disclosed() {
+		t.Fatal("the site advertised a policy and none was read")
+	}
+	if got := status.Limits.Policy; got != `"jira-burst-based";q=100;w=1` {
+		t.Errorf("policy = %q, want the header verbatim", got)
+	}
+	if got := status.Limits.Remaining; got != "348" {
+		t.Errorf("remaining = %q, want 348", got)
+	}
+	if status.Time.IsZero() {
+		t.Error("the clock came back zero from a response that carried one")
+	}
+}
+
+// TestASiteThatAdvertisesNothingSaysSo is the Data Center case, measured
+// 2026-08-17 against 10.4.0: a normal 200 carries no rate-limit header of any
+// kind. Silence is an answer, and it has to be distinguishable from a zero.
+func TestASiteThatAdvertisesNothingSaysSo(t *testing.T) {
+	doer := &stubDoer{
+		body: `{"deploymentType":"Server","serverTime":"2019-03-04T05:06:07.891-0600"}`,
+	}
+
+	status, err := site.ReadStatus(t.Context(), doer, site.Info{Kind: site.DataCenter})
+	if err != nil {
+		t.Fatalf("read status: %v", err)
+	}
+	if status.Limits.Disclosed() {
+		t.Errorf("limits = %+v, and the site sent no such header", status.Limits)
+	}
+}

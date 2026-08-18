@@ -45,6 +45,20 @@ var KeptHeaders = map[string]string{
 	// echoes it is evidence the correlation works end to end.
 	"X-Request-Id": "transport/transport.go reads the echo to correlate a " +
 		"failure with the request that caused it",
+	// The four below arrived together, on the day something started reading
+	// them. Cloud states its policy on every response and a default Data Center
+	// sends none of them, which was measured on 2026-08-17 and could not be
+	// recorded then: that measurement's own card says these are absent here, so
+	// under the rule above they did not belong yet. `jr doctor` reads them, so
+	// now they do, and the next recording is the first that can carry one.
+	"Ratelimit": "transport/ratelimit.go reads it as what is left of the " +
+		"quota right now, and `jr doctor` reports it",
+	"Ratelimit-Policy": "transport/ratelimit.go reads it as the quota and " +
+		"its window, and `jr doctor` reports it",
+	"X-Ratelimit-Limit": "transport/ratelimit.go reads it as Atlassian's " +
+		"own burst capacity, beside the policy",
+	"X-Ratelimit-Remaining": "transport/ratelimit.go reads it as what is " +
+		"left of that burst capacity",
 }
 
 // keepHeader reports whether a recording keeps this header.
