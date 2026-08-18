@@ -359,7 +359,7 @@ func feedWindow(
 	// `--since -1h` names an instant the site has not reached — a refusal for a
 	// first poll that is nobody's mistake. Everything in a feed is measured on
 	// the server's clock because everything it compares was written there.
-	now, err := ServerNow(ctx, conn, info)
+	now, err := site.Now(ctx, conn, info)
 	if err != nil {
 		return ChangeWindow{}, err
 	}

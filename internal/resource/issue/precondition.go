@@ -3,7 +3,6 @@ package issue
 import (
 	"encoding/base64"
 	"encoding/json"
-	"time"
 
 	"github.com/kmoneil/jr/internal/errs"
 	"github.com/kmoneil/jr/internal/site"
@@ -94,10 +93,8 @@ func EncodePrecondition(info site.Info, key, rawUpdated string) (string, error) 
 // untouched issue as changed, and a false stale write is as wrong as a missed
 // one.
 func preconditionStamp(rawUpdated string) (string, error) {
-	for _, layout := range jiraTimeLayouts {
-		if t, err := time.Parse(layout, rawUpdated); err == nil {
-			return t.UTC().Format(preconditionLayout), nil
-		}
+	if t, ok := site.ParseTime(rawUpdated); ok {
+		return t.Format(preconditionLayout), nil
 	}
 	return "", errs.Remote("MALFORMED_TIMESTAMP",
 		"Jira returned an updated timestamp this tool cannot parse").

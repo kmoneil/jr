@@ -1,7 +1,6 @@
 package issue_test
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -280,40 +279,4 @@ func TestAnEmptyWindowIsAllowed(t *testing.T) {
 	if w.Holds(at) {
 		t.Error("a change at the previous bound was reported again")
 	}
-}
-
-// TestServerNowReadsTheSiteClockAndNotThisOne is the reason the feed spends a
-// request on /serverInfo. The clock the window is bounded by has to be the one
-// that stamped the timestamps it will be compared against.
-func TestServerNowReadsTheSiteClockAndNotThisOne(t *testing.T) {
-	doer := &stubDoer{body: `{"deploymentType":"Cloud","version":"1001.0.0",` +
-		`"serverTime":"2019-03-04T05:06:07.891-0600"}`}
-
-	got, err := issue.ServerNow(context.Background(), doer, site.Info{Kind: site.Cloud})
-	if err != nil {
-		t.Fatalf("server now: %v", err)
-	}
-	// A date no machine running this test has on its own clock, and an offset
-	// that is not UTC, so an implementation reading either would fail here.
-	want := time.Date(2019, 3, 4, 11, 6, 7, 891_000_000, time.UTC)
-	if !got.Equal(want) {
-		t.Errorf("server now = %s, want %s", got, want)
-	}
-}
-
-func TestServerNowRefusesASiteThatReportsNoClock(t *testing.T) {
-	doer := &stubDoer{body: `{"deploymentType":"Cloud","version":"1001.0.0"}`}
-
-	_, err := issue.ServerNow(context.Background(), doer, site.Info{Kind: site.Cloud})
-	e := wantCode(t, err, "NO_SERVER_TIME")
-	if e.Detail == "" {
-		t.Error("refusal does not say why the clock is needed")
-	}
-}
-
-func TestServerNowRefusesAClockItCannotParse(t *testing.T) {
-	doer := &stubDoer{body: `{"deploymentType":"Cloud","serverTime":"last Tuesday"}`}
-
-	_, err := issue.ServerNow(context.Background(), doer, site.Info{Kind: site.Cloud})
-	_ = wantCode(t, err, "MALFORMED_TIMESTAMP")
 }
