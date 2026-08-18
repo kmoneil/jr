@@ -1,8 +1,9 @@
 # Output contract
 
-The output shape is a public API. It is versioned, and breaking it requires a
-major bump. While the release version starts with a zero, that bump moves the
-minor position; see [Stability policy](#stability-policy).
+The output shape is a public API. It is versioned, and a change that breaks it
+moves the minor position of the release while the version starts with a zero;
+an additive one moves the patch. See [Stability policy](#stability-policy),
+where every rule says which position it moves.
 
 This document describes what `jr` emits. It is the reference a consumer pins
 against; `jr contract` emits the machine-readable form of the same thing.
@@ -204,7 +205,7 @@ read XML, and it may change in any release, with no version bump and no note.
 
 Do not parse it. If something is parsing output, it wants `tsv`, `json`, or
 `xml`, all of which are versioned and none of which will change shape without a
-major bump.
+release that moves the minor position.
 
 Three things keep the exception contained rather than making it a hole:
 
@@ -1398,72 +1399,122 @@ diffing two runs must not see a difference that means nothing.
 
 ## Stability policy
 
-- Adding a new optional element or attribute: **minor**.
-- Making a required element or attribute optional: **major**. It reads like the
-  bullet above and is its opposite. An addition is something no existing
-  consumer looks for; this is something an existing consumer already reads, and
-  it will now sometimes not be there.
-- Adding a field to a command's _default_ column set: **major**. Agents diff
-  output.
-- Changing an exit code's meaning, an error `code` string, or a `kind`:
-  **major**.
-- Refusing an input that used to be accepted: **major**. Nothing about the
-  output's shape moves, so a script still _parses_ every document identically —
-  and the invocation it was built around now exits 2. This row was missing until
-  0.3.0, whose whole content is three date forms that used to be accepted and
-  answered wrongly. Fixing a wrong answer is not a reason to spare the version:
-  the caller has to change what they send either way, and the version number is
-  the only place they find that out before it happens.
-- Accepting an input that used to be refused: **minor**, and it is the row above
-  read backwards. Every invocation a script already makes still runs and still
-  means the same thing; what changed is that a form which exited 2 now answers.
-  The reader this matters to is the one who *worked around* the refusal, and
-  minor is where they look for that. The row exists because the two directions
-  are not symmetric and a policy that names only one of them is silent rather
-  than permissive about the other, which is how 0.3.0 nearly shipped as a patch.
-- Moving a refusal earlier, so that the same input carries a different `code`:
-  **major**, for the same reason and against the same reader. `BAD_REQUEST` from
-  Jira and `INVALID_DATE` from `jr` describe one mistake, and a consumer
-  branching on `code` sees a string it has never seen. The exit is unchanged and
-  that is not enough, because `code` is the field the contract tells people to
-  branch on.
-- Adding a warning `code`: **minor**, and it bumps no kind version. A warning is
-  a separate document on stderr, so no existing consumer is reading for one it
-  has never seen, and a command that gains a warning emits the same result it
-  did before. Changing what an existing warning code means is **major**, for the
-  reason an error code is.
-- Populating an optional element the schema already declared, for inputs where
-  it used to be absent: **minor**, and it bumps no kind version. The shape did
-  not move: the element was in the schema, in `jr contract`, and in this
-  document, and a consumer was already told it might be there. What moved is how
-  often it is. This is the row the previous one read backwards from: a warning
-  gaining a `code` is new information in a place nobody was reading, and this is
-  new information in a place everybody was told to read and some inputs never
-  filled. The reader it matters to is the one who inferred a rule from the
-  silence, the way "no `warning` child means the query is clean" was true of
-  every Cloud query before 0.3.3 and is now true only of clean ones. Emptying an
-  element that used to be populated is **major**, because that reader's
-  inference fails in the direction that loses information rather than gains it.
-- `jr contract` (or `jr --contract`) dumps the machine-readable schema for every
-  kind this build can emit, so a consumer can pin and verify.
+Every rule below says which position of the release version moves. That is the
+question somebody actually has, and until 2026-08-18 this document answered a
+different one: it classified a change as major or minor and left the reader to
+apply a demotion two sections further down. Three releases got the wrong number
+that way, so the classification and its consequence are now in the same clause.
 
-### What "major" means before 1.0.0
+**A change is either breaking or additive.** Breaking means an invocation a
+caller already makes, or a document a consumer already parses, stops working or
+changes shape. Additive means everything a caller does today still does the same
+thing, and there is something new beside it.
+
+While the release version starts with a zero, and it will for a long time:
+
+| The change is | The release moves       | Example         |
+| ------------- | ----------------------- | --------------- |
+| breaking      | the **minor** position  | 0.8.0 to 0.9.0  |
+| additive      | the **patch** position  | 0.8.0 to 0.8.1  |
+
+The rows:
+
+- Adding a new optional element or attribute: **additive, so the patch position
+  moves.**
+- Making a required element or attribute optional: **breaking, so the minor
+  position moves.** It reads like the row above and is its opposite. An addition
+  is something no existing consumer looks for; this is something an existing
+  consumer already reads, and it will now sometimes not be there.
+- Adding a field to a command's _default_ column set: **breaking, so the minor
+  position moves.** Agents diff output.
+- Changing an exit code's meaning, an error `code` string, or a `kind`:
+  **breaking, so the minor position moves.**
+- Refusing an input that used to be accepted: **breaking, so the minor position
+  moves.** Nothing about the output's shape moves, so a script still _parses_
+  every document identically, and the invocation it was built around now exits
+  2. This row was missing until 0.3.0, whose whole content is three date forms
+  that used to be accepted and answered wrongly. Fixing a wrong answer is not a
+  reason to spare the version: the caller has to change what they send either
+  way, and the version number is the only place they find that out before it
+  happens.
+- Accepting an input that used to be refused: **additive, so the patch position
+  moves.** It is the row above read backwards. Every invocation a script already
+  makes still runs and still means the same thing; what changed is that a form
+  which exited 2 now answers. The reader this matters to is the one who
+  *worked around* the refusal, and the changelog is where they find it. The row
+  exists because the two directions are not symmetric and a policy that names
+  only one of them is silent rather than permissive about the other, which is
+  how 0.3.0 nearly shipped as a patch.
+- Moving a refusal earlier, so that the same input carries a different `code`:
+  **breaking, so the minor position moves**, for the same reason as refusing one
+  and against the same reader. `BAD_REQUEST` from Jira and `INVALID_DATE` from
+  `jr` describe one mistake, and a consumer branching on `code` sees a string it
+  has never seen. The exit is unchanged and that is not enough, because `code`
+  is the field this contract tells people to branch on.
+- Adding a warning `code`: **additive, so the patch position moves**, and it
+  bumps no kind version. A warning is a separate document on stderr, so no
+  existing consumer is reading for one it has never seen, and a command that
+  gains a warning emits the same result it did before. Changing what an existing
+  warning code means is **breaking**, for the reason an error code is.
+- Populating an optional element the schema already declared, for inputs where
+  it used to be absent: **additive, so the patch position moves**, and it bumps
+  no kind version. The shape did not move: the element was in the schema, in
+  `jr contract`, and in this document, and a consumer was already told it might
+  be there. What moved is how often it is. This is the row the previous one read
+  backwards from: a warning gaining a `code` is new information in a place
+  nobody was reading, and this is new information in a place everybody was told
+  to read and some inputs never filled. The reader it matters to is the one who
+  inferred a rule from the silence, the way "no `warning` child means the query
+  is clean" was true of every Cloud query before 0.3.3 and is now true only of
+  clean ones. Emptying an element that used to be populated is **breaking**,
+  because that reader's inference fails in the direction that loses information
+  rather than gains it.
+- Adding a command: **additive, so the patch position moves.** No invocation
+  anybody makes changes, no document anybody parses changes shape, and
+  `jr schema` grows by a leaf. The reader it matters to is looking for a
+  capability, and a capability is something you find in the changelog by name,
+  not by noticing a digit moved. **This row did not exist until 2026-08-18 and
+  its absence cost three releases**, because a new command is the most visible
+  thing a release can contain and the demotion makes it look like the least.
+- Adding a `kind`: **additive, so the patch position moves**, on the same
+  terms. A kind nothing emitted before has no consumer to break: nothing
+  dispatches on a name no command produced. **The exception is a kind a command
+  that already exists starts emitting**, which is **breaking**, because a
+  consumer dispatching on `kind` sees one it has never seen from an invocation
+  it was already making. That is the same failure as changing a `kind`, arriving
+  by addition, and it is why the row is about which command emits it rather than
+  about the kind alone.
+- `jr contract` (or `jr --contract`) dumps the machine-readable schema for every
+  kind this build can emit, so a consumer can pin and verify. That is not a rule
+  about versions; it is what makes the rules checkable.
+
+### Why the positions are shifted, and what changes at 1.0.0
 
 This project is in `0.y.z`, where
 [semver §4](https://semver.org/spec/v2.0.0.html#spec-item-4) says the public API
-is not to be considered stable and anything may change. **So a change marked
-major above moves the minor position while the release version starts with a
-zero: 0.1.1 to 0.2.0, not to 1.0.0 and not to 0.1.2.** Tagging 1.0.0 is a claim
-about how stable this tool intends to be from then on, and no single breaking
-change is a reason to make that claim.
+is not to be considered stable and anything may change. So the whole scale sits
+one position to the right of where semver puts it: breaking takes the minor,
+additive takes the patch, and **the major position is not in use.**
 
-**The demotion cascades, so a change marked minor above moves the patch
-position: 0.2.0 to 0.2.1.** A new command, a new flag, a new warning code, and
-a new optional attribute are all minor, and none of them can move the minor
-position while a breaking change is doing so, or the two would be
-indistinguishable in the only place a consumer looks. This half was inferred
-for two releases before it was written down, and 0.2.1 is the first release
-that had to choose.
+Tagging 1.0.0 is a claim about how stable this tool intends to be from then on,
+and no single breaking change is a reason to make that claim. It is also not a
+countdown: after 0.9.0 comes **0.10.0**, which semver orders above it, and the
+leading zero stays until somebody decides the contract is stable rather than
+until the digits run out.
+
+**Additive changes take the patch position so that a breaking one is visible.**
+That is the whole reason for the shift. A consumer looks at one digit to decide
+whether to read the changelog carefully, and if a new command and a changed
+default column set both move the same digit, that digit has stopped telling them
+anything. The cost is real and it is paid on purpose: `jr doctor` shipped in a
+release whose number says "patch", which understates it to a human reading the
+notes and is exactly right for a script.
+
+**At 1.0.0 every row above moves one position left**: breaking takes the major,
+additive takes the minor, and patch means a fix that changes nothing in this
+document. The rows say "minor" and "patch" today because that is what is true
+today; the release that tags 1.0.0 rewrites them in the same commit, and that is
+the whole of the migration.
 
 The kind versions are unaffected by any of this, and they are what a consumer
 should actually be pinning. They are per-kind and start at 1, so `issue.get`
@@ -1473,8 +1524,38 @@ you a shape moved somewhere; `kind` and `v` tell you whether it was yours.
 
 A Conventional Commit's `!` and its `BREAKING CHANGE:` footer mark the shape
 change wherever it lands, and they do not decide where. `feat(issue)!:` in a
-0.x release is a minor bump, and the footer is still how the changelog and
-anyone reading `git log` find it.
+0.x release moves the minor position, and the footer is still how the changelog
+and anyone reading `git log` find it.
+
+### Three releases took the wrong position, and these rows are why
+
+Checked against the tag history on 2026-08-18, when the two rows for a command
+and a kind were written:
+
+```
+0.3.1  added an optional attribute            additive  patch  correct
+0.3.2  accepted input that used to be refused additive  patch  correct
+0.3.3  populated an optional element          additive  patch  correct
+0.4.0  some bodies now refuse                 breaking  minor  correct
+0.5.0  a --jql fragment now exits 2           breaking  minor  correct
+0.6.0  a new optional element on two errors   additive  minor  should have been 0.5.1
+0.7.0  a command, a kind, an optional element additive  minor  should have been 0.6.1
+0.8.0  a command and a kind                   additive  minor  should have been 0.7.1
+```
+
+Each of the last three said in its own changelog section, in plain words, that
+it was "minor rather than a patch" and that its content was additive. Nobody
+misread the policy: the policy had no row for a new command or a new kind, so
+each release reached for the nearest precedent, and the precedent was the
+previous release that had done the same thing. **A rule that has to be assembled
+from two sections gets assembled differently by the same person on different
+days**, which is what those three numbers are.
+
+Nothing is re-tagged. A published tag cannot be moved once anyone has fetched
+it, the numbers only ever went up, and no consumer was misled in the dangerous
+direction: every one of those releases claimed *more* change than it contained.
+They are listed here because a policy that quietly disagrees with the history it
+governs is worth less than one that says where it was not followed.
 
 ## Verifying against `jr contract`
 
@@ -1617,6 +1698,12 @@ Update this document in the same change that alters any of:
   in repositories it builds, and every worked `jr 1.2.0 (…)` example in this
   file and in `docs/build-profiles.md` against the profiles the Makefile ships.
 - The escaping rules of any writer, or the type-promotion table above.
+- **A change nobody has a stability-policy row for.** Cutting a release is when
+  that gap shows, and the answer has three times been the previous release
+  rather than this document. Write the row in the same change as the behaviour,
+  not in the changelog that needs it: a row costs a paragraph, and a precedent
+  set in prose costs the next person the same half hour and can disagree with
+  the rule nobody thought to check it against.
 - Which format is the default for a content shape.
 - What the ADF converter carries, drops, or refuses, in either direction,
   including the `jira-` link schemes, which are as much a part of the contract
