@@ -373,6 +373,35 @@ func table(n Node, where string) (string, error) {
 	}
 
 	width := len(rows[0])
+
+	// A row wider than the header has nowhere to put the cells past that width.
+	// The grid is implied by the pipes, so tableLine writes the header's number
+	// of them and everything after it falls off the end of the same loop. It
+	// did exactly that until 2026-08-18, with err nil and exit 0: three cells
+	// of content under a one-cell header came out as one.
+	//
+	// GFM ignores the excess by definition, so there is no spelling to fall
+	// back to, and widening the table would invent the header cells nobody
+	// wrote. That is why this is refused and the short row is not: padding a
+	// short row adds empty cells and invents nothing a reader sees, and
+	// dropping a cell loses what somebody typed.
+	//
+	// This is also what refuses the markdown, and not through a second check.
+	// FromMarkdown builds each row from its own pipe count with no reference to
+	// the header, so a one-cell header over a two-cell body row is a document
+	// it will happily build; its closing self-check calls this function and
+	// gets this refusal. The two defects were hiding each other, which is why
+	// neither showed: the parser kept a cell GFM discards, the writer dropped a
+	// cell that existed, and the round trip came out looking clean.
+	for i, row := range rows[1:] {
+		if len(row) > width {
+			return "", unrepresentable(
+				fmt.Sprintf("%s > tableRow %d", where, i+2),
+				"a table row of %d cells under a header row of %d",
+				len(row), width)
+		}
+	}
+
 	var b strings.Builder
 	b.WriteString(tableLine(rows[0], width))
 	b.WriteString("\n|")

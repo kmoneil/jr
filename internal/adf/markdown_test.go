@@ -428,6 +428,15 @@ func TestUnrepresentableIsRefusedByName(t *testing.T) {
 				{"type":"tableCell","content":[{"type":"paragraph","content":[{"type":"text","text":"a"}]}]}]}]}`),
 		says: "no header row",
 	}, {
+		name: "a table row wider than its header",
+		adf: wrap(`{"type":"table","content":[
+			{"type":"tableRow","content":[
+				{"type":"tableHeader","content":[{"type":"paragraph","content":[{"type":"text","text":"h"}]}]}]},
+			{"type":"tableRow","content":[
+				{"type":"tableCell","content":[{"type":"paragraph","content":[{"type":"text","text":"a"}]}]},
+				{"type":"tableCell","content":[{"type":"paragraph","content":[{"type":"text","text":"b"}]}]}]}]}`),
+		says: "under a header row of 1",
+	}, {
 		name: "a custom panel, whose colour is content",
 		adf:  wrap(`{"type":"panel","attrs":{"panelType":"custom","panelColor":"#ff0000"},"content":[]}`),
 		says: `"custom" panel`,
@@ -585,4 +594,77 @@ func TestParseBoundsNesting(t *testing.T) {
 func quoteJSON(s string) string {
 	r := strings.NewReplacer(`\`, `\\`, `"`, `\"`, "\n", `\n`)
 	return `"` + r.Replace(s) + `"`
+}
+
+// TestARowWiderThanItsHeaderIsRefusedRatherThanTruncated covers a silent loss
+// that shipped, and the two halves of it that were hiding each other.
+//
+// `table` takes its width from the header row and `tableLine` writes exactly
+// that many cells, so a body row holding more had every cell past the width
+// dropped, with err nil and exit 0. tableLine's own doc comment reasons about
+// the short row, which it pads; the long row went through the same loop and
+// fell off the end of it.
+//
+// The parse side is the same rule from the other direction and needs no second
+// check. FromMarkdown builds each row from its own pipe count with no reference
+// to the header, so it will build two cells under a one-cell header, which GFM
+// says is a one-column table whose second cell does not exist. Its closing
+// self-check calls ToMarkdown, which is why one refusal covers both: the
+// converter kept a cell GFM discards and then dropped it again on the way out,
+// and the round trip came back looking clean.
+//
+// The short row is deliberately still accepted in both directions. Padding one
+// adds empty cells and invents nothing a reader can see; dropping one loses
+// what somebody typed.
+func TestARowWiderThanItsHeaderIsRefusedRatherThanTruncated(t *testing.T) {
+	const wide = `{"type":"table","content":[
+		{"type":"tableRow","content":[
+			{"type":"tableHeader","content":[{"type":"paragraph","content":[{"type":"text","text":"h"}]}]}]},
+		{"type":"tableRow","content":[
+			{"type":"tableCell","content":[{"type":"paragraph","content":[{"type":"text","text":"kept"}]}]},
+			{"type":"tableCell","content":[{"type":"paragraph","content":[{"type":"text","text":"dropped"}]}]},
+			{"type":"tableCell","content":[{"type":"paragraph","content":[{"type":"text","text":"also"}]}]}]}]}`
+
+	t.Run("the writer refuses it and names the row", func(t *testing.T) {
+		got, err := convert(t, wrap(wide))
+		if err == nil {
+			t.Fatalf("a row of 3 cells under a header of 1 converted to %q, "+
+				"which is two cells of content the reader never sees", got)
+		}
+		for _, want := range []string{"3 cells", "header row of 1", "tableRow 2"} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("the refusal does not say %q:\n%v", want, err)
+			}
+		}
+	})
+
+	t.Run("the markdown is refused by the same check", func(t *testing.T) {
+		if _, err := adf.FromMarkdown("| a |\n| --- |\n| b | c |"); err == nil {
+			t.Error("markdown holding a row wider than its header was accepted, " +
+				"so a cell GFM discards went to Jira as content")
+		}
+	})
+
+	t.Run("a short row is still written, padded", func(t *testing.T) {
+		const short = `{"type":"table","content":[
+			{"type":"tableRow","content":[
+				{"type":"tableHeader","content":[{"type":"paragraph","content":[{"type":"text","text":"a"}]}]},
+				{"type":"tableHeader","content":[{"type":"paragraph","content":[{"type":"text","text":"b"}]}]}]},
+			{"type":"tableRow","content":[
+				{"type":"tableCell","content":[{"type":"paragraph","content":[{"type":"text","text":"only"}]}]}]}]}`
+		got, err := convert(t, wrap(short))
+		if err != nil {
+			t.Fatalf("a short row was refused, which loses nothing and should "+
+				"pad: %v", err)
+		}
+		if want := "| a | b |\n| --- | --- |\n| only |  |"; got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("a rectangular table is untouched", func(t *testing.T) {
+		if _, err := adf.FromMarkdown("| a | b |\n| --- | --- |\n| c | d |"); err != nil {
+			t.Errorf("an ordinary table was refused: %v", err)
+		}
+	})
 }

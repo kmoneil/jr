@@ -659,13 +659,19 @@ unchanged and so is what a reader sees; only the extent of the mark moves, by
 exactly the whitespace nobody can see it on. And a GFM table is rectangular, so a
 table row holding fewer cells than the header row is padded to the header's
 width with empty ones: the cells it gains are empty, so nothing a reader sees is
-invented, and the row keeps the shape the header says the table has.
+invented, and the row keeps the shape the header says the table has. A row
+holding *more* cells than the header is refused rather than padded, and the
+asymmetry is the point: those cells hold content somebody wrote, GFM has nowhere
+to put them, and writing the table without them is the silent truncation this
+contract exists to prevent.
 
 Everything else is refused by name. That includes underlined, coloured,
 superscript, subscript, aligned, indented, and annotated text; collapsible
 sections; multi-column layouts; decision lists; macros and extensions; custom
 panels, whose colour is content; table cells that span rows or columns, hold
-more than a single paragraph, or sit in a table with no header row; and any
+more than a single paragraph, or sit in a table with no header row; a table row
+holding more cells than its header row, which GFM discards rather than writes;
+and any
 node type or mark this build does not know. A node-level JSON field the schema
 does not define is refused too, rather than ignored, ignoring one converts a
 document while silently leaving part of it out.
