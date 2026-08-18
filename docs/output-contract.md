@@ -647,7 +647,7 @@ and loses its colour, an image keeps its id and alt text and loses its layout
 and width, a status keeps its text and colour and loses its local id. Markdown
 has no page, so there is nowhere for a position on one to go.
 
-Two more things move rather than being dropped or refused. A line break at the
+Three more things move rather than being dropped or refused. A line break at the
 very start or end of a block is discarded, because markdown cannot write one
 there and Jira does not render one either, it is what pressing shift-enter at
 the end of a paragraph leaves behind. And whitespace at the edge of an
@@ -656,7 +656,10 @@ space, `* x*` is an asterisk and a word, not a span, and Jira's editor
 produces one whenever somebody bolds a word and then types the space after it.
 The space is written outside the delimiters instead. Every character is
 unchanged and so is what a reader sees; only the extent of the mark moves, by
-exactly the whitespace nobody can see it on.
+exactly the whitespace nobody can see it on. And a GFM table is rectangular, so a
+table row holding fewer cells than the header row is padded to the header's
+width with empty ones: the cells it gains are empty, so nothing a reader sees is
+invented, and the row keeps the shape the header says the table has.
 
 Everything else is refused by name. That includes underlined, coloured,
 superscript, subscript, aligned, indented, and annotated text; collapsible

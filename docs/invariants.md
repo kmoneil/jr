@@ -292,6 +292,19 @@ do not catch, add the test in the same change and cite it here.
   every corpus input is a golden, so a refusal moving in either direction is a
   reviewable line in a pull request rather than a number nobody computed.
   **Enforced by:** `TestTheRefusalSetIsPinned`.
+- **A document the converter writes reads back as the document it came from.**
+  `FuzzMarkdownRoundTrips` permits the first conversion to change the text, for
+  a real reason: emphasis has two spellings, so `_**x**_` and `***x***` are one
+  document written two ways. The allowance is not restricted to spelling, and a
+  first pass that moves a mark across a boundary, drops a node, or changes a
+  table's shape converges exactly as readily. Sixty-five inputs already in that
+  fuzzer's own corpus lose something on the first pass and it is green on all of
+  them. The comparison is a projection, which marks each non-whitespace
+  character carries inside which blocks, because mark order and a mark on
+  whitespace are not content. Losses are a golden over the adversarial corpus
+  and a named list with a reason over the documents Jira really stored.
+  **Enforced by:** `TestTheDocumentSurvivesTheWriter`,
+  `TestEveryRealDocumentSurvivesTheWriter`.
 - **A strike span is never written narrower than the mark it came from.** `~~`
   has no flanking rules, so nothing beside it can make it inert and the only
   thing that changes what it means is another `~~` flush against it, which a
