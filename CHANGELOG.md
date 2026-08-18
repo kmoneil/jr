@@ -20,6 +20,85 @@ accident.
 
 Nothing yet.
 
+## [0.7.1] - 2026-08-18
+
+Emphasis this converter could spell is no longer refused, and a strike is never
+written in two pieces.
+
+**Nothing changed shape.** No kind moved a schema version, no default column set
+gained a field, and no exit code or error `code` changed meaning.
+
+A patch, and the row that decides it is [accepting an input that used to be
+refused](docs/output-contract.md#stability-policy): fifteen markdown bodies that
+exited 2 now convert, which is minor, cascading to the patch position the way
+every minor does in `0.y.z`. Nothing moved the other way. No markdown input that
+used to be accepted is refused, measured over the 2371 inputs in the converter's
+verdict golden, which is the file that exists to see exactly that.
+
+One class of Cloud *document* does move in the other direction, and it is the
+third item below. It is not the row above read backwards: that row is about
+input a caller sends, and this is a body Jira stores. The old answer for it was
+text that said something the document did not, so there is nothing there that a
+consumer could have been reading correctly.
+
+### Fixed
+
+- **A span whose text opens on an escaped delimiter is no longer refused.** The
+  writer asks whether a live delimiter sits strictly inside a span and would
+  close it early, and it read the escapes from one byte too far in, so the
+  asterisk in `\*0` counted as live. `\*0` is what emphasis over the text `*0`
+  renders to, so the asterisk spelling was refused over a collision that is not
+  there, and the underscore cannot close in front of the digit that follows.
+
+  ```console
+  $ jr issue comment add ENG-101 '**\*0**0' --body-format markdown
+  ```
+
+  Fifteen inputs are affected, every one of them a span whose content opens on
+  an escape. They are not new spellings: they are documents that always had one.
+
+- **Emphasis in front of a link is no longer refused.** The writer asks what
+  character its closing delimiter will sit against, and for a neighbour carrying
+  a link the answer is the bracket that opens it, not the first character of the
+  link's text. A bracket is punctuation and the text usually is not, and
+  emphasis ending in punctuation can close in front of the first and not the
+  second, so `*a.*` in front of a link exited 2. It asks the order the writer
+  opens marks in now, so a link's bracket and a strike's tilde both come from
+  the list that decides them.
+
+- **A strike is never written in two pieces, and where that leaves no spelling
+  the body is refused rather than written wrongly.** `~~` has no flanking rules
+  in GFM, so nothing beside it can make it inert, and the only thing that
+  changes what it means is another `~~` flush against it: four tildes are text
+  to a reader. Writing a span narrower is how this converter answers a span it
+  cannot spell, and for a strike that leaves the rest of the mark to open its
+  own span at the cut with nothing in between, so the narrower spelling was the
+  corruption. A strike over emphasised `a.` and a word came back as
+  `~~*a.*~~~~b~~` in the `format="markdown"` body of `jr issue get`.
+
+  Those four tildes came back as text on the next conversion, and the document
+  no longer said what Jira stored. It is written the other way round now, with
+  the emphasis outside, `*~~a.~~*~~b~~`, which says what it says. **Where the
+  span opens on a node carrying nothing but the strike there is no other mark to
+  put outside, and the body now exits 2** with `ADF_UNREPRESENTABLE` naming the
+  construct, where before it produced the four tildes and exited 0. `--raw-body`
+  emits the document exactly as Jira sent it, with `format="adf"`.
+
+  None of the 247 real Cloud documents in this converter's corpus is in that
+  class. It needs a strike over emphasis that markdown itself cannot spell,
+  which is emphasis ending in punctuation with a word character after it.
+
+- **One spelling changes.** Strong over two literal asterisks was written
+  `__\*\*__` and is written `**\*\***` now, which is the asterisk form this
+  writer prefers when nothing beside it merges. Both read back as the same
+  document, and one document in the 247-document corpus is written this way.
+
+### Output contract
+
+- No kind moved. The refusals above are `ADF_UNREPRESENTABLE`, which is the code
+  this conversion has always used for a document markdown cannot represent, and
+  the newly accepted inputs answer with the documents they always would have.
+
 ## [0.7.0] - 2026-08-17
 
 `jr issue changes` answers "what changed since last time" without gaps or
@@ -959,7 +1038,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.7.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.7.1...main
+[0.7.1]: https://github.com/kmoneil/jr/releases/tag/v0.7.1
 [0.7.0]: https://github.com/kmoneil/jr/releases/tag/v0.7.0
 [0.6.0]: https://github.com/kmoneil/jr/releases/tag/v0.6.0
 [0.5.0]: https://github.com/kmoneil/jr/releases/tag/v0.5.0
