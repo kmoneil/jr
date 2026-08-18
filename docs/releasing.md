@@ -74,14 +74,28 @@ reads `CHANGELOG.md` **from the tagged commit**.
 kinds decide the policy: what the release version does follows from whether a
 kind's shape moved and how, not from how much code changed.
 
-The one thing to know before reading it is that **this project is in `0.y.z`, so
-a change the policy calls major moves the minor position.** 0.1.1 to 0.2.0, not
-1.0.0. Tagging 1.0.0 says this tool's shape is stable from then on, and that is
-a decision to make on its own and not as a side effect of one breaking change.
+Every row there names the position it moves, so reading one is the whole of the
+decision. While the version starts with a zero: **a breaking change moves the
+minor position, and an additive one moves the patch.** Tagging 1.0.0 says this
+tool's shape is stable from then on, and that is a decision to make on its own
+and not as a side effect of one breaking change.
+
+**Default to the patch position and make the minor argue for itself.** Only a
+breaking change earns it. A new command and a new kind feel like the biggest
+thing a release can hold and are additive, which is the trap: 0.6.0, 0.7.0 and
+0.8.0 each took the minor position for content their own changelog sections call
+additive, because the rows for a command and a kind did not exist and each
+release reached for the previous one as precedent. Those rows exist now, and the
+policy lists where it was not followed.
 
 A commit carrying `!` and a `BREAKING CHANGE:` footer is how you find those
 changes in `git log` since the last tag. It does not by itself say which
 position moves.
+
+**If nothing in the policy covers the change, write the row before the
+changelog.** That is what produced the three releases above: the number came
+from the nearest precedent, and a precedent set in prose is a rule nobody can
+check the next one against.
 
 ## What the version looks like
 
