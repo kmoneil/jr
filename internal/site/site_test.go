@@ -21,6 +21,10 @@ type stubDoer struct {
 	status int
 	calls  int
 	err    error
+	// header adds response headers beyond Content-Type, for the one caller
+	// that reads any: the rate-limit disclosure a site makes on every response
+	// and a diagnostic reports.
+	header map[string][]string
 }
 
 func (s *stubDoer) Do(context.Context, transport.Request) (*transport.Response, error) {
@@ -32,10 +36,14 @@ func (s *stubDoer) Do(context.Context, transport.Request) (*transport.Response, 
 	if status == 0 {
 		status = 200
 	}
+	header := map[string][]string{"Content-Type": {"application/json"}}
+	for name, values := range s.header {
+		header[name] = values
+	}
 	return &transport.Response{
 		Status: status,
 		Body:   []byte(s.body),
-		Header: map[string][]string{"Content-Type": {"application/json"}},
+		Header: header,
 	}, nil
 }
 
