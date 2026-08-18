@@ -20,6 +20,95 @@ accident.
 
 Nothing yet.
 
+## [0.8.0] - 2026-08-18
+
+`jr doctor` explains why this tool will not work here, one check per layer
+between the binary and an answer from Jira, and reports every one of them
+whether it passed or not.
+
+**It exits 0 whenever the checks ran, whatever they found.** A diagnostic that
+exited non-zero on a finding would make "did the diagnostic run" and "is this
+configuration healthy" the same signal, and telling those apart is the only
+reason to run it. Branch on the document: `doctor/@status` for the roll-up, or
+one check's `@status` for the layer you care about. A non-zero exit means the
+command itself could not run.
+
+The failures it exists for are the ones where the first request fails and the
+reason is three layers below it. A 401 from a Data Center under a context path
+is indistinguishable, from the error alone, from a 401 because the token
+expired, a 401 because a proxy stripped the header, and a 401 because the site
+URL lost its context path and the request reached a different application.
+Each of those was answerable before, by running six commands and knowing which
+six.
+
+Minor rather than a patch on two counts, both additive: a new command and a new
+kind. **No existing kind moved a schema version**, no default column set
+changed, and no exit code or error `code` changed meaning.
+
+### Added
+
+- **`jr doctor`**, which reports eight checks in the order the layers stack:
+  the configuration, the credential, the site URL and its context path, the
+  proxy and TLS settings, the deployment probe, the clock, the account, and
+  whatever the site discloses about rate limits. Each carries `ok`, `failed`,
+  or `skipped`.
+
+  ```console
+  $ jr doctor --format tsv | grep -v $'\tok$'
+  field           value
+  @status         failed
+  @failed         1
+  account/@status failed
+  account/@code   UNAUTHORIZED
+  account/summary Jira rejected the credentials
+  account/remedy  run `jr auth login`, or check that the token has not expired
+  ```
+
+  Every check is reported, including the ones that passed, because a diagnostic
+  that prints only problems cannot be told apart from one whose checks never
+  ran. A `failed` check carries the same `code`, `detail`, and `remedy` the
+  failing layer would have produced on its own, so
+  [troubleshooting.md](docs/troubleshooting.md) answers a code found here or
+  anywhere else. A `skipped` check names the check it was waiting on: read down
+  and act on the first failure, because the ones below it are usually the same
+  cause counted again.
+
+  It needs no credential and no reachable site, and it is in every profile
+  including `reader` and `ci`. A site that answers the deployment probe
+  anonymously is still probed when nothing is stored, so "this site is reachable
+  and is Data Center 10.4" reaches somebody whose actual problem is that they
+  never logged in.
+
+  Three things it reports that no other command will: the URL a request really
+  resolves to, built by the same code that builds a request, so a base and an
+  endpoint that disagree about a context path are visible; the proxy in effect,
+  which comes from `HTTPS_PROXY` and `NO_PROXY` and which nobody configured
+  here; and whether the deployment came from the probe, from its cache, or from
+  `--api-version`, since a stale cached answer and a fresh one are different
+  claims. `--refresh` forces the probe. The clock is never cached, because a
+  cached clock is not a clock.
+
+- **`CLOCK_SKEW`**, the one error `code` only `jr doctor` produces. It compares
+  this machine's clock against the site's own and fails the check at a minute or
+  more apart, because a minute is the finest bound JQL has: no operator this
+  tool can send bisects one, measured on both deployments. A machine a minute
+  out asks Jira for a different window than the one it computed, and every
+  `--since` cursor, relative date, and worklog window is affected silently.
+
+- **What a site discloses about rate limiting**, reported verbatim by the
+  `limits` check: Cloud states a policy on every response and a default Data
+  Center sends none at all. A site that advertises nothing says so rather than
+  reporting zeros.
+
+### Output contract
+
+- **`doctor` v1**, new. One roll-up plus one element per check, each with a
+  closed `status` of `ok`, `failed`, or `skipped`, its own typed attributes, and
+  a `summary`. `jr contract` prints the whole shape.
+
+Nothing else moved. No existing kind changed shape, and every command that ran
+before runs the same way.
+
 ## [0.7.1] - 2026-08-18
 
 Emphasis this converter could spell is no longer refused, and a strike is never
@@ -1038,7 +1127,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.7.1...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.8.0...main
+[0.8.0]: https://github.com/kmoneil/jr/releases/tag/v0.8.0
 [0.7.1]: https://github.com/kmoneil/jr/releases/tag/v0.7.1
 [0.7.0]: https://github.com/kmoneil/jr/releases/tag/v0.7.0
 [0.6.0]: https://github.com/kmoneil/jr/releases/tag/v0.6.0
