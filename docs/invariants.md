@@ -305,6 +305,18 @@ do not catch, add the test in the same change and cite it here.
   and a named list with a reason over the documents Jira really stored.
   **Enforced by:** `TestTheDocumentSurvivesTheWriter`,
   `TestEveryRealDocumentSurvivesTheWriter`.
+- **A table row is never written narrower than it is.** `table` takes its width
+  from the header row and `tableLine` writes exactly that many cells, so a body
+  row holding more had everything past the width dropped, with `err` nil and
+  exit 0: three cells of content under a one-cell header came out as one.
+  `tableLine`'s own doc comment reasons about the short row, which it pads; the
+  long row went through the same loop and fell off the end of it. The parse side
+  was the same rule from the other direction and hid it, because `FromMarkdown`
+  builds each row from its own pipe count with no reference to the header, so it
+  kept a cell GFM discards and the writer dropped it again on the way out. One
+  refusal covers both, through the self-check `FromMarkdown` already ends with.
+  The short row is still padded: empty cells invent nothing a reader sees.
+  **Enforced by:** `TestARowWiderThanItsHeaderIsRefusedRatherThanTruncated`.
 - **A strike span is never written narrower than the mark it came from.** `~~`
   has no flanking rules, so nothing beside it can make it inert and the only
   thing that changes what it means is another `~~` flush against it, which a
