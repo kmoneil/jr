@@ -137,6 +137,21 @@ func FuzzMarkdownRoundTrips(f *testing.F) {
 		// second line of the title read as a block quote
 		`[0](0 "a` + "\n" + `# b")`, // the same shape with a heading under it,
 		// because the first one only proves the character it happens to hold
+		"**!*~~*0~~*~~0~~ *0***", // an escaped asterisk at the very start of a
+		// span, counted as a live delimiter because the scan for escapes began
+		// after the backslash. The emphasis had no spelling left, the strike
+		// around it was cut in two, and the `~~~~` that made came back as four
+		// literal tildes
+		"***~~!~~*~~0~~ *0***0", // the same `~~~~`, eight minutes into the sweep
+		// that was checking the fix for the one above it. Cutting a strike is
+		// what writes those four tildes whatever drove the writer to cut, so
+		// the cut is gone: renderChoices opens the span with another mark
+		// instead, or the document is refused
+		"*\\!*<0:\\>", // emphasis in front of a card, which is written as a
+		// link and therefore starts with a bracket. `after` reported the first
+		// character of the link's text, the emphasis could not close in front
+		// of it, and the document this package had just written was one it
+		// then refused to write again
 	} {
 		f.Add(seed)
 	}

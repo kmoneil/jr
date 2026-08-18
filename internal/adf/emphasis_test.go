@@ -258,6 +258,54 @@ func TestADelimiterIsWrittenOnlyWhereItCanBeRead(t *testing.T) {
 		want: `~~00*a*\*~~`,
 		says: "[strike:00][em+strike:a][strike:*]",
 	}, {
+		// The find of 2026-08-18, and the same ending as the case above it
+		// reached from the other side of the same question: what is actually
+		// written where the delimiter goes.
+		//
+		// The emphasised node holds `*0`, which is written `\*0`, an escaped
+		// asterisk and a digit. insideLive asks whether a live delimiter sits
+		// strictly inside the span and would close it early, and it began its
+		// scan at the first byte strictly inside, so the backslash at index 0
+		// was never consumed and the asterisk it escapes was counted as live.
+		// The asterisk spelling was refused for a collision that is not there;
+		// the underscore cannot close in front of the digit that follows; with
+		// no spelling left, renderChoices cut the strike back to the first
+		// node. That wrote `~~_\*0_~~~~0~~`, where the four tildes are two
+		// delimiters meeting and a reader takes them for text.
+		name: "an escaped delimiter at the start of a span is not a closer",
+		adf: para(`{"type":"text","text":"*0","marks":[{"type":"strike"},{"type":"em"}]},` +
+			`{"type":"text","text":"0","marks":[{"type":"strike"}]}`),
+		want: `~~*\*0*0~~`,
+		says: "[em+strike:*0][strike:0]",
+	}, {
+		// The same document with the strike taken off it, which is where the
+		// mistake starts. There is nothing to cut here, so the old code had
+		// nowhere to put the span and refused the document outright: a
+		// paragraph Jira stores, reported as having no spelling, over a
+		// delimiter that is text.
+		name: "a span opening on an escaped delimiter has a spelling",
+		adf: para(`{"type":"text","text":"*0","marks":[{"type":"em"}]},` +
+			`{"type":"text","text":"0"}`),
+		want: `*\*0*0`,
+		says: "[em:*0]0",
+	}, {
+		// The third find of 2026-08-18, and the same sentence about `after` as
+		// the case above: what a span sits against is the character that will
+		// be written there. A text node carrying a link is written starting
+		// with the link's `[`, and `after` reported the first character of the
+		// node's text instead. Emphasis ending in punctuation cannot close in
+		// front of a word character and can close in front of a bracket, so a
+		// document Cloud stores was refused over a character that is never
+		// written where the model put it. spanMarks decides the order, and a
+		// link is outermost, so the bracket is what lands there even when the
+		// node carries emphasis of its own.
+		name: "a link after a span is its bracket, not its text",
+		adf: para(`{"type":"text","text":"a.","marks":[{"type":"em"}]},` +
+			`{"type":"text","text":"0","marks":[{"type":"link",` +
+			`"attrs":{"href":"https://x.invalid/a"}}]}`),
+		want: "*a.*[0](https://x.invalid/a)",
+		says: "[em:a.][link:0]",
+	}, {
 		// The same rule from the other side: two spans of one mark with nothing
 		// between them are one span, and writing them as two puts their
 		// delimiters against each other. That is what the cut above produced, so
@@ -286,6 +334,80 @@ func TestADelimiterIsWrittenOnlyWhereItCanBeRead(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestAStrikeSpanIsNeverCut is the guard on the cut, and the shape behind
+// three fuzz finds in two days.
+//
+// A strike has one spelling. GFM gives `~~` no flanking rules, so nothing
+// beside it can make it inert, and the only thing that changes what it means is
+// another `~~` flush against it, which a reader takes for four literal tildes.
+// A cut leaves the rest of the mark to open its own span at the cut with
+// nothing in between, so a cut strike writes exactly that.
+//
+// renderChoices used to cut anyway, and the cut is what turned each of those
+// finds from a refusal into a wrong document. Refusing the cut is not the same
+// as refusing the document: renderChoices moves on to the next way of opening
+// the span, and where the node carries another mark that reaches as far, the
+// document has a spelling with that mark on the outside instead. The first two
+// cases here take it. The third has nothing else at the node the span opens on,
+// so it is refused, which is the answer every other unwritable document gets.
+//
+// The documents are built by hand because no markdown produces them.
+// `~~*a.*b~~` is not the first one: the emphasis cannot close in front of a
+// word character, so a reader keeps the asterisks as text.
+// FuzzMarkdownRoundTrips starts from markdown and therefore cannot reach these
+// at all, which is why they converted wrongly under two clean sweeps of the
+// shape.
+func TestAStrikeSpanIsNeverCut(t *testing.T) {
+	for _, c := range []struct{ name, adf, want, says string }{{
+		// The emphasis cannot close in front of `b`, so the strike cannot be
+		// written around it. Written with the emphasis outside instead, both
+		// marks land where the document put them.
+		name: "emphasis inside a strike, word after",
+		adf: para(`{"type":"text","text":"a.","marks":[{"type":"strike"},{"type":"em"}]},` +
+			`{"type":"text","text":"b","marks":[{"type":"strike"}]}`),
+		want: "*~~a.~~*~~b~~",
+		says: "[em+strike:a.][strike:b]",
+	}, {
+		name: "strong inside a strike, word after",
+		adf: para(`{"type":"text","text":"a.","marks":[{"type":"strike"},{"type":"strong"}]},` +
+			`{"type":"text","text":"b","marks":[{"type":"strike"}]}`),
+		want: "**~~a.~~**~~b~~",
+		says: "[strike+strong:a.][strike:b]",
+	}} {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := convert(t, c.adf)
+			if err != nil {
+				t.Fatalf("ToMarkdown: %v", err)
+			}
+			if got != c.want {
+				// It used to write `~~*a.*~~~~b~~`, which reads back with the
+				// four tildes as text on the node after the cut.
+				t.Errorf("ToMarkdown = %q, want %q", got, c.want)
+			}
+			if says := sketch(t, got); says != c.says {
+				t.Errorf("%q reads back as %s, want %s", got, says, c.says)
+			}
+		})
+	}
+
+	// The same shape with a plain struck node in front of it. The span opens on
+	// a node carrying nothing but the strike, so there is no other mark to put
+	// outside and no spelling at all.
+	t.Run("nothing else to put outside", func(t *testing.T) {
+		doc := para(`{"type":"text","text":"0","marks":[{"type":"strike"}]},` +
+			`{"type":"text","text":"a.","marks":[{"type":"strike"},{"type":"em"}]},` +
+			`{"type":"text","text":"b","marks":[{"type":"strike"}]}`)
+		got, err := convert(t, doc)
+		if err == nil {
+			t.Fatalf("ToMarkdown = %q, want a refusal; it reads back as %s",
+				got, sketch(t, got))
+		}
+		if code := errs.Coerce(err).Code; code != "ADF_UNREPRESENTABLE" {
+			t.Errorf("code = %q, want ADF_UNREPRESENTABLE", code)
+		}
+	})
 }
 
 // TestEmphasisWithNoSpellingIsRefusedRatherThanWrittenWrong is the case where

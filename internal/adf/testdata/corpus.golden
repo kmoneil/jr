@@ -256,7 +256,7 @@ b
 __a__*b*
 
 === mark around punctuation
-__\*\*__
+**\*\***
 
 === code holding a backtick
 ``a ` b``

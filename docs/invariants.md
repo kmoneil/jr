@@ -283,6 +283,19 @@ do not catch, add the test in the same change and cite it here.
   every corpus input is a golden, so a refusal moving in either direction is a
   reviewable line in a pull request rather than a number nobody computed.
   **Enforced by:** `TestTheRefusalSetIsPinned`.
+- **A strike span is never written narrower than the mark it came from.** `~~`
+  has no flanking rules, so nothing beside it can make it inert and the only
+  thing that changes what it means is another `~~` flush against it, which a
+  reader takes for four literal tildes. A cut leaves the rest of the mark to
+  open its own span at the cut with nothing in between, so for this mark the
+  cut is not a retry, it is the corruption. Refusing it is not refusing the
+  document: `renderChoices` opens the span with the next mark instead, and only
+  a span whose first node carries nothing else is refused. Three fuzz finds in
+  two days ended in those tildes, two of them the writer wrong about a
+  collision that was not there and one with nothing wrong upstream at all. No
+  markdown produces the documents that reach it, so `FuzzMarkdownRoundTrips`
+  cannot see the class and the guard is asserted from ADF instead.
+  **Enforced by:** `TestAStrikeSpanIsNeverCut`.
 - **A scheduled sweep reports what it measured, not what it was built to
   find.** `if: failure()` fires for a finding, for a tool that could not run,
   and for a runner that was reclaimed. The weekly mutation sweep's first
