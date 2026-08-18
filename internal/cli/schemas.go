@@ -5,10 +5,16 @@ import (
 	"github.com/kmoneil/jr/internal/render"
 )
 
-// The built-in commands own five kinds between them. Their schemas live here
-// rather than beside each builder because the builders are spread across three
-// files and a reader looking for "what does auth.status look like" should find
-// all five in one place.
+// The built-in commands own six kinds between them. Five of their schemas live
+// here rather than beside each builder, because those builders are spread
+// across three files and a reader looking for "what does auth.status look like"
+// should find them in one place.
+//
+// The sixth, `doctor`, is registered in doctor_cmds.go beside the node it
+// describes. It is one builder in one file, and its shape is eight nested
+// elements that have to agree with that builder attribute by attribute, which
+// is the case RegisterSchema's own rule is about: the shortest distance between
+// two things that must agree is the same file.
 func init() {
 	render.RegisterSchema(kindVersion, versionSchema())
 	render.RegisterSchema(kindAuthStatus, authStatusSchema())

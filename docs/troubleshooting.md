@@ -6,6 +6,7 @@ machine-stable `code` and, where there is anything useful to say, a `remedy`.
 know why the tool is refusing something it could have guessed at.
 
 - [How to read an error](#how-to-read-an-error)
+- [Start with `jr doctor`](#start-with-jr-doctor)
 - [Nothing works yet](#nothing-works-yet)
 - [Authentication](#authentication)
 - ["It returned nothing"](#it-returned-nothing)
@@ -47,6 +48,79 @@ command writes **nothing at all** to stdout. So this is always safe:
 ```console
 $ jr issue list --project ENG > out.tsv 2> err.xml
 ```
+
+## Start with `jr doctor`
+
+One error can only describe the request that failed, and the interesting
+failures are the ones where the first request fails and the reason is three
+layers below it. A 401 from a Data Center under a context path reads exactly
+like a 401 from an expired token, a 401 from a proxy that stripped the header,
+and a 401 from a site URL that lost its `/jira` and reached a different
+application.
+
+`jr doctor` takes those layers apart. It reports eight checks, in the order they
+stack, and every one of them whether it passed or not:
+
+```console
+$ jr doctor --format tsv
+field   value
+@status failed
+@checks 8
+@failed 1
+@skipped        0
+config/@status  ok
+...
+account/@status failed
+account/@code   UNAUTHORIZED
+```
+
+It needs no credential and no reachable site, and it is in every build,
+including `reader` and `ci`. **It exits 0 whenever it ran, whatever it found**,
+so branch on the document rather than on `$?`: a non-zero exit means the
+diagnostic itself could not run, never that it found something.
+
+Three verdicts:
+
+- **`ok`** means that layer is working. Every check reports one, including the
+  ones with nothing to say, because a diagnostic that printed only problems
+  could not tell a healthy configuration from a check that never ran.
+- **`failed`** means that layer is broken, and the check carries the same
+  `code`, `detail`, and `remedy` an ordinary command would have failed with.
+  Every code on this page answers a `failed` check too.
+- **`skipped`** means the check could not run, and it names the check it was
+  waiting on. Eight checks in a stack fail together, so read down the document
+  and act on the **first** `failed`: the ones below it are usually the same
+  cause counted again.
+
+Worth knowing what each check can tell you that no other command will:
+
+- **site** reports the URL a request actually resolves to, built by the same
+  code that builds a request. A base and an endpoint that disagree about a
+  context path is the failure that produces an unexplainable 401.
+- **transport** reports the proxy in effect, which nobody configured here and
+  which comes from `HTTPS_PROXY` and `NO_PROXY`, along with the CA bundle and
+  client certificate and where each came from.
+- **deployment** says whether the answer came from the probe, from its cache, or
+  from `--api-version`. A stale cached answer and a fresh one are different
+  claims. `--refresh` forces the probe.
+- **account** is the only check that proves the credential works. The probe
+  answers anonymously on most instances, so a reachable site says nothing about
+  the token.
+
+### `CLOCK_SKEW` — this machine and the site disagree about the time
+
+The one code only `jr doctor` produces. It compares this machine's clock against
+the site's own and fails the check at a minute or more apart.
+
+A minute, because a minute is the finest bound JQL has: no operator this tool
+can send bisects one. So a machine a minute out asks Jira for a different window
+than the one it computed, and the damage is silent. `--since` cursors, `created
+>= "-1d"`, and every worklog and changelog window are all evaluated against a
+clock that is not this one.
+
+Fix the clock, with NTP or whatever your platform uses, or run from a host whose
+clock is right. Nothing in `jr` can compensate for it: a tool that corrected for
+skew would be guessing at an offset that changes while it runs.
 
 ## Nothing works yet
 

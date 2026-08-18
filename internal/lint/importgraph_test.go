@@ -187,6 +187,9 @@ var encoders = []string{"encoding/xml", "gopkg.in/yaml.v3", "encoding/csv"}
 var decodeExceptions = map[string]string{
 	"internal/resource/issue": "BenchmarkParseCost and TestEveryFormatParsesBackToTheSameRows " +
 		"decode a rendered payload the way a consumer would",
+	"internal/cli": "the doctor tests read the document back and assert on one " +
+		"check at a time, which is what a consumer branching on a verdict does; " +
+		"asserting on substrings of the XML would be a test of the writer",
 }
 
 // TestRenderIsTheOnlyWriterOfOutput asserts no package outside render decides

@@ -16,6 +16,7 @@ Available Commands:
   board       Work with boards
   context     Manage named site/project contexts
   contract    Dump the machine-readable output contract for every kind
+  doctor      Explain, layer by layer, why this tool will not work here
   epic        Work with epics
   field       Discover fields, including custom fields
   help        Help about any command

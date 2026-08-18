@@ -64,6 +64,15 @@ type Resolved struct {
 	// a change, use a context that permits it.
 	ReadOnly bool
 
+	// ReadOnlySource says which source latched ReadOnly on, or is empty when
+	// the invocation is not read-only.
+	//
+	// ReadOnly is an OR over three sources rather than a precedence chain, so
+	// sourceOf cannot answer this. What a caller needs when a write is refused
+	// is which of the three to go and change, and only one of them is a file
+	// somebody would think to look in.
+	ReadOnlySource Source
+
 	// CredentialRef is the key the credential store is asked for.
 	CredentialRef string
 
@@ -151,8 +160,9 @@ func Resolve(cfg *Config, over Overrides, getenv Getenv) (*Resolved, error) {
 		Project:    firstNonEmpty(over.Project, getenv(EnvProject), ctx.Project),
 		Board:      firstNonEmpty(over.Board, getenv(EnvBoard), ctx.Board),
 		// Read-only latches on from any source and never off.
-		ReadOnly:      over.ReadOnly || truthy(getenv(EnvReadOnly)) || ctx.ReadOnly,
-		CredentialRef: ctx.Credential,
+		ReadOnly:       over.ReadOnly || truthy(getenv(EnvReadOnly)) || ctx.ReadOnly,
+		ReadOnlySource: readOnlySource(over.ReadOnly, getenv(EnvReadOnly), ctx.ReadOnly),
+		CredentialRef:  ctx.Credential,
 
 		CABundle:       firstNonEmpty(over.CABundle, getenv(EnvCABundle), ctx.CABundle),
 		CABundleSource: sourceOf(over.CABundle, getenv(EnvCABundle), ctx.CABundle),
@@ -301,6 +311,23 @@ func (r *Resolved) CheckWritable(command string) error {
 	return e.
 		WithDetail("read-only was requested by --readonly or %s", EnvReadOnly).
 		WithRemedy("drop --readonly, or unset %s", EnvReadOnly)
+}
+
+// readOnlySource names the first source that latched read-only on.
+//
+// The order is the same as sourceOf's and means something different: there is
+// no precedence here, because any source turning it on turns it on. What this
+// answers is which one to go and undo first.
+func readOnlySource(flag bool, env string, ctx bool) Source {
+	switch {
+	case flag:
+		return FromFlag
+	case truthy(env):
+		return FromEnv
+	case ctx:
+		return FromContext
+	}
+	return FromNowhere
 }
 
 // sourceOf reports which of the three precedence slots supplied a value. It

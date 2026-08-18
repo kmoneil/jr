@@ -77,6 +77,18 @@ A resource reaches all of it through one `registry.Session.Metadata` call, so
 the cache is shared: two commands resolving the same field name in the same day
 make one request between them.
 
+**One command reaches Jira without a session, and it is the diagnostic.** The
+CLI builds the session before a command body runs, so a command that declares
+`NeedsJira` and cannot build one never executes. `jr doctor` exists for exactly
+that case, so it declares `NeedsJira: false` and assembles the layers itself:
+config, credential, client, probe, each reported separately. That is the whole
+reason for the exception. A session hides which of the three failed behind one
+error, which is right for a command that wants an answer and wrong for the one
+whose subject is where the stack broke. It still reuses `session.probe` for the
+deployment, so the cache it reads and the entry it writes are the ones every
+other command uses, and it reaches Jira only through `internal/site`, which
+keeps `internal/cli` off the list of packages that build a request.
+
 **A kind's shape is declared where its node is built.** Every output kind
 registers a `render.Schema` from the same file as the code that builds it,
 because the two have to agree and the shortest distance between them is one

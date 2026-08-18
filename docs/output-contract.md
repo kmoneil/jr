@@ -1048,6 +1048,28 @@ refusal, and why `valid="true"` with a warning and `valid="true"` without one
 lead to different next steps. Both deployments report this. Cloud did not until
 2026-08-14, because the parse endpoint was asked in a mode that withholds it.
 
+`jr doctor` is the second command of this class and the clearer case for the
+rule. It reports eight checks, one per layer: configuration, credential, site,
+transport, deployment, clock, account, and rate limits. Each is `ok`, `failed`,
+or `skipped`, and it exits 0 whenever it ran, whatever it found. A diagnostic that exited non-zero
+on a finding would make "did the diagnostic run" and "is this configuration
+healthy" the same signal, and telling those two apart is the only reason to run
+it. Branch on `doctor/@status` for the roll-up, or on one check's `@status` for
+the layer you care about.
+
+**A failed check carries `code`, `detail`, and `remedy` on stdout, and none of
+that is an error.** They are the strings the failing layer would have produced
+had an ordinary command hit it, reported as data rather than raised, so
+`docs/troubleshooting.md` answers a code found in either place. The rule that
+errors go to stderr is unchanged: nothing here is an error. A non-zero exit from
+`jr doctor` means the command itself could not run, which is a bad flag or a
+format it cannot write, and never a finding.
+
+`skipped` is a third answer that `jql validate` has no need of, and it exists
+because eight checks in a stack fail together. A check whose input never arrived
+names the check it was waiting on rather than repeating one cause eight times,
+so the first `failed` reading down the document is the one to act on.
+
 ### Errors about reaching the site
 
 `NO_SUCH_ENDPOINT`, `NETWORK`, `TIMEOUT`, `MALFORMED_SERVER_INFO`,

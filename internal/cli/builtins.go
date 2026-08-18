@@ -32,6 +32,7 @@ func (a *app) builtins() []*registry.Command {
 		a.schemaCommand(),
 		a.contractCommand(),
 		a.skillCommand(),
+		a.doctorCommand(),
 	}
 	out = append(out, a.authCommands()...)
 	out = append(out, a.contextCommands()...)
