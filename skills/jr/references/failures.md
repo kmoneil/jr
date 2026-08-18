@@ -8,6 +8,7 @@ Most of what looks like a bug is the tool declining to guess.
 
 ## Contents
 
+- [`jr doctor` when the layer is not obvious](#jr-doctor-when-the-layer-is-not-obvious)
 - [Nothing is configured yet](#nothing-is-configured-yet)
 - [Authentication](#authentication)
 - [Empty and truncated results](#empty-and-truncated-results)
@@ -15,6 +16,36 @@ Most of what looks like a bug is the tool declining to guess.
 - [Write refusals](#write-refusals)
 - [Network and server](#network-and-server)
 - [When a write failed and you cannot tell whether it landed](#when-a-write-failed-and-you-cannot-tell-whether-it-landed)
+
+## `jr doctor` when the layer is not obvious
+
+One error describes the request that failed. When the reason is below it, run
+`jr doctor`: eight checks, in the order the layers stack, each `ok`, `failed`,
+or `skipped`.
+
+| Check | Answers |
+| --- | --- |
+| `config` | which context, from which file, and whether read-only is latched |
+| `credential` | which credential a request would carry, from where, and under which scheme |
+| `site` | the URL a request resolves to, and the context path it is under |
+| `transport` | the proxy in effect, the CA bundle, the client certificate |
+| `deployment` | Cloud or Data Center, and whether that came from the probe, its cache, or `--api-version` |
+| `clock` | this machine against the site's, failing at a minute apart |
+| `account` | who the credential is, which is the only proof the credential works |
+| `limits` | whatever the site discloses about throttling |
+
+**It exits 0 whenever it ran, whatever it found.** Read the document, not `$?`.
+A non-zero exit means the diagnostic could not run at all.
+
+A `failed` check carries the same `code`, `detail`, and `remedy` an ordinary
+command would have failed with, so every code below answers one. A `skipped`
+check names the check it was waiting on: read down and act on the **first**
+`failed`, because the rest are usually the same cause counted again.
+
+It needs no credential and no reachable site, and it is in every build. One code
+is its own, `CLOCK_SKEW`: this machine and the site are a minute or more apart,
+which silently moves every `--since`, every relative date, and every window this
+tool computes, because a minute is the finest bound JQL has.
 
 ## Nothing is configured yet
 

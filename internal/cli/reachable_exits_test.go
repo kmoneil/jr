@@ -111,9 +111,16 @@ func exitProbes() []exitProbe {
 		extra: []string{"--context", "nope"},
 		want:  "UNKNOWN_CONTEXT",
 		exempt: map[string]string{
-			"version":        "self-description; it reads no config at all",
-			"schema":         "self-description, from the registry in this binary",
-			"contract":       "self-description, from the registry in this binary",
+			"version":  "self-description; it reads no config at all",
+			"schema":   "self-description, from the registry in this binary",
+			"contract": "self-description, from the registry in this binary",
+			// Not a gap. `jr doctor` reports an unknown context as a failed
+			// config check and exits 0, because a diagnostic that refused to
+			// describe a broken configuration would refuse at the one moment it
+			// is the only useful command left. TestDoctorReportsAnUnknownContext
+			// asserts the verdict and the code that this probe would have read
+			// off stderr.
+			"doctor":         "reports the refusal as a check verdict rather than exiting on it",
 			"context.list":   "lists what is defined, so an undefined name is the answer rather than an error",
 			"context.create": "creates a context; the one being named does not have to exist yet",
 			"auth.login":     "refuses with NO_TOKEN_SOURCE first; a token is required input and nothing blocks on a terminal",
@@ -125,9 +132,12 @@ func exitProbes() []exitProbe {
 		extra: nil,
 		want:  "STORE_PERMISSIONS",
 		exempt: map[string]string{
-			"version":        "self-description; it reads no credential",
-			"schema":         "self-description, from the registry in this binary",
-			"contract":       "self-description, from the registry in this binary",
+			"version":  "self-description; it reads no credential",
+			"schema":   "self-description, from the registry in this binary",
+			"contract": "self-description, from the registry in this binary",
+			// The same reason as above: the unreadable store is a failed
+			// credential check here, not an exit.
+			"doctor":         "reports the refusal as a check verdict rather than exiting on it",
 			"context.list":   "reads the config, never the store",
 			"context.create": "writes the config, never the store",
 			"context.edit":   "writes the config, never the store",

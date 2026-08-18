@@ -156,8 +156,14 @@ This is the cheapest command that proves a credential is good, and it prints the
 username on Data Center. The two are not interchangeable, and it is the one
 thing a token cannot tell you by looking at it.
 
-If it fails, [troubleshooting.md](troubleshooting.md) maps the error codes to
-fixes. The error is structured and names a remedy; read it before anything else.
+If it fails, the error is structured and names a remedy; read it before anything
+else. When the remedy is not enough, `jr doctor` takes the whole stack apart and
+reports every layer between this binary and an answer: the config file, the
+credential, the site URL and its context path, the proxy, the deployment probe,
+the clock, and the account. It needs no credential and no reachable site, and it
+exits 0 whatever it finds, so read the document rather than `$?`.
+[troubleshooting.md](troubleshooting.md) maps the codes either of them produces
+to fixes.
 
 ## 5. Set a default project
 

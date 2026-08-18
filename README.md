@@ -44,7 +44,7 @@ as it was. No script downstream will ever mistake that page for the whole result
 set, and the same is true of every command, in every format, on every path.
 
 > **Status: released, and pinnable.** The command surface is complete and
-> tested: 66 commands in the full build, 44 in the reader. Every output kind
+> tested: 67 commands in the full build, 45 in the reader. Every output kind
 > also carries its own schema version, and those move independently of the
 > release, so a consumer pins `kind` and `v` from the document it parses rather
 > than the version it installed. See
@@ -182,8 +182,8 @@ Then see the [quickstart](#quickstart) above, or
 
 ## What works today
 
-Everything below is built, tested, and asserted by the suite: 66 commands in
-the full build, 44 in the reader.
+Everything below is built, tested, and asserted by the suite: 67 commands in
+the full build, 45 in the reader.
 
 ```
 jr auth      login logout status token
@@ -202,7 +202,7 @@ jr jql       validate explain
 jr field     list
 jr meta      transitions createmeta
 jr mcp       serve
-jr version | schema | contract | skill | completion
+jr version | schema | contract | skill | doctor | completion
 ```
 
 Global: `--format tsv|xml|json|yaml`, plus `markdown` in a build with the
@@ -244,7 +244,7 @@ carried a feature behind them. A tag that names a capability no build can
 perform is the one thing this tool promises not to do, and each of them is a
 two-line file on the day somebody needs it.
 
-Everything else described in this README is built. 66 commands in the full
+Everything else described in this README is built. 67 commands in the full
 build, and `internal/lint` asserts that number against the binaries rather than
 against this sentence. Every tag the build declares now gates real code, and
 `internal/lint/tags_test.go` fails the day one stops.
@@ -810,7 +810,7 @@ because a reader build holds none:
 
 ```console
 $ bin/jr-reader skill | grep 'commands, profile'
-44 commands, profile `reader`, tags `mcp`.
+45 commands, profile `reader`, tags `mcp`.
 ```
 
 Install it by symlinking the copy in this repository, which `make skill`

@@ -927,6 +927,21 @@ func newRequestID() string {
 	return hex.EncodeToString(b[:])
 }
 
+// URLFor renders the absolute URL a request to this path would be sent to.
+//
+// It is for the diagnostic, which has to show the URL that would really go out
+// rather than one it joined for itself. The context path is what goes wrong
+// here: a base and an endpoint that disagree about it is exactly the failure
+// `jr doctor` exists to make visible, and a second join in another package
+// would be a second opinion about the one question being asked.
+func (c *Client) URLFor(path string) (string, error) {
+	target, err := c.resolve(Request{Method: MethodGet, Path: path})
+	if err != nil {
+		return "", err
+	}
+	return target.String(), nil
+}
+
 // Relative converts a URL the server supplied into a path this client will
 // send, and refuses one pointing anywhere else.
 //

@@ -54,6 +54,15 @@ do not catch, add the test in the same change and cite it here.
 - **Exit codes never change meaning.** New conditions get new codes. The table
   is frozen in `internal/exitcode/`.
   **Enforced by:** `TestCodesAreFrozen`.
+- **A diagnostic exits on whether it ran, never on what it found.** `jr doctor`
+  reports eight checks and exits 0 whenever all of them were reached, however
+  many failed. Making a finding non-zero would collapse "the diagnostic ran" and
+  "this configuration is healthy" into one signal, which is the distinction the
+  command exists to draw, and it would suppress the document that carries the
+  verdicts. Every check is present in every run for the same reason: a
+  diagnostic that printed only problems could not be told apart from one whose
+  checks never ran.
+  **Enforced by:** `TestDoctorAlwaysExitsZeroAndReportsEveryCheck`.
 - **stdout is data only.** Never a spinner, a warning, or a progress line. A
   failing command writes nothing at all to stdout, and there are exactly two
   exceptions, both where the alternative is a caller misled about something that

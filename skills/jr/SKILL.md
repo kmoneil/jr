@@ -174,7 +174,7 @@ Generated from the registry of the binary that printed this, so it is the truth
 about that binary and not about the project. A reader build lists no mutating
 commands because it contains none.
 
-66 commands, profile `full`, tags `prompt, render, mcp, write, admin`.
+67 commands, profile `full`, tags `prompt, render, mcp, write, admin`.
 
 | Command | | Does |
 | --- | --- | --- |
@@ -192,6 +192,7 @@ commands because it contains none.
 | `context show` |  | Show one context, or the effective settings for this invocation |
 | `context use` |  | Select the context every command uses by default |
 | `contract` |  | Dump the machine-readable output contract for every kind |
+| `doctor` |  | Explain, layer by layer, why this tool will not work here |
 | `epic add` | `M` | Move issues into an epic |
 | `epic get` |  | Fetch one epic |
 | `epic list` |  | List a board's epics |

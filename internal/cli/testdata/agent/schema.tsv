@@ -12,6 +12,7 @@ context.list	List every configured context	false	false	context.list
 context.show	Show one context, or the effective settings for this invocation	false	false	context.get
 context.use	Select the context every command uses by default	false	false	context.get
 contract	Dump the machine-readable output contract for every kind	false	false	contract
+doctor	Explain, layer by layer, why this tool will not work here	false	false	doctor
 epic.add	Move issues into an epic	true	false	epic.add
 epic.get	Fetch one epic	false	false	epic.get
 epic.list	List a board's epics	false	false	epic.list

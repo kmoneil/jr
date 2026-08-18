@@ -1,0 +1,230 @@
+      <element name="doctor">
+        <attributes count="4">
+          <attribute name="status" type="string" optional="false" enum="ok,failed,skipped"/>
+          <attribute name="checks" type="int" optional="false"/>
+          <attribute name="failed" type="int" optional="false"/>
+          <attribute name="skipped" type="int" optional="false"/>
+        </attributes>
+        <elements count="8">
+          <element name="config" optional="false" repeated="false">
+            <attributes count="9">
+              <attribute name="status" type="string" optional="false" enum="ok,failed,skipped"/>
+              <attribute name="code" type="string" optional="true"/>
+              <attribute name="path" type="string" optional="true"/>
+              <attribute name="contexts" type="int" optional="true"/>
+              <attribute name="context" type="string" optional="true"/>
+              <attribute name="site-source" type="string" optional="true"/>
+              <attribute name="readonly" type="bool" optional="true"/>
+              <attribute name="readonly-source" type="string" optional="true"/>
+              <attribute name="api-version" type="int" optional="true"/>
+            </attributes>
+            <elements count="3">
+              <element name="summary" optional="false" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="detail" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="remedy" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="credential" optional="false" repeated="false">
+            <attributes count="7">
+              <attribute name="status" type="string" optional="false" enum="ok,failed,skipped"/>
+              <attribute name="code" type="string" optional="true"/>
+              <attribute name="source" type="string" optional="true"/>
+              <attribute name="scheme" type="string" optional="true" enum="basic,bearer"/>
+              <attribute name="user" type="string" optional="true"/>
+              <attribute name="site-scoped" type="bool" optional="true"/>
+              <attribute name="searched" type="string" optional="true"/>
+            </attributes>
+            <elements count="3">
+              <element name="summary" optional="false" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="detail" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="remedy" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="site" optional="false" repeated="false">
+            <attributes count="5">
+              <attribute name="status" type="string" optional="false" enum="ok,failed,skipped"/>
+              <attribute name="code" type="string" optional="true"/>
+              <attribute name="url" type="string" optional="true"/>
+              <attribute name="context-path" type="string" optional="true"/>
+              <attribute name="endpoint" type="string" optional="true"/>
+            </attributes>
+            <elements count="3">
+              <element name="summary" optional="false" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="detail" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="remedy" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="transport" optional="false" repeated="false">
+            <attributes count="7">
+              <attribute name="status" type="string" optional="false" enum="ok,failed,skipped"/>
+              <attribute name="code" type="string" optional="true"/>
+              <attribute name="proxy" type="string" optional="true"/>
+              <attribute name="ca-bundle" type="string" optional="true"/>
+              <attribute name="ca-bundle-source" type="string" optional="true"/>
+              <attribute name="client-cert" type="string" optional="true"/>
+              <attribute name="client-key" type="string" optional="true"/>
+            </attributes>
+            <elements count="3">
+              <element name="summary" optional="false" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="detail" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="remedy" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="deployment" optional="false" repeated="false">
+            <attributes count="7">
+              <attribute name="status" type="string" optional="false" enum="ok,failed,skipped"/>
+              <attribute name="code" type="string" optional="true"/>
+              <attribute name="kind" type="string" optional="true" enum="cloud,datacenter"/>
+              <attribute name="version" type="string" optional="true"/>
+              <attribute name="api-base" type="string" optional="true"/>
+              <attribute name="source" type="string" optional="true" enum="probe,cache,declared"/>
+              <attribute name="probed" type="timestamp" optional="true"/>
+            </attributes>
+            <elements count="3">
+              <element name="summary" optional="false" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="detail" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="remedy" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="clock" optional="false" repeated="false">
+            <attributes count="5">
+              <attribute name="status" type="string" optional="false" enum="ok,failed,skipped"/>
+              <attribute name="code" type="string" optional="true"/>
+              <attribute name="server" type="timestamp" optional="true"/>
+              <attribute name="local" type="timestamp" optional="true"/>
+              <attribute name="skew-seconds" type="int" optional="true"/>
+            </attributes>
+            <elements count="3">
+              <element name="summary" optional="false" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="detail" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="remedy" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="account" optional="false" repeated="false">
+            <attributes count="6">
+              <attribute name="status" type="string" optional="false" enum="ok,failed,skipped"/>
+              <attribute name="code" type="string" optional="true"/>
+              <attribute name="id" type="string" optional="true"/>
+              <attribute name="display" type="string" optional="true"/>
+              <attribute name="active" type="bool" optional="true"/>
+              <attribute name="timezone" type="string" optional="true"/>
+            </attributes>
+            <elements count="3">
+              <element name="summary" optional="false" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="detail" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="remedy" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="limits" optional="false" repeated="false">
+            <attributes count="6">
+              <attribute name="status" type="string" optional="false" enum="ok,failed,skipped"/>
+              <attribute name="code" type="string" optional="true"/>
+              <attribute name="policy" type="string" optional="true"/>
+              <attribute name="state" type="string" optional="true"/>
+              <attribute name="limit" type="string" optional="true"/>
+              <attribute name="remaining" type="string" optional="true"/>
+            </attributes>
+            <elements count="3">
+              <element name="summary" optional="false" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="detail" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="remedy" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>

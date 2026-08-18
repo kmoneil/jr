@@ -32,6 +32,7 @@ contains what.
 - **[completion](#completion)** — [`completion`](#jr-completion)
 - **[context](#context)** — [`context create`](#jr-context-create), [`context delete`](#jr-context-delete), [`context edit`](#jr-context-edit), [`context list`](#jr-context-list), [`context show`](#jr-context-show), [`context use`](#jr-context-use)
 - **[contract](#contract)** — [`contract`](#jr-contract)
+- **[doctor](#doctor)** — [`doctor`](#jr-doctor)
 - **[epic](#epic)** — [`epic add`](#jr-epic-add), [`epic get`](#jr-epic-get), [`epic list`](#jr-epic-list), [`epic remove`](#jr-epic-remove)
 - **[field](#field)** — [`field list`](#jr-field-list)
 - **[issue](#issue)** — [`issue activity`](#jr-issue-activity), [`issue assign`](#jr-issue-assign), [`issue attachment download`](#jr-issue-attachment-download), [`issue attachment list`](#jr-issue-attachment-list), [`issue attachment upload`](#jr-issue-attachment-upload), [`issue changes`](#jr-issue-changes), [`issue clone`](#jr-issue-clone), [`issue comment add`](#jr-issue-comment-add), [`issue comment delete`](#jr-issue-comment-delete), [`issue comment edit`](#jr-issue-comment-edit), [`issue comment list`](#jr-issue-comment-list), [`issue create`](#jr-issue-create), [`issue delete`](#jr-issue-delete), [`issue edit`](#jr-issue-edit), [`issue get`](#jr-issue-get), [`issue history`](#jr-issue-history), [`issue link add`](#jr-issue-link-add), [`issue link list`](#jr-issue-link-list), [`issue link remove`](#jr-issue-link-remove), [`issue list`](#jr-issue-list), [`issue move`](#jr-issue-move), [`issue watch`](#jr-issue-watch), [`issue worklog add`](#jr-issue-worklog-add), [`issue worklog delete`](#jr-issue-worklog-delete), [`issue worklog list`](#jr-issue-worklog-list)
@@ -636,6 +637,62 @@ jr contract --format json
 | Emits | Schema | When |
 | --- | --- | --- |
 | `contract` | v2 | always |
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE
+
+## doctor
+
+### `jr doctor`
+
+Explain, layer by layer, why this tool will not work here
+
+```
+jr doctor
+```
+
+Runs every check between this binary and an answer from Jira and reports all of
+them: the configuration, the credential, the site URL and its context path, the
+proxy and TLS settings, the deployment probe, the clock, the account, and
+whatever the site discloses about rate limits.
+
+It exists because the interesting failures are the ones where the first request
+fails and the reason is three layers below it. A 401 from a Data Center under a
+context path is indistinguishable, from the error alone, from a 401 because the
+token expired, a 401 because a proxy stripped the header, and a 401 because the
+site URL lost its context path and the request reached a different application.
+
+**It exits 0 whenever the checks ran, whatever they found.** A diagnostic that
+exited non-zero on a finding would make "did the diagnostic run" and "is this
+configuration healthy" the same signal, and separating those two is the whole
+point. The verdicts are in the document: every check carries ok, failed, or
+skipped, and a failed one carries the same code, detail, and remedy the failing
+layer would have produced on its own.
+
+Every check is reported, including the ones that passed. A diagnostic that
+prints only problems cannot tell a healthy configuration from a check that
+never ran.
+
+It needs no credential and no reachable site, and it never refuses to run: what
+it cannot check it reports as skipped, naming the check it was waiting on. A
+site that answers anonymously is still probed when no credential is stored, so
+"this site is reachable and is Data Center 10.4" is reported to somebody whose
+real problem is that they never logged in.
+
+The deployment probe is read from its cache when a valid entry exists, and says
+which. Pass --refresh to force it. The clock is never cached, because a cached
+clock is not a clock.
+
+Examples:
+
+```console
+jr doctor
+jr doctor --format json
+jr doctor --context work --refresh
+```
+
+| Emits | Schema | When |
+| --- | --- | --- |
+| `doctor` | v1 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE
 

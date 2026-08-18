@@ -281,10 +281,10 @@ document that nothing checks eventually becomes.
 
 | Profile  | Commands | Not present                           |
 | -------- | -------- | ------------------------------------- |
-| `full`   | 66       | none                                  |
-| `agent`  | 64       | `completion`, `sprint close`          |
-| `reader` | 44       | the above, plus the 20 mutating verbs |
-| `ci`     | 43       | the above, plus `mcp serve`           |
+| `full`   | 67       | none                                  |
+| `agent`  | 65       | `completion`, `sprint close`          |
+| `reader` | 45       | the above, plus the 20 mutating verbs |
+| `ci`     | 44       | the above, plus `mcp serve`           |
 
 `make test-profiles` runs the whole suite under every shipped tag set, and the
 contract tests inside it assert the surface directly: no mutating command
@@ -298,6 +298,14 @@ needs to explain itself is the smallest one, and a skill that shipped only with
 `mcp` would be absent from `ci`, which is the profile an unattended job runs.
 Because it is generated per build, a reader binary's skill lists no mutating
 commands rather than describing commands it does not contain.
+
+`jr doctor` is in all four for the same reason, and the reason is sharper here.
+It reports every layer between the binary and an answer from Jira, and the
+environments where those layers go wrong are the unattended ones: a `ci` build
+in a container with no system trust store, an `agent` build behind a proxy
+nobody told it about. A diagnostic gated behind a tag would be absent from the
+build that most needs it, and a caller with a `reader` binary and a bare 401
+would have nothing to run.
 
 ## Enforcement
 
