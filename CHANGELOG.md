@@ -20,6 +20,99 @@ accident.
 
 Nothing yet.
 
+## [0.9.0] - 2026-08-18
+
+**A table row holding more cells than its header row is refused now, in both
+directions, where it used to lose the extra cells and say nothing.**
+
+That is the whole of what changed for a caller. If no table you read out of Jira
+or send to it has a row wider than its header, this release changes nothing you
+do, and you are upgrading for a silent loss you were not hitting.
+
+Minor rather than a patch on one count and only one: an input that used to be
+accepted is now refused. The rest of the release is additive or internal and
+would not have moved the version by itself, which is the arithmetic
+[the stability policy](docs/output-contract.md#stability-policy) now states in
+each row rather than leaving to be assembled from two sections.
+
+### Fixed
+
+- **A table row wider than its header row no longer loses its extra cells.**
+  `ToMarkdown` took its width from the header row and wrote exactly that many
+  cells per row, so everything past that width was dropped, with no error and
+  exit 0. A body row holding `KEPT`, `DROPPED`, and `ALSO-DROPPED` under a
+  one-cell header came out as:
+
+  ```
+  | H |
+  | --- |
+  | KEPT |
+  ```
+
+  It is now `ADF_UNREPRESENTABLE` at exit 2, naming the row rather than the
+  table, because the next question is always which one:
+
+  ```console
+  $ jr issue get ENG-1
+  ADF_UNREPRESENTABLE: the document contains a table row of 3 cells under a
+  header row of 1, which markdown cannot represent (at doc > table > tableRow 2)
+  ```
+
+  `--raw-body` emits the document exactly as Jira sent it, as it does for every
+  other refusal, so nothing is unreachable.
+
+  **The same refusal covers markdown you send.** `FromMarkdown` built each row
+  from its own pipe count with no reference to the header, so a one-cell header
+  over `| b | c |` built two cells under one. GFM ignores the excess cells of a
+  long row by definition, so that markdown is a one-column table whose second
+  cell does not exist, and this tool was turning it into content on its way to
+  Jira. The two defects hid each other: the parser kept a cell GFM discards and
+  the writer dropped a cell that existed, so the round trip came out looking
+  clean.
+
+  **A row with *fewer* cells than the header is still padded**, and the
+  asymmetry is deliberate. The cells a short row gains are empty, so nothing a
+  reader sees is invented; a cell dropped from a long row is content somebody
+  wrote.
+
+  Measured before it shipped: three of the 1852 inputs in this converter's
+  markdown corpus build such a row, and **none of the 247 documents recorded
+  from a real Jira**. If you have never seen a ragged table, that is why.
+
+### Changed
+
+- **Every rule in the stability policy now says which position of the release
+  version it moves.** It classified a change as major or minor and left a
+  demotion two sections down to be applied by the reader, which is a rule
+  assembled from two places and it was assembled inconsistently: 0.6.0, 0.7.0
+  and 0.8.0 each took the minor position for purely additive content and each
+  should have been a patch. The document now lists where it was not followed.
+  Nothing is re-tagged and no published release changes; what changes is how the
+  next number is picked. The policy also gained the two rows whose absence
+  caused it, for **adding a command** and **adding a kind**, both additive.
+
+### Output contract
+
+- **Nothing moved.** No kind changed shape, no kind version was bumped, no
+  default column set changed, and no exit code or error `code` changed meaning.
+  `ADF_UNREPRESENTABLE` is not new; it now covers one more construct, which is
+  listed with the others in
+  [output-contract.md](docs/output-contract.md).
+
+### Internal
+
+Not user-visible, and here because it is what found the bug above.
+
+- **What the converter loses is pinned, not only what it refuses.** The
+  round-trip fuzzer permits the first conversion to change the text, for a real
+  reason: emphasis has two delimiter characters, so the same span written with
+  underscores and with asterisks is one document written two ways. The allowance
+  is not restricted to spelling, so a first pass that moved a mark, dropped a
+  node, or changed a table's shape converged just as readily and the fuzzer was
+  green on all of it. Sixty-five inputs in its own corpus lose something on that
+  pass. They are a golden now, and the table defect was the first thing it
+  caught.
+
 ## [0.8.0] - 2026-08-18
 
 `jr doctor` explains why this tool will not work here, one check per layer
@@ -1127,7 +1220,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.8.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.9.0...main
+[0.9.0]: https://github.com/kmoneil/jr/releases/tag/v0.9.0
 [0.8.0]: https://github.com/kmoneil/jr/releases/tag/v0.8.0
 [0.7.1]: https://github.com/kmoneil/jr/releases/tag/v0.7.1
 [0.7.0]: https://github.com/kmoneil/jr/releases/tag/v0.7.0
