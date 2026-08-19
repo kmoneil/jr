@@ -393,17 +393,28 @@ do not catch, add the test in the same change and cite it here.
   before another position has tried its first returns a different member of the
   same set and moves text that was stable.
 
-  Eight corpus inputs are still refused this way, and a budget a hundred
-  thousand times larger moves none of them. They are two shapes, and neither
-  needs a wider search: `insideLive` refuses a `**` span whose content holds a
-  live asterisk, and a live asterisk inside is only a collision when it does not
-  pair with something else inside. Deciding that is the reader's pairing
-  algorithm, so the answer is to read the candidate back rather than to add a
-  rule, which is what
-  `_plans/backlog/ready/the-writer-guesses-what-the-reader-will-say.md` has said
-  since it was raised.
   **Enforced by:** `TestASpanIsReconsideredWhenTheRestOfTheRunCannotBeWritten`,
   `TestANestedSpanTakesTheCharacterItsParentNeedsToLeave`.
+- **A spelling the writer's own rules refuse is offered to the reader before it
+  is given up on.** `merges` holds two checks that are approximations rather
+  than rules: `insideLive` refuses a `**` span whose content holds a live
+  asterisk, and the flush test refuses one whose content starts or ends with the
+  delimiter on one side only. Both are right about a span delimited by a single
+  character and conservative about one delimited by two, because a live asterisk
+  inside is only a collision when it does not pair with something else inside.
+  `**a*b*c**` is fine and `**a*bc**` is not, and what decides is the reader's
+  delimiter pairing. There is no rule to add that is not that algorithm written
+  a second time, so the last pass of the search drops both checks and reads
+  every candidate it then generates back, comparing it against the nodes it was
+  written from through `contentKey`. A candidate the reader does not agree with
+  is not written. This took the emphasis refusals to **zero** across the corpus,
+  from 75 before 2026-08-19, and it is affordable only because of where it sits:
+  the greedy walk answers almost every document, the search runs when the walk
+  refused, and this pass runs when every strict spelling in the search has been
+  tried. Relaxing the generator without the check would emit spellings nothing
+  verifies, and adding the check without relaxing would never see a candidate;
+  they are one change.
+  **Enforced by:** `TestTheWriterAsksTheReaderWhenItsOwnRulesRefuse`.
 - **A scheduled sweep reports what it measured, not what it was built to
   find.** `if: failure()` fires for a finding, for a tool that could not run,
   and for a runner that was reclaimed. The weekly mutation sweep's first
