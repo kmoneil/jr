@@ -380,11 +380,30 @@ do not catch, add the test in the same change and cite it here.
   median of both corpora and 1.55 at the worst, and the search is only reached
   when the walk has refused. `searchBudget` bounds it, because a backtracking
   walk is exponential in the worst case and the linear guarantee above is not
-  negotiable. Twelve corpus inputs are still refused this way and a budget a
-  hundred thousand times larger moves none of them: they need one delimiter run
-  that closes one mark and opens another, which is a spelling this writer does
-  not generate rather than an assignment it failed to find.
-  **Enforced by:** `TestASpanIsReconsideredWhenTheRestOfTheRunCannotBeWritten`.
+  negotiable.
+
+  Three things are chosen while writing a run and all three are searched: which
+  mark opens a span, how far it reaches, and which of the two characters an
+  emphasis span is written with. The third hides, because it is correct about
+  the span that makes it and wrong about the span around it: writing the strong
+  in `*_00_0 __0__*` as `**0**` is right, and it leaves the em's content ending
+  in a live asterisk where neither of the em's spellings can be read back. So
+  the search yields every way of writing a span's content rather than the first,
+  and it does that in a second pass, because reaching for a second character
+  before another position has tried its first returns a different member of the
+  same set and moves text that was stable.
+
+  Eight corpus inputs are still refused this way, and a budget a hundred
+  thousand times larger moves none of them. They are two shapes, and neither
+  needs a wider search: `insideLive` refuses a `**` span whose content holds a
+  live asterisk, and a live asterisk inside is only a collision when it does not
+  pair with something else inside. Deciding that is the reader's pairing
+  algorithm, so the answer is to read the candidate back rather than to add a
+  rule, which is what
+  `_plans/backlog/ready/the-writer-guesses-what-the-reader-will-say.md` has said
+  since it was raised.
+  **Enforced by:** `TestASpanIsReconsideredWhenTheRestOfTheRunCannotBeWritten`,
+  `TestANestedSpanTakesTheCharacterItsParentNeedsToLeave`.
 - **A scheduled sweep reports what it measured, not what it was built to
   find.** `if: failure()` fires for a finding, for a tool that could not run,
   and for a runner that was reclaimed. The weekly mutation sweep's first

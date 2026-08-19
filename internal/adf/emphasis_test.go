@@ -573,3 +573,49 @@ func TestASpanIsReconsideredWhenTheRestOfTheRunCannotBeWritten(t *testing.T) {
 		t.Errorf("%q reads back as %s, want %s", got, says, want)
 	}
 }
+
+// TestANestedSpanTakesTheCharacterItsParentNeedsToLeave is the third thing the
+// writer chooses while writing a run, and the last of the three to be searched.
+//
+// A span picks between `*` and `_` by taking the first that can be read back
+// where it sits, which is correct about that span and says nothing about the
+// span around it. `*_00_0 __0__*` is em over two nodes with strong on the
+// second: writing the strong `**0**` is correct, and it leaves the em's content
+// ending in a live asterisk, where neither of the em's own spellings can be
+// read back. Writing it `__0__` costs the strong span nothing and leaves the em
+// its asterisk.
+//
+// Nothing about that is visible from inside the strong span. It is visible only
+// to something enumerating both, which is why the search yields every way of
+// writing a span's content rather than the first, and why it does that in a
+// second pass: the first pass allows only each span's first workable character,
+// so a document that already had a spelling keeps the one it had.
+func TestANestedSpanTakesTheCharacterItsParentNeedsToLeave(t *testing.T) {
+	for _, c := range []struct{ name, adf, want, says string }{{
+		name: "strong inside em, and the em needs the asterisk",
+		adf: para(`{"type":"text","text":"_00_0 ","marks":[{"type":"em"}]},` +
+			`{"type":"text","text":"0","marks":[{"type":"em"},{"type":"strong"}]}`),
+		want: `*\_00_0 __0__*`,
+		says: "[em:_00_0 ][em+strong:0]",
+	}, {
+		name: "strong on both ends of an em",
+		adf: para(`{"type":"text","text":"0","marks":[{"type":"em"},{"type":"strong"}]},` +
+			`{"type":"text","text":" __0_0 ","marks":[{"type":"em"}]},` +
+			`{"type":"text","text":"0","marks":[{"type":"em"},{"type":"strong"}]}`),
+		want: `*__0__ \_\_0_0 __0__*`,
+		says: "[em+strong:0][em: __0_0 ][em+strong:0]",
+	}} {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := convert(t, c.adf)
+			if err != nil {
+				t.Fatalf("ToMarkdown: %v", err)
+			}
+			if got != c.want {
+				t.Errorf("ToMarkdown = %q, want %q", got, c.want)
+			}
+			if says := sketch(t, got); says != c.says {
+				t.Errorf("%q reads back as %s, want %s", got, says, c.says)
+			}
+		})
+	}
+}
