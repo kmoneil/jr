@@ -54,6 +54,40 @@ func trimLine(s string) string { return strings.Trim(s, blockSpace) }
 // a hard break. This is deliberately not what FromText does with the same
 // input, because FromText contains text and this parses it.
 func FromMarkdown(text string) (Node, error) {
+	doc, err := read(text)
+	if err != nil {
+		return Node{}, err
+	}
+
+	// Anything this builds has to be something the writer can carry back.
+	//
+	// Otherwise the two halves of this package disagree about the subset, and
+	// a body means one thing going into Jira and another coming out, which is
+	// the exact failure the whole package exists to prevent, arriving from the
+	// inside. Checking it here costs one conversion of a small document and
+	// makes the agreement structural rather than a property the tests happen
+	// to hold: every case the round-trip fuzzer found was one of these.
+	//
+	// It asks `write` rather than `ToMarkdown` on purpose. The question is
+	// whether the document has a spelling at all, which one conversion answers;
+	// settling it as well would be work nothing here reads.
+	if _, err := write(doc); err != nil {
+		return Node{}, errs.Usage("MARKDOWN_UNSUPPORTED",
+			"this markdown builds something that cannot be written down again").
+			WithDetail("%s", errs.Coerce(err).Message).
+			WithRemedy("remove it, or send the body with --body-format text " +
+				"to store it as the characters you typed")
+	}
+	return doc, nil
+}
+
+// read builds the document without asking whether it can be written back.
+//
+// It is the unchecked half of the pair, and the reason it exists is `settle`:
+// the writer reads its own output to find out whether it has stopped moving,
+// and going through FromMarkdown for that would run the write-back check on
+// every round of a loop whose whole subject is what the writer just wrote.
+func read(text string) (Node, error) {
 	if !utf8.ValidString(text) {
 		return Node{}, errs.Usage("INVALID_ENCODING", "the text is not valid UTF-8").
 			WithRemedy("check the file or pipe it came from")
@@ -75,22 +109,6 @@ func FromMarkdown(text string) (Node, error) {
 
 	doc := Node{Type: "doc", Version: Version, Content: content}
 	numberTasks(doc.Content, new(int))
-
-	// Anything this builds has to be something ToMarkdown can carry back.
-	//
-	// Otherwise the two halves of this package disagree about the subset, and
-	// a body means one thing going into Jira and another coming out — which is
-	// the exact failure the whole package exists to prevent, arriving from the
-	// inside. Checking it here costs one conversion of a small document and
-	// makes the agreement structural rather than a property the tests happen
-	// to hold: every case the round-trip fuzzer found was one of these.
-	if _, err := ToMarkdown(doc); err != nil {
-		return Node{}, errs.Usage("MARKDOWN_UNSUPPORTED",
-			"this markdown builds something that cannot be written down again").
-			WithDetail("%s", errs.Coerce(err).Message).
-			WithRemedy("remove it, or send the body with --body-format text " +
-				"to store it as the characters you typed")
-	}
 	return doc, nil
 }
 

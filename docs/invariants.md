@@ -348,6 +348,23 @@ do not catch, add the test in the same change and cite it here.
   to read ``0 ~~*0*~~__\!__*\!*``, which it had written itself one conversion
   earlier.
   **Enforced by:** `TestTheAsteriskIsYieldedUntilThereIsNoRoom`.
+- **The markdown a document converts to is a fixed point.** Reading it back and
+  writing it again gives the same characters. One conversion was not: a mark on
+  whitespace is dropped when that whitespace lands at the edge of a span, which
+  is deliberate, but which span an edge belongs to is decided while writing.
+  Two mark runs that overlap without nesting force a cut, the cut can leave a
+  marked space at the head of what is left, and only one such space lands there
+  per conversion, so a document with two of them took three conversions to stop
+  moving and `FuzzMarkdownRoundTrips` allows two. Widening that allowance is not
+  the answer, because n marked spaces need n conversions. `ToMarkdown` settles
+  instead, and only through a document it reads back as the one it was given:
+  settling looked free on every corpus here, all of which are markdown-shaped,
+  and a text node holding a newline is not. The reader joins the lines with a
+  space the way a soft break does, and an unanchored settle adopted the join and
+  lost the newline. `contentKey` is the definition of "the same document" that
+  the anchor needs, and it is the same function the survival golden projects
+  through, so the writer's judgement and the golden's cannot drift apart.
+  **Enforced by:** `TestTheTextIsAFixedPoint`.
 - **A scheduled sweep reports what it measured, not what it was built to
   find.** `if: failure()` fires for a finding, for a tool that could not run,
   and for a runner that was reclaimed. The weekly mutation sweep's first

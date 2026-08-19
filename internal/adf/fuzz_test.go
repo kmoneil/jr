@@ -152,6 +152,10 @@ func FuzzMarkdownRoundTrips(f *testing.F) {
 		// character of the link's text, the emphasis could not close in front
 		// of it, and the document this package had just written was one it
 		// then refused to write again
+		"__!_____!__ __!_____!_____!__ __0___", // two whitespace nodes carrying
+		// em inside overlapping mark runs. Markdown can only nest, so the cut
+		// stranded one marked space per conversion and the text took three to
+		// stop moving, one more than this target allows. See settle
 		"0~~ ~~*~~0~~***!***!*", // three emphasis spans against each other,
 		// where every one of them was keeping the asterisk clear for the next.
 		// The first took the underscore, the second had an underscore on its

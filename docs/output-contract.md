@@ -704,6 +704,24 @@ in two, and where the span has no other mark to put there it is refused. What
 reaches this is a strike over emphasis markdown itself cannot spell: emphasis
 ending in punctuation with a word character after it.
 
+**The markdown a body converts to is a fixed point.** Reading it back and
+writing it again gives the same characters, so the body you read out of
+`issue get` is the body you get by piping it back in. That is not free: one
+conversion of a document is not always stable, because a mark on whitespace is
+dropped when that whitespace lands at the edge of a span, and which span an edge
+belongs to is decided while writing. Two mark runs that overlap without nesting
+force a cut, the cut can leave a marked space at the head of what is left, and
+only one such space lands there per conversion, so a document with two of them
+took three conversions to stop moving.
+
+The conversion settles before it returns, and it settles only through a document
+it is still carrying exactly. What a settling conversion sheds is a mark on a
+space, which the paragraph above already says moves outside its span. Anything
+else and the first conversion's text stands: a text node holding a newline is
+written with the newline, and although reading that back joins the lines with a
+space the way a soft break does, the newline is a character and settling never
+buys stability with one.
+
 ## Types
 
 XML has no attribute types, so **every attribute is a string** in JSON and YAML,

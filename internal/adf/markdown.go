@@ -34,12 +34,107 @@ import (
 // and a status lozenge's local id say where something sits on a page, not what
 // it says; markdown has no page, and those are dropped deliberately rather
 // than refused. Everything that carries meaning is kept.
+//
+// The text it returns is a fixed point: reading it back and writing it again
+// gives the same characters. See settle, which is where that is arranged and
+// why it is not free.
 func ToMarkdown(doc Node) (string, error) {
+	md, err := write(doc)
+	if err != nil {
+		return "", err
+	}
+	return settle(doc, md), nil
+}
+
+// write converts the document once, which is what this function did under the
+// name ToMarkdown until settling arrived above it.
+//
+// It is the unchecked half of the pair, and it has exactly two callers:
+// ToMarkdown, which settles what it returns, and FromMarkdown, which asks it
+// whether the document it just built can be carried back. Neither of those
+// calls the other's public entry point, so there is no recursion here rather
+// than a bounded one.
+func write(doc Node) (string, error) {
 	blocks, err := blockList(doc.Content, "doc")
 	if err != nil {
 		return "", err
 	}
 	return strings.Join(blocks, "\n\n"), nil
+}
+
+// settleRounds bounds the search below. The worst input anybody has measured
+// needs three, and every one of the 1911 in the verdict corpus needs at most
+// one, so eight is more than double the headroom over the only case that has
+// ever exceeded the corpus.
+const settleRounds = 8
+
+// settle converts the text until it stops changing, and returns the first
+// version if it never does or if settling would cost the document anything.
+//
+// One conversion of this package is not a fixed point. A mark on whitespace is
+// dropped when that whitespace lands at the edge of a span, which is deliberate
+// and documented, but which span an edge belongs to is decided while writing:
+// two mark runs that overlap without nesting force a cut, the cut can leave a
+// marked space at the head of what is left, and only one such space lands there
+// per conversion. So a body somebody read out of `issue get` could differ from
+// the body they got by piping it back in, with nothing to say which of the two
+// was the answer.
+//
+// The nightly sweep of 2026-08-19 reported it as text still changing after two
+// conversions, on a document with two marked spaces that needed three. That is
+// the shape the fuzz target's allowance was built for and one conversion wider
+// than it permits, and widening the allowance is not the answer: n marked
+// spaces need n conversions, so no fixed number is the right one to allow.
+//
+// The check against contentKey is the whole of why this is safe, and it was
+// not in the first version of this function.
+//
+// Settling looked free: over every accepted input in the verdict corpus six
+// texts move, none of them loses a mark, and none changes the projection. That
+// corpus is markdown-shaped, so it does not hold the documents markdown cannot
+// spell, and one of those was three feet away in this package's own unit
+// tests. An ADF text node holding a newline is written with the newline and the
+// next line's `#` escaped; reading that back joins the lines with a space,
+// because a soft break is a space in CommonMark, and **settling adopted the
+// join.** `a\n# second line` came back as `a # second line` and the newline was
+// gone. That is a real loss the writer has always had latently, and settling
+// without this check would have made it the answer this function returns.
+//
+// So a conversion is only settled through when the document it reads back is
+// the document it was given. What is shed on the way to a fixed point is then
+// only ever a mark on a space, which `docs/output-contract.md` says moves
+// outside its span and which contentKey counts as no content for that reason.
+// Anything else and the first version stands, unchanged from what shipped
+// before this existed.
+//
+// Returning the first version when it does not settle keeps today's behaviour
+// for a document this cannot help, rather than picking an arbitrary point in a
+// sequence that is still moving. The round-trip fuzzer still reports it, which
+// is the signal that matters.
+func settle(doc Node, md string) string {
+	first, want := md, contentKey(doc)
+	for range settleRounds {
+		again, err := read(md)
+		if err != nil {
+			// The writer produced text its own reader cannot take. That is a
+			// defect, and it is the round-trip property's to report: refusing
+			// here would turn it into a failed `issue get` on a body the caller
+			// can do nothing about.
+			return first
+		}
+		if contentKey(again) != want {
+			return first
+		}
+		next, err := write(again)
+		if err != nil {
+			return first
+		}
+		if next == md {
+			return md
+		}
+		md = next
+	}
+	return first
 }
 
 // unrepresentable is the one refusal in this file, so every construct markdown
