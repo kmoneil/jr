@@ -3,14 +3,12 @@ package adf_test
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
-	"unicode"
 
 	"github.com/kmoneil/jr/internal/adf"
 )
@@ -37,93 +35,16 @@ import (
 // fix. Regenerate with `make golden`.
 const survivalGolden = "markdown-survives.tsv"
 
-// projection reduces a document to what markdown is able to carry: which marks
-// each non-whitespace character holds, in order, inside which blocks.
+// projection is the package's own definition of "the same document", reached
+// through export_test.go rather than kept as a second copy here.
 //
-// This is the definition of "the same document" that the comparison needs, and
-// it is deliberately not equality of the trees. Three differences are not
-// losses and a tree comparison would report all three:
-//
-//   - Mark order is an artefact of how the text was typed.
-//   - Adjacent text nodes carrying the same marks are one run of content.
-//   - **A mark on whitespace cannot be written down.** renderSpan moves edge
-//     whitespace outside its span on purpose, because markdown cannot
-//     emphasise a space, so counting that as loss would be measuring the
-//     design rather than a defect. Whitespace is projected with no marks.
-//
-// What is left is the thing a reader would notice: this character was bold and
-// now it is not, this cell was here and now it is gone.
-func projection(n adf.Node) string {
-	var b strings.Builder
-	project(n, &b)
-	return b.String()
-}
-
-func project(n adf.Node, b *strings.Builder) {
-	if n.Type == "text" {
-		marks := markKey(n.Marks)
-		for _, r := range n.Text {
-			if unicode.IsSpace(r) {
-				fmt.Fprintf(b, "%q\n", r)
-				continue
-			}
-			fmt.Fprintf(b, "%q %s\n", r, marks)
-		}
-		return
-	}
-	if n.Type != "doc" {
-		fmt.Fprintf(b, "<%s %s\n", n.Type, attrKey(n.Attrs))
-	}
-	for _, c := range n.Content {
-		project(c, b)
-	}
-	if n.Type != "doc" {
-		fmt.Fprintf(b, ">%s\n", n.Type)
-	}
-}
-
-// markKey is a mark set in an order that does not depend on how it was typed.
-func markKey(marks []adf.Mark) string {
-	keys := make([]string, 0, len(marks))
-	for _, m := range marks {
-		raw, err := json.Marshal(m)
-		if err != nil {
-			keys = append(keys, m.Type)
-			continue
-		}
-		keys = append(keys, string(raw))
-	}
-	sort.Strings(keys)
-	// Joined on a separator JSON cannot contain, so lossClass can split the set
-	// back apart. A comma is in every mark that carries attributes.
-	return strings.Join(keys, "\x1f")
-}
-
-// attrKey is a node's attributes, minus the two that are not content.
-//
-// localId is editor state that FromMarkdown renumbers per document, and an
-// attribute whose value is the empty string is how ADF spells absent in the
-// places this converter round-trips through a URI.
-func attrKey(attrs map[string]any) string {
-	if len(attrs) == 0 {
-		return ""
-	}
-	kept := make(map[string]any, len(attrs))
-	for k, v := range attrs {
-		if k == "localId" || v == "" {
-			continue
-		}
-		kept[k] = v
-	}
-	if len(kept) == 0 {
-		return ""
-	}
-	raw, err := json.Marshal(kept)
-	if err != nil {
-		return fmt.Sprintf("%v", kept)
-	}
-	return string(raw)
-}
+// It lived in this file first and was moved into content.go when `settle`
+// needed the same question answered on every conversion. The format is
+// unchanged, which is what lossClass below reads, and having one function
+// rather than two is the point: the golden that records what the writer loses
+// and the writer's own decision about whether it has lost anything cannot
+// drift apart if they are the same code.
+func projection(n adf.Node) string { return adf.ContentKey(n) }
 
 // survives reports whether writing this document and reading it back gives the
 // same document, and what changed when it does not.

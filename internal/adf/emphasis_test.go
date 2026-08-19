@@ -435,3 +435,91 @@ func TestEmphasisWithNoSpellingIsRefusedRatherThanWrittenWrong(t *testing.T) {
 			structured.Remedy)
 	}
 }
+
+// TestTheAsteriskIsYieldedUntilThereIsNoRoom is the nightly sweep's find of
+// 2026-08-19, and the class it belongs to is wider than the input that found
+// it.
+//
+// Every emphasis span writes itself expecting the next one to open with an
+// asterisk, because `opensWith` names one on its behalf before the next span
+// has chosen anything. So a span with an emphasis neighbour takes the
+// underscore and leaves the asterisk for it. That is worth doing — an
+// underscore goes inert between word characters, so a span that has to close in
+// front of one has only the asterisk, and `_a_**b**c` is written rather than
+// refused because the first span handed it along.
+//
+// It is also unsatisfiable at three. The first yields the asterisk and takes
+// the underscore, the second has an underscore on its left and a predicted
+// asterisk on its right, and neither character is left. That is not a limit of
+// markdown: `_a_**b**_c_` is spelled below, and CommonMark reads it back as the
+// three spans it came from. Every document of the shape was refused until the
+// sweep reported one with a strike in it, as this package being unable to read
+// `0 ~~*0*~~__\!__*\!*`, which it had written itself one conversion earlier.
+//
+// The fix is that the yielding is a preference and gets given up: inlineList
+// writes the run a second time without it, and only when the first attempt
+// found no spelling for some span in it. So the two-span cases here are
+// unchanged, and the rest are documents that used to have no spelling at all.
+func TestTheAsteriskIsYieldedUntilThereIsNoRoom(t *testing.T) {
+	em := func(text string) string {
+		return `{"type":"text","text":"` + text + `","marks":[{"type":"em"}]},`
+	}
+	strong := func(text string) string {
+		return `{"type":"text","text":"` + text + `","marks":[{"type":"strong"}]},`
+	}
+
+	for _, c := range []struct{ name, adf, want, says string }{{
+		// Two spans, which the yielding has always been able to satisfy: the
+		// first takes the underscore and the second keeps the asterisk. Here to
+		// pin that the second attempt is not reached and changes nothing.
+		name: "two spans against each other",
+		adf:  para(strings.TrimSuffix(em("a")+strong("b"), ",")),
+		want: "_a_**b**",
+		says: "[em:a][strong:b]",
+	}, {
+		// The reason the yielding is worth keeping. The strong span has to
+		// close in front of `c`, where an underscore is inert, so it needs the
+		// asterisk and the em in front of it must not take one.
+		name: "yielding is what makes the neighbour writable",
+		adf: para(em("a") + strong("b") +
+			`{"type":"text","text":"c"}`),
+		want: "_a_**b**c",
+		says: "[em:a][strong:b]c",
+	}, {
+		// Three, which no amount of yielding satisfies. Written on the second
+		// attempt, where each span looks at the delimiter actually beside it
+		// rather than at one nobody has chosen.
+		name: "three spans against each other",
+		adf:  para(strings.TrimSuffix(em("a")+strong("b")+em("c"), ",")),
+		want: "*a*__b__*c*",
+		says: "[em:a][strong:b][em:c]",
+	}, {
+		name: "four spans against each other",
+		adf:  para(strings.TrimSuffix(em("a")+strong("b")+em("c")+strong("d"), ",")),
+		want: "*a*__b__*c*__d__",
+		says: "[em:a][strong:b][em:c][strong:d]",
+	}, {
+		// The document the sweep found, which is the same three spans with a
+		// strike inside the first and an escaped character in the other two.
+		name: "the sweep's own document",
+		adf: para(`{"type":"text","text":"0 "},` +
+			`{"type":"text","text":"0","marks":[{"type":"em"},{"type":"strike"}]},` +
+			`{"type":"text","text":"!","marks":[{"type":"strong"}]},` +
+			`{"type":"text","text":"!","marks":[{"type":"em"}]}`),
+		want: `0 *~~0~~*__\!__*\!*`,
+		says: "0 [em+strike:0][strong:!][em:!]",
+	}} {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := convert(t, c.adf)
+			if err != nil {
+				t.Fatalf("ToMarkdown: %v", err)
+			}
+			if got != c.want {
+				t.Errorf("ToMarkdown = %q, want %q", got, c.want)
+			}
+			if says := sketch(t, got); says != c.says {
+				t.Errorf("%q reads back as %s, want %s", got, says, c.says)
+			}
+		})
+	}
+}

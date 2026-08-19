@@ -405,3 +405,89 @@ func TestALineOfNonMarkdownWhitespaceIsNotBlank(t *testing.T) {
 		t.Errorf("built %d blocks, want 1: a non-breaking space does not make a line blank", n)
 	}
 }
+
+// TestTheTextIsAFixedPoint is the writer's stability contract, and it is the
+// nightly sweep's second find of 2026-08-19.
+//
+// One conversion was not a fixed point. A mark on whitespace is dropped when
+// that whitespace lands at the edge of a span, which is deliberate and
+// documented; which span an edge belongs to is decided while writing, and two
+// mark runs that overlap without nesting force a cut that can leave a marked
+// space at the head of what is left. Only one such space lands there per
+// conversion, so a document with two of them took three conversions to stop
+// moving. A body read out of `issue get` was not the body you got by piping it
+// back in, and nothing said which of the two was the answer.
+//
+// The last case is the guard rather than the fix, and it is why settling is
+// anchored on the document. Settling looked free on every corpus this package
+// has: six texts move and none loses a mark. Those corpora are markdown-shaped,
+// and an ADF text node holding a newline is not. The newline is written, the
+// reader joins the lines with a space because that is what a soft break is, and
+// an unanchored settle adopted the join and lost the newline. So a conversion
+// is settled through only when what it reads back is the document it was given.
+func TestTheTextIsAFixedPoint(t *testing.T) {
+	t.Run("markdown that took three conversions", func(t *testing.T) {
+		const src = "__!_____!__ __!_____!_____!__ __0___"
+		doc, err := adf.FromMarkdown(src)
+		if err != nil {
+			t.Fatalf("FromMarkdown: %v", err)
+		}
+		once, err := adf.ToMarkdown(doc)
+		if err != nil {
+			t.Fatalf("ToMarkdown: %v", err)
+		}
+		again, err := adf.FromMarkdown(once)
+		if err != nil {
+			t.Fatalf("this package cannot read its own output: %v", err)
+		}
+		twice, err := adf.ToMarkdown(again)
+		if err != nil {
+			t.Fatalf("ToMarkdown: %v", err)
+		}
+		if twice != once {
+			t.Errorf("the text moved on the conversion after the first"+
+				"\n--- was ---\n%s\n--- now ---\n%s", once, twice)
+		}
+	})
+
+	t.Run("a marked space between overlapping runs", func(t *testing.T) {
+		// strong over the first two nodes and em over the last three, which
+		// markdown cannot nest. Built by hand because the cut that strands the
+		// mark is the writer's, and no markdown asks for it directly.
+		doc := para(`{"type":"text","text":"0","marks":[{"type":"strong"}]},` +
+			`{"type":"text","text":"0","marks":[{"type":"strong"},{"type":"em"}]},` +
+			`{"type":"text","text":" ","marks":[{"type":"em"}]},` +
+			`{"type":"text","text":"0","marks":[{"type":"em"}]}`)
+		once, err := convert(t, doc)
+		if err != nil {
+			t.Fatalf("ToMarkdown: %v", err)
+		}
+		back, err := adf.FromMarkdown(once)
+		if err != nil {
+			t.Fatalf("this package cannot read its own output: %v", err)
+		}
+		twice, err := adf.ToMarkdown(back)
+		if err != nil {
+			t.Fatalf("ToMarkdown: %v", err)
+		}
+		if twice != once {
+			t.Errorf("the text moved on the conversion after the first"+
+				"\n--- was ---\n%q\n--- now ---\n%q", once, twice)
+		}
+	})
+
+	t.Run("settling never costs the document a character", func(t *testing.T) {
+		// The newline is content. Reading this text back joins the lines with a
+		// space, so the document it reads back as is not the one it was given,
+		// and the first version stands.
+		doc := para(`{"type":"text","text":"a\n# second line"}`)
+		got, err := convert(t, doc)
+		if err != nil {
+			t.Fatalf("ToMarkdown: %v", err)
+		}
+		if want := "a\n" + `\# second line`; got != want {
+			t.Errorf("got %q, want %q; settling adopted a loss rather than "+
+				"normalising a spelling", got, want)
+		}
+	})
+}

@@ -34,12 +34,119 @@ import (
 // and a status lozenge's local id say where something sits on a page, not what
 // it says; markdown has no page, and those are dropped deliberately rather
 // than refused. Everything that carries meaning is kept.
+//
+// The text it returns is a fixed point: reading it back and writing it again
+// gives the same characters. See settle, which is where that is arranged and
+// why it is not free.
 func ToMarkdown(doc Node) (string, error) {
+	md, err := write(doc)
+	if err != nil {
+		return "", err
+	}
+	return settle(doc, md), nil
+}
+
+// write converts the document once, which is what this function did under the
+// name ToMarkdown until settling arrived above it.
+//
+// It is the unchecked half of the pair, and it has exactly two callers:
+// ToMarkdown, which settles what it returns, and FromMarkdown, which asks it
+// whether the document it just built can be carried back. Neither of those
+// calls the other's public entry point, so there is no recursion here rather
+// than a bounded one.
+func write(doc Node) (string, error) {
 	blocks, err := blockList(doc.Content, "doc")
 	if err != nil {
 		return "", err
 	}
 	return strings.Join(blocks, "\n\n"), nil
+}
+
+// settleRounds bounds the search below. The worst input anybody has measured
+// needs three, and every one of the 1911 in the verdict corpus needs at most
+// one, so eight is more than double the headroom over the only case that has
+// ever exceeded the corpus.
+const settleRounds = 8
+
+// settle converts the text until it stops changing, and returns the first
+// version if it never does or if settling would cost the document anything.
+//
+// One conversion of this package is not a fixed point. A mark on whitespace is
+// dropped when that whitespace lands at the edge of a span, which is deliberate
+// and documented, but which span an edge belongs to is decided while writing:
+// two mark runs that overlap without nesting force a cut, the cut can leave a
+// marked space at the head of what is left, and only one such space lands there
+// per conversion. So a body somebody read out of `issue get` could differ from
+// the body they got by piping it back in, with nothing to say which of the two
+// was the answer.
+//
+// The nightly sweep of 2026-08-19 reported it as text still changing after two
+// conversions, on a document with two marked spaces that needed three. That is
+// the shape the fuzz target's allowance was built for and one conversion wider
+// than it permits, and widening the allowance is not the answer: n marked
+// spaces need n conversions, so no fixed number is the right one to allow.
+//
+// The check against contentKey is the whole of why this is safe, and it was
+// not in the first version of this function.
+//
+// Settling looked free: over every accepted input in the verdict corpus six
+// texts move, none of them loses a mark, and none changes the projection. That
+// corpus is markdown-shaped, so it does not hold the documents markdown cannot
+// spell, and one of those was three feet away in this package's own unit
+// tests. An ADF text node holding a newline is written with the newline and the
+// next line's `#` escaped; reading that back joins the lines with a space,
+// because a soft break is a space in CommonMark, and **settling adopted the
+// join.** `a\n# second line` came back as `a # second line` and the newline was
+// gone. That is a real loss the writer has always had latently, and settling
+// without this check would have made it the answer this function returns.
+//
+// So a conversion is only settled through when the document it reads back is
+// the document it was given. What is shed on the way to a fixed point is then
+// only ever a mark on a space, which `docs/output-contract.md` says moves
+// outside its span and which contentKey counts as no content for that reason.
+// Anything else and the first version stands, unchanged from what shipped
+// before this existed.
+//
+// Returning the first version when it does not settle keeps today's behaviour
+// for a document this cannot help, rather than picking an arbitrary point in a
+// sequence that is still moving. The round-trip fuzzer still reports it, which
+// is the signal that matters.
+func settle(doc Node, md string) string {
+	first := md
+	var want string
+	var known bool
+	for range settleRounds {
+		again, err := read(md)
+		if err != nil {
+			// The writer produced text its own reader cannot take. That is a
+			// defect, and it is the round-trip property's to report: refusing
+			// here would turn it into a failed `issue get` on a body the caller
+			// can do nothing about.
+			return first
+		}
+		next, err := write(again)
+		if err != nil {
+			return first
+		}
+		if next == md {
+			return md
+		}
+		// Only here is a different text about to be adopted, and only here is
+		// the anchor worth computing. Almost every document is already a fixed
+		// point and leaves through the line above, so projecting it twice to
+		// find that out was most of what this function cost. Timed over the
+		// 166 real documents that convert, 200 reps each: 9.0x one conversion
+		// at the median and 39us on the worst of them, against 4.3x and 20us
+		// once the projection moved down here.
+		if !known {
+			want, known = contentKey(doc), true
+		}
+		if contentKey(again) != want {
+			return first
+		}
+		md = next
+	}
+	return first
 }
 
 // unrepresentable is the one refusal in this file, so every construct markdown
@@ -500,7 +607,17 @@ func tableLine(cells []string, width int) string {
 }
 
 func inlineList(nodes []Node, where string) (string, error) {
-	out, err := renderInline(trimEdgeBreaks(coalesce(nodes)), nil, "", where)
+	nodes = trimEdgeBreaks(coalesce(nodes))
+
+	out, err := renderInline(nodes, nil, "", where, false)
+	if isNoSpelling(err) {
+		// Nothing in this run could be spelled while every span was also
+		// keeping the asterisk clear for the span after it. That preference is
+		// a guess about a decision nobody has made yet, so the run is written
+		// again without it. See delimiterAfter, which is where it is given up,
+		// and which says why a second attempt is the whole of the fix.
+		out, err = renderInline(nodes, nil, "", where, true)
+	}
 	if e, ok := errors.AsType[*noSpelling](err); ok {
 		// Every spelling of some span in here was refused, so this one is about
 		// the document after all. It becomes the ordinary refusal here, at the
@@ -553,7 +670,9 @@ var spanMarks = []string{"link", "strong", "em", "strike"}
 // the next character starts a line. Escaping decided per node instead put a
 // backslash in front of a hash that was mid-line and left one alone that was
 // not — the two passes disagreed, which is how the fuzzer saw it.
-func renderInline(nodes []Node, applied []Mark, written, where string) (string, error) {
+func renderInline(nodes []Node, applied []Mark, written, where string,
+	crowded bool,
+) (string, error) {
 	var b strings.Builder
 	for i := 0; i < len(nodes); {
 		choices := spanChoices(nodes, i, applied)
@@ -566,7 +685,7 @@ func renderInline(nodes []Node, applied []Mark, written, where string) (string, 
 			i++
 			continue
 		}
-		span, j, err := renderChoices(choices, nodes, i, applied, written, &b, where)
+		span, j, err := renderChoices(choices, nodes, i, applied, written, &b, where, crowded)
 		if err != nil {
 			return "", err
 		}
@@ -592,7 +711,7 @@ func renderInline(nodes []Node, applied []Mark, written, where string) (string, 
 // each of them as its own span, and the strike goes outside the second, which
 // is what the input said in the first place.
 func renderChoices(choices []spanChoice, nodes []Node, i int, applied []Mark,
-	written string, b *strings.Builder, where string,
+	written string, b *strings.Builder, where string, crowded bool,
 ) (string, int, error) {
 	var refused error
 	for _, c := range choices {
@@ -604,7 +723,7 @@ func renderChoices(choices []spanChoice, nodes []Node, i int, applied []Mark,
 			if j < c.j && (strands(nodes, j) || cutRunsTogether(c.mark)) {
 				continue
 			}
-			span, err := renderSpan(nodes, i, j, c.mark, applied, written, b, where)
+			span, err := renderSpan(nodes, i, j, c.mark, applied, written, b, where, crowded)
 			switch {
 			case err == nil:
 				return span, j, nil
@@ -669,10 +788,10 @@ func isNoSpelling(err error) bool {
 
 // renderSpan writes one run of nodes carrying the same mark, delimiters and all.
 func renderSpan(nodes []Node, i, j int, mark Mark, applied []Mark,
-	written string, b *strings.Builder, where string,
+	written string, b *strings.Builder, where string, crowded bool,
 ) (string, error) {
 	inner, err := renderInline(nodes[i:j], append(applied, mark),
-		written+b.String(), where)
+		written+b.String(), where, crowded)
 	if err != nil {
 		return "", err
 	}
@@ -697,12 +816,13 @@ func renderSpan(nodes []Node, i, j int, mark Mark, applied []Mark,
 	// The trailing whitespace this span moves outside itself sits between its
 	// closing delimiter and whatever comes next, so that is what the delimiter
 	// is up against.
-	next := after(nodes[j:], applied)
+	next, guessed := after(nodes[j:], applied)
 	if trail != "" {
-		next = rune(trail[0])
+		next, guessed = rune(trail[0]), false
 	}
 	open, closing, err := delimiters(mark, core,
-		beforeOf(b.String(), lead), endsWithLiveOf(b.String(), lead), next, where)
+		beforeOf(b.String(), lead), endsWithLiveOf(b.String(), lead), next,
+		delimiterAfter(next, guessed, crowded), where)
 	if err != nil {
 		return "", err
 	}
@@ -786,11 +906,12 @@ func carries(n Node, m Mark) bool {
 // about a mark the document did not have, over a character the span does not
 // use. The round-trip fuzzer found it on the second pass over `*0*~~*0*~~0`.
 func delimiters(
-	m Mark, inner string, prev rune, prevLive byte, next rune, where string,
+	m Mark, inner string, prev rune, prevLive byte, next rune, nextLive byte,
+	where string,
 ) (open, closing string, err error) {
 	switch m.Type {
 	case "strong", "em":
-		return emphasisDelimiters(m.Type, inner, prev, prevLive, next, where)
+		return emphasisDelimiters(m.Type, inner, prev, prevLive, next, nextLive, where)
 	case "strike":
 		return "~~", "~~", nil
 	case "link":
@@ -817,10 +938,11 @@ func delimiters(
 // closes nothing. Both asterisks then read as text and the emphasis was gone,
 // exit 0, from output this package produced itself.
 func emphasisDelimiters(
-	kind, inner string, prev rune, prevLive byte, next rune, where string,
+	kind, inner string, prev rune, prevLive byte, next rune, nextLive byte,
+	where string,
 ) (open, closing string, err error) {
 	for _, char := range []byte{'*', '_'} {
-		if merges(char, inner, prev, prevLive, next) ||
+		if merges(char, inner, prev, prevLive, next, nextLive) ||
 			!flanks(char, inner, prev, next) {
 			continue
 		}
@@ -1014,7 +1136,7 @@ func splitEdgeSpace(s string) (lead, core, trail string) {
 // and in a second vocabulary, where an underscore was itself a word character
 // and every byte over 0x7f was one. flanks asks the reader's own rule instead,
 // so the two halves of the package cannot drift on it.
-func merges(char byte, inner string, prev rune, prevLive byte, next rune) bool {
+func merges(char byte, inner string, prev rune, prevLive byte, next rune, nextLive byte) bool {
 	// A live delimiter strictly inside would close this span early, wherever
 	// it came from — a nested span that picked the same character, or an
 	// underscore inside a word, which looks like one and is inert.
@@ -1038,7 +1160,7 @@ func merges(char byte, inner string, prev rune, prevLive byte, next rune) bool {
 	if prev != 0 && next != 0 && unicode.IsSpace(prev) && unicode.IsSpace(next) {
 		return false
 	}
-	return prevLive == char || next == rune(char)
+	return prevLive == char || nextLive == char
 }
 
 // insideLive reports an unescaped delimiter somewhere other than the two ends.
@@ -1225,31 +1347,84 @@ func endsWithLiveOf(prefix, suffix string) byte {
 // Asking escapeText rather than keeping a second list of what it escapes: the
 // answer has to be the escaper's, and a list beside it is the drift this
 // package has already paid for twice.
-func after(rest []Node, applied []Mark) rune {
+// The second return says the character is predicted rather than settled, which
+// is true of exactly one of the answers below: the asterisk `opensWith` names
+// for a neighbouring emphasis span, whose delimiter is chosen later. A tilde and
+// a bracket are what a strike and a link are always written with, and every
+// other answer is a character already in the document. delimiterAfter is what
+// the distinction is for.
+func after(rest []Node, applied []Mark) (rune, bool) {
 	if len(rest) == 0 || rest[0].Type != "text" {
-		return 0
+		return 0, false
 	}
 	first, size := utf8.DecodeRuneInString(rest[0].Text)
 	// Whitespace comes before the next span's delimiter, because that span
 	// moves its own edge whitespace outside itself. Two delimiters with a
 	// space between them do not merge.
 	if size > 0 && unicode.IsSpace(first) {
-		return first
+		return first, false
 	}
 	if d := opensWith(rest[0], applied); d != 0 {
-		return d
+		return d, d == '*'
 	}
 	if size == 0 {
-		return 0
+		return 0, false
 	}
 	if written := escapeText(string(first), false); written[0] == '\\' {
 		// It goes out escaped, so the character against the delimiter is the
 		// backslash. Mid-line by construction: a span's delimiter precedes it,
 		// which is why lineStart is false and why the line-start-only escapes
 		// are correctly absent from the answer.
-		return '\\'
+		return '\\', false
 	}
-	return first
+	return first, false
+}
+
+// delimiterAfter is the delimiter this span's closing run is certainly written
+// against, which is a narrower question than the one `after` answers.
+//
+// The flanking rules need the character beside the run only to classify it, and
+// a predicted asterisk classifies the same as the underscore that may turn up
+// instead. Merging needs its identity, and there the prediction is the whole
+// difference: a neighbouring emphasis span has not picked its character yet, and
+// `opensWith` names the asterisk on its behalf so this span avoids it and the
+// neighbour, seeing an underscore beside it, keeps the asterisk.
+//
+// That yielding is worth doing, because an underscore is the harder of the two
+// to place: it goes inert between word characters, so a span that has to close
+// in front of one has only the asterisk. Handing it along is why `_a_**b**c`
+// is written rather than refused.
+//
+// It is also unsatisfiable as soon as three emphasis spans sit against each
+// other. The first yields the asterisk and takes the underscore; the second has
+// an underscore on its left and a predicted asterisk on its right and may take
+// neither; and the run has no spelling at all. `_a_**b**_c_` is a document Jira
+// stores, CommonMark reads it back as exactly the three spans it came from, and
+// this writer refused it — along with everything else of that shape, which is
+// what the nightly sweep of 2026-08-19 reported as this package being unable to
+// read `0 ~~*0*~~__\!__*\!*`, which it had just written itself.
+//
+// So the preference is given up rather than abandoned. `crowded` is the second
+// attempt at one inline run, made by inlineList only after the first attempt
+// refused every way of spelling some span in it, and it says to take the
+// asterisk here and let the neighbour see what is actually beside it. The first
+// attempt is unchanged, so no document that is written today is written
+// differently; a document that is refused today may now be written.
+//
+// Guarding on `guessed` rather than on the character alone is belt and braces:
+// a literal asterisk in text is escaped and reaches `after` as a backslash, and
+// an underscore at the start of a text node is escaped for the same reason, so
+// today a settled `*` or `_` beside a span cannot happen. If that ever changes,
+// this drops a real collision rather than a prediction, and the round trip is
+// where it would be found.
+func delimiterAfter(next rune, guessed, crowded bool) byte {
+	if next != '*' && next != '_' {
+		return 0
+	}
+	if guessed && crowded {
+		return 0
+	}
+	return byte(next)
 }
 
 // opensWith is the delimiter a node's own marks put in front of its text, or
