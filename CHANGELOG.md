@@ -20,6 +20,60 @@ accident.
 
 Nothing yet.
 
+## [0.9.2] - 2026-08-19
+
+**Emphasis this tool refused to write, and could have written, now converts.**
+The count of such documents in its own adversarial corpus went from 75 to zero.
+
+Nothing about any document's shape moved. No kind's schema version moved, no
+default column set changed, no exit code or error `code` means anything
+different, and no input that converted before converts differently now. If your
+bodies convert today, this release changes nothing you do.
+
+Patch on every count, and it is the second patch of the day: 0.9.1 settled the
+markdown a body converts to, and this one is about the bodies that never got
+that far.
+
+### Fixed
+
+- **Emphasis with no spelling is no longer refused when a spelling exists.**
+  Writing a run of emphasis means choosing three things at every position: which
+  mark opens the span, how far it reaches, and which of `*` or `_` it is written
+  with. The writer fixed all three at the moment it reached them, so a choice
+  that was correct where it was made could leave the rest of the line with
+  nothing, and the document was refused over a decision three nodes earlier.
+
+  It searches the line now, in the same order it used to walk it, and only after
+  the ordinary walk has refused. A body that converts today converts identically.
+
+- **The writer asks the reader about a spelling its own rules refuse.** Two of
+  those rules were approximations of how a reader pairs delimiters: one refused
+  a bold span whose content held a stray `*`, which is only a collision when
+  that `*` does not pair with another one inside. `**a*b*c**` is fine and
+  `**a*bc**` is not, and only the reader can tell them apart.
+
+  So the last thing the writer tries is dropping those rules, writing the
+  candidate, reading it back, and comparing it with the document it started
+  from. A candidate the reader does not agree with is not written. Together with
+  the search above, this took the emphasis refusals to zero.
+
+- **A code block whose language starts with its own fence character is no longer
+  mangled.** The opening line of a fenced block is a run of the fence character
+  and then the language, so a language of ``~`x`` after `~~~` read as a fence of
+  four and a language of `` `x ``: a character of content gone, and a closing
+  fence that no longer closed anything. The document came back as `a code fence
+  that is never closed`, pointing at a line nobody wrote. A space separates them
+  now, written only where it is needed.
+
+### Output contract
+
+No kind's schema version moved.
+
+- `docs/output-contract.md` now says that the emphasis spelling is searched over
+  the whole line rather than fixed one span at a time, and that a spelling the
+  writer's own rules refuse is offered to the reader before it is given up on.
+  Both describe behaviour a caller can observe only as fewer refusals.
+
 ## [0.9.1] - 2026-08-19
 
 **Bodies this tool refused to convert, and could have converted, now convert.
@@ -1293,7 +1347,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.9.1...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.9.2...main
+[0.9.2]: https://github.com/kmoneil/jr/releases/tag/v0.9.2
 [0.9.1]: https://github.com/kmoneil/jr/releases/tag/v0.9.1
 [0.9.0]: https://github.com/kmoneil/jr/releases/tag/v0.9.0
 [0.8.0]: https://github.com/kmoneil/jr/releases/tag/v0.8.0
