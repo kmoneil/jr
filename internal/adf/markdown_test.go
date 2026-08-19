@@ -668,3 +668,45 @@ func TestARowWiderThanItsHeaderIsRefusedRatherThanTruncated(t *testing.T) {
 		}
 	})
 }
+
+// TestACodeFenceIsSeparatedFromItsLanguage is the nightly target's find on
+// `~~~ ~`+"`"+`000000\r~~~`, and it is a defect in the writer rather than in the
+// reader that reported it.
+//
+// The opening line of a fenced block is a run of the fence character and then
+// the info string, so a language beginning with that character is part of the
+// fence. `~~~` in front of a language of "~x" is a fence of four and a language
+// of "x": one character of content gone, and a closing fence of three that no
+// longer closes anything. The document came back as "a code fence that is never
+// closed", pointing at a line nobody wrote.
+//
+// The tilde only becomes the fence character when the language holds a backtick,
+// which is why the first two cases are here: they are the same language shape
+// against a backtick fence, where nothing runs together and nothing may change.
+func TestACodeFenceIsSeparatedFromItsLanguage(t *testing.T) {
+	for _, c := range []struct{ name, lang, want string }{
+		{"an ordinary language is untouched", "go", "```go\nx\n```"},
+		{"a tilde is not the fence character here", "~tilde", "```~tilde\nx\n```"},
+		{"a backtick sends the fence to tildes", "`tick", "~~~`tick\nx\n~~~"},
+		{"and then a leading tilde needs the gap", "~`both", "~~~ ~`both\nx\n~~~"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			doc := wrap(`{"type":"codeBlock","attrs":{"language":` + quoteJSON(c.lang) +
+				`},"content":[{"type":"text","text":"x"}]}`)
+			got, err := convert(t, doc)
+			if err != nil {
+				t.Fatalf("ToMarkdown: %v", err)
+			}
+			if got != c.want {
+				t.Errorf("ToMarkdown = %q, want %q", got, c.want)
+			}
+			back, err := adf.FromMarkdown(got)
+			if err != nil {
+				t.Fatalf("this package cannot read its own output: %v", err)
+			}
+			if lang, _ := back.Content[0].Attrs["language"].(string); lang != c.lang {
+				t.Errorf("the language came back as %q, want %q", lang, c.lang)
+			}
+		})
+	}
+}

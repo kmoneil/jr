@@ -338,7 +338,26 @@ func codeBlock(n Node, where string) (string, error) {
 		char = '~'
 	}
 	fence := strings.Repeat(string(char), max(3, longestRun(code, char)+1))
-	return fence + lang + "\n" + code + "\n" + fence, nil
+
+	// A language beginning with the fence character is part of the fence unless
+	// something separates them. The opening line is a run of the character and
+	// then the info string, so `~~~` in front of a language of "~x" is a fence
+	// of four and an info string of "x": the language loses a character, and
+	// the closing fence, written at the length this function chose, is now too
+	// short to close anything. The whole document was refused on the way back
+	// in, with "a code fence that is never closed" pointing at a line nobody
+	// wrote.
+	//
+	// CommonMark allows whitespace between the two and this package's own
+	// reader trims it, which is why the space costs nothing and is only written
+	// where it is load-bearing. Found by the nightly's target on
+	// `~~~ ~\`000000\r~~~`, whose language is "~\`000000": a backtick sends the
+	// fence to tildes and the leading tilde then merges into it.
+	gap := ""
+	if strings.HasPrefix(lang, string(char)) {
+		gap = " "
+	}
+	return fence + gap + lang + "\n" + code + "\n" + fence, nil
 }
 
 func longestBacktickRun(s string) int { return longestRun(s, '`') }
