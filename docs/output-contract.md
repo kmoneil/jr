@@ -685,9 +685,15 @@ an address holding a line ending, and an attachment id holding the `/` that
 separates it from its collection, are refused rather than encoded one way.
 
 Emphasis picks between the `*` and `_` spellings so that its delimiters never
-run together with a neighbouring span's. Where neither spelling would be read
-back as what the document says, the conversion is refused rather than written
-down and hoped over.
+run together with a neighbouring span's. The choice is made over the whole
+inline run rather than one span at a time: a span whose neighbour is also
+emphasis takes the underscore and leaves the asterisk for it, because an
+underscore is inert between word characters and the neighbour may need the
+asterisk to close at all. Three spans against each other cannot all be given
+the asterisk that way, so the run is spelled a second time with each span
+reading the delimiter actually beside it, and `_a_**b**_c_` is written rather
+than refused. Where neither spelling would be read back as what the document
+says, the conversion is refused rather than written down and hoped over.
 
 Strikethrough has no such choice: it is `~~`, and two of them with nothing
 between them are four tildes to a reader rather than the end of one span and

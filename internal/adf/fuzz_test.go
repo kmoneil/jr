@@ -152,6 +152,11 @@ func FuzzMarkdownRoundTrips(f *testing.F) {
 		// character of the link's text, the emphasis could not close in front
 		// of it, and the document this package had just written was one it
 		// then refused to write again
+		"0~~ ~~*~~0~~***!***!*", // three emphasis spans against each other,
+		// where every one of them was keeping the asterisk clear for the next.
+		// The first took the underscore, the second had an underscore on its
+		// left and a predicted asterisk on its right and could take neither,
+		// and a run this package had just written came back refused
 	} {
 		f.Add(seed)
 	}

@@ -330,6 +330,24 @@ do not catch, add the test in the same change and cite it here.
   markdown produces the documents that reach it, so `FuzzMarkdownRoundTrips`
   cannot see the class and the guard is asserted from ADF instead.
   **Enforced by:** `TestAStrikeSpanIsNeverCut`.
+- **A run of emphasis spans is spelled as a run, not one span at a time.** Each
+  span writes itself expecting the next to open with an asterisk, because
+  `opensWith` names one on the neighbour's behalf before the neighbour has
+  chosen anything, so a span with an emphasis neighbour takes the underscore and
+  leaves the asterisk for it. That is worth doing: an underscore is inert
+  between word characters, so a neighbour closing in front of one has only the
+  asterisk. It is also unsatisfiable at three spans against each other, where the
+  middle one has an underscore on its left and a predicted asterisk on its right
+  and may take neither. Every document of that shape was refused, `_a_**b**_c_`
+  among them, which CommonMark reads back as exactly the three spans it came
+  from. So the prediction is treated as the preference it is and given up:
+  `inlineList` writes the run a second time without it, and only after the first
+  attempt found no spelling for some span in it, which is why nothing written
+  today is written differently and 62 corpus inputs that were refused now
+  convert. The nightly sweep of 2026-08-19 found it as this package being unable
+  to read ``0 ~~*0*~~__\!__*\!*``, which it had written itself one conversion
+  earlier.
+  **Enforced by:** `TestTheAsteriskIsYieldedUntilThereIsNoRoom`.
 - **A scheduled sweep reports what it measured, not what it was built to
   find.** `if: failure()` fires for a finding, for a tool that could not run,
   and for a runner that was reclaimed. The weekly mutation sweep's first
