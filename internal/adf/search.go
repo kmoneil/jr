@@ -1,5 +1,7 @@
 package adf
 
+import "strings"
+
 // This file is the writer's answer to a choice that was wrong later.
 //
 // renderInline walks a run left to right and commits: renderChoices enumerates
@@ -68,7 +70,7 @@ func searchBudget(n int) int { return 8*n + 64 }
 // is the same document spelled differently, for a body somebody may already
 // have recorded. The stability policy calls moving text that was stable
 // breaking, and nothing here is worth that.
-func searchInline(nodes []Node, applied []Mark, written, where string, crowded bool) (string, error) {
+func searchInline(nodes []Node, applied []Mark, written, where string, crowded, relaxed bool) (string, error) {
 	var refused error
 	// Emphasis has two spellings, so one skip exhausts the alternatives.
 	for maxSkip := range 2 {
@@ -77,9 +79,15 @@ func searchInline(nodes []Node, applied []Mark, written, where string, crowded b
 			crowded: crowded,
 			budget:  searchBudget(len(nodes)),
 			maxSkip: maxSkip,
+			relaxed: relaxed,
 		}
 		var out string
 		err := s.enumerate(nodes, applied, written, func(text string) error {
+			if s.relaxed && !verifyRun(text, nodes) {
+				// Generated under weakened rules and the reader does not agree
+				// it says what the document says. Ask for another.
+				return &noSpelling{where: where}
+			}
 			out = text
 			return nil
 		})
@@ -109,6 +117,9 @@ type inlineSearch struct {
 	// reach on this pass. See searchInline for why it is a pass rather than an
 	// inner loop.
 	maxSkip int
+	// relaxed drops the two checks in `merges` that approximate the reader's
+	// pairing, which is only safe because every candidate is then read back.
+	relaxed bool
 	refused error
 }
 
@@ -201,7 +212,7 @@ func (s *inlineSearch) wrap(
 	step func(int, string) error,
 ) error {
 	for skip := 0; skip <= s.maxSkip; skip++ {
-		span, err := wrapSpan(nodes, j, mark, applied, inner, text, s.where, s.crowded, skip)
+		span, err := wrapSpan(nodes, j, mark, applied, inner, text, s.where, s.crowded, skip, s.relaxed)
 		if err != nil {
 			if isNoSpelling(err) {
 				// No further spelling of this content. The caller's next move
@@ -235,4 +246,31 @@ func (s *inlineSearch) exhausted() error {
 		s.refused = &noSpelling{where: s.where}
 	}
 	return s.refused
+}
+
+// runKey projects a run of inline nodes the way contentKey projects a document.
+func runKey(nodes []Node) string {
+	var b strings.Builder
+	for _, n := range nodes {
+		projectContent(n, &b)
+	}
+	return b.String()
+}
+
+// verifyRun reports whether text reads back as the run it was written from.
+//
+// This is the writer asking the reader rather than modelling it, which is what
+// `_plans/backlog/.../the-writer-guesses-what-the-reader-will-say.md` has been
+// about since it was raised. It is affordable here because it runs only on the
+// third pass of a search that itself runs only when the greedy walk refused.
+func verifyRun(text string, nodes []Node) bool {
+	back, err := read(text)
+	if err != nil {
+		return false
+	}
+	var got []Node
+	for _, blk := range back.Content {
+		got = append(got, blk.Content...)
+	}
+	return runKey(got) == runKey(nodes)
 }

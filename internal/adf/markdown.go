@@ -645,10 +645,19 @@ func inlineList(nodes []Node, where string) (string, error) {
 		// here at all is rare enough that it costs nothing measurable, because
 		// the walk makes 1.00 attempts per span position at the median of both
 		// corpora and 1.55 at the worst.
-		for _, crowded := range []bool{false, true} {
-			out, err = searchInline(nodes, nil, "", where, crowded)
-			if !isNoSpelling(err) {
-				break
+		// The order is least surprising first, and relaxation is outermost
+		// because it is the only one that changes what a candidate is allowed
+		// to be rather than which candidate is tried. Every strict spelling,
+		// under both neighbour preferences, is exhausted before the writer
+		// starts generating what `merges` would have refused and asking the
+		// reader about it.
+	search:
+		for _, relaxed := range []bool{false, true} {
+			for _, crowded := range []bool{false, true} {
+				out, err = searchInline(nodes, nil, "", where, crowded, relaxed)
+				if !isNoSpelling(err) {
+					break search
+				}
 			}
 		}
 	}
@@ -829,7 +838,7 @@ func renderSpan(nodes []Node, i, j int, mark Mark, applied []Mark,
 	if err != nil {
 		return "", err
 	}
-	return wrapSpan(nodes, j, mark, applied, inner, b.String(), where, crowded, 0)
+	return wrapSpan(nodes, j, mark, applied, inner, b.String(), where, crowded, 0, false)
 }
 
 // wrapSpan puts the delimiters around a span whose content is already written.
@@ -845,7 +854,7 @@ func renderSpan(nodes []Node, i, j int, mark Mark, applied []Mark,
 // character a span is written with can be the reason the span *after* it has no
 // spelling, and that is not something the span can see from where it is.
 func wrapSpan(nodes []Node, j int, mark Mark, applied []Mark,
-	inner, sofar, where string, crowded bool, skip int,
+	inner, sofar, where string, crowded bool, skip int, relaxed bool,
 ) (string, error) {
 	// Whitespace at the edge of a span moves outside it. Markdown cannot
 	// emphasise a leading or trailing space: `* x*` is an asterisk and a word,
@@ -877,7 +886,7 @@ func wrapSpan(nodes []Node, j int, mark Mark, applied []Mark,
 	}
 	open, closing, err := delimiters(mark, core,
 		beforeOf(sofar, lead), endsWithLiveOf(sofar, lead), next,
-		delimiterAfter(next, guessed, crowded), skip, where)
+		delimiterAfter(next, guessed, crowded), skip, relaxed, where)
 	if err != nil {
 		return "", err
 	}
@@ -962,7 +971,7 @@ func carries(n Node, m Mark) bool {
 // use. The round-trip fuzzer found it on the second pass over `*0*~~*0*~~0`.
 func delimiters(
 	m Mark, inner string, prev rune, prevLive byte, next rune, nextLive byte,
-	skip int, where string,
+	skip int, relaxed bool, where string,
 ) (open, closing string, err error) {
 	if skip > 0 && m.Type != "strong" && m.Type != "em" {
 		// A strike is `~~` and a link is brackets. Neither has a second
@@ -971,7 +980,7 @@ func delimiters(
 	}
 	switch m.Type {
 	case "strong", "em":
-		return emphasisDelimiters(m.Type, inner, prev, prevLive, next, nextLive, skip, where)
+		return emphasisDelimiters(m.Type, inner, prev, prevLive, next, nextLive, skip, relaxed, where)
 	case "strike":
 		return "~~", "~~", nil
 	case "link":
@@ -999,10 +1008,10 @@ func delimiters(
 // exit 0, from output this package produced itself.
 func emphasisDelimiters(
 	kind, inner string, prev rune, prevLive byte, next rune, nextLive byte,
-	skip int, where string,
+	skip int, relaxed bool, where string,
 ) (open, closing string, err error) {
 	for _, char := range []byte{'*', '_'} {
-		if merges(char, inner, prev, prevLive, next, nextLive) ||
+		if merges(char, inner, prev, prevLive, next, nextLive, relaxed) ||
 			!flanks(char, inner, prev, next) {
 			continue
 		}
@@ -1202,16 +1211,24 @@ func splitEdgeSpace(s string) (lead, core, trail string) {
 // and in a second vocabulary, where an underscore was itself a word character
 // and every byte over 0x7f was one. flanks asks the reader's own rule instead,
 // so the two halves of the package cannot drift on it.
-func merges(char byte, inner string, prev rune, prevLive byte, next rune, nextLive byte) bool {
-	// A live delimiter strictly inside would close this span early, wherever
-	// it came from — a nested span that picked the same character, or an
-	// underscore inside a word, which looks like one and is inert.
-	if insideLive(inner, char) {
-		return true
-	}
-	// Flush on one side only.
-	if (len(inner) > 0 && inner[0] == char) != (endsWithLive(inner) == char) {
-		return true
+func merges(char byte, inner string, prev rune, prevLive byte, next rune, nextLive byte, relaxed bool) bool {
+	// Both of the checks below are approximations of the reader's pairing, and
+	// `relaxed` is the search asking to skip them and be told the answer by the
+	// reader instead. See searchInline's third pass, which verifies every
+	// candidate it generates this way.
+	if !relaxed {
+		// A live delimiter strictly inside would close this span early, wherever
+		// it came from — a nested span that picked the same character, or an
+		// underscore inside a word, which looks like one and is inert. It is an
+		// approximation: a live delimiter inside is only a collision when it
+		// does not pair with something else inside, and `**a*b*c**` is fine.
+		if insideLive(inner, char) {
+			return true
+		}
+		// Flush on one side only.
+		if (len(inner) > 0 && inner[0] == char) != (endsWithLive(inner) == char) {
+			return true
+		}
 	}
 	// Both of those are about the span's own content and are decided before
 	// what surrounds it, because the check below used to sit in front of them
