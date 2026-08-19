@@ -619,3 +619,66 @@ func TestANestedSpanTakesTheCharacterItsParentNeedsToLeave(t *testing.T) {
 		})
 	}
 }
+
+// TestTheWriterAsksTheReaderWhenItsOwnRulesRefuse is the last of the emphasis
+// refusals, and the first time this package answers a question about the reader
+// by asking the reader.
+//
+// `merges` holds two checks that are approximations rather than rules.
+// `insideLive` refuses a `**` span whose content holds a live asterisk, and the
+// flush test refuses one whose content starts or ends with the delimiter on one
+// side only. Both are right about a span delimited by a single character and
+// both are conservative about one delimited by two, because a live asterisk
+// inside is only a collision when it does not pair with something else inside:
+// `**a*b*c**` is fine and `**a*bc**` is not, and what decides is the reader's
+// delimiter pairing.
+//
+// There is no rule to add here that is not that algorithm written a second
+// time, which is the whole subject of
+// `the-writer-guesses-what-the-reader-will-say`. So the last pass of the search
+// drops those two checks, and every candidate it generates that way is read
+// back and compared against the nodes it was written from. A candidate the
+// reader does not agree with is not written; it is the next candidate's turn.
+//
+// It is affordable because of where it sits. The greedy walk answers almost
+// every document, the search runs only when the walk refused, and this pass
+// runs only when every strict spelling in the search has been tried.
+func TestTheWriterAsksTheReaderWhenItsOwnRulesRefuse(t *testing.T) {
+	for _, c := range []struct{ name, adf, want, says string }{{
+		// A strong run and an em run that overlap without nesting, with a
+		// marked space inside the em. Every strict spelling collides.
+		name: "overlapping runs with a marked space",
+		adf: para(`{"type":"text","text":"0","marks":[{"type":"strong"}]},` +
+			`{"type":"text","text":"0","marks":[{"type":"em"},{"type":"strong"}]},` +
+			`{"type":"text","text":" ","marks":[{"type":"em"}]},` +
+			`{"type":"text","text":"0","marks":[{"type":"em"},{"type":"strong"}]},` +
+			`{"type":"text","text":"0"}`),
+		want: `__0*0*__ ***0***0`,
+		// The space keeps no mark, which is the whitespace rule in
+		// docs/output-contract.md and not a loss this pass introduces.
+		says: "[strong:0][em+strong:0] [em+strong:0]0",
+	}, {
+		// A strong span whose content holds a live asterisk, which is exactly
+		// what insideLive refuses and exactly what a reader pairs internally.
+		name: "a live asterisk inside a strong span",
+		adf: para(`{"type":"text","text":"0","marks":[{"type":"strong"}]},` +
+			`{"type":"text","text":"0","marks":[{"type":"em"},{"type":"strong"}]},` +
+			`{"type":"text","text":"0_0","marks":[{"type":"strong"}]},` +
+			`{"type":"text","text":"0","marks":[{"type":"em"},{"type":"strong"}]}`),
+		want: `__0*0*__**0_0**__*0*__`,
+		says: "[strong:0][em+strong:0][strong:0_0][em+strong:0]",
+	}} {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := convert(t, c.adf)
+			if err != nil {
+				t.Fatalf("ToMarkdown: %v", err)
+			}
+			if got != c.want {
+				t.Errorf("ToMarkdown = %q, want %q", got, c.want)
+			}
+			if says := sketch(t, got); says != c.says {
+				t.Errorf("%q reads back as %s, want %s", got, says, c.says)
+			}
+		})
+	}
+}

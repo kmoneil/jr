@@ -152,6 +152,10 @@ func FuzzMarkdownRoundTrips(f *testing.F) {
 		// character of the link's text, the emphasis could not close in front
 		// of it, and the document this package had just written was one it
 		// then refused to write again
+		"**0~~0~~0~~0~~0~~ ~~0*0_0~~0~~0*0**", // a strong span whose content
+		// holds a live asterisk, which `insideLive` refuses and a reader pairs
+		// internally. Found by a fuzz run against the commit before the writer
+		// started asking the reader about the spellings its own rules refuse
 		"*0***0*****0** **0*****0**0", // a strong span cut to one node, which
 		// is a correct span and leaves an asterisk where the next one needed
 		// it. The walk had already committed and could not go back, so a

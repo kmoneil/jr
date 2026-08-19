@@ -704,12 +704,17 @@ returns the first complete answer in the order the spans would otherwise have
 been taken, and only reaches for a second character once nothing else works, so
 a document that converts is unaffected by any of it.
 
-Where no assignment can be read back as what the document says, the conversion
-is refused rather than written down and hoped over. That refusal is real and not
-rare. Markdown can spell one delimiter run that closes one mark and opens
-another, and can hold a delimiter inside a span that pairs with something else
-inside it; this writer generates neither, so a document needing one is refused
-even though a spelling exists.
+A spelling the writer's own rules refuse is offered to the reader before it is
+given up on. Two of those rules are approximations of how a reader pairs
+delimiters rather than rules in their own right, and the last thing the writer
+tries is dropping them, writing the candidate, reading it back, and comparing it
+with the document it started from. A candidate the reader does not agree with is
+not written.
+
+Where no candidate reads back as what the document says, the conversion is
+refused rather than written down and hoped over. That refusal is still real: a
+document can hold marks markdown has no arrangement for, and `--raw-body` emits
+it exactly as Jira sent it.
 
 Strikethrough has no such choice: it is `~~`, and two of them with nothing
 between them are four tildes to a reader rather than the end of one span and
