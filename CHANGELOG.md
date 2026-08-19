@@ -20,6 +20,79 @@ accident.
 
 Nothing yet.
 
+## [0.9.1] - 2026-08-19
+
+**Bodies this tool refused to convert, and could have converted, now convert.
+And the markdown a body converts to is a fixed point: read it back, write it
+again, and you get the same characters.**
+
+Nothing about any document's shape moved. No kind's schema version moved, no
+default column set changed, and no exit code or error `code` means anything
+different. If `issue get` and `issue create` do what you need today, this
+release changes nothing you do. It is for the bodies that exited 2 with
+`MARKDOWN_UNSUPPORTED` and for anyone whose text came back different when they
+piped it through twice.
+
+Patch on every count. Sixty-three inputs move from refused to accepted, which
+[the stability policy](docs/output-contract.md#stability-policy) calls additive
+in as many words, and nothing moved the other way in either golden.
+
+### Fixed
+
+- **Three or more emphasis spans against each other are no longer refused.**
+  Every emphasis span wrote itself expecting the next one to open with an
+  asterisk, so a span with an emphasis neighbour took the underscore and left
+  the asterisk for it. Two spans can both be satisfied that way and three
+  cannot: the middle one has an underscore on its left and an asterisk expected
+  on its right, and no character is left. `_a_**b**_c_` is a document Jira
+  stores and CommonMark reads back as exactly the three spans it came from, and
+  it was refused, along with every other document of that shape:
+
+  ```console
+  $ jr issue get ENG-1
+  ADF_UNREPRESENTABLE: the document contains emphasis that markdown cannot
+  spell unambiguously here, which markdown cannot represent (at doc > paragraph)
+  ```
+
+  62 inputs in the converter's own corpus were refused this way.
+
+- **A span the writer could not follow is reconsidered rather than refused.**
+  The writer took the first spelling that worked at each position and never went
+  back, so a span that was correct on its own could leave the rest of the line
+  with no spelling, and the document was refused over a choice made three nodes
+  earlier. It searches the line now, in the same order, and only after the
+  ordinary walk has already refused, so a body that converts today converts
+  identically and no faster path pays for it.
+
+- **The markdown a body converts to no longer keeps changing.** A mark on
+  whitespace cannot be written down, so it is dropped when that whitespace lands
+  at the edge of an emphasised span. Which span an edge belongs to is decided
+  while writing, and only one marked space landed at an edge per conversion, so
+  a body with two of them needed three conversions before its text stopped
+  moving. Reading a body out of `issue get` and piping it back in did not give
+  you the same document you started with, and nothing said which of the two
+  answers was the real one. The conversion settles before it returns.
+
+  It settles only through a document it is still carrying exactly. A text node
+  holding a newline is written with the newline, and although reading that back
+  joins the lines with a space the way a soft break does, the newline is a
+  character and settling never buys stability with one.
+
+### Output contract
+
+No kind's schema version moved.
+
+- The stability policy has a new row, for changing the text a command emits
+  inside a field whose shape is unchanged. It is additive where that text was
+  not stable and breaking where it was, and it exists because the settling
+  change above is the first one that needed it and the policy answered by
+  precedent rather than by rule three times before.
+- `docs/output-contract.md` now states that a body's markdown is a fixed point,
+  that the emphasis spelling is chosen over the whole line rather than one span
+  at a time, and that a document needing a single delimiter run to close one
+  mark and open another is still refused. The last of those was already the
+  behaviour and was not written down.
+
 ## [0.9.0] - 2026-08-18
 
 **A table row holding more cells than its header row is refused now, in both
@@ -1220,7 +1293,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.9.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.9.1...main
+[0.9.1]: https://github.com/kmoneil/jr/releases/tag/v0.9.1
 [0.9.0]: https://github.com/kmoneil/jr/releases/tag/v0.9.0
 [0.8.0]: https://github.com/kmoneil/jr/releases/tag/v0.8.0
 [0.7.1]: https://github.com/kmoneil/jr/releases/tag/v0.7.1

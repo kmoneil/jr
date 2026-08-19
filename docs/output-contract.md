@@ -1505,6 +1505,20 @@ The rows:
   clean ones. Emptying an element that used to be populated is **breaking**,
   because that reader's inference fails in the direction that loses information
   rather than gains it.
+- Changing the text a command emits inside a field whose shape is unchanged,
+  for inputs where that text was **not stable**: **additive, so the patch
+  position moves.** Nothing a consumer parses changes shape, and the only
+  documents affected are ones where two runs of the same command already
+  disagreed with each other, so a consumer diffing them was already watching
+  them move. Changing it for inputs where the text **was** stable is
+  **breaking**, because that is a document somebody has recorded and diffs
+  against, and it is the same reader the default-column-set row protects. This
+  row did not exist until 0.9.1, whose markdown writer began settling a body
+  before returning it: one conversion of a document was not a fixed point, and
+  which of the two answers you got depended on how many times the text had been
+  round-tripped. The number came out patch either way, and the row is here
+  because a number that comes from an argument rather than a rule is how three
+  releases got the wrong one.
 - Adding a command: **additive, so the patch position moves.** No invocation
   anybody makes changes, no document anybody parses changes shape, and
   `jr schema` grows by a leaf. The reader it matters to is looking for a
