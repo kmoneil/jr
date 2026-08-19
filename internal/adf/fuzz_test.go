@@ -152,6 +152,11 @@ func FuzzMarkdownRoundTrips(f *testing.F) {
 		// character of the link's text, the emphasis could not close in front
 		// of it, and the document this package had just written was one it
 		// then refused to write again
+		"~~~ ~`000000\r~~~", // a code block whose language begins with the
+		// character its own fence is written in. The fence and the language
+		// ran together, so the opening fence was one character longer than the
+		// closing one and the document came back as a fence that is never
+		// closed
 		"*0***0*****0** **0*****0**0", // a strong span cut to one node, which
 		// is a correct span and leaves an asterisk where the next one needed
 		// it. The walk had already committed and could not go back, so a
