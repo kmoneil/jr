@@ -152,6 +152,10 @@ func FuzzMarkdownRoundTrips(f *testing.F) {
 		// character of the link's text, the emphasis could not close in front
 		// of it, and the document this package had just written was one it
 		// then refused to write again
+		"**~~0~~0~~0~~0~~0~~0*0_0~~0~~0*0~~ ~~0**", // the same shape with the
+		// strikes arranged differently, found by a second run against a tree
+		// without the fix. Two independent finds of one class is the argument
+		// for the class being closed rather than the input being unlucky
 		"**0~~0~~0~~0~~0~~ ~~0*0_0~~0~~0*0**", // a strong span whose content
 		// holds a live asterisk, which `insideLive` refuses and a reader pairs
 		// internally. Found by a fuzz run against the commit before the writer
