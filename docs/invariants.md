@@ -365,6 +365,26 @@ do not catch, add the test in the same change and cite it here.
   the anchor needs, and it is the same function the survival golden projects
   through, so the writer's judgement and the golden's cannot drift apart.
   **Enforced by:** `TestTheTextIsAFixedPoint`.
+- **A span the writer cannot follow is reconsidered, not refused.**
+  `renderChoices` lists the ways to open the span at one position and takes the
+  first that can be written, and nothing went back, so a locally correct span
+  could leave the rest of the run with no spelling and the document was refused
+  over a choice made three nodes earlier. The strong span over the last two
+  nodes of one fuzz find has no spelling, is cut to one and written `***0***`,
+  and that leaves an asterisk where the next span needs one: `**` merges into a
+  run of three and `__` cannot close between two word characters. Opening the
+  `em` instead writes `_**0**_` and the next span takes `**`, which is the text
+  this converter's own reader had just built the document from. The run is
+  searched rather than walked, in the same order, so a document that converts
+  today is unaffected: the walk makes 1.00 attempts per span position at the
+  median of both corpora and 1.55 at the worst, and the search is only reached
+  when the walk has refused. `searchBudget` bounds it, because a backtracking
+  walk is exponential in the worst case and the linear guarantee above is not
+  negotiable. Twelve corpus inputs are still refused this way and a budget a
+  hundred thousand times larger moves none of them: they need one delimiter run
+  that closes one mark and opens another, which is a spelling this writer does
+  not generate rather than an assignment it failed to find.
+  **Enforced by:** `TestASpanIsReconsideredWhenTheRestOfTheRunCannotBeWritten`.
 - **A scheduled sweep reports what it measured, not what it was built to
   find.** `if: failure()` fires for a finding, for a tool that could not run,
   and for a runner that was reclaimed. The weekly mutation sweep's first

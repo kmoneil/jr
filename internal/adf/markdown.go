@@ -614,9 +614,24 @@ func inlineList(nodes []Node, where string) (string, error) {
 		// Nothing in this run could be spelled while every span was also
 		// keeping the asterisk clear for the span after it. That preference is
 		// a guess about a decision nobody has made yet, so the run is written
-		// again without it. See delimiterAfter, which is where it is given up,
-		// and which says why a second attempt is the whole of the fix.
+		// again without it. See delimiterAfter, which is where it is given up.
 		out, err = renderInline(nodes, nil, "", where, true)
+	}
+	if isNoSpelling(err) {
+		// Both walks commit to the first spelling that works at each position
+		// and never reconsider, and a span that is locally writable can leave
+		// the rest of the run with nothing. So the run is searched rather than
+		// walked, in the same order, which returns what the walk would have
+		// returned if the walk could have gone back. See search.go: reaching
+		// here at all is rare enough that it costs nothing measurable, because
+		// the walk makes 1.00 attempts per span position at the median of both
+		// corpora and 1.55 at the worst.
+		for _, crowded := range []bool{false, true} {
+			out, err = searchInline(nodes, nil, "", where, crowded)
+			if !isNoSpelling(err) {
+				break
+			}
+		}
 	}
 	if e, ok := errors.AsType[*noSpelling](err); ok {
 		// Every spelling of some span in here was refused, so this one is about

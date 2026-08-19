@@ -523,3 +523,53 @@ func TestTheAsteriskIsYieldedUntilThereIsNoRoom(t *testing.T) {
 		})
 	}
 }
+
+// TestASpanIsReconsideredWhenTheRestOfTheRunCannotBeWritten is the nightly
+// sweep's third find of 2026-08-19, and the third defect in one enumeration.
+//
+// `renderChoices` lists the ways to open the span at one position and takes the
+// first that can be written. Nothing goes back. So a span that is locally
+// correct can leave the rest of the run with no spelling, and the document is
+// refused over a choice made three nodes earlier.
+//
+// Here the strong span over the last two nodes has no spelling, so it is cut to
+// one and written `***0***`. That is a correct span. It leaves an asterisk
+// against the node after it, where `**` merges into a run of three and `__`
+// cannot close between two word characters, and the run is refused. Opening the
+// `em` on that node instead writes `_**0**_`, the next span takes `**`, and the
+// document comes out as the text its own reader was handed.
+//
+// The document is built by hand because the failure is on the way out, and the
+// spelling below is the one `*0***0*****0** **0*****0**0` reads back as: this
+// converter refused a document that its own reader had just built from text
+// this converter had just written.
+//
+// What the search does not reach is worth naming, because the first estimate of
+// it was wrong. Twelve inputs in the verdict corpus are still refused this way,
+// and raising the budget by a factor of a hundred thousand does not move any of
+// them: the enumeration genuinely runs out. They need a spelling this writer
+// has no vocabulary for, where one delimiter run closes one mark and opens
+// another, which is the rule of three the parent card has been naming since
+// 2026-08-15. A search finds an assignment of marks to spans; it cannot invent
+// a spelling the writer never generates.
+func TestASpanIsReconsideredWhenTheRestOfTheRunCannotBeWritten(t *testing.T) {
+	doc := para(`{"type":"text","text":"0","marks":[{"type":"em"}]},` +
+		`{"type":"text","text":"0","marks":[{"type":"strong"}]},` +
+		`{"type":"text","text":"0","marks":[{"type":"em"},{"type":"strong"}]},` +
+		`{"type":"text","text":" "},` +
+		`{"type":"text","text":"0","marks":[{"type":"em"},{"type":"strong"}]},` +
+		`{"type":"text","text":"0","marks":[{"type":"strong"}]},` +
+		`{"type":"text","text":"0"}`)
+
+	got, err := convert(t, doc)
+	if err != nil {
+		t.Fatalf("ToMarkdown: %v", err)
+	}
+	if want := `*0*__0*0*__ _**0**_**0**0`; got != want {
+		t.Errorf("ToMarkdown = %q, want %q", got, want)
+	}
+	if says, want := sketch(t, got),
+		"[em:0][strong:0][em+strong:0] [em+strong:0][strong:0]0"; says != want {
+		t.Errorf("%q reads back as %s, want %s", got, says, want)
+	}
+}
