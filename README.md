@@ -925,38 +925,9 @@ archive, so it reaches somebody holding only the tarball.
 
 ## How this was built
 
-This tool was built with AI assistance. A human directed, reviewed, and accepted
-every part of the work and takes full responsibility for the result. We share this
-for transparency, not as a selling point or an excuse.
-
-The division of labour is worth being precise about, because "written by AI" has
-come to imply something that did not happen here. The model was fast, tireless,
-and wrote most of the code. It did not decide that a truncated result must never
-report itself complete in any format. It did not decide that a credential should
-be redacted where the trace event is built rather than where it is printed, so
-that no future formatter can leak one. It did not decide that a number in a
-document is worthless until something asserts it, or that a fixture nobody
-recorded has to say so in a field a lint can read. Those decisions are what the
-code is, and each one was made by a person who then had to insist on it, more
-than once, against a perfectly reasonable draft that did it the other way.
-
-That is the part that is not evenly distributed. The model is available to
-everyone reading this. Knowing which confident answer to distrust, and being
-willing to throw away a good afternoon's work because the reasoning behind it
-was plausible rather than checked, is the input that was actually scarce.
-
-Humans and models produce slop in roughly equal measure. Neither one is the
-reason software is good or bad. What decides that is the verification: what is
-actually tested, what is measured against a real system instead of recalled, and
-which claims something would catch if they stopped being true. A careful human
-and a careful model with the same test suite land in the same place, and so do a
-careless one of each.
-
-So the rules for this repository are aimed at that, and they are enforced rather
-than professed. The specific failure mode worth designing against is confident
-plausibility: an endpoint recalled from memory looks exactly like one read off a
-real response, and a fixture that encodes what its author assumed passes exactly
-like one recorded from a server.
+Built with AI assistance. I directed, reviewed, and accepted every part of it,
+and I'm responsible for the result. Noted for transparency, not as a selling
+point or an excuse.
 
 - **Claims about Jira are measured, not remembered.** Five bugs shipped and were
   found by pointing a real build at a real instance, not by any test.
