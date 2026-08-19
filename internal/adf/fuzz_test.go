@@ -152,6 +152,10 @@ func FuzzMarkdownRoundTrips(f *testing.F) {
 		// character of the link's text, the emphasis could not close in front
 		// of it, and the document this package had just written was one it
 		// then refused to write again
+		"*0***0*****0** **0*****0**0", // a strong span cut to one node, which
+		// is a correct span and leaves an asterisk where the next one needed
+		// it. The walk had already committed and could not go back, so a
+		// document this converter's own reader had just built was refused
 		"__!_____!__ __!_____!_____!__ __0___", // two whitespace nodes carrying
 		// em inside overlapping mark runs. Markdown can only nest, so the cut
 		// stranded one marked space per conversion and the text took three to

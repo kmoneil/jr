@@ -692,8 +692,20 @@ underscore is inert between word characters and the neighbour may need the
 asterisk to close at all. Three spans against each other cannot all be given
 the asterisk that way, so the run is spelled a second time with each span
 reading the delimiter actually beside it, and `_a_**b**_c_` is written rather
-than refused. Where neither spelling would be read back as what the document
-says, the conversion is refused rather than written down and hoped over.
+than refused.
+
+The choice of which mark opens a span, and how far it reaches, is searched over
+the whole run rather than fixed one position at a time. A span that can be
+written can leave the rest of the run with nothing, so the writer reconsiders
+rather than refusing over a choice made earlier. The search returns the first
+complete answer in the order the spans would otherwise have been taken, so a
+document that converts is unaffected by it.
+
+Where no assignment of marks to spans can be read back as what the document
+says, the conversion is refused rather than written down and hoped over. That
+refusal is real and not rare: markdown can spell one delimiter run that closes
+one mark and opens another, and this writer has no vocabulary for it, so a
+document needing that spelling is refused even though a spelling exists.
 
 Strikethrough has no such choice: it is `~~`, and two of them with nothing
 between them are four tildes to a reader rather than the end of one span and
