@@ -810,7 +810,24 @@ func renderSpan(nodes []Node, i, j int, mark Mark, applied []Mark,
 	if err != nil {
 		return "", err
 	}
+	return wrapSpan(nodes, j, mark, applied, inner, b.String(), where, crowded, 0)
+}
 
+// wrapSpan puts the delimiters around a span whose content is already written.
+//
+// It is the half of renderSpan that does not depend on how the content was
+// produced, which is what the search needs: searchInline enumerates the ways to
+// write the content and calls this for each of them, where the greedy walk
+// writes the content once and calls it once.
+//
+// skip is how many otherwise-workable spellings to pass over before taking one.
+// The greedy walk always passes zero, which is the first spelling that works and
+// is what it has always emitted. The search counts up from zero, because the
+// character a span is written with can be the reason the span *after* it has no
+// spelling, and that is not something the span can see from where it is.
+func wrapSpan(nodes []Node, j int, mark Mark, applied []Mark,
+	inner, sofar, where string, crowded bool, skip int,
+) (string, error) {
 	// Whitespace at the edge of a span moves outside it. Markdown cannot
 	// emphasise a leading or trailing space: `* x*` is an asterisk and a word,
 	// not a span, and Jira's editor produces one constantly, from bolding a
@@ -825,6 +842,10 @@ func renderSpan(nodes []Node, i, j int, mark Mark, applied []Mark,
 		lead, core, trail = "", inner, ""
 	}
 	if core == "" {
+		if skip > 0 {
+			// A span with no core has one spelling, which is its content.
+			return "", &noSpelling{where: where}
+		}
 		return inner, nil
 	}
 
@@ -836,8 +857,8 @@ func renderSpan(nodes []Node, i, j int, mark Mark, applied []Mark,
 		next, guessed = rune(trail[0]), false
 	}
 	open, closing, err := delimiters(mark, core,
-		beforeOf(b.String(), lead), endsWithLiveOf(b.String(), lead), next,
-		delimiterAfter(next, guessed, crowded), where)
+		beforeOf(sofar, lead), endsWithLiveOf(sofar, lead), next,
+		delimiterAfter(next, guessed, crowded), skip, where)
 	if err != nil {
 		return "", err
 	}
@@ -922,11 +943,16 @@ func carries(n Node, m Mark) bool {
 // use. The round-trip fuzzer found it on the second pass over `*0*~~*0*~~0`.
 func delimiters(
 	m Mark, inner string, prev rune, prevLive byte, next rune, nextLive byte,
-	where string,
+	skip int, where string,
 ) (open, closing string, err error) {
+	if skip > 0 && m.Type != "strong" && m.Type != "em" {
+		// A strike is `~~` and a link is brackets. Neither has a second
+		// spelling to ask for.
+		return "", "", &noSpelling{where: where}
+	}
 	switch m.Type {
 	case "strong", "em":
-		return emphasisDelimiters(m.Type, inner, prev, prevLive, next, nextLive, where)
+		return emphasisDelimiters(m.Type, inner, prev, prevLive, next, nextLive, skip, where)
 	case "strike":
 		return "~~", "~~", nil
 	case "link":
@@ -954,11 +980,17 @@ func delimiters(
 // exit 0, from output this package produced itself.
 func emphasisDelimiters(
 	kind, inner string, prev rune, prevLive byte, next rune, nextLive byte,
-	where string,
+	skip int, where string,
 ) (open, closing string, err error) {
 	for _, char := range []byte{'*', '_'} {
 		if merges(char, inner, prev, prevLive, next, nextLive) ||
 			!flanks(char, inner, prev, next) {
+			continue
+		}
+		if skip > 0 {
+			// Workable, but the caller has already tried this one and come
+			// back. See wrapSpan.
+			skip--
 			continue
 		}
 		run := string(char)

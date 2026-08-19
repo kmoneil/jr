@@ -694,18 +694,22 @@ the asterisk that way, so the run is spelled a second time with each span
 reading the delimiter actually beside it, and `_a_**b**_c_` is written rather
 than refused.
 
-The choice of which mark opens a span, and how far it reaches, is searched over
-the whole run rather than fixed one position at a time. A span that can be
-written can leave the rest of the run with nothing, so the writer reconsiders
-rather than refusing over a choice made earlier. The search returns the first
-complete answer in the order the spans would otherwise have been taken, so a
-document that converts is unaffected by it.
+Which mark opens a span, how far it reaches, and which of the two characters it
+is written with are searched over the whole run rather than fixed one position
+at a time. Any of the three can be the reason something later has no spelling,
+and the third is invisible from where it is made: a nested span written `**x**`
+is correct in itself and can leave the span around it with no spelling at all,
+where writing it `__x__` costs nothing and leaves the asterisk free. The search
+returns the first complete answer in the order the spans would otherwise have
+been taken, and only reaches for a second character once nothing else works, so
+a document that converts is unaffected by any of it.
 
-Where no assignment of marks to spans can be read back as what the document
-says, the conversion is refused rather than written down and hoped over. That
-refusal is real and not rare: markdown can spell one delimiter run that closes
-one mark and opens another, and this writer has no vocabulary for it, so a
-document needing that spelling is refused even though a spelling exists.
+Where no assignment can be read back as what the document says, the conversion
+is refused rather than written down and hoped over. That refusal is real and not
+rare. Markdown can spell one delimiter run that closes one mark and opens
+another, and can hold a delimiter inside a span that pairs with something else
+inside it; this writer generates neither, so a document needing one is refused
+even though a spelling exists.
 
 Strikethrough has no such choice: it is `~~`, and two of them with nothing
 between them are four tildes to a reader rather than the end of one span and
