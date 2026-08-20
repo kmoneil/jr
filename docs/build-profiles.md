@@ -336,6 +336,24 @@ untagged file and was called from two write-tagged ones, so it compiled into
 the reader and the ci binary and could never run there. Nothing in the tree
 could see it: the linter that would have said so was the one configured not to.
 
+**The full tag set is not a superset of the shipped profiles.** Four files sit
+behind negated constraints and three of them ship: `presentational_absent.go`
+(`!render`), `prompt_absent.go` (`!prompt`), `partial_noop.go` (`!write`). No
+build with every tag on compiles any of them, so a pass that runs once at
+`TAGS_FULL` is not a pass that ran four times. `make vet`, `make test-profiles`,
+and `make golden` loop the tag sets and are unaffected; `make vuln` and
+`make fuzz` run once at the full set and are not.
+
+For `make fuzz` this costs nothing, since no fuzz target lives in a negated
+file. For `make vuln` it costs nothing today for a reason worth stating, because
+it is a property and not a coincidence: those three files are a const, a
+refusal, and a no-op, and between them they import `internal/errs` and
+`internal/registry` and nothing else. A vulnerability lives in a dependency or
+in the standard library, and code that reaches neither cannot carry one.
+`internal/lint/negatedtags_test.go` asserts exactly that, and it fails in both
+directions: a negated file that grows an import outside `internal/`, and a tree
+with no negated files left, which would make this paragraph the stale one.
+
 **A command declares the tags it needs.** `internal/cli/contract_test.go`
 iterates every registered command and asserts:
 

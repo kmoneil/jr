@@ -561,6 +561,15 @@ do not catch, add the test in the same change and cite it here.
   client. That is what lets it be tested against a recorded fixture with no
   auth, no config, and no network.
   **Enforced by:** `TestEveryPackageThatReachesJiraHasAConversation`.
+- **A file no full-tags build compiles imports nothing outside `internal/`.**
+  `make vuln` scans once, at `TAGS_FULL`, and the comment justifying that said
+  there are no negated build constraints in the tree. There are four, three of
+  them shipped, so one pass is not four. The scan is still right, because those
+  three are a const, a refusal, and a no-op that reach no dependency and no
+  standard-library package, and that is the property this asserts rather than
+  the sentence that was wrong. The check also fails if the set empties, because
+  then the corrected comment is stale in the other direction.
+  **Enforced by:** `TestWhatAFullTagsScanCannotSeeImportsNothing`.
 
 ## Keeping this current
 
