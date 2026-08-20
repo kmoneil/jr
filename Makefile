@@ -397,9 +397,15 @@ complexity:
 # The scan runs under TAGS_FULL for the reason the fuzz sweep does. With no
 # tags it analyses the smallest build there is, and a vulnerability reachable
 # only from code behind `write` or `mcp` would be invisible while the scan
-# reported itself clean. There are no negated build constraints in this tree,
-# so the full tag set is a superset of every shipped profile and one pass
-# covers all four.
+# reported itself clean.
+#
+# This said "there are no negated build constraints in this tree, so the full
+# tag set is a superset of every shipped profile". There are four, three of
+# them shipped: presentational_absent.go, prompt_absent.go, partial_noop.go.
+# No full-tags build compiles any of them, so one pass is not four. It still
+# covers every third-party symbol, because those three are ten lines between
+# them and import nothing outside internal/, and that is the property this
+# scan actually needs. Nothing asserts it.
 #
 # Test files are deliberately not scanned: nothing in them ships, and a finding
 # there would fail a build over code no user can reach.
@@ -446,13 +452,57 @@ vet:
 
 ## ci: everything CI enforces, runnable locally
 .PHONY: ci
-ci: fmt-check vet lint vuln test-profiles test-race build-all size
+ci: fmt-check fix-check vet lint vuln test-profiles test-race build-all size
 
 ## fmt-check: fail if the tree is not formatted
 .PHONY: fmt-check
 fmt-check:
 	@out=$$(gofumpt -l .); \
 	if [ -n "$$out" ]; then echo "not formatted:"; echo "$$out"; exit 1; fi
+
+# The modernizer that ships in the box, and nobody here had run it.
+#
+# `go fix` was the pre-Go-1 API rewriter and was worth nothing. Since Go 1.26 it
+# is an analysis driver carrying suggested fixes, 22 of them, listed by
+# `go tool fix help`. `-diff` prints a patch and applies nothing; bare `go fix`
+# writes to the tree, so never run it without reading the patch first.
+#
+# It loops the four tag sets rather than running once at TAGS_FULL, because a
+# full-tags pass is not a superset of the shipped profiles: three files ship
+# behind negated constraints and no full-tags build compiles any of them. See
+# the note on the vuln target. Untagged this reports 15 files against 18 at full
+# tags, so a single pass in either direction misses real work.
+#
+# Two things to know when it goes red.
+#
+# The remedy is usually `go fix -tags "<the tag set it named>" ./...`, then
+# `make fmt`, then read the diff. It is a machine edit to source and it gets
+# reviewed like any other.
+#
+# But the combined run can also stall: it reports `N of M fixes skipped (e.g.
+# due to conflicts)` on stderr, exits non-zero, and prints an *empty* patch,
+# and re-running does not clear it. That state is real and this tree was in it
+# halfway through the sweep that made this target possible. The way out is one
+# fixer at a time, `go fix -stringsseq ./...` and so on, which has no conflicts
+# to resolve; the combined run goes quiet once they have all landed. Which is
+# also why this checks the output and not only the exit status: on that path
+# the status is the only signal there is.
+#
+# One fixer is worth naming. `omitzero` rewrites `omitempty` in a struct tag,
+# which changes what is serialised, which is an output-contract change and a
+# schema version. It fires zero times today. If it ever fires, the answer is
+# not to apply it because a make target said so.
+## fix-check: fail if the toolchain's modernizer has anything to suggest
+.PHONY: fix-check
+fix-check:
+	@for tags in "$(TAGS_CI)" "$(TAGS_READER)" "$(TAGS_AGENT)" "$(TAGS_FULL)"; do \
+		out=$$(go fix -diff -tags "$$tags" ./... 2>&1); status=$$?; \
+		if [ $$status -ne 0 ] || [ -n "$$out" ]; then \
+			echo "go fix has something to say under tags=$${tags:-none} (exit $$status):"; \
+			printf '%s\n' "$$out"; \
+			exit 1; \
+		fi; \
+	done
 
 ## tools: install the pinned tools make ci shells out to
 #

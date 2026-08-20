@@ -22,6 +22,11 @@ const (
 	untaggedTool    = "staticcheck"
 	untaggedCheck   = "U1000"
 	untaggedInstall = "honnef.co/go/tools/cmd/staticcheck"
+
+	// The modernizer pass, and the flag that keeps it from writing to the
+	// tree. There is no install to assert: it is `go fix`.
+	fixTarget = "fix-check"
+	fixFlag   = "-diff"
 )
 
 // TestTheVulnerabilityScanIsWiredIntoBothCIs is the gate on the gate.
@@ -129,6 +134,62 @@ func TestTheWorkflowsPinTheSameToolchainAsGoMod(t *testing.T) {
 				"sets GOTOOLCHAIN=local, so every job in that workflow fails "+
 				"until they match", path, got[1], want)
 		}
+	}
+}
+
+// TestTheModernizerIsWiredIntoBothCIs is the third gate on a gate in this file,
+// and it asserts one thing the other two do not have to: the tag sets.
+//
+// `go fix` sees one build, like every build command. Untagged it reported 15
+// files against 18 at full tags when this landed, and the reflex fix, running
+// it once at TAGS_FULL, is wrong in the other direction: three shipped files
+// sit behind negated constraints and no full-tags build compiles any of them.
+// A gate that loops one tag set is a gate with a blind spot in whichever
+// direction it picked, and the blind spot is invisible because the pass is
+// green either way.
+//
+// The -diff assertion is the safety one. Bare `go fix` rewrites source in
+// place. A gate that dropped the flag would rewrite the tree on the runner,
+// find nothing left to suggest, and pass, every time, for ever.
+//
+// No install assertion, unlike the two tests above: `go fix` is in the
+// distribution, so GO_VERSION is the only version it has.
+func TestTheModernizerIsWiredIntoBothCIs(t *testing.T) {
+	makefile := readFile(t, makefilePath)
+
+	// The whole recipe, not the first line: the tag sets and the flag are on
+	// different lines of it.
+	recipe := regexp.MustCompile(`(?m)^` + fixTarget + `:\n((?:\t.*\n)+)`).
+		FindStringSubmatch(makefile)
+	if recipe == nil {
+		t.Fatalf("the Makefile has no %s target", fixTarget)
+	}
+
+	if !strings.Contains(recipe[1], fixFlag) {
+		t.Errorf("`make %s` runs go fix without %s, so it rewrites the tree "+
+			"instead of reporting on it and can never fail", fixTarget, fixFlag)
+	}
+
+	for _, tags := range []string{"TAGS_CI", "TAGS_READER", "TAGS_AGENT", "TAGS_FULL"} {
+		if !strings.Contains(recipe[1], "$("+tags+")") {
+			t.Errorf("`make %s` does not cover $(%s); one tag set is not a "+
+				"superset of the others in either direction", fixTarget, tags)
+		}
+	}
+
+	ci := regexp.MustCompile(`(?m)^ci:\s*(.*)$`).FindStringSubmatch(makefile)
+	if ci == nil {
+		t.Fatal("the Makefile has no ci target")
+	}
+	if !slices.Contains(strings.Fields(ci[1]), fixTarget) {
+		t.Errorf("`make ci` does not run %s; its prerequisites are %q",
+			fixTarget, ci[1])
+	}
+
+	workflow := readFile(t, ciWorkflow)
+	if !strings.Contains(workflow, "make "+fixTarget) {
+		t.Errorf("%s never runs `make %s`, so the pass is enforced only for "+
+			"whoever runs the Makefile by hand", ciWorkflow, fixTarget)
 	}
 }
 
