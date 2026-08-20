@@ -14,6 +14,23 @@ import (
 // A panic or a third kind of error means a document somewhere on a real Cloud
 // site takes `issue get` down, and the input that does it is not one anybody
 // would think to write in a table.
+//
+// What it is good at is Parse, and what it is bad at is the property in the
+// sentence above. Measured over its own corpus on 2026-08-20, 639 entries:
+//
+//	Parse refused (never reaches the property):  614
+//	ToMarkdown refused:                            8
+//	converted:                                    17
+//
+// Twenty-five inputs reach ToMarkdown at all, because a mutation of a JSON
+// document is almost never a JSON document. That is not a defect to fix here:
+// arbitrary bytes through Parse is a robustness check worth keeping, and the
+// 614 are it doing its job. It is a reason not to read this target's green as
+// coverage of the writer.
+//
+// FuzzMarkedParagraphConverts covers that side, by building documents from
+// marks rather than parsing them from bytes, so it reaches the property on
+// every input.
 func FuzzToMarkdown(f *testing.F) {
 	for _, seed := range []string{
 		`{"type":"doc","version":1,"content":[]}`,
