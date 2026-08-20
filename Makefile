@@ -403,9 +403,15 @@ complexity:
 # tag set is a superset of every shipped profile". There are four, three of
 # them shipped: presentational_absent.go, prompt_absent.go, partial_noop.go.
 # No full-tags build compiles any of them, so one pass is not four. It still
-# covers every third-party symbol, because those three are ten lines between
-# them and import nothing outside internal/, and that is the property this
-# scan actually needs. Nothing asserts it.
+# covers every symbol worth scanning, because those three are ten lines between
+# them and import nothing outside internal/, and that is the property this scan
+# actually needs.
+#
+# internal/lint/negatedtags_test.go asserts it, in both directions: a file the
+# full build cannot compile may import nothing but internal packages, and the
+# check fails if no such file is left, because then this paragraph is the stale
+# one. The first sentence here was wrong for as long as anybody had read it,
+# and a correction nothing keeps true is the same defect with a later date.
 #
 # Test files are deliberately not scanned: nothing in them ships, and a finding
 # there would fail a build over code no user can reach.
