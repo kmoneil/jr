@@ -2,6 +2,7 @@ package cli_test
 
 import (
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -139,7 +140,7 @@ func TestTheFlagSurfaceSweepCanFail(t *testing.T) {
 func boundFlags(help string) []string {
 	var out []string
 	var inFlags bool
-	for _, line := range strings.Split(help, "\n") {
+	for line := range strings.SplitSeq(help, "\n") {
 		switch {
 		case strings.HasPrefix(line, "Flags:"):
 			inFlags = true
@@ -172,10 +173,5 @@ func declaredFlags(rc *registry.Command) []string {
 }
 
 func contains(haystack []string, needle string) bool {
-	for _, s := range haystack {
-		if s == needle {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(haystack, needle)
 }

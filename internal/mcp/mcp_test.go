@@ -121,7 +121,7 @@ func session(t *testing.T, reg *registry.Registry, requests ...string) []map[str
 	}
 
 	var replies []map[string]any
-	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(out.String()), "\n") {
 		if line == "" {
 			continue
 		}
@@ -473,7 +473,7 @@ func TestNothingButFramesReachOut(t *testing.T) {
 	if err != nil {
 		t.Fatalf("serve: %v", err)
 	}
-	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(out.String()), "\n") {
 		var probe map[string]any
 		if err := json.Unmarshal([]byte(line), &probe); err != nil {
 			t.Fatalf("a non-JSON line reached the output stream: %q", line)
@@ -526,7 +526,7 @@ func TestAPanickingToolDoesNotEndTheSession(t *testing.T) {
 	}
 
 	var replies []map[string]any
-	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(out.String()), "\n") {
 		var reply map[string]any
 		if err := json.Unmarshal([]byte(line), &reply); err != nil {
 			t.Fatalf("reply is not JSON: %v\n%s", err, line)
