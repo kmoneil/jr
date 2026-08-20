@@ -126,7 +126,7 @@ func TestMarkdownCellsCannotRestructureTheTable(t *testing.T) {
 	})
 
 	got := markdownOf(t, doc)
-	for _, line := range strings.Split(strings.TrimSpace(got), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(got), "\n") {
 		if !strings.HasPrefix(line, "|") {
 			continue
 		}

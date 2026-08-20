@@ -714,14 +714,14 @@ func TestNoFlagUsageCarriesABackquote(t *testing.T) {
 
 // backquoted is the run cobra would lift out, for the message above.
 func backquoted(usage string) string {
-	open := strings.Index(usage, "`")
-	if open < 0 {
+	_, after, ok := strings.Cut(usage, "`")
+	if !ok {
 		return ""
 	}
-	rest := usage[open+1:]
-	close := strings.Index(rest, "`")
-	if close < 0 {
+	rest := after
+	before, _, ok := strings.Cut(rest, "`")
+	if !ok {
 		return ""
 	}
-	return rest[:close]
+	return before
 }

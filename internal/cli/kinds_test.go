@@ -79,7 +79,7 @@ func kindShapes(t *testing.T, contract string) map[string]string {
 	out := map[string]string{}
 	var name string
 	var block []string
-	for _, line := range strings.Split(contract, "\n") {
+	for line := range strings.SplitSeq(contract, "\n") {
 		if name == "" {
 			m := kindOpen.FindStringSubmatch(line)
 			if m == nil {

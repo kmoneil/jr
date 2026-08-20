@@ -886,13 +886,7 @@ func TestDefaultFieldsCoverTheOutput(t *testing.T) {
 		"summary", "status", "assignee", "priority", "issuetype",
 		"project", "created", "updated", "labels",
 	} {
-		found := false
-		for _, f := range fields {
-			if f == want {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(fields, want)
 		if !found {
 			t.Errorf("DefaultFields omits %q, which the output renders", want)
 		}
@@ -1350,13 +1344,7 @@ func TestFieldsAreAdditive(t *testing.T) {
 
 	fields := append(issue.DefaultFields(), issue.ExtraFieldNames([]string{"customfield_1"})...)
 	for _, needed := range got {
-		found := false
-		for _, f := range fields {
-			if f == needed {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(fields, needed)
 		if !found {
 			t.Errorf("requesting an extra field dropped %q from the request", needed)
 		}

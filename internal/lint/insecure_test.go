@@ -97,7 +97,7 @@ func grepTree(t *testing.T, pattern *regexp.Regexp) map[string]string {
 		if readErr != nil {
 			return readErr
 		}
-		for _, line := range strings.Split(string(body), "\n") {
+		for line := range strings.SplitSeq(string(body), "\n") {
 			if pattern.MatchString(line) {
 				rel, _ := filepath.Rel(repoRoot, path)
 				out[rel] = strings.TrimSpace(line)

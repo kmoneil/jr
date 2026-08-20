@@ -98,7 +98,7 @@ func (a *app) scrubber(siteURL string) transport.Scrubber {
 	if host := hostOnly(siteURL); host != "" {
 		replace[host] = recordedHost
 	}
-	for _, pair := range strings.Split(a.getenv(EnvRecordScrub), ",") {
+	for pair := range strings.SplitSeq(a.getenv(EnvRecordScrub), ",") {
 		from, to, ok := strings.Cut(strings.TrimSpace(pair), "=")
 		if ok && strings.TrimSpace(from) != "" {
 			replace[strings.TrimSpace(from)] = strings.TrimSpace(to)
@@ -134,7 +134,7 @@ func (a *app) scrubber(siteURL string) transport.Scrubber {
 // recording, and a report that always fires is one nobody reads.
 func (a *app) scrubTargets() []string {
 	var out []string
-	for _, pair := range strings.Split(a.getenv(EnvRecordScrub), ",") {
+	for pair := range strings.SplitSeq(a.getenv(EnvRecordScrub), ",") {
 		from, _, ok := strings.Cut(strings.TrimSpace(pair), "=")
 		if from = strings.TrimSpace(from); ok && from != "" {
 			out = append(out, from)

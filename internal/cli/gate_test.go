@@ -229,9 +229,7 @@ func runGated(
 	env["JIRA_SITE"] = "https://jira.example.invalid"
 	env["JIRA_API_TOKEN"] = "not-a-real-token"
 	env["JIRA_AUTH_USER"] = "ada@example.invalid"
-	for k, v := range extra {
-		env[k] = v
-	}
+	maps.Copy(env, extra)
 	code := cli.Main(context.Background(), args, cli.Options{
 		Registry: reg,
 		Stdout:   &out,

@@ -85,7 +85,7 @@ func lossClass(was, now string) string {
 				kinds["text"] = true
 				continue
 			}
-			for _, m := range strings.Split(marks, "\x1f") {
+			for m := range strings.SplitSeq(marks, "\x1f") {
 				var parsed adf.Mark
 				if err := json.Unmarshal([]byte(m), &parsed); err == nil {
 					kinds["mark:"+parsed.Type] = true
@@ -110,10 +110,10 @@ func lossClass(was, now string) string {
 // so a line present twice on one side and once on the other still shows.
 func symmetricDifference(was, now string) []string {
 	count := map[string]int{}
-	for _, line := range strings.Split(was, "\n") {
+	for line := range strings.SplitSeq(was, "\n") {
 		count[line]++
 	}
-	for _, line := range strings.Split(now, "\n") {
+	for line := range strings.SplitSeq(now, "\n") {
 		count[line]--
 	}
 	var out []string
