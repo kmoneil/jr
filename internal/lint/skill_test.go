@@ -99,7 +99,7 @@ func skillReferenceNames(t *testing.T) []string {
 	rest, _, _ = strings.Cut(rest, "\n")
 
 	var names []string
-	for _, n := range strings.Split(rest, ",") {
+	for n := range strings.SplitSeq(rest, ",") {
 		if n = strings.TrimSpace(n); n != "" {
 			names = append(names, n)
 		}

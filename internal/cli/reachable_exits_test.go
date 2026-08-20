@@ -270,16 +270,16 @@ func probeFile(t *testing.T, dir string) string {
 // carries one; the tests run in the default, which is XML for a record.
 func errorCodeIn(stderr string) string {
 	const open, close = "<code>", "</code>"
-	i := strings.Index(stderr, open)
-	if i < 0 {
+	_, after, ok := strings.Cut(stderr, open)
+	if !ok {
 		return ""
 	}
-	rest := stderr[i+len(open):]
-	j := strings.Index(rest, close)
-	if j < 0 {
+	rest := after
+	before, _, ok := strings.Cut(rest, close)
+	if !ok {
 		return ""
 	}
-	return rest[:j]
+	return before
 }
 
 func formatCodes(codes []exitcode.Code) string {

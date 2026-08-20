@@ -3,6 +3,7 @@ package issue
 import (
 	"context"
 	"errors"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -428,12 +429,7 @@ func accountLocation(
 }
 
 func isEventKind(k string) bool {
-	for _, known := range EventKinds() {
-		if k == known {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(EventKinds(), k)
 }
 
 // activityUserKey is where the resolved --user is left for the body.

@@ -83,13 +83,10 @@ func Age(timestamp string, now time.Time) string {
 		return ""
 	}
 
-	d := now.Sub(at)
-	if d < 0 {
-		// The server's clock is ahead of this machine's. Reporting a negative
-		// age would be reporting the skew, which is not what the column is
-		// about, and inventing a positive one would be worse.
-		d = 0
-	}
+	// A negative difference means the server's clock is ahead of this
+	// machine's. Reporting it would be reporting the skew, which is not what
+	// the column is about, and inventing a positive one would be worse.
+	d := max(now.Sub(at), 0)
 
 	switch {
 	case d < time.Minute:

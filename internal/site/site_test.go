@@ -2,6 +2,7 @@ package site_test
 
 import (
 	"context"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,9 +38,7 @@ func (s *stubDoer) Do(context.Context, transport.Request) (*transport.Response, 
 		status = 200
 	}
 	header := map[string][]string{"Content-Type": {"application/json"}}
-	for name, values := range s.header {
-		header[name] = values
-	}
+	maps.Copy(header, s.header)
 	return &transport.Response{
 		Status: status,
 		Body:   []byte(s.body),

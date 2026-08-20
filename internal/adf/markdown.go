@@ -408,7 +408,7 @@ func list(n Node, where string) (string, error) {
 	// Three levels of empty single-item list render as `- - -`, which is a
 	// thematic break and not a list at all. There is no other spelling, so it
 	// is refused rather than written down as something else.
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if isThematicBreak(line) {
 			return "", unrepresentable(where, "a list markdown cannot tell from a rule")
 		}
@@ -1584,7 +1584,7 @@ func leaf(n Node, lineStart bool, where string) (string, error) {
 // spaces cannot be written down - and writing it anyway produces markdown that
 // reads back as code, which is the silent alteration this package refuses.
 func checkEdgeSpace(s, where string) error {
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		// The hard break this package writes is a backslash, so a line ending
 		// in one is not trailing whitespace.
 		trimmed := strings.TrimSuffix(line, "\\")

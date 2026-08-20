@@ -1,6 +1,7 @@
 package site_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -112,10 +113,5 @@ func TestTheRecordedTransitionsAreAConversationAServerHad(t *testing.T) {
 }
 
 func contains(haystack []string, needle string) bool {
-	for _, s := range haystack {
-		if s == needle {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(haystack, needle)
 }

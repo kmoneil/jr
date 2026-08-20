@@ -39,7 +39,7 @@ func FromText(text string) (Node, error) {
 	// \r\n first, so a file written on Windows does not leave a stray carriage
 	// return inside every line.
 	normalized := strings.ReplaceAll(text, "\r\n", "\n")
-	for _, block := range strings.Split(normalized, "\n\n") {
+	for block := range strings.SplitSeq(normalized, "\n\n") {
 		doc.Content = append(doc.Content, paragraph(block))
 	}
 	return doc, nil

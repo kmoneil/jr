@@ -34,6 +34,13 @@ jobs:
           make fmt-check
       - name: vet
         run: make vet
+      # The modernizer that ships with the toolchain. No install step and no
+      # version to pin: it is `go fix`, so GO_VERSION above is the only version
+      # it has. Named here rather than left to `make ci` for the reason the
+      # steps around it are: this workflow runs the targets one at a time, so a
+      # check only in `make ci` is a check CI skips.
+      - name: modernizer
+        run: make fix-check
       # v8 is the first action release that runs golangci-lint v2, which
       # `.golangci.yml` declares with `version: "2"`, and v9 is the first that
       # runs on Node 24. v8 is a node20 action, so it kept the deprecation
