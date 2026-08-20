@@ -328,8 +328,11 @@ do not catch, add the test in the same change and cite it here.
   two days ended in those tildes, two of them the writer wrong about a
   collision that was not there and one with nothing wrong upstream at all. No
   markdown produces the documents that reach it, so `FuzzMarkdownRoundTrips`
-  cannot see the class and the guard is asserted from ADF instead.
-  **Enforced by:** `TestAStrikeSpanIsNeverCut`.
+  cannot see the class and the guard is asserted from ADF instead. That was one
+  hand-written shape until 2026-08-20; `FuzzMarkedParagraphConverts` now fuzzes
+  the class it belongs to, building paragraphs from mark sets rather than from
+  markdown, which is the only input space in which these documents exist.
+  **Enforced by:** `TestAStrikeSpanIsNeverCut`, `FuzzMarkedParagraphConverts`.
 - **A run of emphasis spans is spelled as a run, not one span at a time.** Each
   span writes itself expecting the next to open with an asterisk, because
   `opensWith` names one on the neighbour's behalf before the neighbour has
