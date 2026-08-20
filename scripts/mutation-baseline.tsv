@@ -40,6 +40,29 @@
 #
 # If one of those is ever killed honestly, delete its paragraph and lower the
 # count in the same change. The ledger only shrinks.
+#
+# `internal/site` went 37 to 34 on 2026-08-20, and the three are not named the
+# way jql's are, because a lowering owes no argument: what is written here is
+# what survives, and 34 do. Three commits touched the package in the window and
+# only 69ebd3a added assertions, moving the site's clock out of the change feed
+# and bringing a test over every layout Jira sends.
+#
+# It was measured twice, and the second run was not a formality. A mutant can
+# live in one sweep and die in the next if a test brushes the timeout, so a
+# count that moved is a count to take again before a ratchet is turned on it.
+# Both runs said 34 and named the *same* fifty survivors across the three
+# packages, byte for byte, which is a stronger agreement than two matching
+# totals would have been.
+#
+# One thing this file cannot tell you and should. Every count in it is a local
+# measurement. `mutation-weekly` has run twice in CI, on 2026-08-17, and failed
+# both times: the sweep was killed after 76 seconds with `make: ***
+# [Makefile:421: mutate] Terminated`, which is SIGTERM and a runner limit rather
+# than a broken sweep, since it completes here in about four minutes. Issue 57
+# said exactly the right thing, "no conclusion about the tests follows from this
+# run", and was closed without one. Until a scheduled sweep finishes, the
+# schedule is not what keeps these numbers honest; somebody running `make
+# mutate` is.
 internal/jql	3	the only place a value is quoted; an unexercised branch is an injection
 internal/render	13	the output contract itself, and the escaping rules under it
-internal/site	37	deployment detection, field and user resolution, the cache
+internal/site	34	deployment detection, field and user resolution, the cache
