@@ -336,6 +336,19 @@ untagged file and was called from two write-tagged ones, so it compiled into
 the reader and the ci binary and could never run there. Nothing in the tree
 could see it: the linter that would have said so was the one configured not to.
 
+That pass has one hole, measured 2026-08-20: **`staticcheck` does not report an
+unused *exported* declaration**, even in a package under `internal/` that
+nothing outside the module can reach. An exported function added to
+`internal/workflow`, whose every other declaration is behind `write`, passes
+`make lint-untagged` clean.
+
+It reaches no binary regardless, and that is the correction worth making here:
+the guarantee in this heading is the **linker's**, not the linter's. Go drops
+what nothing calls, so unreachable code is absent from the artefact whether a
+linter noticed it or not. `lint-untagged` is what keeps such code out of the
+*source*, where a reader would take it for part of the package's surface. The
+two do different jobs and only one of them is about bytes.
+
 **The full tag set is not a superset of the shipped profiles.** Four files sit
 behind negated constraints and three of them ship: `presentational_absent.go`
 (`!render`), `prompt_absent.go` (`!prompt`), `partial_noop.go` (`!write`). No
@@ -384,6 +397,45 @@ func init() {
 
 A build without `write` does not compile the file, so the command is absent
 rather than refusing at runtime. That is the whole mechanism.
+
+### Why nothing inspects the binary, and please do not add it
+
+The sentences above say "not in the binary" and "no prompt package linked", and
+`internal/buildinfo/buildinfo.go` says it again about `CanPrompt`. They read
+like claims that ought to have a test against the artefact, and the reflex is
+`go tool nm`. It was tried on 2026-08-20 and it cannot work. The measurements,
+so nobody spends the afternoon again:
+
+- **It is a tautology.** A file behind `//go:build write` is not compiled in a
+  reader build, so its symbols cannot appear in one.
+  `go list -tags mcp -f '{{range .GoFiles}}{{.}} {{end}}' ./internal/resource/issue/`
+  returns no `write.go`. The intersection is empty by construction.
+- **It cannot see the failure it is for.** Move a write-only function into an
+  untagged file with a live untagged caller, which is the `echoMode` shape, and
+  `nm` does find the symbol in the reader binary, but the check does not: it
+  builds its list of names from files carrying the tag, and the function no
+  longer does. A check that derives its subject from where the code lives
+  cannot see the code move.
+- **`nm` has no notion of intent.** The real gap is write-path code in an
+  untagged file that a reader build reaches, and that is exactly the case where
+  the symbol legitimately belongs and nothing in the binary says otherwise.
+- **A symbol golden is not the way out.** The reader binary holds 1427 symbols
+  under `github.com/kmoneil/jr/`. Two builds of one tree produce identical
+  sets, so determinism is not the objection; a rename, a new closure, or a Go
+  version with different inlining is. A golden regenerated reflexively is worse
+  than none.
+- **`echoMode` would not have been caught anyway.** It is small enough to
+  inline, and `go tool nm` of the *full* build finds zero symbols for it.
+
+And one thing to know before reaching for `nm` for any other reason: the shipped
+binaries are linked with `-s -w`, so `go tool nm bin/jr` answers
+`no symbol section`. Any such check has to build its own binary.
+
+**The compiler enforces compile-out. It does not merely claim it.** A tagged
+file is not compiled; the linker then drops what nothing reaches. What is worth
+asserting is everything above that line, which is what the tests in the previous
+section do: that the registration is gated correctly, that the surface differs,
+and that the tag sets are the ones the Makefile ships.
 
 ## Runtime read-only mode
 
