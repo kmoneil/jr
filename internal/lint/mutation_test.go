@@ -221,8 +221,9 @@ func TestTheMutationSweepExitCodesSayWhichFailureItWas(t *testing.T) {
 // `i++` to `i--` makes it oscillate against a neighbour while appending on every
 // cycle. Gremlins classifies them correctly, as timed out, but the timeout is
 // the coefficient times a measured suite time that includes a cold build, so a
-// runner grants about 104 seconds where this machine grants 4.8. Three
-// scheduled sweeps died taking sixteen gigabytes and the runner with them.
+// runner grants about 104 seconds where this machine grants 4.8. Both
+// `mutation-weekly` runs that predate the cap died taking sixteen gigabytes and
+// the runner with them, as did every arm of the probe that chased it.
 //
 // The cap has to reach `go` and not this script's own shell. Capping the shell
 // caps gremlins, which sizes itself from NumCPU and then dies copying the
@@ -273,8 +274,8 @@ func TestTheMutationSweepBoundsARunawayMutant(t *testing.T) {
 	if !strings.Contains(string(recorded), "ulimit -v") {
 		t.Errorf("a child of %s resolves go to something that sets no "+
 			"address-space limit. A mutant whose loop does not terminate then "+
-			"allocates until the machine dies, which is what killed three "+
-			"scheduled sweeps.\nIt resolved to:\n%s",
+			"allocates until the machine dies, which is what killed every "+
+			"mutation-weekly run that predates the cap.\nIt resolved to:\n%s",
 			mutationScript, firstLine(string(recorded)))
 	}
 }
