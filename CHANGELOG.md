@@ -20,6 +20,105 @@ accident.
 
 Nothing yet.
 
+## [0.9.3] - 2026-08-21
+
+**Any field on an issue can now be written.** `issue create` and `issue edit`
+took a fixed set of fields and had no escape hatch, so every custom field on a
+screen was unreachable and the only way to set story points was to leave this
+tool for `curl`, losing the dry run, the precondition, and the validation on
+the way out.
+
+Additive on every count. Every invocation you make today still runs, means the
+same thing, and produces the same document, with two exceptions that are both
+new spellings rather than changed ones. Three kinds gained an optional element
+and moved a schema version; if you parse output, read **Output contract**
+below, because that list is the part with consequences.
+
+Patch, and the first release here where a kind's version moves for an additive
+change. See the new stability row for why that does not make it breaking.
+
+### Added
+
+- **`--field id=value` on `issue create` and `issue edit`.** The id or the name
+  both work, and the value is typed from your site's own field catalogue, so a
+  number field refuses a value that is not a number before anything is sent.
+  Repeat one id to build an array; nothing is split on commas, because a comma
+  is a character a value may contain.
+
+      jr issue edit ENG-101 --field 'Story Points=5'
+      jr issue create --type Story --summary Retry --field customfield_10140=5
+
+  On a read `--field` selects a column and takes a bare name. The `=` is what
+  separates the two senses, and a bare name on a write is refused rather than
+  read as the other one.
+
+- **`--field-json id=<json>` on the same two commands**, whose value is sent
+  exactly as written. It is not a convenience. Jira reports Epic Link, Rank,
+  Team, Parent Link and most plugin fields as schema type `any`, which says
+  nothing about what to send, so `--field` refuses those by name and points
+  here rather than guessing:
+
+      jr issue edit ENG-101 --field-json customfield_11350='"ENG-42"'
+
+- **`--header` on `auth token`**, which prints `Authorization: <value>` on one
+  line and nothing else, so a shell can capture the whole output:
+
+      curl -H "$(jr auth token --header)" ...
+
+  Without it the command emits a document like every other command, and no
+  format in this contract is safe to interpolate into a header. Capturing one
+  whole and using it produced curl status `000`, which is what curl also
+  reports for a network failure, so the mistake did not announce itself.
+  `--header` with an explicit `--format` is refused with `HEADER_AND_FORMAT`:
+  they name two different outputs.
+
+- **Jira's own type key for a custom field**, as an optional `custom-type`
+  element on `field list`, `meta createmeta` and `meta transitions`. It was
+  being read off the wire and discarded. It is the only thing that says what
+  JSON a value has to be: measured against a Data Center, thirteen custom
+  fields all carry it and five of them report schema type `any`, which without
+  the key makes those five one undifferentiated type.
+
+### Fixed
+
+- **A flag that is really a positional argument now says so.**
+  `jr sprint add --sprint 128 ENG-1` was refused with an empty suggestion list,
+  because the candidates were the command's flags and `sprint` is a declared
+  argument. It now answers `sprint is an argument, not a flag`, with the usage
+  line. Exact matches only, so a typo of a real flag still gets the flag
+  suggestion it always did.
+
+### Output contract
+
+Three kinds moved, all for the same added optional element. Nothing was removed
+or renamed, no default column set changed, no exit code or error `code` means
+anything different, and no input that was accepted before is refused now.
+
+- **`field.list` v1 → v2.** New optional `custom-type` element, carrying Jira's
+  `schema.custom` key for a custom field and absent on a system field. **The
+  default TSV columns are unchanged**, so a script splitting on tabs keeps the
+  four cells it had; the element reaches `xml`, `json` and `yaml`.
+- **`meta.createmeta` v1 → v2.** The same element on every field of a create
+  screen, with the same default columns.
+- **`meta.transitions` v2 → v3.** The same element, and this kind moved only
+  because it shares its field shape with `meta.createmeta`. Nothing else about
+  a transition changed.
+
+Six new error `code` strings, all on inputs that were previously refused as an
+unknown flag: `FIELD_NOT_KV`, `FIELD_HAS_A_FLAG`, `FIELD_TYPE_UNSUPPORTED`,
+`FIELD_NOT_A_NUMBER`, `FIELD_NOT_JSON`, and `DUPLICATE_FIELD`, plus
+`HEADER_AND_FORMAT` on `auth token`. Each exits 2 and each is listed in
+[output-contract.md](docs/output-contract.md) and
+[troubleshooting.md](docs/troubleshooting.md).
+
+**The stability policy has two corrections**, and this release is what found
+them. `v` was documented as moving "on breaking change", which was never what
+the gate enforced: `make golden` refuses a changed shape at an unchanged
+version, additive or not. And there was no row for a kind version moving on its
+own. There is now, and it says what this release does: kind versions move
+independently of the release, so price the release on the rows describing what
+changed and list the kinds here.
+
 ## [0.9.2] - 2026-08-19
 
 **Emphasis this tool refused to write, and could have written, now converts.**
@@ -1347,7 +1446,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.9.2...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.9.3...main
+[0.9.3]: https://github.com/kmoneil/jr/releases/tag/v0.9.3
 [0.9.2]: https://github.com/kmoneil/jr/releases/tag/v0.9.2
 [0.9.1]: https://github.com/kmoneil/jr/releases/tag/v0.9.1
 [0.9.0]: https://github.com/kmoneil/jr/releases/tag/v0.9.0
