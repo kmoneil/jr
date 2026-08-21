@@ -422,11 +422,13 @@ complexity:
 # with four fuzz targets and answers "no" sixteen times.
 #
 # It is not in `ci` and not on the pull-request path. The sweep takes about four
-# minutes here and considerably longer on a two-core runner, and a score moves
-# when a test is added anywhere, so a threshold on it would redden a pull
-# request that touched nothing near the mutant. It runs on a schedule against a
-# baseline that only goes down, and scripts/mutate.sh is where both of those
-# decisions are written out.
+# minutes here and four minutes and one second on a `ubuntu-latest` runner,
+# measured 2026-08-20; "considerably longer on a two-core runner" stood here
+# unmeasured until somebody ran one. Minutes either way is the reason it is off
+# the pull-request path, and a score moves when a test is added anywhere, so a
+# threshold on it would redden a pull request that touched nothing near the
+# mutant. It runs on a schedule against a baseline that only goes down, and
+# scripts/mutate.sh is where both of those decisions are written out.
 ## mutate: run mutation testing against the baseline in scripts/
 .PHONY: mutate
 mutate:
