@@ -27,8 +27,16 @@ import (
 // Kinds and schema versions this resource emits. Bump a version in the same
 // commit that changes the corresponding golden file.
 const (
-	KindList    = "field.list"
-	VersionList = 1
+	KindList = "field.list"
+	// v2 adds the optional custom-type leaf: Jira's own key for a custom
+	// field's type, which the catalogue has always carried and this tool
+	// parsed and threw away. It is what tells two "any" fields apart, and
+	// without it the type column is the whole answer for five of the thirteen
+	// custom fields a stock Data Center has.
+	//
+	// An element and not a column, so the default TSV column set does not move
+	// and a script splitting on tabs keeps the four cells it had.
+	VersionList = 2
 )
 
 func init() {
@@ -53,6 +61,10 @@ func Schema() *render.Schema {
 			{Schema: render.Leaf("name", render.TypeString)},
 			{Schema: render.Leaf("type", render.TypeString), Optional: true},
 			{Schema: render.Leaf("items", render.TypeString), Optional: true},
+			// Jira's own key for the field's type. Present only on a custom
+			// field, and the only thing that distinguishes two fields whose
+			// schema type is both "any".
+			{Schema: render.Leaf("custom-type", render.TypeString), Optional: true},
 			// What a query may call this field. A custom field has at least
 			// one, and often more than one.
 			{Schema: render.ListSchema("clause-names", "clause-name",
@@ -166,6 +178,7 @@ func Node(f site.Field) *render.Node {
 	n.Leaf("name", f.Name)
 	n.LeafIf("type", f.Type)
 	n.LeafIf("items", f.Items)
+	n.LeafIf("custom-type", f.CustomType)
 
 	clauses := make([]*render.Node, 0, len(f.ClauseNames))
 	for _, c := range f.ClauseNames {

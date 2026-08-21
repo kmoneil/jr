@@ -211,10 +211,23 @@ Prints the Authorization header value a request to this site would carry.
 
 This deliberately reveals a secret. It exists so a script can hand the
 credential to curl or another client without re-implementing the credential
-lookup. The value is one field of a document, so take that field:
+lookup.
+
+--header prints the whole header and nothing else, on one line, so the obvious
+capture is the correct one:
+
+    curl -H "$(jr auth token --header)" ...
+
+Without it the result is a document like every other result, and the value is
+one field of it, so take that field:
 
     header=$(jr auth token --format tsv | awk -F'\t' '$1=="authorization"{print $2}')
     curl -H "Authorization: $header" ...
+
+Capturing a whole document into a variable and using it as a header does not
+work in any format and does not say so: curl reports status 000, which is what
+it reports for a network failure. --header exists because that failure looks
+like something else.
 
 Everywhere else in this tool a credential is redacted. Here it is the requested
 output, and it goes to stdout like any other result — so redirect it
@@ -224,15 +237,17 @@ Examples:
 
 ```console
 jr auth token --site your-site.atlassian.net
+jr auth token --header
 ```
 
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--site` | `string` | — | site to print the credential for; defaults to the current context's |
+| `--header` | `bool` | — | print `Authorization: &lt;value>` on one line and nothing else, for a shell to interpolate whole |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `auth.token` | v1 | always |
+| `auth.token` | v1 | --header was not given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND
 
@@ -915,7 +930,7 @@ jr field list --refresh
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `field.list` | v1 | always |
+| `field.list` | v2 | always |
 
 Default TSV columns: `id`, `name`, `type`, `custom`
 
@@ -1552,12 +1567,26 @@ subset cannot hold rather than approximating it. --body-format adf takes an
 Atlassian Document Format document as JSON and sends it as given. Both are
 Cloud only: Data Center stores wiki markup, and there is no converter to it.
 
+--field sets anything the flags above do not name, by field id or by field
+name: --field customfield_10140=5 or --field 'Story Points=5'. The value is
+typed from the site's own catalogue, so a number field refuses a value that is
+not a number, and an unknown field is refused with the near misses rather than
+sent. Repeat one id to build an array; nothing is split on commas, because a
+comma is a character a value may contain.
+
+--field-json sets a field to a JSON value sent exactly as written, for a field
+whose type this tool will not guess at. A schema type of "any" is the common
+case, and Epic Link is one: --field-json customfield_11350='"ENG-42"'. A field
+a typed flag already owns is refused by name, because two spellings of one
+write is a silent last-one-wins.
+
 Examples:
 
 ```console
 jr issue create --type Bug --summary 'Retry drops the last error'
 jr issue create --type Task --summary Ship --idempotency-key deploy-42
 jr issue create --type Bug --summary Probe --dry-run
+jr issue create --type Story --summary Retry --field 'Story Points=5'
 ```
 
 | Flag | Type | Default | Description |
@@ -1570,6 +1599,8 @@ jr issue create --type Bug --summary Probe --dry-run
 | `--assignee`, `-a` | `string` | — | assignee, by display name, email, or id; the word unassigned leaves it unset |
 | `--parent` | `string` | — | parent issue key: the epic on Cloud, or the issue a subtask belongs to |
 | `--idempotency-key` | `string` | — | make a retry safe: the same key returns the original issue |
+| `--field` | `string` | — | set a field by id or name, as id=value, e.g. customfield_10140=5 or 'Story Points=5'; repeat for several, and repeat one id to build an array (repeatable) |
+| `--field-json` | `string` | — | set a field to a JSON value sent as written, as id=&lt;json>, e.g. customfield_11350='"ENG-42"'; for a field whose type this tool will not guess at (repeatable) |
 | `--body-format` | `text\|markdown\|adf` | `text` | how to read the body: text sends it uninterpreted, markdown converts it, adf takes a document as JSON; the last two are Cloud only |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
 
@@ -1667,6 +1698,19 @@ letting the word precondition imply an atomic one.
 
 --description and --body-format work exactly as on issue create.
 
+--field sets anything the flags above do not name, by field id or by field
+name: --field customfield_10140=5 or --field 'Story Points=5'. The value is
+typed from the site's own catalogue, so a number field refuses a value that is
+not a number, and an unknown field is refused with the near misses rather than
+sent. Repeat one id to build an array; nothing is split on commas, because a
+comma is a character a value may contain.
+
+--field-json sets a field to a JSON value sent exactly as written, for a field
+whose type this tool will not guess at. A schema type of "any" is the common
+case, and Epic Link is one: --field-json customfield_11350='"ENG-42"'. A field
+a typed flag already owns is refused by name, because two spellings of one
+write is a silent last-one-wins.
+
 Examples:
 
 ```console
@@ -1676,6 +1720,8 @@ jr issue edit ENG-101 --assignee unassigned --dry-run
 jr issue edit ENG-101 --parent ENG-42
 jr issue edit ENG-101 --parent none
 jr issue edit ENG-101 --priority High --if-unchanged eyJkIjo
+jr issue edit ENG-101 --field 'Story Points=0.5'
+jr issue edit ENG-101 --field-json customfield_11350='"ENG-42"'
 ```
 
 | Argument | Required | Description |
@@ -1692,6 +1738,8 @@ jr issue edit ENG-101 --priority High --if-unchanged eyJkIjo
 | `--remove-label` | `string` | — | remove a label, leaving the others; repeat for several (repeatable) |
 | `--assignee`, `-a` | `string` | — | set the assignee, by display name, email, or id; the word unassigned clears it |
 | `--parent` | `string` | — | set the parent issue, which on Cloud is the epic; the word none clears it |
+| `--field` | `string` | — | set a field by id or name, as id=value, e.g. customfield_10140=5 or 'Story Points=5'; repeat for several, and repeat one id to build an array (repeatable) |
+| `--field-json` | `string` | — | set a field to a JSON value sent as written, as id=&lt;json>, e.g. customfield_11350='"ENG-42"'; for a field whose type this tool will not guess at (repeatable) |
 | `--body-format` | `text\|markdown\|adf` | `text` | how to read the body: text sends it uninterpreted, markdown converts it, adf takes a document as JSON; the last two are Cloud only |
 | `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
@@ -2517,7 +2565,7 @@ jr meta createmeta --project ENG --type Story --format json
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `meta.createmeta` | v1 | always |
+| `meta.createmeta` | v2 | always |
 
 Default TSV columns: `id`, `name`, `required`, `type`
 
@@ -2562,7 +2610,7 @@ jr meta transitions ENG-101 --format json
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `meta.transitions` | v2 | always |
+| `meta.transitions` | v3 | always |
 
 Default TSV columns: `id`, `name`, `to`, `category`
 

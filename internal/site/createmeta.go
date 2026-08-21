@@ -25,6 +25,11 @@ type MetaField struct {
 	Type string `json:"type,omitempty"`
 	// Items is the element type of an array field.
 	Items string `json:"items,omitempty"`
+	// CustomType is Jira's own key for a custom field's type, and is empty for
+	// a system field. It says what JSON the value has to be where the schema
+	// type does not: Epic Link is "any" on both deployments and
+	// com.pyxis.greenhopper.jira:gh-epic-link here.
+	CustomType string `json:"customType,omitempty"`
 	// AllowedValues are the values Jira will accept, when it constrains them.
 	// They are the difference between "this field is required" and a caller
 	// being able to fill it in without a second lookup.
@@ -57,8 +62,9 @@ type rawMetaField struct {
 	Name     string `json:"name"`
 	Required bool   `json:"required"`
 	Schema   struct {
-		Type  string `json:"type"`
-		Items string `json:"items"`
+		Type   string `json:"type"`
+		Items  string `json:"items"`
+		Custom string `json:"custom"`
 	} `json:"schema"`
 	HasDefaultValue bool              `json:"hasDefaultValue"`
 	AllowedValues   []json.RawMessage `json:"allowedValues"`
@@ -76,6 +82,7 @@ func (r rawMetaField) convert(id string) MetaField {
 		Required:      r.Required,
 		Type:          r.Schema.Type,
 		Items:         r.Schema.Items,
+		CustomType:    r.Schema.Custom,
 		HasDefault:    r.HasDefaultValue,
 		AllowedValues: allowedValueNames(r.AllowedValues),
 	}

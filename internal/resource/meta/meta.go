@@ -26,10 +26,15 @@ import (
 // Kinds and schema versions this resource emits. Bump a version in the same
 // commit that changes the corresponding golden file.
 const (
-	KindTransitions    = "meta.transitions"
-	VersionTransitions = 2
+	KindTransitions = "meta.transitions"
+	// v3 adds the optional custom-type leaf to every field on a screen. Both
+	// kinds share MetaFieldSchema, so both move: a screen reports Epic Link as
+	// "any" exactly as the catalogue does, and the type key is the only thing
+	// that says which "any" it is.
+	VersionTransitions = 3
 	KindCreateMeta     = "meta.createmeta"
-	VersionCreateMeta  = 1
+	// v2 for the same addition. See VersionTransitions.
+	VersionCreateMeta = 2
 )
 
 func init() {
@@ -88,6 +93,10 @@ func MetaFieldSchema() *render.Schema {
 			{Schema: render.Leaf("name", render.TypeString)},
 			{Schema: render.Leaf("type", render.TypeString), Optional: true},
 			{Schema: render.Leaf("items", render.TypeString), Optional: true},
+			// Jira's own key for the field's type, present only on a custom
+			// field. A screen reports Epic Link as "any"; this says which kind
+			// of "any" it is.
+			{Schema: render.Leaf("custom-type", render.TypeString), Optional: true},
 			{Schema: render.ListSchema("allowed-values", "allowed-value",
 				render.Leaf("allowed-value", render.TypeString))},
 		},
@@ -356,6 +365,7 @@ func MetaFieldNode(f site.MetaField) *render.Node {
 	n.Leaf("name", f.Name)
 	n.LeafIf("type", f.Type)
 	n.LeafIf("items", f.Items)
+	n.LeafIf("custom-type", f.CustomType)
 
 	values := make([]*render.Node, 0, len(f.AllowedValues))
 	for _, v := range f.AllowedValues {

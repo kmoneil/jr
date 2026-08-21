@@ -13,7 +13,9 @@ is available, which makes them the ones worth knowing before you need them.
 - [`sprint = <id>` is not current membership](#sprint--id-is-not-current-membership)
 - [Questions JQL cannot answer](#questions-jql-cannot-answer)
 - [Nothing splits on commas](#nothing-splits-on-commas)
+- [`--field` reads a column and writes a value](#--field-reads-a-column-and-writes-a-value)
 - [A record in TSV is not a row](#a-record-in-tsv-is-not-a-row)
+- [`auth token` is a document, not a header](#auth-token-is-a-document-not-a-header)
 - [The default limit is 50](#the-default-limit-is-50)
 
 ## Dates are evaluated in Jira's timezone, not yours
@@ -150,6 +152,39 @@ Repeated flags OR together. Different flags AND together. Every list filter has 
 negative twin (`--not-status`, `--not-type`, `--not-label`) which is a `NOT IN`
 and ANDs with the rest.
 
+## `--field` reads a column and writes a value
+
+One word, two jobs, and the `=` is what separates them.
+
+```console
+# On a read it selects a column, and takes a bare name.
+jr issue get ENG-101 --field 'Story Points'
+
+# On a write it sets the field, and takes id=value.
+jr issue edit ENG-101 --field 'Story Points=5'
+```
+
+A bare name on a write is refused with `FIELD_NOT_KV` rather than read as the
+other sense. Repeat one id on a write to build an array; nothing is split on
+commas here either.
+
+A field with a typed flag of its own (summary, description, priority, labels,
+assignee, parent, type) is refused with `FIELD_HAS_A_FLAG` naming that flag.
+Use the flag: it validates the value and resolves a user, which `--field`
+cannot.
+
+`FIELD_TYPE_UNSUPPORTED` means the field exists and its schema type says nothing
+about what to send. Jira reports Epic Link, Rank, Team, and most plugin fields
+as `any`. The remedy names `--field-json`, whose value is JSON sent verbatim, so
+a string carries its own quotes inside the shell's:
+
+```console
+jr issue edit ENG-101 --field-json customfield_11350='"ENG-42"'
+```
+
+`jr field list --format json` carries both the schema type and Jira's own type
+key, which is the only thing that tells two `any` fields apart.
+
 ## A record in TSV is not a row
 
 A collection in TSV is a header row plus data rows. A **single record** in TSV is
@@ -161,6 +196,27 @@ id=$(jr sprint create "Sprint 14" --board 42 --format tsv |
 ```
 
 If you are parsing one record, XML or JSON is usually the better choice.
+
+## `auth token` is a document, not a header
+
+Every result this tool produces is a document, and `auth token` is no exception.
+Capturing it whole and using it as a header produces a malformed header, and
+curl reports that as status `000`, which is what it also reports for a network
+failure, so the mistake does not look like one.
+
+```console
+# Wrong in every format: $TOKEN is a whole document.
+TOKEN=$(jr auth token); curl -H "Authorization: $TOKEN" ...
+
+# Right: the flag that prints a header and nothing else.
+curl -H "$(jr auth token --header)" ...
+
+# Or take the one field.
+header=$(jr auth token --format tsv | awk -F'\t' '$1=="authorization"{print $2}')
+```
+
+`--header` with an explicit `--format` is `HEADER_AND_FORMAT`, exit 2: they name
+two different outputs.
 
 ## The default limit is 50
 
