@@ -341,7 +341,12 @@ Every successful XML response:
 ```
 
 - `kind`, stable identifier for the payload shape. An agent dispatches on it.
-- `v`, schema version for that kind, incremented on breaking change.
+- `v`, schema version for that kind, incremented whenever the kind's shape
+  changes, additively or otherwise. It said "on breaking change" until 2026-08-21
+  and that was never what the gate enforced: `make golden` refuses a changed
+  shape at an unchanged version, so an added optional element moves `v` too.
+  **A `v` that moved does not by itself say the release is breaking.** See the
+  stability policy, and the row for this case below.
 - `site`, **the Jira this answer came from**: the base URL the request was
   actually sent to, including any context path. Present on every document from a
   command that reached a site, and **absent** on one that did not — `jr version`
@@ -1488,7 +1493,16 @@ While the release version starts with a zero, and it will for a long time:
 The rows:
 
 - Adding a new optional element or attribute: **additive, so the patch position
-  moves.**
+  moves.** It moves the kind's schema version as well, because `make golden`
+  refuses a changed shape at an unchanged version, and that bump is not a second
+  question: see the row below.
+- A kind's schema version moving on its own: **it decides nothing.** Every kind
+  carries its own version and those move independently of the release, which is
+  what CHANGELOG.md tells a consumer to pin against. Price the release on the
+  rows that describe what actually changed, and list the kind and its new
+  version under **Output contract** so a consumer pinning `v` finds out. This
+  row was missing until 2026-08-21, when three kinds moved for one added
+  optional element and the only reading available made a patch look breaking.
 - Making a required element or attribute optional: **breaking, so the minor
   position moves.** It reads like the row above and is its opposite. An addition
   is something no existing consumer looks for; this is something an existing
