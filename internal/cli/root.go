@@ -70,7 +70,7 @@ and go to stderr.`),
 	// pflag's own parse errors carry no code and no exit status. Wrapping them
 	// here is what makes an unknown flag a structured exit 2 rather than a bare
 	// line on stderr.
-	root.SetFlagErrorFunc(flagError)
+	root.SetFlagErrorFunc(a.flagError)
 
 	root.PersistentFlags().StringVar(&a.requestedFormat, "format", "", formatUsage())
 	root.PersistentFlags().BoolVar(&a.describe, "describe", false,
@@ -104,6 +104,13 @@ and go to stderr.`),
 		// An explicit --format wins; otherwise JIRA_FORMAT sets the default
 		// globally. Both are validated here so a bad value fails before any
 		// work is done, not after.
+		//
+		// Which of the two it came from is recorded before they are merged,
+		// because a command that refuses --format has to refuse the flag and
+		// not the environment: JIRA_FORMAT is set once for a whole shell, and
+		// refusing an invocation because of it would make that setting a
+		// landmine rather than a default.
+		a.formatFromFlag = a.requestedFormat != ""
 		if a.requestedFormat == "" {
 			a.requestedFormat = a.getenv(EnvFormat)
 		}
@@ -181,6 +188,10 @@ func rejectUnknownSubcommand(cmd *cobra.Command, args []string) error {
 	return e
 }
 
+// annotationCommand is the key under which a cobra command carries its
+// registry name.
+const annotationCommand = "jr.command"
+
 // newLeaf builds the cobra command for one registered command.
 //
 // The two callbacks are methods returning closures rather than closures
@@ -200,6 +211,12 @@ func (a *app) newLeaf(rc *registry.Command) *cobra.Command {
 		Example:       rc.Example,
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		// Cobra hands a flag-error callback the cobra command and nothing
+		// else, so the registry name travels on the command itself. The
+		// alternative is rebuilding the dotted name out of CommandPath by
+		// stripping the binary's own name, which breaks the day somebody
+		// renames the binary.
+		Annotations: map[string]string{annotationCommand: rc.Name()},
 	}
 
 	binder := bindFlags(cc, rc)

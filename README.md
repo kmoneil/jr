@@ -390,6 +390,26 @@ corrected. The error says so and names the fix. And every read consults the
 field catalogue, which is one request per TTL rather than per command, but is
 not free on a cold cache.
 
+**Setting one is the same word and a different shape.** On `issue create` and
+`issue edit`, `--field` takes `id=value` and writes the field. The `=` is what
+separates the two senses, and a bare name on a write is refused rather than
+read as a column request:
+
+```console
+$ jr issue edit ENG-250 --field 'Story Points=5'
+$ jr issue create --type Story --summary Retry --field customfield_10042=5
+```
+
+The value is typed from the same catalogue, so a number field refuses a value
+that is not a number before anything is sent, and repeating one id builds an
+array. Where Jira reports a type that says nothing about what to send, which it
+does for Epic Link and most plugin fields, the refusal names `--field-json`,
+whose value is sent exactly as written:
+
+```console
+$ jr issue edit ENG-250 --field-json customfield_11350='"ENG-42"'
+```
+
 </details>
 
 <details>

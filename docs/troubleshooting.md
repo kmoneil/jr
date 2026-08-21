@@ -756,6 +756,63 @@ Refused rather than compared, because comparing a value from somewhere else
 would report "the issue changed", which is a claim about your issue that nobody
 checked.
 
+### Setting a field `jr` has no flag for
+
+`issue create` and `issue edit` name a handful of fields directly. Everything
+else, which on most instances means every custom field, goes through `--field`:
+
+```console
+$ jr issue edit ENG-101 --field 'Story Points=5'
+$ jr issue create --type Story --summary Retry --field customfield_10140=5
+```
+
+The name or the id both work, and the value is typed from your site's own
+catalogue: a number field refuses a value that is not a number before anything
+is sent. Repeat the flag with one id to build an array; nothing is split on
+commas, because a comma is a character a value may contain.
+
+### `FIELD_NOT_KV` (exit 2)
+
+`--field` means two different things and this is the one that says so. On a
+write it *sets* a field and takes `id=value`; on `jr issue get` and
+`jr issue list` it *selects a column* and takes a bare name. A bare name on a
+write is refused rather than read as the other one:
+
+```console
+$ jr issue edit ENG-101 --field 'Story Points'          # refused
+$ jr issue edit ENG-101 --field 'Story Points=5'        # sets it
+$ jr issue get ENG-101 --field 'Story Points'           # shows it
+```
+
+### `FIELD_HAS_A_FLAG` (exit 2)
+
+The field has a typed flag of its own, and that flag is the answer:
+`--summary`, `--description`, `--priority`, `--label`, `--assignee`,
+`--parent`, `--type`. Naming one field twice has no single right answer, so it
+is refused rather than resolved to whichever the implementation applied last.
+
+### `FIELD_TYPE_UNSUPPORTED` (exit 2)
+
+The field exists and `jr` will not guess at its schema type. This is most often
+type `any`, which is what Jira reports for Epic Link, Rank, Team, Parent Link,
+and anything a plugin added. `detail` carries Jira's own type key where the
+site reported one, and the remedy is to say exactly what to send:
+
+```console
+$ jr issue edit ENG-101 --field-json customfield_11350='"ENG-42"'
+```
+
+`--field-json` sends the value verbatim, so the quoting is JSON quoting: a
+string needs its own quotes inside the shell's.
+
+Run `jr field list --format json` to see a field's type and type key.
+
+### `DUPLICATE_FIELD` (exit 2)
+
+One field was named twice. On an array field repeating `--field` is how you
+build the array, so this only fires when the field is not an array, or when
+`--field` and `--field-json` both name it.
+
 ### A write failed and you do not know whether it happened
 
 `jr` never replays a non-idempotent request after an upstream error — a POST

@@ -59,8 +59,11 @@ type app struct {
 	// empty when the caller expressed no preference and the per-content
 	// default applies.
 	requestedFormat string
-	describe        bool
-	contract        bool
+	// formatFromFlag records that --format was typed, as opposed to
+	// JIRA_FORMAT being set. Only `auth token --header` reads it.
+	formatFromFlag bool
+	describe       bool
+	contract       bool
 
 	// exit is the status the run resolved to.
 	exit exitcode.Code
@@ -328,12 +331,15 @@ const nearLimit = 5
 // Ranked against *this* command's flags rather than every flag jr has.
 // Suggesting `--worklog-author` on a command that has no such flag is a second
 // wrong turn dressed as help.
-func flagError(cmd *cobra.Command, err error) error {
+func (a *app) flagError(cmd *cobra.Command, err error) error {
 	e := usageError(cmd, "%s", err.Error())
 
 	typed := typedFlag(err.Error())
 	if typed == "" {
 		return e
+	}
+	if detail := a.positionalDetail(cmd, typed); detail != "" {
+		return e.WithDetail("%s", detail)
 	}
 	near := nearest.Strings(typed, declaredFlags(cmd), nearLimit)
 	if len(near) == 0 {
@@ -347,6 +353,36 @@ func flagError(cmd *cobra.Command, err error) error {
 		dashed = append(dashed, "--"+n)
 	}
 	return e.WithDetail("did you mean: %s", strings.Join(dashed, ", "))
+}
+
+// positionalDetail answers the caller who typed an argument as a flag.
+//
+// `jr sprint add --sprint 128 ENG-1` is not a typo. The word is declared, it is
+// one token away from where it belongs, and it is a positional argument.
+// Ranking it against the flags finds nothing, and "nothing close" is the right
+// answer to a typo and the wrong one here: the caller guessed the wrong kind of
+// token, not the wrong spelling, and telling them so is a different sentence.
+//
+// Exact match only, and ahead of the distance ranking. A fuzzy match would put
+// `--issues` one edit from the `issue` argument on half the commands in this
+// tree, and the hint would start firing on real typos, where the flag advice is
+// the advice that helps.
+func (a *app) positionalDetail(cmd *cobra.Command, typed string) string {
+	if a.reg == nil {
+		return ""
+	}
+	rc, ok := a.reg.Lookup(cmd.Annotations[annotationCommand])
+	if !ok {
+		return ""
+	}
+	for _, arg := range rc.Args {
+		if !strings.EqualFold(arg.Name, typed) {
+			continue
+		}
+		return arg.Name + " is an argument, not a flag: " +
+			buildinfo.App + " " + rc.UseLine() + " " + rc.ArgSpec()
+	}
+	return ""
 }
 
 // typedFlag recovers the long flag a caller typed from pflag's own message,

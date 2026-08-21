@@ -139,6 +139,15 @@ Mutations are gated on purpose, and the gates are cheap to satisfy honestly.
    changed issue with `STALE_WRITE` at exit 7, having sent nothing. It is a
    read-compare with a one-round-trip window, not an atomic swap, and it says so
    in its own output.
+4. **`--field id=value` for anything without a flag of its own.** Story points,
+   acceptance criteria, and every other custom field are reachable:
+   `jr issue edit ENG-1 --field 'Story Points=5'`. The id or the name both work
+   and the value is typed from the site's catalogue, so a bad value is refused
+   before anything is sent. Where the type is one `jr` will not guess at, and
+   Jira reports Epic Link and most plugin fields as `any`, the refusal names
+   `--field-json`, which sends the value verbatim:
+   `--field-json customfield_11350='"ENG-42"'`. Do not leave `jr` for `curl` to
+   set a field; you lose the dry run, the precondition, and the validation.
 
 ## Picking the right command
 

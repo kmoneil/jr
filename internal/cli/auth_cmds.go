@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -397,25 +398,91 @@ Prints the Authorization header value a request to this site would carry.
 
 This deliberately reveals a secret. It exists so a script can hand the
 credential to curl or another client without re-implementing the credential
-lookup. The value is one field of a document, so take that field:
+lookup.
+
+--header prints the whole header and nothing else, on one line, so the obvious
+capture is the correct one:
+
+    curl -H "$(` + buildinfo.App + ` auth token --header)" ...
+
+Without it the result is a document like every other result, and the value is
+one field of it, so take that field:
 
     header=$(` + buildinfo.App + ` auth token --format tsv | awk -F'\t' '$1=="authorization"{print $2}')
     curl -H "Authorization: $header" ...
 
+Capturing a whole document into a variable and using it as a header does not
+work in any format and does not say so: curl reports status 000, which is what
+it reports for a network failure. --header exists because that failure looks
+like something else.
+
 Everywhere else in this tool a credential is redacted. Here it is the requested
 output, and it goes to stdout like any other result — so redirect it
 deliberately, and do not pass it through a command that logs its arguments.`),
-		Example: buildinfo.App + " auth token --site your-site.atlassian.net",
-		Flags: []registry.Flag{{
-			Name: "site", Type: registry.TypeString,
-			Usage: "site to print the credential for; defaults to the current context's",
+		Example: strings.Join([]string{
+			buildinfo.App + " auth token --site your-site.atlassian.net",
+			buildinfo.App + " auth token --header",
+		}, "\n"),
+		Flags: []registry.Flag{
+			{
+				Name: "site", Type: registry.TypeString,
+				Usage: "site to print the credential for; defaults to the current context's",
+			},
+			{
+				Name: "header", Type: registry.TypeBool,
+				Usage: "print `Authorization: <value>` on one line and nothing " +
+					"else, for a shell to interpolate whole",
+			},
+		},
+		// Only with --header. Without it this emits its document like anything
+		// else, and the declaration says which invocation produces which.
+		OwnsStdoutWhen: headerOwnsStdout,
+		Outputs: []registry.Output{{
+			Kind: kindAuthToken, Version: versionAuthToken,
+			When: "--header was not given",
 		}},
-		Outputs: []registry.Output{{Kind: kindAuthToken, Version: versionAuthToken}},
 		// NotFound for the reason `auth status` carries it: --site defaults to
 		// the current context's, so an unknown --context is exit 5 here too.
 		ExitCodes: []exitcode.Code{exitcode.Auth, exitcode.NotFound},
+		Validate:  a.validateAuthToken,
 		Run:       a.runAuthToken,
 	}
+}
+
+// headerOwnsStdout reports whether this invocation writes a bare header line.
+func headerOwnsStdout(inv *registry.Invocation) bool {
+	return inv.Flags.Bool("header")
+}
+
+// validateAuthToken refuses the two ways --header can be asked for something it
+// cannot give.
+//
+// --format names one of four documents and --header is not one of them. Letting
+// the two coexist would mean silently ignoring whichever lost, and an input a
+// command accepted is never quietly forgotten. JIRA_FORMAT is deliberately not
+// grounds for refusal: it is set once for a whole shell, and a per-invocation
+// flag has to beat an ambient default rather than collide with it.
+func (a *app) validateAuthToken(_ context.Context, inv *registry.Invocation) error {
+	if !inv.Flags.Bool("header") {
+		return nil
+	}
+	if a.formatFromFlag {
+		return errs.Usage("HEADER_AND_FORMAT",
+			"--header and --format name two different outputs").
+			WithDetail("--header prints one line that is not a document, and " +
+				"--format chooses how a document is encoded").
+			WithRemedy("pass one of them: --header for a header, or " +
+				"--format tsv and take the authorization field")
+	}
+	if inv.Stdout == nil {
+		// Inside `mcp serve` stdout carries JSON-RPC frames, and a bare line
+		// there is a frame the peer cannot parse. The same refusal that
+		// `issue attachment download --output -` makes, for the same reason.
+		return errs.Usage("NO_STDOUT",
+			"this caller has no stdout to write a header to").
+			WithRemedy("drop --header and read the authorization field of the result")
+	}
+	return nil
 }
 
 func (a *app) runAuthToken(_ context.Context, inv *registry.Invocation) (*render.Doc, error) {
@@ -430,6 +497,18 @@ func (a *app) runAuthToken(_ context.Context, inv *registry.Invocation) (*render
 	header, err := cred.Header()
 	if err != nil {
 		return nil, err
+	}
+
+	if inv.Flags.Bool("header") {
+		// No document: the line is the output. The CLI knows not to render one
+		// because OwnsStdoutWhen said so before this ran. The name is written
+		// out rather than taken from the map's key, so the line is the same
+		// whatever the scheme resolved to.
+		if _, err := fmt.Fprintln(inv.Stdout, "Authorization: "+header["Authorization"]); err != nil {
+			return nil, errs.Runtime("HEADER_NOT_WRITTEN",
+				"the credential could not be written to stdout").Wrap(err)
+		}
+		return nil, nil //nolint:nilnil // the line is the result.
 	}
 
 	n := render.El("token").

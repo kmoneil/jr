@@ -25,7 +25,9 @@ const catalogueJSON = `[
 	 "clauseNames":["summary"],"schema":{"type":"string"}},
 	{"id":"customfield_10042","name":"Story Points","custom":true,
 	 "searchable":true,"orderable":true,"navigable":true,
-	 "clauseNames":["cf[10042]","Story Points"],"schema":{"type":"number"}},
+	 "clauseNames":["cf[10042]","Story Points"],
+	 "schema":{"type":"number",
+	           "custom":"com.atlassian.jira.plugin.system.customfieldtypes:float"}},
 	{"id":"customfield_10099","name":"Sprint","custom":true,
 	 "searchable":true,"orderable":false,"navigable":true,
 	 "clauseNames":["cf[10099]","Sprint"],
@@ -54,6 +56,37 @@ func TestListEmitsTheCatalogue(t *testing.T) {
 // TestListDeclaresColumnsThatResolve keeps the default TSV projection honest: a
 // column whose path finds nothing renders as an empty cell rather than failing,
 // so nothing else would catch it.
+// TestTheTypeKeyReachesTheOutput is the gate every new value has to pass here:
+// a field that is fetched and not rendered is a field nobody can read.
+// schema.custom was parsed off the wire and dropped for the life of this
+// package, and no test noticed because nothing asked for it.
+//
+// It is an element and not a column. Adding it to the default TSV set would
+// shift every column after it, which the stability policy calls breaking; an
+// optional element is additive and reaches xml, json and yaml, which is where a
+// caller reading a type key is looking.
+func TestTheTypeKeyReachesTheOutput(t *testing.T) {
+	out, _ := run(t, registry.Limit{All: true}, render.XML)
+
+	const want = "<custom-type>com.atlassian.jira.plugin.system.customfieldtypes:float</custom-type>"
+	if !strings.Contains(out, want) {
+		t.Errorf("the type key did not reach the output:\n%s", out)
+	}
+	// A system field has none, and an empty element would read as a field
+	// whose type key is the empty string.
+	if strings.Count(out, "<custom-type>") != 1 {
+		t.Errorf("a field with no type key rendered one anyway:\n%s", out)
+	}
+
+	// And the default column set does not move: a script splitting on tabs
+	// keeps the same four cells it had.
+	tsv, _ := run(t, registry.Limit{All: true}, render.TSV)
+	header, _, _ := strings.Cut(tsv, "\n")
+	if header != "id\tname\ttype\tcustom" {
+		t.Errorf("the default column set changed: %q", header)
+	}
+}
+
 func TestListDeclaresColumnsThatResolve(t *testing.T) {
 	node := field.Node(site.Field{
 		ID: "customfield_10042", Name: "Story Points", Custom: true, Type: "number",

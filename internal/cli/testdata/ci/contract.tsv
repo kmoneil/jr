@@ -9,7 +9,7 @@ contract	2	contract
 doctor	1	doctor
 epic.get	1	epic.get
 epic.list	1	epic.list
-field.list	1	field.list
+field.list	2	field.list
 issue.activity	1	issue.activity
 issue.attachment.download	1	issue.attachment.download
 issue.attachment.list	1	issue.attachment.list
@@ -22,8 +22,8 @@ issue.list	7	issue.list
 issue.worklog.list	2	issue.worklog.list
 jql.explain	1	jql.explain
 jql.validate	1	jql.validate
-meta.createmeta	1	meta.createmeta
-meta.transitions	2	meta.transitions
+meta.createmeta	2	meta.createmeta
+meta.transitions	3	meta.transitions
 project.components	1	project.components
 project.get	2	project.get
 project.list	2	project.list

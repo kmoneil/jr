@@ -1042,6 +1042,12 @@ their typo.
 | `UNKNOWN_USER`         | 2    | No user with that display name, email, or id. `detail` lists the plausible near misses with their ids, and is absent where the search returned nothing that shares a word with what was typed. A partial match is a near miss, not a resolution. |
 | `AMBIGUOUS_USER`       | 2    | Several users share that display name. `detail` lists every candidate with its id, whether the account is inactive, and whether it is an app rather than a person.                                                                               |
 | `UNKNOWN_PROJECT`      | 5    | The project does not exist, or this credential may not create in it. Reported for either status the createmeta route answers an unaddressable project with, a 10.3 Data Center says 400, and 404 is equally plausible elsewhere.                 |
+| `FIELD_NOT_KV`         | 2    | `--field` or `--field-json` on a write was given something that is not `id=value`. On a write `--field` sets a field; on `issue get` and `issue list` it selects a column, and only the second takes a bare name.                                |
+| `FIELD_HAS_A_FLAG`     | 2    | The field resolved and a typed flag already writes it. `message` names the flag. Two spellings of one write is a silent last-one-wins, so it is refused rather than resolved.                                                                    |
+| `FIELD_TYPE_UNSUPPORTED` | 2  | The field resolved and `--field` will not guess at its schema type. `message` carries the type, `detail` carries Jira's own type key where the site reported one, and `remedy` names `--field-json`.                                            |
+| `FIELD_NOT_A_NUMBER`   | 2    | A number field was given a value that is not a number. Refused locally, against the site's own catalogue, so it costs no write.                                                                                                                  |
+| `FIELD_NOT_JSON`       | 2    | A `--field-json` value did not parse. `detail` is the decoder's own words.                                                                                                                                                                       |
+| `DUPLICATE_FIELD`      | 2    | One field was named twice: twice through `--field` where the field is not an array, or once through each flag. Repeating `--field` on an array field is how an array is built and is not this.                                                   |
 
 Field resolution costs one request against a cold cache and none against a warm
 one; a command that names nothing to resolve makes no extra request at all.
@@ -1058,19 +1064,36 @@ back to XML rather than failing twice.
 
 ### A command that writes bytes instead of a document
 
-`jr issue attachment download --output -` writes the file to stdout and emits no
-result document. It is the only command that does this and the exception is
-narrow on purpose: a file and a result on the same channel means one corrupts
-the other, and the caller who asked for the file gets it.
+Two invocations write raw bytes to stdout and emit no result document. Both are
+opt-in by flag, neither is a default, and the exception is narrow on purpose: a
+document and something that is not one on the same channel means one corrupts
+the other.
 
-Writing to a path is the ordinary case and emits `issue.attachment.download`
-saying what was written, where, and how many bytes, counted while writing, so
-if it disagrees with the size the listing reported, this is the one that
-happened.
+`jr issue attachment download --output -` writes the file. Writing to a path is
+the ordinary case and emits `issue.attachment.download` saying what was written,
+where, and how many bytes, counted while writing, so if it disagrees with the
+size the listing reported, this is the one that happened.
+
+`jr auth token --header` writes one line, `Authorization: <value>`, and a
+newline. Without the flag the command emits `auth.token` like any other record.
+It exists because no format in this contract is safe to capture whole: all four
+are documents, and `TOKEN=$(jr auth token)` interpolated into a header is a
+malformed header that curl reports as status 000, which is what it also reports
+for a network failure. `--header` makes capturing the whole output correct:
+
+```sh
+curl -H "$(jr auth token --header)" ...
+```
+
+It is not a `--format`, so the four formats stay four, and nothing generic
+learns to emit a bare value. `--header` together with an explicit `--format`
+is `HEADER_AND_FORMAT` and exit 2: they name two different outputs, and
+accepting both would mean ignoring one. `JIRA_FORMAT` is not grounds for that
+refusal, because it is set once for a whole shell.
 
 A caller with no stdout to spare, `mcp serve`, where bytes would land on the
 JSON-RPC stream as a frame the peer cannot parse, gets `NO_STDOUT` and exit 2
-rather than a corrupted session.
+rather than a corrupted session. Both invocations refuse there.
 
 ### Verdicts
 
@@ -1661,7 +1684,7 @@ attributes were unconditional until 2026-08-11 and printed a default instead:
 
 | Kind                                | Field        | Absent when                                                                    |
 | ----------------------------------- | ------------ | ------------------------------------------------------------------------------ |
-| `meta.transitions` v2               | `has-screen` | The server sent no `hasScreen`, which on Data Center is every transition        |
+| `meta.transitions` v3               | `has-screen` | The server sent no `hasScreen`, which on Data Center is every transition        |
 | `project.list` v2, `project.get` v2 | `private`    | The server sent no `isPrivate`, which on Data Center is every project           |
 
 Both rendered `false` there, on the strength of a field the response does not
