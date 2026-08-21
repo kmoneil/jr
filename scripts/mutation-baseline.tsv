@@ -15,7 +15,10 @@
 # every query and owns the only place a value is quoted, render writes the
 # output contract, and site decides what a deployment is and resolves the names
 # every command takes. The sweep costs about four minutes on a developer
-# machine and considerably more on a runner, which is why it is scheduled.
+# machine and, measured 2026-08-20, four minutes and one second on a
+# `ubuntu-latest` runner. It is scheduled because it is slower than a test
+# suite, not because a runner is slow at it: "considerably more on a runner"
+# stood here unmeasured until the day somebody ran one.
 #
 # `internal/jql` went 16 to 3 on 2026-08-17. Thirteen were killed by assertions
 # named in internal/jql/*_test.go; the three below are equivalent mutants, which
@@ -54,15 +57,29 @@
 # packages, byte for byte, which is a stronger agreement than two matching
 # totals would have been.
 #
-# One thing this file cannot tell you and should. Every count in it is a local
-# measurement. `mutation-weekly` has run twice in CI, on 2026-08-17, and failed
-# both times: the sweep was killed after 76 seconds with `make: ***
-# [Makefile:421: mutate] Terminated`, which is SIGTERM and a runner limit rather
-# than a broken sweep, since it completes here in about four minutes. Issue 57
-# said exactly the right thing, "no conclusion about the tests follows from this
-# run", and was closed without one. Until a scheduled sweep finishes, the
-# schedule is not what keeps these numbers honest; somebody running `make
-# mutate` is.
+# Where these numbers come from, which this file could not tell you until
+# 2026-08-20 and now can.
+#
+# `mutation-weekly` failed the only two times it ran, on 2026-08-17, the second
+# killed after 76 seconds with `make: *** [Makefile:421: mutate] Terminated`.
+# The paragraph that first stood here read that as a runner limit. It was not.
+# Both failures predate the fix, and every time here is UTC because the run log
+# is: the 07:04 schedule ran before `b4169e6` (12:06), and the 12:13 dispatch
+# ran *on* `b4169e6`, which is not a descendant of `50c402f`, the commit that
+# bounds the address space a mutated test may claim. That commit landed at
+# 13:36, 83 minutes after the dispatch it would have saved, and nobody ran the
+# sweep again for three days.
+#
+# It was run on 2026-08-20 against `2174f33` and succeeded, four minutes and one
+# second in the sweep step, matching this file on all three packages. So the
+# 34 below is corroborated by a machine that is not the one that measured it,
+# and `scripts/mutate.sh`'s claim that a runner completes the sweep at 3 GiB is
+# corroborated too.
+#
+# The lesson is not about runners. A gate that was fixed and never re-run is
+# indistinguishable from a gate that is still broken, and the distinguishing
+# command took one minute. Issue 57 said exactly the right thing, "no conclusion
+# about the tests follows from this run", and was closed without one.
 internal/jql	3	the only place a value is quoted; an unexercised branch is an injection
 internal/render	13	the output contract itself, and the escaping rules under it
 internal/site	34	deployment detection, field and user resolution, the cache
