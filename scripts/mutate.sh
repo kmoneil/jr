@@ -68,18 +68,23 @@ fi
 # the measurement is of a cold build as much as of a suite: 1.74 seconds on a CI
 # runner against 79.77 milliseconds here. The same mutant therefore gets about
 # 104 seconds there rather than 4.8, which is enough to take sixteen gigabytes
-# and the machine with them. It killed three scheduled sweeps, and every arm of
-# a probe that tried to fix it by lowering the worker count, one worker
-# included: a single runaway is sufficient.
+# and the machine with them. It killed both `mutation-weekly` runs that predate
+# this cap, one scheduled and one dispatched, and every arm of a probe that
+# tried to fix it by lowering the worker count, one worker included: a single
+# runaway is sufficient.
 #
 # So the bound belongs on the process and not on the concurrency. Measured on
-# arm64 and amd64 alike, and the floor is sharp because thread stacks count
-# against this limit: below 3 GiB the Go runtime cannot start, dying with
-# "pthread_create failed: Resource temporarily unavailable" before any mutant
-# runs. At 3 GiB a runner completed the sweep for the first time, reporting
-# Killed: 203, Lived: 16, Timed out: 0 and never dropping below 11.8 GB free.
-# 4 GiB reports exactly the same counts and bottoms out at 8.0 GB, so 3 GiB is
-# the same answer with twice the headroom.
+# arm64 and amd64 alike, with `ulimit -v` on the shell and gremlins called
+# directly, which is not where the cap ends up and is why the floor read that
+# way: thread stacks count against this limit, so a shell-capped run below 3 GiB
+# cannot start the Go runtime at all and dies with "pthread_create failed:
+# Resource temporarily unavailable" before any mutant runs. At 3 GiB that arm
+# got through `internal/jql` for the first time, reporting Killed: 203,
+# Lived: 16, Timed out: 0 and never dropping below 11.8 GB free. 4 GiB reports
+# exactly the same counts and bottoms out at 8.0 GB, so 3 GiB is the same answer
+# with twice the headroom. One package and not the sweep: these arms ran
+# `gremlins unleash ./internal/jql/` directly, which is why the count is
+# jql's 16 of that date rather than a verdict table.
 #
 # The baseline does not move: `lived` is what it records, and a runaway that
 # used to exhaust its timeout now dies at the cap and is counted as killed.
@@ -98,11 +103,17 @@ fi
 # shim ahead of it reaches every child and nothing else. This script calls
 # gremlins by absolute path and is unaffected by its own shim.
 #
-# 3 GiB rather than less: a four-core runner completes the full sweep at 2 GiB
-# too, never touching swap and bottoming out at 14.1 GB free against 12.2 GB at
-# 3 GiB, so the lower value is not wrong. 3 GiB is what has also been run
-# against twelve workers here, and it leaves room for a package larger than the
-# three swept today without anybody having to rediscover this comment.
+# 3 GiB rather than less: with the cap in the place it actually goes, a
+# four-core runner completes the full sweep at 2 GiB too, `make mutate` through
+# all three packages at that day's baseline of 16, 13 and 37, never touching
+# swap and bottoming out at 14.1 GB free against 12.2 GB at 3 GiB, so the lower
+# value is not wrong. That arm is also the first full sweep to finish on a
+# runner, which the paragraph above is not, and it is the same 2 GiB that
+# paragraph reports failing. The difference is the whole point of the two
+# paragraphs between them: capped on the shell it cannot start, capped on `go`
+# it finishes. 3 GiB is what has also been run against twelve workers here, and
+# it leaves room for a package larger than the three swept today without anybody
+# having to rediscover this comment.
 MUTATION_ADDRESS_SPACE_KIB=${MUTATION_ADDRESS_SPACE_KIB:-3145728}
 realgo=$(command -v go) || {
 	echo "no go on PATH" >&2
