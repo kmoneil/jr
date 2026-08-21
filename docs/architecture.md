@@ -485,8 +485,9 @@ coefficient, `internal/lint/mutation_test.go` holds it above the range where
 that happens, and the workflow goes through `make mutate` so the scheduled sweep
 cannot pick up a different one.
 
-That coefficient has a second consequence, and it cost three scheduled sweeps
-before anybody measured it. The timeout is the coefficient times the *measured*
+That coefficient has a second consequence, and before anybody measured it, it
+cost both `mutation-weekly` runs that predate the cap and all three arms of the
+probe that chased them. The timeout is the coefficient times the *measured*
 suite time, and on a runner that measurement includes a cold build: 1.74 seconds
 against 79.77 milliseconds locally. So a mutant gets about 104 seconds there
 rather than 4.8, which matters because some mutants do not terminate. Four of
