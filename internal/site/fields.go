@@ -32,6 +32,12 @@ type Field struct {
 	Type string `json:"type,omitempty"`
 	// Items is the element type of an array field.
 	Items string `json:"items,omitempty"`
+	// CustomType is Jira's own key for a custom field's type, e.g.
+	// com.atlassian.jira.plugin.system.customfieldtypes:float. It is empty for
+	// a system field, and it is the only thing that says what JSON a value has
+	// to be: five of the thirteen custom fields on a stock Data Center report
+	// their schema type as "any", and every one of them carries a key here.
+	CustomType string `json:"customType,omitempty"`
 	// ClauseNames are the names JQL accepts for this field. A custom field is
 	// addressable as cf[10042] as well as by its name, and both are resolvable
 	// here for the same reason: they are what a person actually types.
@@ -102,6 +108,7 @@ func FetchFields(ctx context.Context, client Doer, info Info) (*Catalogue, error
 			Custom:      r.Custom,
 			Type:        r.Schema.Type,
 			Items:       r.Schema.Items,
+			CustomType:  r.Schema.Custom,
 			ClauseNames: r.ClauseNames,
 			Searchable:  r.Searchable,
 			Orderable:   r.Orderable,

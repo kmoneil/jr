@@ -238,6 +238,21 @@ do not catch, add the test in the same change and cite it here.
   render as unassigned with an unknown status. A flag either affects the output
   or does not exist.
   **Enforced by:** `TestFieldNamesResolveThroughTheCommand`, `TestFieldsResolveByIdAndName`.
+- **One field has one spelling on a write.** `--field` reaches any field a typed
+  flag does not, and refuses every field one does, naming that flag. Two
+  spellings of one write is a last-one-wins whose winner depends on map
+  iteration order. The list of owned fields cannot be derived, because only the
+  request builders know that `--priority` writes `priority`. So the guard builds
+  a request with every typed flag set and requires each field id it produces to
+  be on the list.
+  **Enforced by:** `TestEveryTypedFlagOwnsItsField`, `TestFieldWriteRefusesBeforeAnythingIsSent`.
+- **A write refuses a type rather than guessing at it.** `--field` encodes from
+  the schema type the site reported. A type it cannot encode unambiguously is
+  refused by name, pointing at `--field-json`, which sends the value verbatim.
+  Jira reports `any` for Epic Link, Rank, Team, Parent Link, and most plugin
+  fields. That is five of the thirteen custom fields on a stock Data Center, so
+  it is the common path and not the edge.
+  **Enforced by:** `TestFieldWriteEncodesFromTheSitesOwnTypes`, `TestFieldJSONIsSentAsWritten`.
 - **A flag's effect is asserted, not reviewed.** The sweep drives every flag on
   and off, each deployment, and the requests, the columns, the document, or the
   error has to differ. An exemption goes in `flagWithNoObservableEffect` or

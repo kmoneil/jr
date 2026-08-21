@@ -104,6 +104,84 @@ func TestARefusalSaysNothingRatherThanGuessing(t *testing.T) {
 	}
 }
 
+// TestAnArgumentTypedAsAFlagSaysSo is the fifth refusal of the one mistake, and
+// the one the other four left out.
+//
+// `jr sprint add --sprint 128 ENG-1` is not a spelling mistake: the word is
+// declared, it is one token from where it belongs, and it is a positional
+// argument. Ranked against the flags it finds nothing, and "nothing close" is
+// the right answer to a typo. Here it reads as "no such thing", which is
+// false.
+//
+// Asserted on a command in every build. `sprint add` is where this was found
+// and it needs the write tag, so a test named for it would not run in the
+// profile `make test` uses.
+func TestAnArgumentTypedAsAFlagSaysSo(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		args  []string
+		usage string
+	}{
+		{
+			name:  "a single required argument",
+			args:  []string{"issue", "get", "--format", "json", "--key", "ENG-1"},
+			usage: "jr issue get <key>",
+		},
+		{
+			name:  "on another command entirely",
+			args:  []string{"meta", "transitions", "--format", "json", "--key", "ENG-1"},
+			usage: "jr meta transitions <key>",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// JSON, because the usage line carries angle brackets and XML
+			// escapes them. Asserting on `&lt;key&gt;` would pin the encoding
+			// rather than the sentence. It comes before the bad flag because
+			// parsing stops at the bad flag, and a --format after it has not
+			// been read when the refusal is rendered.
+			got := run(t, nil, tc.args...)
+
+			if got.exit != exitcode.Usage {
+				t.Fatalf("exit = %v, want %v\nstderr: %s", got.exit, exitcode.Usage, got.stderr)
+			}
+			if !strings.Contains(got.stderr, "is an argument, not a flag") {
+				t.Errorf("the refusal did not say what the word is:\n%s", got.stderr)
+			}
+			// The usage line comes from the same declaration the check reads,
+			// so a caller is shown where the word goes and not only that it is
+			// in the wrong place.
+			if !strings.Contains(got.stderr, tc.usage) {
+				t.Errorf("stderr does not carry %q:\n%s", tc.usage, got.stderr)
+			}
+			// This is not a spelling correction and must not read as one.
+			if strings.Contains(got.stderr, "did you mean") {
+				t.Errorf("an exact argument match was offered as a guess:\n%s", got.stderr)
+			}
+			if !strings.Contains(got.stderr, "--help") {
+				t.Errorf("the detail displaced the remedy:\n%s", got.stderr)
+			}
+		})
+	}
+}
+
+// TestANearFlagStillBeatsAnArgumentThatIsNotOne keeps the new branch from
+// swallowing the old one. The argument check is exact, so a typo of a real flag
+// still gets the flag advice even on a command whose arguments have names.
+func TestANearFlagStillBeatsAnArgumentThatIsNotOne(t *testing.T) {
+	got := run(t, nil, "issue", "get", "--fild", "customfield_10042")
+
+	if got.exit != exitcode.Usage {
+		t.Fatalf("exit = %v, want %v\nstderr: %s", got.exit, exitcode.Usage, got.stderr)
+	}
+	detail := element(got.stderr, "detail")
+	if !strings.Contains(detail, "--field") {
+		t.Errorf("a near flag was not offered:\n%s", got.stderr)
+	}
+	if strings.Contains(detail, "is an argument") {
+		t.Errorf("a typo was answered as though it named an argument:\n%s", got.stderr)
+	}
+}
+
 // TestSuggestionsComeFromThisCommandsOwnFlags keeps the candidate set honest.
 //
 // Every flag jr has is the wrong set to rank against: `--worklog-after` is a

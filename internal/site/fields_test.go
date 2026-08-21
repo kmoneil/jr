@@ -82,6 +82,62 @@ func TestFetchFieldsNormalizesTheCatalogue(t *testing.T) {
 	}
 }
 
+// TestTheTypeKeyIsCarriedThrough is the one thing the schema block says that
+// the schema type does not.
+//
+// Measured against a stock Data Center on 2026-08-21: thirteen custom fields,
+// five of them typed "any" (Epic Link, Rank, Team, Parent Link, Development),
+// and all thirteen carrying a schema.custom key. Without the key those five are
+// indistinguishable from each other and from any future field, and a write to
+// one of them is a guess. The key arrived on the wire and was parsed into a
+// struct field nothing read, which is how it went unnoticed.
+func TestTheTypeKeyIsCarriedThrough(t *testing.T) {
+	const catalogue = `[
+		{"id":"summary","name":"Summary","custom":false,
+		 "schema":{"type":"string"}},
+		{"id":"customfield_10111","name":"Story Points","custom":true,
+		 "schema":{"type":"number",
+		           "custom":"com.atlassian.jira.plugin.system.customfieldtypes:float"}},
+		{"id":"customfield_10110","name":"Epic Link","custom":true,
+		 "schema":{"type":"any","custom":"com.pyxis.greenhopper.jira:gh-epic-link"}},
+		{"id":"customfield_10108","name":"Rank","custom":true,
+		 "schema":{"type":"any","custom":"com.pyxis.greenhopper.jira:gh-lexo-rank"}}
+	]`
+
+	got, err := site.FetchFields(t.Context(), &stubDoer{body: catalogue},
+		site.Info{Kind: site.DataCenter})
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+
+	for _, tc := range []struct{ id, want string }{
+		{"summary", ""},
+		{"customfield_10111", "com.atlassian.jira.plugin.system.customfieldtypes:float"},
+		{"customfield_10110", "com.pyxis.greenhopper.jira:gh-epic-link"},
+		{"customfield_10108", "com.pyxis.greenhopper.jira:gh-lexo-rank"},
+	} {
+		f, err := got.Resolve(tc.id)
+		if err != nil {
+			t.Fatalf("resolve %s: %v", tc.id, err)
+		}
+		if f.CustomType != tc.want {
+			t.Errorf("%s: custom type = %q, want %q", tc.id, f.CustomType, tc.want)
+		}
+	}
+
+	// The two "any" fields are the case. They agree on everything the schema
+	// type reports and are different fields taking different values, so a
+	// catalogue that cannot tell them apart cannot type either one.
+	link, _ := got.Resolve("customfield_10110")
+	rank, _ := got.Resolve("customfield_10108")
+	if link.Type != rank.Type {
+		t.Fatalf("the fixture no longer has two any-typed fields")
+	}
+	if link.CustomType == rank.CustomType {
+		t.Errorf("two any-typed fields are indistinguishable: %q", link.CustomType)
+	}
+}
+
 // TestFetchFieldsFallsBackToKey covers the Data Center versions that populate
 // key and leave id empty. Dropping the field would make its name unresolvable
 // for a reason nobody could see.

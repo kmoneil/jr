@@ -635,6 +635,62 @@ renamed in Jira fails `issue get` and `issue list` until the context is
 corrected; and every read consults the field catalogue, which is one request per
 cache TTL rather than per command, but is not free on a cold cache.
 
+### Writing one
+
+On a write `--field` takes `id=value` and sets the field. It is the same word
+in both places and the `=` is what separates the senses: `--field 'Story Points'`
+on a read asks for a column, `--field 'Story Points=5'` on a write sets a value.
+A bare name on a write is refused rather than read as the other one.
+
+```console
+$ jr issue edit ENG-101 --field 'Story Points=5'
+$ jr issue create --type Story --summary Retry --field customfield_10140=5
+```
+
+The value is typed from your site's own catalogue, so a number field refuses a
+value that is not a number before anything is sent:
+
+```console
+$ jr issue edit ENG-101 --field 'Story Points=about five'
+FIELD_NOT_A_NUMBER: customfield_10140 (Story Points) takes a number
+```
+
+Repeat one id to build an array. Nothing is split on commas, because a comma is
+a character a value may contain:
+
+```console
+$ jr issue edit ENG-101 --field components=api --field components=transport
+```
+
+**Some fields have no type worth guessing at.** Jira reports Epic Link, Rank,
+Team, Parent Link, and most plugin fields as type `any`, which says nothing
+about what to send. Those are refused by name, and `--field-json` sends the
+value exactly as written:
+
+```console
+$ jr issue edit ENG-101 --field 'Epic Link=ENG-42'
+FIELD_TYPE_UNSUPPORTED: customfield_11350 (Epic Link) has type "any"
+  detail: Jira calls it com.pyxis.greenhopper.jira:gh-epic-link
+  remedy: send the value as written: --field-json customfield_11350='"..."'
+
+$ jr issue edit ENG-101 --field-json customfield_11350='"ENG-42"'
+```
+
+The quoting is JSON quoting inside shell quoting, so a string carries its own
+double quotes. `jr field list --format json` shows both the type and the type
+key, which is what tells two `any` fields apart.
+
+Everything else a write does still applies. `--dry-run` prints the body,
+`--if-unchanged` still refuses a stale write, and a field a typed flag already
+owns is refused naming that flag:
+
+```console
+$ jr issue edit ENG-101 --field 'Story Points=5' --dry-run
+$ jr issue edit ENG-101 --field 'Story Points=5' --if-unchanged "$precondition"
+$ jr issue edit ENG-101 --field summary=hello
+FIELD_HAS_A_FLAG: summary is written by --summary, not by --field
+```
+
 ## Exporting and piping
 
 TSV is the default for lists precisely so this works:
@@ -842,6 +898,32 @@ inherited as a generic failure.
 
 Use the smallest build that does the job. `make build-ci` is query-only and the
 smallest of the four; a token it holds cannot write even if the script is wrong.
+
+### Handing the credential to another tool
+
+`jr auth token --header` prints one line, `Authorization: <value>`, so the
+obvious capture is the correct one:
+
+```bash
+curl -H "$(jr auth token --header)" \
+     "https://$JIRA_SITE/rest/api/3/myself"
+```
+
+Do not capture `jr auth token` without the flag and use it as a header. Every
+other output of that command is a *document*, which is the whole design, and a
+document interpolated into a header is a malformed header. curl answers status
+000, which is what it also answers for a network failure, so the mistake does
+not look like one.
+
+If you want the value on its own rather than the whole header, take the field:
+
+```bash
+header=$(jr auth token --format tsv | awk -F'\t' '$1=="authorization"{print $2}')
+```
+
+The command reveals a secret on purpose and is the only one that does. It goes
+to stdout like any other result, so redirect it deliberately and keep it out of
+anything that logs its arguments.
 
 ## Agents and MCP
 

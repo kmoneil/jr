@@ -148,6 +148,46 @@ func TestCreateMetaCarriesAllowedValues(t *testing.T) {
 	t.Error("priority is missing from the result")
 }
 
+// TestCreateMetaCarriesTheTypeKey is the same claim as the catalogue's, on the
+// other endpoint that reports a field's schema.
+//
+// A create screen reports Epic Link as "any" exactly as /field does, so the
+// screen alone cannot say what to send either. The key was not even asked for
+// here: rawMetaField declared type and items and stopped.
+func TestCreateMetaCarriesTheTypeKey(t *testing.T) {
+	const withCustom = `{"maxResults":100,"startAt":0,"total":2,"isLast":true,
+		"values":[
+			{"fieldId":"summary","name":"Summary","required":true,
+			 "schema":{"type":"string"},"hasDefaultValue":false},
+			{"fieldId":"customfield_10110","name":"Epic Link","required":false,
+			 "schema":{"type":"any",
+			           "custom":"com.pyxis.greenhopper.jira:gh-epic-link"},
+			 "hasDefaultValue":false}]}`
+
+	doer := &routingDoer{routes: map[string]string{
+		"/rest/api/2/issue/createmeta/ENG/issuetypes":       issueTypesJSON,
+		"/rest/api/2/issue/createmeta/ENG/issuetypes/10001": withCustom,
+	}}
+	meta, err := site.FetchCreateMeta(t.Context(), doer,
+		site.Info{Kind: site.DataCenter}, "ENG", "Bug")
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+
+	for _, f := range meta.Fields {
+		switch f.ID {
+		case "customfield_10110":
+			if f.CustomType != "com.pyxis.greenhopper.jira:gh-epic-link" {
+				t.Errorf("custom type = %q, want the greenhopper key", f.CustomType)
+			}
+		case "summary":
+			if f.CustomType != "" {
+				t.Errorf("a system field reported a custom type: %q", f.CustomType)
+			}
+		}
+	}
+}
+
 // TestTheTwoCausesStaySeparate keeps "no such project" and "no such type"
 // apart. They have different fixes, and reporting them as one leaves a caller
 // guessing which of three things to check.

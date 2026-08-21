@@ -2,6 +2,7 @@ package cli_test
 
 import (
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -231,6 +232,54 @@ func TestAuthLifecycle(t *testing.T) {
 	if !strings.HasPrefix(header, "Basic ") {
 		t.Errorf("the pipeline in `auth token --help` yielded %q from:\n%s",
 			header, tsv.stdout)
+	}
+
+	// The other worked example, and the reason it exists: `--header` is the
+	// one output of this command that a shell may capture whole. Everything
+	// else here is a document, and a document interpolated into a header is a
+	// malformed header that curl reports as status 000, which is
+	// indistinguishable from a network failure. That is how an agent spent a
+	// turn on it.
+	bare := mustRun(t, env, "auth", "token", "--header")
+	if !strings.HasPrefix(bare.stdout, "Authorization: Basic ") {
+		t.Errorf("--header did not produce a header line:\n%q", bare.stdout)
+	}
+	if strings.Count(bare.stdout, "\n") != 1 || !strings.HasSuffix(bare.stdout, "\n") {
+		t.Errorf("--header wrote more than one line:\n%q", bare.stdout)
+	}
+	if strings.Contains(bare.stdout, "<") || strings.Contains(bare.stdout, "\t") {
+		t.Errorf("--header wrote a document:\n%q", bare.stdout)
+	}
+	if bare.stderr != "" {
+		t.Errorf("--header wrote to stderr:\n%s", bare.stderr)
+	}
+	// The whole line is the header, so what a shell captures is what curl
+	// takes. That is the entire claim.
+	if name, value, ok := strings.Cut(strings.TrimSpace(bare.stdout), ": "); !ok ||
+		name != "Authorization" || value != header {
+		t.Errorf("--header and the tsv field disagree: %q vs %q", bare.stdout, header)
+	}
+
+	// --format asks how to encode a document and --header asks for something
+	// that is not one. Accepting both would mean ignoring one of them.
+	clash := run(t, env, "auth", "token", "--header", "--format", "json")
+	if clash.exit != exitcode.Usage {
+		t.Errorf("--header with --format exited %v, want %v", clash.exit, exitcode.Usage)
+	}
+	if clash.stdout != "" {
+		t.Errorf("a refused --header wrote to stdout:\n%s", clash.stdout)
+	}
+	if !strings.Contains(clash.stderr, "HEADER_AND_FORMAT") {
+		t.Errorf("the refusal did not name itself:\n%s", clash.stderr)
+	}
+
+	// JIRA_FORMAT is not the flag. It is set once for a whole shell, and
+	// refusing an invocation because of it would make the setting a landmine.
+	ambient := map[string]string{"JIRA_FORMAT": "json"}
+	maps.Copy(ambient, env)
+	withEnv := mustRun(t, ambient, "auth", "token", "--header")
+	if !strings.HasPrefix(withEnv.stdout, "Authorization: Basic ") {
+		t.Errorf("JIRA_FORMAT refused --header:\n%q", withEnv.stdout)
 	}
 
 	blocked := run(t, env, "auth", "logout", "--site", "acme.atlassian.invalid")

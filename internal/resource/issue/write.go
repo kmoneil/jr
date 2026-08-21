@@ -105,11 +105,25 @@ interpreting it is not.
 --body-format markdown converts it instead, refusing by name anything the
 subset cannot hold rather than approximating it. --body-format adf takes an
 Atlassian Document Format document as JSON and sends it as given. Both are
-Cloud only: Data Center stores wiki markup, and there is no converter to it.`),
+Cloud only: Data Center stores wiki markup, and there is no converter to it.
+
+--field sets anything the flags above do not name, by field id or by field
+name: --field customfield_10140=5 or --field 'Story Points=5'. The value is
+typed from the site's own catalogue, so a number field refuses a value that is
+not a number, and an unknown field is refused with the near misses rather than
+sent. Repeat one id to build an array; nothing is split on commas, because a
+comma is a character a value may contain.
+
+--field-json sets a field to a JSON value sent exactly as written, for a field
+whose type this tool will not guess at. A schema type of "any" is the common
+case, and Epic Link is one: --field-json customfield_11350='"ENG-42"'. A field
+a typed flag already owns is refused by name, because two spellings of one
+write is a silent last-one-wins.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue create --type Bug --summary 'Retry drops the last error'",
 			buildinfo.App + " issue create --type Task --summary Ship --idempotency-key deploy-42",
 			buildinfo.App + " issue create --type Bug --summary Probe --dry-run",
+			buildinfo.App + " issue create --type Story --summary Retry --field 'Story Points=5'",
 		}, "\n"),
 		Flags: []registry.Flag{
 			{
@@ -146,6 +160,8 @@ Cloud only: Data Center stores wiki markup, and there is no converter to it.`),
 				Name: "idempotency-key", Type: registry.TypeString,
 				Usage: "make a retry safe: the same key returns the original issue",
 			},
+			fieldSetFlagDecl(),
+			fieldJSONFlagDecl(),
 			bodyFormatFlag(),
 			dryRunFlag(),
 		},
@@ -182,7 +198,10 @@ func validateCreate(ctx context.Context, inv *registry.Invocation) error {
 				WithRemedy("--parent takes the key of the issue this belongs under")
 		}
 	}
-	return nil
+	// Last, because it is the only check here that can cost a request. An
+	// invocation that was going to be refused for a local reason is refused
+	// without fetching a catalogue nobody will read.
+	return resolveFieldWrites(ctx, inv, "create")
 }
 
 // CreateOptions is one `issue create` request, before it becomes JSON.
@@ -195,6 +214,10 @@ type CreateOptions struct {
 	Labels      []string
 	Assignee    string
 	Parent      string
+	// Fields is everything --field and --field-json resolved to, keyed by
+	// field id and already encoded. It cannot collide with the typed options
+	// above: a field one of them owns is refused during validation.
+	Fields map[string]any
 }
 
 // CreateRequest builds the request without sending it.
@@ -248,6 +271,7 @@ func (c *Client) CreateRequest(opt CreateOptions) (transport.Request, error) {
 	if opt.Assignee != "" {
 		fields["assignee"] = c.assigneeValue(opt.Assignee)
 	}
+	mergeFieldWrites(fields, opt.Fields)
 
 	body, err := json.Marshal(map[string]any{"fields": fields})
 	if err != nil {
@@ -398,6 +422,7 @@ func runCreate(ctx context.Context, inv *registry.Invocation) (*render.Doc, erro
 		Labels:      inv.Flags.StringSlice("label"),
 		Assignee:    resolvedAssignee(inv, inv.Flags.String("assignee")),
 		Parent:      inv.Flags.String("parent"),
+		Fields:      fieldWrites(inv),
 	})
 	if err != nil {
 		return nil, err
@@ -562,7 +587,20 @@ letting the word precondition imply an atomic one.
 
 --dry-run prints the exact request, body included, and sends nothing.
 
---description and --body-format work exactly as on issue create.`),
+--description and --body-format work exactly as on issue create.
+
+--field sets anything the flags above do not name, by field id or by field
+name: --field customfield_10140=5 or --field 'Story Points=5'. The value is
+typed from the site's own catalogue, so a number field refuses a value that is
+not a number, and an unknown field is refused with the near misses rather than
+sent. Repeat one id to build an array; nothing is split on commas, because a
+comma is a character a value may contain.
+
+--field-json sets a field to a JSON value sent exactly as written, for a field
+whose type this tool will not guess at. A schema type of "any" is the common
+case, and Epic Link is one: --field-json customfield_11350='"ENG-42"'. A field
+a typed flag already owns is refused by name, because two spellings of one
+write is a silent last-one-wins.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue edit ENG-101 --summary 'A better summary'",
 			buildinfo.App + " issue edit ENG-101 --add-label retry --remove-label wontfix",
@@ -570,6 +608,8 @@ letting the word precondition imply an atomic one.
 			buildinfo.App + " issue edit ENG-101 --parent ENG-42",
 			buildinfo.App + " issue edit ENG-101 --parent none",
 			buildinfo.App + " issue edit ENG-101 --priority High --if-unchanged eyJkIjo",
+			buildinfo.App + " issue edit ENG-101 --field 'Story Points=0.5'",
+			buildinfo.App + " issue edit ENG-101 --field-json customfield_11350='\"ENG-42\"'",
 		}, "\n"),
 		Args: []registry.Arg{{
 			Name: "key", Usage: "issue key, e.g. ENG-101", Required: true,
@@ -603,6 +643,8 @@ letting the word precondition imply an atomic one.
 				Usage: "set the parent issue, which on Cloud is the epic; " +
 					"the word none clears it",
 			},
+			fieldSetFlagDecl(),
+			fieldJSONFlagDecl(),
 			bodyFormatFlag(),
 			ifUnchangedFlagDecl(),
 			dryRunFlag(),
@@ -654,7 +696,8 @@ func validateEdit(ctx context.Context, inv *registry.Invocation) error {
 		return errs.Usage("NOTHING_TO_EDIT", "issue edit was given nothing to change").
 			WithRemedy("name at least one field, e.g. --summary")
 	}
-	return nil
+	// Last, because it is the only check here that can cost a request.
+	return resolveFieldWrites(ctx, inv, "edit")
 }
 
 func editTouchesAnything(inv *registry.Invocation) bool {
@@ -667,7 +710,9 @@ func editTouchesAnything(inv *registry.Invocation) bool {
 			return true
 		}
 	}
-	for _, name := range []string{"label", "add-label", "remove-label"} {
+	for _, name := range []string{
+		"label", "add-label", "remove-label", fieldSetFlag, fieldJSONFlag,
+	} {
 		if len(inv.Flags.StringSlice(name)) > 0 {
 			return true
 		}
@@ -693,6 +738,10 @@ type EditOptions struct {
 	// SetParent is SetAssignee's reason again: "" is what an omitted flag reads
 	// as, and clearing the parent has to be sayable.
 	SetParent bool
+	// Fields is everything --field and --field-json resolved to, keyed by
+	// field id and already encoded. It cannot collide with the typed options
+	// above: a field one of them owns is refused during validation.
+	Fields map[string]any
 }
 
 // EditRequest builds the request without sending it.
@@ -764,6 +813,7 @@ func (c *Client) editFields(opt EditOptions) (map[string]any, error) {
 		}
 		fields["parent"] = value
 	}
+	mergeFieldWrites(fields, opt.Fields)
 	return fields, nil
 }
 
@@ -805,6 +855,7 @@ func runEdit(ctx context.Context, inv *registry.Invocation) (*render.Doc, error)
 		Priority:     inv.Flags.String("priority"),
 		AddLabels:    inv.Flags.StringSlice("add-label"),
 		RemoveLabels: inv.Flags.StringSlice("remove-label"),
+		Fields:       fieldWrites(inv),
 	}
 	if labels := inv.Flags.StringSlice("label"); labels != nil {
 		opt.Labels = labels
