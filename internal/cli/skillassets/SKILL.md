@@ -55,10 +55,27 @@ flags, defaults, and exit codes. Reach for it instead of `--help` parsing or
 recall, and instead of guessing that a flag you know from another CLI exists
 here.
 
-One known gap: **`--limit` is real on every command marked `paginated="true"`
-but is not listed among its flags.** It is the flag that decides whether you get
-a complete result set, so it is covered explicitly below rather than left to
-discovery.
+**A command has two sets of flags and `jr schema <command>` reports both.**
+`<flags>` is what the command declares. `<global-flags>` is what it inherits
+from the root, and each of those carries an `affects` attribute saying what it
+reaches **on that command**:
+
+| `affects` | What it means for you |
+| --- | --- |
+| `result` | It narrows what you get back, and nothing in the result says so. `--project` is one. Read these before you trust a count. |
+| `provenance` | It decides which Jira answers. The envelope's `site` attribute tells you which one did. |
+| `invocation` | It changes how the command runs or prints, not what the answer is. |
+
+`affects="result"` is the one to check. A scoped query is complete within a
+frame the result document does not name: `jr issue list --jql 'key = OPS-1'`
+against a context whose project is `ENG` returns zero rows, `complete="true"`,
+and exit 0, which is the same answer as "nothing matched". `--all-projects`
+lifts the scope where the command has it, and `jr context show` says what the
+scope currently is.
+
+An empty value does not lift it. `--project ""` is refused as `EMPTY_SCOPE`,
+because it used to fall back to the context and produce exactly the empty
+success above.
 
 ## Reading what comes back
 

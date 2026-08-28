@@ -17,7 +17,14 @@ const (
 	KindContract = "contract"
 
 	VersionCommands = 1
-	VersionCommand  = 1
+	// VersionCommand is 2 because a command now describes the global flags it
+	// inherits, and which of them reach its result set. A consumer that pinned
+	// v1 read a command's own flags and had no way to learn that --project
+	// filters `issue activity`; v2 adds <global-flags>, and the block is not
+	// optional, because a caller reading it to find out what can narrow their
+	// results must be able to tell "nothing does" from "this build does not
+	// say".
+	VersionCommand = 2
 	// VersionContract is 2 because each kind now carries its element schema.
 	// A consumer that pinned v1 read a name, a version, and a list of
 	// emitters; v2 adds the shape, which is the half §3.5 promised and the
@@ -85,6 +92,7 @@ func CommandSchema() *render.Schema {
 				Text: &render.Field{Type: render.TypeString},
 			})},
 			{Schema: render.ListSchema("flags", "flag", flagSchema())},
+			{Schema: render.ListSchema("global-flags", "global-flag", globalFlagSchema())},
 			{Schema: render.ListSchema("exit-codes", "exit-code", &render.Schema{
 				Element: "exit-code",
 				Attrs: []render.Field{
@@ -117,6 +125,26 @@ func flagSchema() *render.Schema {
 				render.Leaf("value", render.TypeString)), Optional: true},
 		},
 	}
+}
+
+// globalFlagSchema is a flag the root declares and this command inherits.
+//
+// It is the ordinary flag shape plus one attribute, and that attribute is the
+// reason the block exists. Thirteen more flag names in front of an agent would
+// be a worse answer than none: what it needs is which of them decide what the
+// answer is, and `affects` is the only field here that is a property of the
+// pair rather than of the flag.
+func globalFlagSchema() *render.Schema {
+	s := flagSchema()
+	s.Element = "global-flag"
+	s.Attrs = append(s.Attrs, render.Field{
+		Name: "affects", Type: render.TypeString,
+		Enum: []string{
+			string(EffectResult), string(EffectProvenance),
+			string(EffectInvocation),
+		},
+	})
+	return s
 }
 
 // ContractSchema is the shape of one kind in `jr contract` — including, since
@@ -254,6 +282,20 @@ func CommandDoc(c *Command) *render.Doc {
 	}
 	n.Child(render.ListEl("flags", "flag", flags...))
 
+	// The inherited half. It is a separate element rather than more <flag>
+	// rows because the two are declared in different places and a caller may
+	// reasonably want only the command's own; merging them would make
+	// `flags count` a number that means something new, which is the kind of
+	// silent redefinition this document exists to avoid.
+	inherited := c.InheritedGlobals()
+	globals := make([]*render.Node, 0, len(inherited))
+	for _, f := range inherited {
+		globals = append(globals,
+			flagNodeAs("global-flag", f).
+				Attr("affects", string(c.GlobalEffect(f.Name))))
+	}
+	n.Child(render.ListEl("global-flags", "global-flag", globals...))
+
 	exits := make([]*render.Node, 0, len(c.ExitCodes))
 	for _, code := range c.AllExitCodes() {
 		exits = append(exits, render.El("exit-code").
@@ -275,8 +317,14 @@ func CommandDoc(c *Command) *render.Doc {
 	return render.Record(KindCommand, VersionCommand, n)
 }
 
-func flagNode(f Flag) *render.Node {
-	n := render.El("flag").
+func flagNode(f Flag) *render.Node { return flagNodeAs("flag", f) }
+
+// flagNodeAs renders a flag under a given element name, so a global and a
+// declared flag cannot describe themselves differently: one builder, two
+// element names, and the `affects` attribute the caller adds afterwards is the
+// only thing that separates them.
+func flagNodeAs(element string, f Flag) *render.Node {
+	n := render.El(element).
 		Attr("name", f.Name).
 		Attr("type", string(f.Type)).
 		Attr("required", strconv.FormatBool(f.Required)).

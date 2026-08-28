@@ -29,7 +29,7 @@ project.get	2	project.get
 project.list	2	project.list
 project.statuses	2	project.statuses
 project.versions	1	project.versions
-schema.command	1	schema
+schema.command	2	schema
 schema.commands	1	schema
 sprint.get	1	sprint.get
 sprint.list	1	sprint.list

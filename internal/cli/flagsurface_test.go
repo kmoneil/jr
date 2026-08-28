@@ -68,6 +68,7 @@ func TestEveryBoundFlagIsDeclared(t *testing.T) {
 				return
 			}
 			declared := declaredFlags(rc)
+			checkGlobalSurface(t, rc, got.stdout)
 
 			for _, name := range bound {
 				if !contains(declared, name) {
@@ -130,22 +131,115 @@ func TestTheFlagSurfaceSweepCanFail(t *testing.T) {
 	if contains(bound, helpFlag) {
 		t.Error("boundFlags kept cobra's own --help, which no command declares")
 	}
+
+	// The same question for the global half, which is the half that had no
+	// parser at all until 2026-08-28. globalFlagsIn returning nothing would
+	// report every command's inherited surface correct, which is exactly how
+	// the section it now reads went thirteen flags unchecked.
+	globals := globalFlagsIn(help + `
+Global Flags:
+      --format string    output format
+      --project string   project key, overriding the context's
+`)
+	wantGlobals := []string{"format", "project"}
+	if len(globals) != len(wantGlobals) {
+		t.Fatalf("globalFlagsIn parsed %v, want %v", globals, wantGlobals)
+	}
+	for i := range wantGlobals {
+		if globals[i] != wantGlobals[i] {
+			t.Fatalf("globalFlagsIn parsed %v, want %v", globals, wantGlobals)
+		}
+	}
+	// And the two parsers must not read each other's section, or a global
+	// would satisfy the per-command comparison and a declared flag the global
+	// one.
+	if contains(globals, "assignee") {
+		t.Error("globalFlagsIn read the command's own Flags section, so a " +
+			"declared flag would pass as an inherited global")
+	}
+	if contains(boundFlags(help), "project") {
+		t.Error("boundFlags read the Global Flags section, which is the " +
+			"exclusion this sweep was built around and the one that hid " +
+			"--project from every consumer of the registry")
+	}
+}
+
+// checkGlobalSurface holds the Global Flags section of --help to
+// registry.GlobalFlags, in both directions, the way the section above holds a
+// command's own flags to its declaration.
+//
+// This half did not exist until 2026-08-28, and its absence was written down
+// rather than overlooked: boundFlags skipped the Global Flags section, with the
+// comment "Global Flags are declared on the root rather than per command, so a
+// command's declaration is not expected to carry them." That sentence was true
+// and it was the bug. The sweep was written against the --limit incident, where
+// the missing flag was per-command, and the exclusion drawn to make that sweep
+// pass drew the boundary around thirteen flags nobody was checking — including
+// --project, which filters `issue activity`'s result set and appeared in no
+// `jr schema` output anywhere.
+//
+// A gate written from one incident inherits that incident's idea of where the
+// thing lives.
+func checkGlobalSurface(t *testing.T, rc *registry.Command, help string) {
+	t.Helper()
+
+	bound := globalFlagsIn(help)
+	var declared []string
+	for _, f := range rc.InheritedGlobals() {
+		declared = append(declared, f.Name)
+	}
+	sort.Strings(declared)
+
+	for _, name := range bound {
+		if contains(declared, name) {
+			continue
+		}
+		t.Errorf("--%s is inherited by `%s` and described nowhere.\n"+
+			"`jr schema %s` reports the flags this command has and omits this "+
+			"one, so an agent told to prefer the schema over --help — which is "+
+			"what internal/cli/skillassets tells it — cannot learn the flag "+
+			"exists.\n"+
+			"Declare it in registry.GlobalFlags.",
+			name, rc.UseLine(), rc.Name())
+	}
+	for _, name := range declared {
+		if contains(bound, name) {
+			continue
+		}
+		t.Errorf("--%s is described as an inherited global of `%s` and cobra "+
+			"does not offer it there.\n"+
+			"`jr schema %s` advertises a flag the binary will refuse as "+
+			"unknown, or route to a local flag of the same name.",
+			name, rc.UseLine(), rc.Name())
+	}
 }
 
 // boundFlags returns the long flag names in the command's own Flags section,
 // excluding cobra's --help and the persistent flags inherited from the root.
 //
-// Global Flags are declared on the root rather than per command, so a command's
-// declaration is not expected to carry them.
+// The two sections are read separately because they are declared separately:
+// a command's own flags come from Command.Flags and the inherited ones from
+// registry.GlobalFlags. checkGlobalSurface reads the other half.
 func boundFlags(help string) []string {
+	return helpFlagsIn(help, "Flags:", "Global Flags:")
+}
+
+// globalFlagsIn returns the long flag names in the Global Flags section.
+func globalFlagsIn(help string) []string {
+	return helpFlagsIn(help, "Global Flags:", "")
+}
+
+// helpFlagsIn parses one section of --help, from its header to the next
+// unindented line or to stop, whichever comes first.
+func helpFlagsIn(help, header, stop string) []string {
 	var out []string
 	var inFlags bool
 	for line := range strings.SplitSeq(help, "\n") {
 		switch {
-		case strings.HasPrefix(line, "Flags:"):
+		case strings.HasPrefix(line, header):
 			inFlags = true
 			continue
-		case strings.HasPrefix(line, "Global Flags:"):
+		case stop != "" && strings.HasPrefix(line, stop):
 			inFlags = false
 			continue
 		case line != "" && !strings.HasPrefix(line, " "):

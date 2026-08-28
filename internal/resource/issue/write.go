@@ -81,8 +81,9 @@ func dryRunFlag() registry.Flag {
 
 func createCommand() *registry.Command {
 	return &registry.Command{
-		Path:    []string{"issue", "create"},
-		Summary: "Create an issue",
+		Path:     []string{"issue", "create"},
+		ScopedBy: []string{registry.GlobalProject},
+		Summary:  "Create an issue",
 		Description: strings.TrimSpace(`
 Creates one issue in the resolved project.
 

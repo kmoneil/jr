@@ -560,6 +560,43 @@ as long as an issue carries it. Where the check cannot be made at all, whether
 the route is absent, the site reports no labels, or the request failed, nothing
 is said rather than something guessed.
 
+## Scope, and what a global flag reaches
+
+Thirteen flags are declared on the root and inherited by every command, and
+they are not all the same kind of thing. `--format` decides how an answer is
+printed. `--project` decides what the answer **is**, on the commands that read
+it, and nothing in the result says so.
+
+`jr schema <command>` reports them in a `<global-flags>` block, and each one
+carries an `affects` attribute for **that command**:
+
+```xml
+<global-flag name="project" type="string" required="false" repeatable="false" affects="result">
+  <usage>project key, overriding the context's</usage>
+</global-flag>
+<global-flag name="format" type="enum" required="false" repeatable="false" affects="invocation">
+  ...
+</global-flag>
+```
+
+| `affects` | Means |
+| --- | --- |
+| `result` | The flag narrows what this command's result set is, and nothing in the result document says it was in effect. |
+| `provenance` | The flag decides which Jira answers. The envelope's `site` attribute reports which one did, so it is never silent. |
+| `invocation` | The flag changes how the command runs or how its answer is printed, not what the answer is. |
+
+It is per command-and-flag, not per flag: `--project` is `result` on
+`issue list` and `invocation` on `auth token`, which does not read it.
+
+**A global a command shadows is not listed.** `meta createmeta` declares a
+`--project` of its own, so cobra routes the value there and omits the global
+from `--help`; `<global-flags>` omits it for the same reason, and the flag
+appears among the command's own `<flags>` where it belongs.
+
+`affects="result"` is what an agent should branch on when it needs to know
+whether its result set was computed over the whole site. Today the only two
+flags that ever carry it are `--project` and `--board`.
+
 ## Documents and mixed content
 
 Long text is emitted as a child element, never an attribute, and never escaped
@@ -1025,6 +1062,17 @@ It is always present, never omitted when false.
 
 `detail` and `remedy` are present when there is something useful to say.
 `request-id` is present for any failure that reached Jira.
+
+### Errors about scope
+
+| Code          | Exit | Meaning                                                                                                                                                                                                                                                     |
+| ------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EMPTY_SCOPE` | 2    | `--project ""` or `--board ""`. An empty scope does not lift the scope: it falls back to the context's, so the query runs against a project the caller did not name and returns a complete, empty, exit-0 result. Refused rather than silently reinterpreted. |
+
+It is raised on the **flag** and never on the environment. An empty
+`JIRA_PROJECT` is a shell that has the variable exported and unset, which is a
+configuration rather than a request; refusing it would make an environment
+variable a landmine, which is the reasoning `--format` already follows.
 
 ### Resolution failures
 

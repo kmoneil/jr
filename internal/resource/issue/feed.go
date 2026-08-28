@@ -93,8 +93,9 @@ func sortFeed(rows []FeedChange) {
 
 func changesCommand() *registry.Command {
 	return &registry.Command{
-		Path:    []string{"issue", "changes"},
-		Summary: "Report what changed since the last poll, and where to resume",
+		Path:     []string{"issue", "changes"},
+		ScopedBy: []string{registry.GlobalProject},
+		Summary:  "Report what changed since the last poll, and where to resume",
 		Description: strings.TrimSpace(`
 An incremental feed of recorded changes: every field that moved on every issue in
 scope, oldest first, with a cursor to poll again from.

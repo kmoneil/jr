@@ -217,8 +217,9 @@ func ListColumns() []render.Column {
 
 func listCommand() *registry.Command {
 	return &registry.Command{
-		Path:    []string{"sprint", "list"},
-		Summary: "List a board's sprints",
+		Path:     []string{"sprint", "list"},
+		ScopedBy: []string{registry.GlobalBoard},
+		Summary:  "List a board's sprints",
 		Description: strings.TrimSpace(`
 Returns the sprints on a board, ordered by id.
 

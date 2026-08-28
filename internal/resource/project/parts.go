@@ -63,8 +63,9 @@ type NamedStatus struct {
 
 func componentsCommand() *registry.Command {
 	return &registry.Command{
-		Path:    []string{"project", "components"},
-		Summary: "List a project's components",
+		Path:     []string{"project", "components"},
+		ScopedBy: []string{registry.GlobalProject},
+		Summary:  "List a project's components",
 		Description: strings.TrimSpace(`
 Returns the components of a project, ordered by name.
 
@@ -173,8 +174,9 @@ func runComponents(
 
 func versionsCommand() *registry.Command {
 	return &registry.Command{
-		Path:    []string{"project", "versions"},
-		Summary: "List a project's versions",
+		Path:     []string{"project", "versions"},
+		ScopedBy: []string{registry.GlobalProject},
+		Summary:  "List a project's versions",
 		Description: strings.TrimSpace(`
 Returns the release versions of a project, newest first.
 
@@ -292,8 +294,9 @@ func runVersions(
 
 func statusesCommand() *registry.Command {
 	return &registry.Command{
-		Path:    []string{"project", "statuses"},
-		Summary: "List the statuses each issue type can be in",
+		Path:     []string{"project", "statuses"},
+		ScopedBy: []string{registry.GlobalProject},
+		Summary:  "List the statuses each issue type can be in",
 		Description: strings.TrimSpace(`
 Returns, for every issue type in a project, the statuses its workflow allows.
 
