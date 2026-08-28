@@ -183,7 +183,11 @@ func buildForPrompt(t *testing.T) string {
 	t.Helper()
 
 	bin := filepath.Join(t.TempDir(), "jr")
-	build := exec.Command("go", "build", "-tags", "prompt", "-o", bin, "../../cmd/jr")
+	// -buildvcs=false for the reason internal/lint/goldens_test.go gives at
+	// length: `go build` shells out to git to stamp a revision, a concurrent
+	// run loses that race, and nothing here reads the stamp.
+	build := exec.Command("go", "build",
+		"-buildvcs=false", "-tags", "prompt", "-o", bin, "../../cmd/jr")
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
 	}
