@@ -297,6 +297,19 @@ do not catch, add the test in the same change and cite it here.
   **Enforced by:** `TestAnOutOfScopeJQLSaysSo`,
   `TestTheScopeWarningStaysQuietOnQueriesThatAreFine`,
   `TestProjectsSelectedIsNotAFieldScan`.
+- **`issue history --changed-field` matches the changelog's own names, and says
+  so when it matches nothing.** It compares against the field name and id the
+  changelog carries, never through the site's field catalogue: Jira 9.12 Data
+  Center sends no field id in a changelog at all, so resolving a friendly name
+  to a `customfield_` id would match nothing on that deployment. A filter that
+  removed every row on an issue that has changes warns and names what the issue
+  does hold, because a mistyped field and a field nobody touched otherwise
+  produce the same zero rows at exit 0. Filtering never changes completeness:
+  that is computed from the saves the server sent, not from the rows written.
+  **Enforced by:** `TestHistoryFiltersByChangedField`,
+  `TestHistoryFilterMatchesTheChangelogsOwnNames`,
+  `TestAnUnmatchedChangedFieldSaysWhatTheIssueHolds`,
+  `TestAMatchedChangedFieldIsSilent`.
 - **An empty scope is refused, not reinterpreted.** `--project ""` falls back to
   the context's project rather than lifting the scope, so accepting it means
   running a query against a project the caller did not name and returning a

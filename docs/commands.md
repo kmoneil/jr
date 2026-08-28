@@ -1863,6 +1863,23 @@ instead, so there the entire changelog arrives in one request or not at all. A
 Data Center history longer than that one response can carry is reported
 incomplete rather than silently cut.
 
+--changed-field narrows the rows to the fields you name, and it is the flag to
+reach for before reading this output at all. A description edit puts a whole
+description on each side of one row, twice for a revision, and an issue with a
+few of those costs more to read than every other question about it put
+together. --changed-field status is "did anybody move this, and when".
+
+It matches what the changelog records: the field's display name, and its id
+where the server sends one. It does not resolve names through the site's field
+catalogue, because Jira 9.12 Data Center sends no field id in a changelog at
+all, so resolving a name to an id would match nothing there. It is applied
+here rather than by the server — neither deployment's changelog route filters
+by field — so it saves output and context, not requests.
+
+A --changed-field that matches nothing, on an issue that has changes, warns
+and names the fields the issue does hold. Asking about a field nobody touched
+is a legal question, so it still exits 0.
+
 Comment authorship is not recorded here. Jira writes a field transition to the
 changelog and a comment is not a field transition, so "what did this person do
 to this issue" needs this and `issue comment list` both.
@@ -1871,6 +1888,7 @@ Examples:
 
 ```console
 jr issue history ENG-101
+jr issue history ENG-101 --changed-field status
 jr issue history ENG-101 --format json --limit all
 ```
 
@@ -1880,6 +1898,7 @@ jr issue history ENG-101 --format json --limit all
 
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
+| `--changed-field` | `string` | — | only changes to this field, by the name the changelog records or by its id; repeat for several; matched here rather than by the server, so it saves output and not requests (repeatable) |
 | `--page-size` | `int` | — | results per HTTP request, 1 to 100; transport tuning only, and Cloud only — Data Center serves the whole changelog in one response and has nothing to page |
 | `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
 
