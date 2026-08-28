@@ -165,7 +165,21 @@ troubleshooting that used to say an exit-0 empty result "is an honest 'nothing
 matched'" now says to check the scope first, because that sentence was the one
 that would have told this reviewer their short answer was fine.
 
-## [0.9.3] - 2026-08-21
+## 0.9.3 - 2026-08-21 (withdrawn)
+
+**This release was deleted on 2026-08-28 and its tag no longer exists.** It is
+unlinked for that reason: there is nothing to link to. The section is kept
+because a changelog records what happened, and 0.9.3 happened. Every change
+below shipped, and all of it is in 0.10.0.
+
+Nothing was wrong with the code. The tag pointed into a stretch of history that
+was rewritten to strip a tool-attribution trailer from fifteen commit messages,
+and a tag left pointing at the pre-rewrite commits was the last thing holding
+them. No binary from it had ever been downloaded, which is what made deleting
+it cheap enough to prefer over keeping it.
+
+If you pinned 0.9.3, move to 0.10.0. If you already fetched it, your clone
+still has the tag and the old commits under it; nothing here removes those.
 
 **Any field on an issue can now be written.** `issue create` and `issue edit`
 took a fixed set of fields and had no escape hatch, so every custom field on a
@@ -1593,7 +1607,6 @@ recent enough to be worth reading.
 
 [unreleased]: https://github.com/kmoneil/jr/compare/v0.10.0...main
 [0.10.0]: https://github.com/kmoneil/jr/releases/tag/v0.10.0
-[0.9.3]: https://github.com/kmoneil/jr/releases/tag/v0.9.3
 [0.9.2]: https://github.com/kmoneil/jr/releases/tag/v0.9.2
 [0.9.1]: https://github.com/kmoneil/jr/releases/tag/v0.9.1
 [0.9.0]: https://github.com/kmoneil/jr/releases/tag/v0.9.0
