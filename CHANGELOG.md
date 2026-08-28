@@ -20,6 +20,151 @@ accident.
 
 Nothing yet.
 
+## [0.10.0] - 2026-08-28
+
+**`jr` now says what its answers were computed over.** An agent used 0.9.3 for
+one ordinary read-only task against a Data Center site and summed the tool up in
+a sentence: the refusals are excellent, the silences are dangerous, and on an
+ordinary day it hit three silences for every refusal. Every change here is one
+of those silences.
+
+The one that cost it most: a query is combined with the context's project, so a
+`--jql` naming issues in another project returns a complete, exit-0 result that
+is missing them. Its 195-row pull was internally consistent and 23% short of the
+answer, and nothing in the document said which project it was about.
+
+Minor rather than patch on one count, and it is small: `--project ""` used to be
+accepted and is now refused. Everything else is additive. If you parse output,
+read **Output contract** below.
+
+### Added
+
+- **`<global-flags>` in `jr schema <command>`.** Thirteen flags are declared on
+  the root and inherited by every command, and until now they appeared in
+  `--help` and in no `jr schema` output anywhere. `jr schema issue.activity`
+  reported seven flags and the binary took eight; the eighth was `--project`,
+  which filters that command's results.
+
+  Each entry carries an `affects` attribute **for that command**:
+
+  | `affects` | Means |
+  | --- | --- |
+  | `result` | narrows what this command's rows are, and nothing in the result says so |
+  | `provenance` | decides which Jira answers; the envelope's `site` reports which one did |
+  | `invocation` | changes how it runs or prints, not what the answer is |
+
+  It is per command-and-flag, not per flag: `--project` is `result` on
+  `issue list` and `invocation` on `auth token`. `affects="result"` is the one
+  to read before trusting a count, and today only `--project` and `--board` ever
+  carry it.
+
+- **`project` and `board` on the result envelope**, beside `site`:
+
+      <result kind="issue.list" v="7" site="https://jira.example" project="ENG">
+
+  They report the scope the command **read**, not the scope the context holds,
+  so `--all-projects` emits neither and a document that named a project there
+  would be describing a frame its rows did not come from. Absent means no scope
+  was applied. TSV has no envelope and so carries neither, exactly as it carries
+  no `site`.
+
+- **`--changed-field` on `issue history`**, repeatable. A changelog carries
+  every description edit as a full before-and-after body on one row, so one call
+  could cost more to read than every other question about an issue put together.
+
+      jr issue history ENG-101 --changed-field status
+
+  It matches the name the changelog records, or the field's id where the server
+  sends one, and deliberately does not resolve through the site's field
+  catalogue: Jira 9.12 Data Center sends no field id in a changelog at all, so
+  resolving a name to a `customfield_` id would match nothing there. It filters
+  in this process, so it saves output and context rather than requests, and it
+  cannot change whether a result is complete.
+
+### Changed
+
+- **`--project ""` and `--board ""` are refused** with `EMPTY_SCOPE` at exit 2.
+  An empty scope never lifted the scope: it fell back to the context's, so the
+  query ran against a project nobody named and returned a complete, empty,
+  exit-0 result. It is the flag that is refused and never the environment — an
+  exported-but-empty `JIRA_PROJECT` is a shell's configuration rather than a
+  request. `context create` and `context edit` are unaffected: their `--project`
+  is their own flag clearing a stored setting, and `--unset project` is still
+  how you clear one.
+
+  **This is the only reason this release takes the minor position.**
+
+- **`jr schema` describes the global flags it inherits**, so `flags count` is no
+  longer a count of some of them. A global a command shadows with a flag of its
+  own is omitted, matching what `--help` already did.
+
+- **`docs/commands.md` generates its global-flag table** instead of listing them
+  in a hand-written sentence, which had twelve of the thirteen: `--ca-bundle`
+  had been added to the root and never to the prose.
+
+- **The shipped skill's one hand-written exception is gone.** It claimed
+  `--limit` is unlisted on paginated commands, which was measurably false on all
+  four. In its place is the caveat that is now true: a scoped query is complete
+  within a frame the result document names.
+
+### Fixed
+
+- **An out-of-scope `--jql` is no longer silent.** `SCOPE_MISMATCH` on stderr,
+  exit 0, rows unchanged:
+
+      jr issue list --jql 'key = OPS-208'      # context project is ENG
+
+  It reads the fragment as tokens, so a project key inside a string value is a
+  value, and fires only on positive selection — `project != OPS` says nothing.
+  Measured over the 22 distinct `--jql` fragments in this repository's docs and
+  examples: exactly one warns, and it genuinely cannot match.
+
+- **A mistyped `--changed-field` says what the issue does hold.**
+  `UNKNOWN_CHANGED_FIELD` on stderr at exit 0, listing the fields that did
+  change, because a mistyped field and a field nobody touched otherwise produce
+  the same zero rows.
+
+- **`internal/lint` no longer fails intermittently against a clean tree.** Six
+  tests build or list the binary and `go test` runs them in parallel; each build
+  of a main package shells out to git to stamp a revision, and that call
+  intermittently failed at roughly two runs in five. Nothing user-visible, and
+  it is here because it made the suite untrustworthy for as long as it went
+  unnamed — the failure message was `exit status 1` and a blank line, because
+  the helper read a field only `Output` populates and it was calling `Run`.
+
+### Output contract
+
+One kind moved, plus three new `code` strings and two new envelope attributes.
+No default column set changed, no exit code means anything different, and no
+kind was removed or renamed.
+
+- **`schema.command` v1 → v2.** New `<global-flags>` element on every command
+  record, listing the globals that command inherits, each with an `affects`
+  attribute. It is always present rather than optional: a caller reading it to
+  find out what can narrow their results has to be able to tell "nothing does"
+  from "this build does not say". `schema.commands`, the list form, is
+  unchanged.
+
+- **`project` and `board` on `<result>`**, optional, beside `site`. **No kind's
+  schema version moves for them.** The envelope is written outside every
+  registered kind shape — `jr contract` describes payloads — which `make golden`
+  confirms by not moving a byte of `testdata/kinds`.
+
+- **One new error `code`: `EMPTY_SCOPE`**, exit 2, on `--project ""` and
+  `--board ""`. This is the breaking change: an input that was accepted is now
+  refused, which the stability policy puts in the minor position.
+
+- **Two new warning `code` strings: `SCOPE_MISMATCH` and
+  `UNKNOWN_CHANGED_FIELD`.** Both are stderr documents at exit 0 and neither
+  bumps a kind version. A warning is a separate document, so no existing
+  consumer is reading for one it has never seen.
+
+Both are listed in [output-contract.md](docs/output-contract.md) and in
+[troubleshooting.md](docs/troubleshooting.md), and the section of
+troubleshooting that used to say an exit-0 empty result "is an honest 'nothing
+matched'" now says to check the scope first, because that sentence was the one
+that would have told this reviewer their short answer was fine.
+
 ## [0.9.3] - 2026-08-21
 
 **Any field on an issue can now be written.** `issue create` and `issue edit`
@@ -1446,7 +1591,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.9.3...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.10.0...main
+[0.10.0]: https://github.com/kmoneil/jr/releases/tag/v0.10.0
 [0.9.3]: https://github.com/kmoneil/jr/releases/tag/v0.9.3
 [0.9.2]: https://github.com/kmoneil/jr/releases/tag/v0.9.2
 [0.9.1]: https://github.com/kmoneil/jr/releases/tag/v0.9.1
