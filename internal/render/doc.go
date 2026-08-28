@@ -30,6 +30,28 @@ type Doc struct {
 	// becomes a stderr warning plus exit 3 in that format.
 	Site string
 
+	// Project and Board are the context scope this answer was computed over,
+	// and they are the second half of the provenance Site began.
+	//
+	// Site says which Jira answered. These say which slice of it, which is the
+	// question a caller could not ask the output at all: a bounded result is
+	// reported incomplete, and a *scoped* one is reported complete, because it
+	// is complete — within a frame the document never named. An agent pulled
+	// 195 rows of a 252-row answer with complete="true" and exit 0, because the
+	// context's project was set and nothing said so.
+	//
+	// Empty when the command did not consult the context, which is not the same
+	// as "the context has no project": `issue list --all-projects` asks for no
+	// scope and gets none, and reporting the configured project there would
+	// describe a frame the rows did not come from. They are set from what the
+	// command actually read, through registry.ScopeWatcher, rather than from a
+	// second look at the context.
+	//
+	// **TSV carries no envelope and so carries neither**, exactly as it carries
+	// no site.
+	Project string
+	Board   string
+
 	// Exactly one of Collection and Record is set.
 	Collection *Collection
 	Record     *Node

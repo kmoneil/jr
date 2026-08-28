@@ -270,9 +270,15 @@ func (s *Server) invocation(
 	}
 
 	if cmd.NeedsJira {
-		if inv.Jira, err = s.session(); err != nil {
+		jira, err := s.session()
+		if err != nil {
 			return nil, "", err
 		}
+		// Wrapped so the envelope reports the scope this call asked for. A
+		// model is the caller least able to notice it was handed a narrowed
+		// answer: it did not choose the context, cannot see the shell, and gets
+		// no stderr, which is where every other hint would be.
+		inv.Jira = registry.WatchScope(jira)
 	}
 
 	// Read-only and confirmation, from the declaration, in the same place and

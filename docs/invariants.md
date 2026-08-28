@@ -278,6 +278,16 @@ do not catch, add the test in the same change and cite it here.
   from which files mention `inv.Jira.Project()`: a helper shared by four
   commands is one call site and four different answers.
   **Enforced by:** `TestScopedByMatchesWhatTheCommandReads`, `TestTheScopeSweepCanFail`.
+- **The envelope names the scope the answer was computed over, and it is the
+  scope the command read.** `complete="true"` says no bound cut the result
+  short; it has never said "this is the answer", and until the `project` and
+  `board` attributes existed there was no field in which the difference could be
+  stated. They report what the command asked the session for, through
+  `registry.ScopeWatcher`, rather than a second read of the context: a second
+  read answers for `--all-projects`, which consults the context for nothing and
+  would be stamped with a scope its rows did not come from.
+  **Enforced by:** `TestTheEnvelopeNamesTheScopeTheAnswerWasComputedOver`,
+  `TestTheScopeAttributeMatchesTheQueryThatWasSent`.
 - **An empty scope is refused, not reinterpreted.** `--project ""` falls back to
   the context's project rather than lifting the scope, so accepting it means
   running a query against a project the caller did not name and returning a

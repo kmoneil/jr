@@ -322,6 +322,7 @@ func (a *app) runDocument(
 			rc.Name(), doc.Kind, doc.Version)
 	}
 	doc.Site = siteOf(inv)
+	doc.Project, doc.Board = scopeOf(inv)
 	return a.emit(doc)
 }
 
@@ -337,6 +338,29 @@ func siteOf(inv *registry.Invocation) string {
 		return ""
 	}
 	return inv.Jira.Site()
+}
+
+// scopeOf names the context scope the command asked for, for the envelope.
+//
+// It reports what was *read*, not what is configured, which is why it goes
+// through the watcher rather than calling Project() here. Calling it here would
+// answer for every command that has a session, including `issue list
+// --all-projects`, whose rows came from every project on the site and whose
+// envelope would then name one.
+//
+// A session that is not a watcher reports nothing rather than guessing. That
+// is not a hole: newInvocation wraps every session it builds, and a caller that
+// assembles its own — a test, a future embedder — gets an envelope with no
+// scope rather than a wrong one.
+func scopeOf(inv *registry.Invocation) (project, board string) {
+	if inv == nil {
+		return "", ""
+	}
+	w, ok := inv.Jira.(*registry.ScopeWatcher)
+	if !ok {
+		return "", ""
+	}
+	return w.Scope()
 }
 
 // newInvocation assembles everything a command is handed before it runs.
@@ -364,7 +388,11 @@ func (a *app) newInvocation(
 		if err != nil {
 			return nil, err
 		}
-		inv.Jira = jira
+		// Wrapped so the envelope can report the scope this command asked for
+		// rather than the scope the context happens to hold. The two differ on
+		// exactly the invocation that matters: --all-projects reads no project
+		// and must report none.
+		inv.Jira = registry.WatchScope(jira)
 	}
 	if rc.Paginated {
 		limit, err := registry.ParseLimit(cmd.Flags().Lookup("limit").Value.String())

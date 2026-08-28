@@ -67,11 +67,22 @@ reaches **on that command**:
 | `invocation` | It changes how the command runs or prints, not what the answer is. |
 
 `affects="result"` is the one to check. A scoped query is complete within a
-frame the result document does not name: `jr issue list --jql 'key = OPS-1'`
+frame `complete="true"` says nothing about: `jr issue list --jql 'key = OPS-1'`
 against a context whose project is `ENG` returns zero rows, `complete="true"`,
-and exit 0, which is the same answer as "nothing matched". `--all-projects`
-lifts the scope where the command has it, and `jr context show` says what the
-scope currently is.
+and exit 0, which is the same answer as "nothing matched".
+
+**The envelope names the frame.** Every structured format carries the scope the
+answer was actually computed over, beside the site:
+
+```xml
+<result kind="issue.list" v="7" site="https://jira.example" project="ENG">
+```
+
+Absent means the command asked for no scope, which is what `--all-projects`
+produces and what a command like `version` always produces. **TSV has no
+envelope**, so a pipeline that needs to know its scope asks for `--format json`,
+exactly as it does for `site`. `--all-projects` lifts the scope where the
+command has it, and `jr context show` says what the scope currently is.
 
 An empty value does not lift it. `--project ""` is refused as `EMPTY_SCOPE`,
 because it used to fall back to the context and produce exactly the empty

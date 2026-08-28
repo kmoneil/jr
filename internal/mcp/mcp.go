@@ -415,6 +415,7 @@ func (s *Server) run(
 		return "", err
 	}
 	doc.Site = siteOf(inv)
+	doc.Project, doc.Board = scopeOf(inv)
 	if err := render.Write(&out, doc, format); err != nil {
 		return "", err
 	}
@@ -433,6 +434,22 @@ func siteOf(inv *registry.Invocation) string {
 	return inv.Jira.Site()
 }
 
+// scopeOf names the context scope a tool call asked for, for the envelope.
+//
+// It matters more here than on the command line. A caller with a shell can run
+// `jr context show`; a model gets the document and nothing else, and a scoped
+// answer is complete, exit-0, and indistinguishable from an unscoped one.
+func scopeOf(inv *registry.Invocation) (project, board string) {
+	if inv == nil {
+		return "", ""
+	}
+	w, ok := inv.Jira.(*registry.ScopeWatcher)
+	if !ok {
+		return "", ""
+	}
+	return w.Scope()
+}
+
 // streamInto runs a collection command and writes its rows, plus the truncation
 // warning if it was cut short.
 func streamInto(ctx context.Context, out *strings.Builder, cmd *registry.Command,
@@ -444,6 +461,7 @@ func streamInto(ctx context.Context, out *strings.Builder, cmd *registry.Command
 		Name:    cmd.CollectionName,
 		Columns: columnsFor(cmd, inv),
 		Site:    siteOf(inv),
+		Scope:   func() (string, string) { return scopeOf(inv) },
 	})
 	if err != nil {
 		return err
