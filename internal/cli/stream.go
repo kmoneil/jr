@@ -125,6 +125,7 @@ func streamSpec(rc *registry.Command, inv *registry.Invocation) render.StreamSpe
 		Name:    rc.CollectionName,
 		Columns: columns,
 		Site:    siteOf(inv),
+		Scope:   func() (string, string) { return scopeOf(inv) },
 	}
 }
 

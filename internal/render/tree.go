@@ -78,6 +78,12 @@ func docValue(d *Doc) map[string]any {
 	if d.Site != "" {
 		out["site"] = d.Site
 	}
+	if d.Project != "" {
+		out["project"] = d.Project
+	}
+	if d.Board != "" {
+		out["board"] = d.Board
+	}
 	if d.Record != nil {
 		out[d.Record.Name] = nodeValue(d.Record)
 		return out

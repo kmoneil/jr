@@ -16,6 +16,13 @@ type StreamSpec struct {
 	// Name is the container element, e.g. "issues".
 	Name    string
 	Columns []Column
+	// Scope reports the context scope the command asked for, for the envelope.
+	//
+	// It is a function rather than a value because a spec is built before the
+	// command runs and the scope is something the command *reads*: asking at
+	// Close is the only point at which the answer exists. Nil is fine and means
+	// "no scope to report", which is what every non-scoped command has.
+	Scope func() (project, board string)
 }
 
 // Stream emits a collection, writing rows as they arrive where the format
@@ -281,6 +288,15 @@ func (s *Stream) Close(complete bool, nextPageToken string) error {
 			Columns:        s.spec.Columns,
 		})
 		doc.Site = s.spec.Site
+		// Resolved now rather than when the spec was built. The spec is
+		// assembled before the command runs and the scope is something the
+		// command *reads*, so asking at Close is the only point where the
+		// answer exists. Nothing streams here — s.streaming is false in this
+		// branch, and TSV, the one format that streams, has no envelope to put
+		// this in — so there is no header already on stdout to contradict.
+		if s.spec.Scope != nil {
+			doc.Project, doc.Board = s.spec.Scope()
+		}
 		return Write(s.w, doc, s.format)
 	}
 
