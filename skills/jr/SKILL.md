@@ -157,6 +157,12 @@ Feeding results to a model is the common case and format choice dominates it.
   running for an hour.
 - Ask for the columns you need. Fetching fields you will not read costs tokens on
   the way out and requests on the way in.
+- **`issue history` without `--changed-field` is the most expensive read in the
+  tool.** A changelog carries every description edit as a full before-and-after
+  body on one row. `--changed-field status` is "who moved this, and when", and
+  it is usually the whole question. Repeat it for several fields. A field the
+  issue never changed warns and names the ones it did, so a typo does not cost
+  a second call.
 
 ## Writing
 
