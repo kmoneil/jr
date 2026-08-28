@@ -156,8 +156,9 @@ func ListColumns() []render.Column {
 
 func listCommand() *registry.Command {
 	return &registry.Command{
-		Path:    []string{"board", "list"},
-		Summary: "List the boards this credential can see",
+		Path:     []string{"board", "list"},
+		ScopedBy: []string{registry.GlobalProject},
+		Summary:  "List the boards this credential can see",
 		Description: strings.TrimSpace(`
 Returns the boards visible to the credential, ordered by id.
 
@@ -379,8 +380,9 @@ func listProject(inv *registry.Invocation) string {
 
 func getCommand() *registry.Command {
 	return &registry.Command{
-		Path:    []string{"board", "get"},
-		Summary: "Fetch one board",
+		Path:     []string{"board", "get"},
+		ScopedBy: []string{registry.GlobalBoard},
+		Summary:  "Fetch one board",
 		Description: strings.TrimSpace(`
 Returns a single board by id.
 

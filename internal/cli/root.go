@@ -3,16 +3,18 @@ package cli
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/kmoneil/jr/internal/buildinfo"
 	"github.com/kmoneil/jr/internal/errs"
 	"github.com/kmoneil/jr/internal/nearest"
 	"github.com/kmoneil/jr/internal/registry"
 	"github.com/kmoneil/jr/internal/render"
-	"github.com/kmoneil/jr/internal/transport"
 )
 
 // groupSummaries describes the intermediate nouns in the command tree. A noun
@@ -72,31 +74,29 @@ and go to stderr.`),
 	// line on stderr.
 	root.SetFlagErrorFunc(a.flagError)
 
-	root.PersistentFlags().StringVar(&a.requestedFormat, "format", "", formatUsage())
-	root.PersistentFlags().BoolVar(&a.describe, "describe", false,
-		"print this command's schema instead of running it")
-	root.PersistentFlags().StringVar(&a.contextName, "context", "",
-		"use this context for one invocation, without selecting it")
-	root.PersistentFlags().StringVar(&a.site, "site", "",
-		"Jira site, overriding the context's")
-	root.PersistentFlags().StringVar(&a.project, "project", "",
-		"project key, overriding the context's")
-	root.PersistentFlags().StringVar(&a.board, "board", "",
-		"board id, overriding the context's")
-	root.PersistentFlags().StringVar(&a.apiVersion, "api-version", "",
-		"force the REST version, 2 or 3, and skip the deployment probe")
-	root.PersistentFlags().StringVar(&a.caBundle, "ca-bundle", "",
-		"PEM file of certificates to trust in addition to the system roots")
-	root.PersistentFlags().BoolVar(&a.readOnly, "readonly", false,
-		"refuse any command that would change Jira")
-	root.PersistentFlags().BoolVar(&a.debug, "debug", false,
-		"trace HTTP requests to stderr; credentials are redacted in the transport")
-	root.PersistentFlags().BoolVar(&a.refresh, "refresh", false,
-		"ignore cached site metadata and probe again")
-	root.PersistentFlags().IntVar(&a.retries, "retries", transport.DefaultRetries,
-		"retry budget per request; exhausting it exits 8 or 9, never 0")
-	root.PersistentFlags().IntVar(&a.maxRequests, "max-requests", 0,
-		"cap total HTTP calls for this invocation; 0 means no cap")
+	// Every persistent flag is bound from registry.GlobalFlags, which is the
+	// only place its name, usage and default are written down. They used to be
+	// declared here, straight onto cobra, and that was the second declaration
+	// CLAUDE.md says does not exist: `jr schema`, docs/commands.md and the MCP
+	// tool list all read the registry, so thirteen flags were bound and
+	// accepted and described nowhere.
+	//
+	// The variables stay local. What moved is the description, not the storage.
+	bind := globalBinder{flags: root.PersistentFlags()}
+	bind.str(&a.requestedFormat, registry.GlobalFormat)
+	bind.boolean(&a.describe, registry.GlobalDescribe)
+	bind.str(&a.contextName, registry.GlobalContext)
+	bind.str(&a.site, registry.GlobalSite)
+	bind.str(&a.project, registry.GlobalProject)
+	bind.str(&a.board, registry.GlobalBoard)
+	bind.str(&a.apiVersion, registry.GlobalAPIVersion)
+	bind.str(&a.caBundle, registry.GlobalCABundle)
+	bind.boolean(&a.readOnly, registry.GlobalReadOnly)
+	bind.boolean(&a.debug, registry.GlobalDebug)
+	bind.boolean(&a.refresh, registry.GlobalRefresh)
+	bind.number(&a.retries, registry.GlobalRetries)
+	bind.number(&a.maxRequests, registry.GlobalMaxRequests)
+	bind.mustHaveBoundEveryGlobal()
 	root.Flags().BoolVar(&a.contract, "contract", false,
 		"dump the machine-readable output contract for every kind")
 
@@ -119,7 +119,7 @@ and go to stderr.`),
 				return err
 			}
 		}
-		return nil
+		return a.refuseEmptyScopes(cmd.Root().PersistentFlags())
 	}
 
 	a.attach(root)
@@ -412,24 +412,96 @@ func describeArity(minArgs, maxArgs int) string {
 // `render` tag neither lists markdown nor mentions it — advertising a format
 // that would be refused is the drift the whole self-describing surface exists
 // to prevent.
-func formatUsage() string {
-	names := render.FormatNames()
-	usage := fmt.Sprintf("output format: %s (default: tsv for lists, xml for records",
-		strings.Join(names, "|"))
-	if name, ok := presentationalName(); ok {
-		usage += "; " + name + " is for reading and is not a versioned contract"
+// refuseEmptyScopes refuses `--project ""` and `--board ""`.
+//
+// An empty scope does not unscope. It falls back to the context, deliberately —
+// see the comment on listQuery in internal/resource/issue — so somebody
+// reaching for it as an escape hatch gets the context's project, a query that
+// cannot match what they named, and a complete empty exit-0 result. That is
+// the tool's own silence, manufactured out of a flag value nobody means.
+//
+// It is checked on the flag rather than on the resolved settings, because an
+// empty JIRA_PROJECT is a shell that has the variable exported and unset, which
+// is a configuration and not a request. Refusing that would make an environment
+// variable a landmine, which is the reasoning --format already follows above.
+//
+// And it reads the root's persistent set rather than the command's merged one,
+// because `context create --project ENG` sets that command's *own* --project
+// and leaves the global untouched. Reading cmd.Flags() saw Changed on the local
+// flag and an empty value on the global, and refused every context create in
+// the suite.
+func (a *app) refuseEmptyScopes(persistent *pflag.FlagSet) error {
+	for _, scope := range []struct {
+		name  string
+		value string
+	}{
+		{registry.GlobalProject, a.project},
+		{registry.GlobalBoard, a.board},
+	} {
+		if !persistent.Changed(scope.name) || scope.value != "" {
+			continue
+		}
+		return errs.Usage("EMPTY_SCOPE",
+			"--%s was given an empty value", scope.name).
+			WithDetail("an empty --%s does not lift the scope; it falls back "+
+				"to the context's, and the query runs against that", scope.name).
+			WithRemedy("drop the flag to use the context's %s, or pass "+
+				"--all-projects where the command has it", scope.name)
 	}
-	return usage + "). " + EnvFormat + " sets it for every command"
+	return nil
 }
 
-// presentationalName is the presentation format this build has, if any.
-func presentationalName() (string, bool) {
-	for _, f := range render.Formats() {
-		if render.Presentational(f) {
-			return string(f), true
+// globalBinder binds a persistent flag from its registry declaration, so the
+// name, the usage string and the default have exactly one source.
+//
+// It panics on a name the registry does not declare, and
+// mustHaveBoundEveryGlobal panics on a declared global nothing bound. Both are
+// programmer errors in this file and neither is reachable from a caller, which
+// is why they are panics rather than errors: a binary that got either wrong
+// must not start and describe itself wrongly.
+type globalBinder struct {
+	flags *pflag.FlagSet
+	bound []string
+}
+
+func (b *globalBinder) declaration(name string) registry.Flag {
+	f, ok := registry.GlobalFlag(name)
+	if !ok {
+		panic("cli: no global flag named " + name)
+	}
+	b.bound = append(b.bound, name)
+	return f
+}
+
+func (b *globalBinder) str(p *string, name string) {
+	f := b.declaration(name)
+	b.flags.StringVar(p, f.Name, f.Default, f.Usage)
+}
+
+func (b *globalBinder) boolean(p *bool, name string) {
+	f := b.declaration(name)
+	b.flags.BoolVar(p, f.Name, f.Default == "true", f.Usage)
+}
+
+func (b *globalBinder) number(p *int, name string) {
+	f := b.declaration(name)
+	def, err := strconv.Atoi(f.Default)
+	if err != nil {
+		panic("cli: global flag --" + name + " has a non-numeric default " + f.Default)
+	}
+	b.flags.IntVar(p, f.Name, def, f.Usage)
+}
+
+// mustHaveBoundEveryGlobal is the direction a compiler cannot check. Adding a
+// flag to registry.GlobalFlags and forgetting to bind it here would describe a
+// flag the binary refuses as unknown, which is the same defect as the one this
+// whole change is about, pointing the other way.
+func (b *globalBinder) mustHaveBoundEveryGlobal() {
+	for _, f := range registry.GlobalFlags() {
+		if !slices.Contains(b.bound, f.Name) {
+			panic("cli: global flag --" + f.Name + " is declared and never bound")
 		}
 	}
-	return "", false
 }
 
 // subcommandNames is what this command's children are called, for ranking a

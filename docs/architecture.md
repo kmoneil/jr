@@ -144,6 +144,22 @@ flags, args, output kinds, exit codes, required tags, and the function that runs
 it. From that one declaration come the cobra tree, `jr schema`, and the MCP tool
 list. They cannot drift because there is only one of them.
 
+It also holds `registry.GlobalFlags`, the thirteen flags declared once and
+inherited by every command, and `internal/cli` binds cobra's persistent set from
+it rather than declaring them a second time. They used to be declared straight
+onto the cobra root, which meant they were bound, accepted and printed in
+`--help` and absent from every consumer of the registry: `jr schema issue
+activity` reported seven flags and the binary took eight, and the eighth was
+`--project`, which filters that command's result set.
+
+`Command.ScopedBy` is the other half. A global is inherited by every command and
+means something different on each, so a command declares which globals reach its
+*result set*; `jr schema` renders that as an `affects` attribute per inherited
+flag. It is declared rather than derived, because a command that could read the
+context scope is not one that does, and
+`TestScopedByMatchesWhatTheCommandReads` holds every declaration to what the
+command actually asks its session for.
+
 It also holds `registry.Gate`, which turns two of those declarations into
 refusals: `Destructive` needs `--yes`, and `Mutating` is refused outright in
 read-only mode, both before validation and before any network call. It lives
@@ -408,6 +424,8 @@ name to `customfield_10042` should not cost a round trip on every invocation.
 | Command reference   | `docs/commands.md` rendered from the registry and compared                                                                     | Exact under the full profile; every command present is documented under a reduced one                                                                                                                               |
 | Agent skill         | `skills/jr` rendered by `jr skill` and compared                                                                                 | Exact under the full profile; present and non-empty under a reduced one. Regenerate with `make skill`                                                                                                               |
 | Flag surface        | Each command's `--help` parsed and compared against its declaration                                                            | The bound flag names and `Command.AllFlags()` are equal in both directions, so a flag the binary accepts and the registry never mentions is not invisible to every consumer of the registry                          |
+| Global flag surface | The `Global Flags:` section of each command's `--help` compared against `registry.GlobalFlags`                                 | Equal in both directions. This half did not exist until 2026-08-28: the parser skipped that section by design, and thirteen inherited flags went unchecked because the sweep was written against a per-command one   |
+| Scope declarations  | Each command driven against a recording session, and what it asked for compared against `Command.ScopedBy`                     | Equal in both directions, so `affects="result"` in `jr schema` is what the command does rather than what somebody wrote down                                                                                        |
 | CLI surface         | Snapshot tests of `--help`, `schema`, exit codes                                                                               | Any diff is reviewed                                                                                                                                                                                                |
 | Architecture        | Import-graph assertions                                                                                                        | Every PR                                                                                                                                                                                                            |
 | Build profiles      | Matrix build of all profiles, a size assertion, and a command count per profile                                                | Every PR                                                                                                                                                                                                            |

@@ -264,8 +264,9 @@ func validateDoc(r Result) *render.Doc {
 
 func explainCommand() *registry.Command {
 	return &registry.Command{
-		Path:    []string{"jql", "explain"},
-		Summary: "Show the query this tool would send",
+		Path:     []string{"jql", "explain"},
+		ScopedBy: []string{registry.GlobalProject},
+		Summary:  "Show the query this tool would send",
 		Description: strings.TrimSpace(`
 Renders a query the way it would go out, and makes no request at all.
 

@@ -259,6 +259,30 @@ do not catch, add the test in the same change and cite it here.
   `commandNotSwept`, with its reason.
   **Enforced by:** `TestEveryFlagChangesWhatTheCommandDoes`,
   `TestTheFlagSweepAccountsForEveryFlag`.
+- **Every flag the binary accepts is described by the registry, inherited ones
+  included.** A command's own flags and the `Global Flags:` section of its
+  `--help` are both compared against the declaration, in both directions. The
+  second half was missing until 2026-08-28 and its absence was written down as a
+  design note rather than noticed as a gap: the parser skipped that section
+  because the sweep had been built against `--limit`, a per-command flag, and
+  the exclusion drawn to make that sweep pass left thirteen inherited flags
+  unchecked. `--project` was one of them, it filters `issue activity`, and it
+  appeared in no `jr schema` output anywhere.
+  **Enforced by:** `TestEveryBoundFlagIsDeclared`, `TestTheFlagSurfaceSweepCanFail`.
+- **A command's `ScopedBy` is what it actually reads.** `jr schema` reports each
+  inherited global with an `affects` attribute, and `affects="result"` comes
+  from `Command.ScopedBy`. Every command is driven against a recording session
+  and what it asks for is compared against what it declares, both ways round, so
+  a command that reads the context's project without declaring it fails and so
+  does one that declares a scope it never reads. The declaration is not derived
+  from which files mention `inv.Jira.Project()`: a helper shared by four
+  commands is one call site and four different answers.
+  **Enforced by:** `TestScopedByMatchesWhatTheCommandReads`, `TestTheScopeSweepCanFail`.
+- **An empty scope is refused, not reinterpreted.** `--project ""` falls back to
+  the context's project rather than lifting the scope, so accepting it means
+  running a query against a project the caller did not name and returning a
+  complete, empty, exit-0 result.
+  **Enforced by:** `TestAnEmptyScopeIsRefused`.
 - **A command validates its own flags in `Command.Validate`.** A streaming
   command writes its header before its body runs, so a rejection from inside the
   command arrives after bytes are on stdout.

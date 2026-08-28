@@ -165,6 +165,13 @@ so clearing needs its own spelling. --unset site is refused: a context without a
 site is not a context with one fewer setting, it is one that cannot be used, and
 ` + "`" + buildinfo.App + ` context delete` + "`" + ` is how you say that.
 
+The --project here is this command's own, not the global one, and it is the
+reason an empty value is accepted here and refused everywhere else. Elsewhere
+` + "`" + `--project ""` + "`" + ` is EMPTY_SCOPE, because an empty scope falls back to the
+context's rather than lifting it and the query runs against a project nobody
+named. Here there is no scope to fall back to: the value being cleared is the
+stored setting itself.
+
 --field replaces the whole stored set, exactly as --label does on issue edit.
 --unset field empties it. What is stored is added to whatever a read's own
 --field asks for, so editing here changes every issue read rather than

@@ -184,8 +184,9 @@ func commentsSchema() *render.Schema {
 
 func listCommand() *registry.Command {
 	return &registry.Command{
-		Path:    []string{"issue", "list"},
-		Summary: "List issues matching a query",
+		Path:     []string{"issue", "list"},
+		ScopedBy: []string{registry.GlobalProject},
+		Summary:  "List issues matching a query",
 		Description: strings.TrimSpace(`
 Builds a JQL query from the flags, or takes one whole with --jql, and returns
 the matching issues.

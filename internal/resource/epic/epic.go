@@ -149,8 +149,9 @@ var doneValues = []string{"true", "false"}
 
 func listCommand() *registry.Command {
 	return &registry.Command{
-		Path:    []string{"epic", "list"},
-		Summary: "List a board's epics",
+		Path:     []string{"epic", "list"},
+		ScopedBy: []string{registry.GlobalBoard},
+		Summary:  "List a board's epics",
 		Description: strings.TrimSpace(`
 Returns the epics on a board, ordered by id.
 

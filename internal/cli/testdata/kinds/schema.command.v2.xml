@@ -1,0 +1,159 @@
+      <element name="command">
+        <attributes count="7">
+          <attribute name="name" type="string" optional="false"/>
+          <attribute name="use" type="string" optional="false"/>
+          <attribute name="mutating" type="bool" optional="false"/>
+          <attribute name="destructive" type="bool" optional="false"/>
+          <attribute name="paginated" type="bool" optional="false"/>
+          <attribute name="kind" type="string" optional="false"/>
+          <attribute name="v" type="int" optional="false"/>
+        </attributes>
+        <elements count="9">
+          <element name="summary" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="description" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="outputs" list-of="output" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="output" optional="true" repeated="true">
+                <attributes count="3">
+                  <attribute name="kind" type="string" optional="false"/>
+                  <attribute name="v" type="int" optional="false"/>
+                  <attribute name="when" type="string" optional="true"/>
+                </attributes>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="args" list-of="arg" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="arg" optional="true" repeated="true">
+                <attributes count="3">
+                  <attribute name="name" type="string" optional="false"/>
+                  <attribute name="required" type="bool" optional="false"/>
+                  <attribute name="variadic" type="bool" optional="false"/>
+                </attributes>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="flags" list-of="flag" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="flag" optional="true" repeated="true">
+                <attributes count="6">
+                  <attribute name="name" type="string" optional="false"/>
+                  <attribute name="type" type="string" optional="false"/>
+                  <attribute name="required" type="bool" optional="false"/>
+                  <attribute name="repeatable" type="bool" optional="false"/>
+                  <attribute name="short" type="string" optional="true"/>
+                  <attribute name="default" type="string" optional="true"/>
+                </attributes>
+                <elements count="2">
+                  <element name="usage" optional="false" repeated="false">
+                    <attributes count="0"/>
+                    <text name="text" type="string" optional="false"/>
+                    <elements count="0"/>
+                  </element>
+                  <element name="values" list-of="value" optional="true" repeated="false">
+                    <attributes count="1">
+                      <attribute name="count" type="int" optional="false"/>
+                    </attributes>
+                    <elements count="1">
+                      <element name="value" optional="true" repeated="true">
+                        <attributes count="0"/>
+                        <text name="text" type="string" optional="false"/>
+                        <elements count="0"/>
+                      </element>
+                    </elements>
+                  </element>
+                </elements>
+              </element>
+            </elements>
+          </element>
+          <element name="global-flags" list-of="global-flag" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="global-flag" optional="true" repeated="true">
+                <attributes count="7">
+                  <attribute name="name" type="string" optional="false"/>
+                  <attribute name="type" type="string" optional="false"/>
+                  <attribute name="required" type="bool" optional="false"/>
+                  <attribute name="repeatable" type="bool" optional="false"/>
+                  <attribute name="short" type="string" optional="true"/>
+                  <attribute name="default" type="string" optional="true"/>
+                  <attribute name="affects" type="string" optional="false" enum="result,provenance,invocation"/>
+                </attributes>
+                <elements count="2">
+                  <element name="usage" optional="false" repeated="false">
+                    <attributes count="0"/>
+                    <text name="text" type="string" optional="false"/>
+                    <elements count="0"/>
+                  </element>
+                  <element name="values" list-of="value" optional="true" repeated="false">
+                    <attributes count="1">
+                      <attribute name="count" type="int" optional="false"/>
+                    </attributes>
+                    <elements count="1">
+                      <element name="value" optional="true" repeated="true">
+                        <attributes count="0"/>
+                        <text name="text" type="string" optional="false"/>
+                        <elements count="0"/>
+                      </element>
+                    </elements>
+                  </element>
+                </elements>
+              </element>
+            </elements>
+          </element>
+          <element name="exit-codes" list-of="exit-code" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="exit-code" optional="true" repeated="true">
+                <attributes count="2">
+                  <attribute name="code" type="int" optional="false"/>
+                  <attribute name="name" type="string" optional="false"/>
+                </attributes>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="requires-tags" list-of="tag" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="tag" optional="true" repeated="true">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+          <element name="example" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>
