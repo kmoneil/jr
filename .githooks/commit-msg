@@ -79,4 +79,52 @@ printf '%s\n' "$body" | grep -Eq '\*\*[^*/ ][^*/]*\*\*' &&
 printf '%s\n' "$body" | grep -Eq '\[[^]]+\]\([^)]+\)' &&
 	flag "a markdown link" '\[[^]]+\]\([^)]+\)' "Put the bare URL, which a terminal can follow."
 
+# No tool attribution anywhere in the message.
+#
+# A commit message says what changed and why. Which editor, assistant, or
+# harness produced it is not part of that, it is metadata about the authoring
+# session, and it outlives the session by the whole life of the repository.
+#
+# This is here because a session trailer reached ten commits on main before
+# anybody read one, and taking it back out cost a history rewrite: fifteen
+# messages rewritten, a force-push past a ruleset that had to be lifted and
+# put back, one published tag left pointing into the old history, and a hash
+# in scripts/mutation-baseline.tsv that had to be restamped because it named
+# a commit that no longer existed.
+#
+# A setting in somebody's home directory would not have stopped it. That
+# setting existed and was set to false; it governed a different trailer. This
+# runs from the repository, for every clone that installs the hooks, and does
+# not care which tool is holding the pen.
+#
+# The whole message is searched rather than the trailer block alone: an
+# attribution line is not always last, and a body that merely mentions one of
+# these URLs is a body quoting something that does not belong in history
+# either.
+whole=$(cat "$1")
+
+attrib() {
+	echo "commit-msg: $1 in the message."
+	echo
+	printf '%s\n' "$whole" | grep -nE "$2" | head -3 | sed 's/^/  /'
+	echo
+	echo "  $3"
+	echo
+	echo "  A commit message records what changed and why, not what wrote it."
+	exit 1
+}
+
+printf '%s\n' "$whole" | grep -Eiq '^[[:space:]]*Claude-Session:' &&
+	attrib "a session trailer" '^[[:space:]]*Claude-Session:' \
+		"Remove the line. Set attribution.sessionUrl to false in Claude Code settings so it stops being added."
+printf '%s\n' "$whole" | grep -Eiq 'claude\.ai/code/session' &&
+	attrib "a session URL" 'claude\.ai/code/session' \
+		"Remove it. A session link is private, expires, and means nothing to a reader of git log."
+printf '%s\n' "$whole" | grep -Eiq '^[[:space:]]*Co-Authored-By:[[:space:]]*Claude' &&
+	attrib "a tool co-author trailer" '^[[:space:]]*Co-Authored-By:[[:space:]]*Claude' \
+		"Remove the line. Set includeCoAuthoredBy to false in Claude Code settings."
+printf '%s\n' "$whole" | grep -Eiq 'Generated with \[?Claude Code' &&
+	attrib "a generator credit" 'Generated with \[?Claude Code' \
+		"Remove the line."
+
 exit 0
