@@ -43,8 +43,7 @@ func statementCoverage(t *testing.T, pkg string) float64 {
 	t.Helper()
 
 	profile := filepath.Join(t.TempDir(), "cover.out")
-	test := exec.Command("go", "test", "-coverprofile="+profile, "./"+pkg+"/")
-	test.Dir = "../.."
+	test := goCmd("../..", "test", "-coverprofile="+profile, "./"+pkg+"/")
 	if out, err := test.CombinedOutput(); err != nil {
 		t.Fatalf("go test ./%s/: %v\n%s", pkg, err, out)
 	}

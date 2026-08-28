@@ -155,11 +155,27 @@ func buildProfile(t *testing.T, dir string, p profile) string {
 	t.Helper()
 
 	out := filepath.Join(dir, "jr-"+p.name)
-	build := exec.Command("go", "build", "-tags", p.tags, "-o", out, "./cmd/jr")
+	// -buildvcs=false because this package builds the binary from several
+	// tests at once, and `go build` shells out to git to stamp the revision
+	// into it. Concurrent invocations lose that race, and the build fails
+	// with `error obtaining VCS status: exit status 128` — a red run against
+	// a tree that compiles perfectly, roughly two runs in five here.
+	//
+	// Nothing these tests ask a built binary depends on the stamp. They ask
+	// `schema`, `contract`, and `version --format <f>`, and the last one is
+	// used as "the cheapest command that emits a document" rather than for
+	// what it says. The shipped binaries are stamped by scripts/version.sh
+	// through LDFLAGS, which is a different mechanism and is unaffected.
 	// The module root, which is two up from internal/lint.
-	build.Dir = "../.."
-	if err := build.Run(); err != nil {
-		t.Fatalf("build %s (tags=%q): %v\n%s", p.name, p.tags, err, stderrOf(err))
+	build := goCmd("../..", "build", "-tags", p.tags, "-o", out, "./cmd/jr")
+	// CombinedOutput rather than Run, because (*exec.ExitError).Stderr is only
+	// populated by Output and CombinedOutput. With Run it is nil, so every
+	// build failure in this package printed `exit status 1` and a blank line,
+	// and the compiler's diagnosis — including the VCS error above — was
+	// captured by the runner and thrown away. Two investigations went into
+	// rediscovering by hand what this line now prints.
+	if combined, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build %s (tags=%q): %v\n%s", p.name, p.tags, err, combined)
 	}
 	return out
 }

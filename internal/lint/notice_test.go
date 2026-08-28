@@ -2,7 +2,6 @@ package lint_test
 
 import (
 	"os"
-	"os/exec"
 	"regexp"
 	"slices"
 	"strings"
@@ -105,12 +104,11 @@ func TestTheDependencyCountsMatchGoMod(t *testing.T) {
 func linkedModules(t *testing.T, p profile, goos string) []string {
 	t.Helper()
 
-	cmd := exec.Command("go", "list",
+	cmd := goCmd(repoRoot, "list",
 		"-tags", p.tags,
 		"-deps",
 		"-f", "{{if .Module}}{{.Module.Path}}{{end}}",
 		"./cmd/jr")
-	cmd.Dir = repoRoot
 	// GOARCH is fixed so this asks about one build rather than the host's, and
 	// amd64 exists on all three platforms.
 	cmd.Env = append(os.Environ(), "GOOS="+goos, "GOARCH=amd64")
