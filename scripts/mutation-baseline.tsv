@@ -70,11 +70,20 @@
 # 13:36, 83 minutes after the dispatch it would have saved, and nobody ran the
 # sweep again for three days.
 #
-# It was run on 2026-08-20 against `2174f33` and succeeded, four minutes and one
+# It was run on 2026-08-20 against `2a5bcf3` and succeeded, four minutes and one
 # second in the sweep step, matching this file on all three packages. So the
 # 34 below is corroborated by a machine that is not the one that measured it,
 # and `scripts/mutate.sh`'s claim that a runner completes the sweep at 3 GiB is
 # corroborated too.
+#
+# That hash was restamped on 2026-08-28: it read `2174f33` until main's history
+# was rewritten to strip a trailer from fifteen commit messages, which changed
+# every hash from the modernizer-gate commit (`ea8972b`, PR 96) onward without
+# touching a byte of any tree. A clone taken before that date resolves the old
+# hash and not this one.
+#
+# The first draft of this paragraph cited the *old* hash of that boundary
+# commit, which is the defect it was written to fix, one line further down.
 #
 # The lesson is not about runners. A gate that was fixed and never re-run is
 # indistinguishable from a gate that is still broken, and the distinguishing
