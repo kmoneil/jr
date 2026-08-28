@@ -27,8 +27,7 @@ type pkg struct {
 func loadPackages(t *testing.T) []pkg {
 	t.Helper()
 
-	cmd := exec.Command("go", "list", "-json", "./...")
-	cmd.Dir = ".."
+	cmd := goCmd("..", "list", "-json", "./...")
 	out, err := cmd.Output()
 	if err != nil {
 		var stderr string

@@ -229,8 +229,7 @@ func goFiles(t *testing.T, tags []string) map[string]bool {
 	}
 	args = append(args, "./...")
 
-	cmd := exec.Command("go", args...)
-	cmd.Dir = ".."
+	cmd := goCmd("..", args...)
 	stdout, err := cmd.Output()
 	if err != nil {
 		var stderr string

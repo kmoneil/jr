@@ -321,6 +321,51 @@ func commandsIn(t *testing.T, dir string, p profile) []string {
 	return out
 }
 
+// goCmd builds a `go` invocation for this package's tests.
+//
+// Every `go` subprocess in internal/lint goes through here, because of one
+// flag: -buildvcs=false. Six tests build or list the binary, `go test` runs
+// them in parallel, and each `go build` or `go list` of a main package shells
+// out to git to stamp the revision. Intermittently that git call fails and the
+// build fails with it:
+//
+//	error obtaining VCS status: exit status 128
+//	    Use -buildvcs=false to disable VCS stamping.
+//
+// which is a red run against a tree that compiles perfectly. Measured at
+// roughly two runs in five on this machine, in three different tests, and it
+// took three sightings to name because the failure printed `exit status 1` and
+// nothing else — see stderrOf below.
+//
+// What git was unhappy about is not established. 128 is its generic fatal, `go`
+// does not pass the message through, and the same repository answered `fatal:
+// detected dubious ownership` to an unrelated command once in the same session
+// and then stopped. The fix does not depend on knowing: it stops `go` calling
+// git at all, which is the right thing here regardless of why the call fails.
+//
+// Nothing any of these tests asks depends on the stamp. They ask `schema`,
+// `contract`, `go list -deps`, and `version --format <f>`, the last as "the
+// cheapest command that emits a document" rather than for what it says. The
+// shipped binaries are stamped by scripts/version.sh through LDFLAGS, a
+// different mechanism this does not touch.
+//
+// It is a helper rather than a flag at six call sites so the seventh cannot
+// forget it. The first fix was the flag at two call sites, and the next run
+// failed in the third.
+func goCmd(dir string, args ...string) *exec.Cmd {
+	full := append([]string{args[0], "-buildvcs=false"}, args[1:]...)
+	cmd := exec.Command("go", full...)
+	cmd.Dir = dir
+	return cmd
+}
+
+// stderrOf reads the captured stderr of a failed command.
+//
+// It only works after Output or CombinedOutput: those two populate
+// (*exec.ExitError).Stderr and Run does not, so a caller that used Run got an
+// empty string and a failure message with nothing in it. Every caller here goes
+// through askBinary or runs the built binary with Output. buildProfile used
+// Run, which is what made a broken build report four words.
 func stderrOf(err error) string {
 	if ee, ok := errors.AsType[*exec.ExitError](err); ok {
 		return string(ee.Stderr)
