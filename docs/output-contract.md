@@ -352,6 +352,13 @@ Every successful XML response:
   command that reached a site, and **absent** on one that did not — `jr version`
   and `jr context list` name no Jira rather than an empty one. See
   [Provenance](#provenance) below.
+- `project` and `board`, **the scope this answer was computed over**. Present
+  when the command asked the context for one, absent when it did not, on the
+  same rule as `site` and for the same reason: an empty attribute would read as
+  a project whose key is the empty string. They are the answer to a question the
+  envelope could not previously be asked — a truncated result is reported
+  incomplete, and a *scoped* one is reported complete, because it is, within a
+  frame nothing named. See [Scope](#scope-and-what-a-global-flag-reaches).
 - `complete`, **`true` only if the result set is exhaustive.** If a limit
   truncated it, `complete="false"` and `<next-page-token>` is present. There is
   no third state and no way to get a truncated set that claims to be complete.
@@ -467,6 +474,22 @@ format, and `jr issue list --format json` is the whole of the answer.
 
 Adding it moved no kind version. The per-kind shapes describe the payload, and
 this is on the envelope every kind shares.
+
+`project` and `board` are the same argument one level in, and they arrived the
+same way: from a command run against a scope nobody stated, returning a
+well-formed, complete, exit-0 document about a quarter of the answer. `site`
+says which Jira; these say which slice of it, and all four bullets above apply
+unchanged — the scope that was **used** rather than the one configured, data
+rather than a diagnostic, and absent in TSV.
+
+The one difference is worth stating because it is what makes them checkable.
+`site` is a property of the connection and can be read at the boundary at any
+time. A scope is something a command *reads*, and reading it again at the
+boundary would answer for an invocation that did not: `--all-projects` consults
+the context for nothing and would be stamped with the context's project. So
+the session is wrapped, the read is recorded, and the envelope reports what the
+query used. `TestTheEnvelopeNamesTheScopeTheAnswerWasComputedOver` fails on the
+obvious implementation.
 
 ## Streaming
 
@@ -596,6 +619,34 @@ appears among the command's own `<flags>` where it belongs.
 `affects="result"` is what an agent should branch on when it needs to know
 whether its result set was computed over the whole site. Today the only two
 flags that ever carry it are `--project` and `--board`.
+
+### The envelope says which scope was used
+
+`jr schema` says a flag *can* narrow this command. The envelope says whether it
+*did*:
+
+```xml
+<result kind="issue.list" v="7" site="https://jira.example/jira" project="ENG">
+```
+
+**It reports the scope the command read, not the scope the context holds**, and
+the difference is the whole design. `jr issue list --all-projects` asks the
+context for no project, so its envelope names none — and a document that named
+`ENG` there would be describing a frame its rows did not come from, which is
+this attribute's own failure mode inverted. `jr --project OPS issue list`
+against a context set to `ENG` names `OPS`, because that is what the query used.
+
+A command that never consults the context emits neither attribute. `jr version`
+and `jr issue get ENG-1` name no scope: the first has no Jira and the second was
+told exactly which issue.
+
+**TSV carries no envelope and so carries neither**, exactly as it carries no
+`site`. That is the same limitation `complete` has there, and the reason
+truncation becomes a stderr warning plus exit 3 in that format.
+
+Neither attribute moves any kind's schema version. The envelope is written
+outside every registered kind shape — `jr contract` describes payloads — which
+`make golden` confirms by not moving a byte of `testdata/kinds`.
 
 ## Documents and mixed content
 

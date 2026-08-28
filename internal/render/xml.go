@@ -20,6 +20,11 @@ func writeXML(w *writer, d *Doc) {
 	if d.Site != "" {
 		root.Attr("site", d.Site)
 	}
+	// The scope this answer was computed over, on the same rule as site:
+	// absent rather than empty, because an empty attribute reads as a project
+	// whose key is the empty string.
+	root.AttrIf("project", d.Project)
+	root.AttrIf("board", d.Board)
 
 	switch {
 	case d.Record != nil:
