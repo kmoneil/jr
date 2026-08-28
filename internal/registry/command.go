@@ -134,6 +134,25 @@ type Command struct {
 	// them has to lose. The document does, because the caller asked for the
 	// file. Writing to a path emits the document as normal.
 	OwnsStdoutWhen func(inv *Invocation) bool
+	// ScopedBy names the global flags that reach this command's *result set*,
+	// as opposed to the ones that change how it is printed or fetched.
+	//
+	// A global is declared once and inherited by every command, so nothing
+	// about a command's own declaration says which of the thirteen decide what
+	// its answer is. Before this existed, `jr schema issue.activity` reported
+	// seven flags and `jr issue activity --help` bound eight, and the eighth
+	// was --project, which silently narrowed the result set to the context's
+	// project. An agent told to prefer the schema over --help — which is what
+	// internal/cli/skillassets tells it — had no way to learn the flag was
+	// there, and read `flags count="7"` as a count.
+	//
+	// It is declared rather than derived. A command that *could* read the
+	// context scope is not one that does: `issue get ENG-1` resolves a session,
+	// takes its key from the argument, and asks the context for nothing.
+	// TestScopedByMatchesWhatTheCommandReads holds each declaration to what the
+	// command actually asks the session for, in both directions, so a
+	// declaration that is wrong fails rather than misinforming.
+	ScopedBy []string
 	// NeedsJira marks a command that talks to the configured site. The CLI
 	// layer builds a Session for it; a command without this never resolves a
 	// credential and never probes the deployment.

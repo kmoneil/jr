@@ -199,14 +199,67 @@ func writeReferencePreamble(b *strings.Builder) {
 		"refused in read-only mode, and is absent from the reader and ci builds. A",
 		"command marked **destructive** additionally requires `--yes`.",
 		"",
-		"**Global flags** apply to every command and are not repeated in each entry:",
-		"`--format`, `--context`, `--site`, `--project`, `--board`, `--readonly`,",
-		"`--describe`, `--debug`, `--refresh`, `--retries`, `--max-requests`, and",
-		"`--api-version`. See [output-contract.md](output-contract.md) for what the",
-		"formats guarantee and [build-profiles.md](build-profiles.md) for which build",
-		"contains what.",
+		"**Global flags** apply to every command and are not repeated in each entry.",
+		"See [output-contract.md](output-contract.md) for what the formats guarantee",
+		"and [build-profiles.md](build-profiles.md) for which build contains what.",
 		"",
 	)
+	writeGlobalFlagTable(b)
+}
+
+// writeGlobalFlagTable renders registry.GlobalFlags, and what each one reaches.
+//
+// It is generated because the hand-written version was wrong. This paragraph
+// used to list the globals inline and listed twelve of the thirteen — --ca-bundle
+// had been added to the root and never to the sentence — which is the third
+// copy of a list that now has one source. And "apply to every command" was the
+// part worth replacing rather than correcting: --project applies to `issue
+// activity` by filtering its results and to `auth token` not at all, and a
+// reader who cannot tell those apart is the reader this table is for.
+//
+// The per-command answer is in `jr schema <command>`, where each inherited
+// global carries an affects attribute. This table is the summary.
+func writeGlobalFlagTable(b *strings.Builder) {
+	writeLines(b,
+		"**What a global reaches** depends on the command, so `jr schema <command>`",
+		"reports it per command as an `affects` attribute on each inherited flag.",
+		"The three values:",
+		"",
+		"| `affects` | Means |",
+		"| --- | --- |",
+	)
+	for _, e := range []registry.Effect{
+		registry.EffectResult, registry.EffectProvenance, registry.EffectInvocation,
+	} {
+		fmt.Fprintf(b, "| `%s` | %s |\n", e, registry.EffectDescriptions[e])
+	}
+	writeLines(b,
+		"",
+		"The flags themselves:",
+		"",
+		"| Flag | Type | Default | Usage |",
+		"| --- | --- | --- | --- |",
+	)
+	for _, f := range registry.GlobalFlags() {
+		fmt.Fprintf(b, "| `--%s` | `%s` | %s | %s |\n",
+			f.Name, f.Type, defaultCell(f.Default), escapePipes(f.Usage))
+	}
+	b.WriteString("\n")
+}
+
+// defaultCell renders a flag's default, or an em-space-free placeholder for a
+// flag that has none.
+func defaultCell(def string) string {
+	if def == "" {
+		return "—"
+	}
+	return "`" + def + "`"
+}
+
+// escapePipes keeps a usage string containing a pipe — `tsv|xml|json|yaml` —
+// from ending its table cell early.
+func escapePipes(s string) string {
+	return strings.ReplaceAll(s, "|", "\\|")
 }
 
 // writeLines writes each argument as its own line.

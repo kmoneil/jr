@@ -393,8 +393,9 @@ func runList(
 
 func getCommand() *registry.Command {
 	return &registry.Command{
-		Path:    []string{"project", "get"},
-		Summary: "Fetch one project",
+		Path:     []string{"project", "get"},
+		ScopedBy: []string{registry.GlobalProject},
+		Summary:  "Fetch one project",
 		Description: strings.TrimSpace(`
 Returns a single project by key or id.
 

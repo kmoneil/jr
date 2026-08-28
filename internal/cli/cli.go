@@ -26,7 +26,10 @@ import (
 )
 
 // EnvFormat overrides the default output format for every command.
-const EnvFormat = "JIRA_FORMAT"
+//
+// The name lives in the registry, beside the --format declaration whose usage
+// string names it. This alias is what the rest of this package reads.
+const EnvFormat = registry.EnvFormat
 
 // app is the mutable state of one invocation. It exists so Main is a pure
 // function of its arguments and environment, and the whole program is testable

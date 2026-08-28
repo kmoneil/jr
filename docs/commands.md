@@ -17,12 +17,37 @@ produce. A command marked **mutating** changes Jira: it accepts `--dry-run`, is
 refused in read-only mode, and is absent from the reader and ci builds. A
 command marked **destructive** additionally requires `--yes`.
 
-**Global flags** apply to every command and are not repeated in each entry:
-`--format`, `--context`, `--site`, `--project`, `--board`, `--readonly`,
-`--describe`, `--debug`, `--refresh`, `--retries`, `--max-requests`, and
-`--api-version`. See [output-contract.md](output-contract.md) for what the
-formats guarantee and [build-profiles.md](build-profiles.md) for which build
-contains what.
+**Global flags** apply to every command and are not repeated in each entry.
+See [output-contract.md](output-contract.md) for what the formats guarantee
+and [build-profiles.md](build-profiles.md) for which build contains what.
+
+**What a global reaches** depends on the command, so `jr schema <command>`
+reports it per command as an `affects` attribute on each inherited flag.
+The three values:
+
+| `affects` | Means |
+| --- | --- |
+| `result` | narrows what this command's result set is, and nothing in the result says so |
+| `provenance` | decides which Jira answers; the envelope's site attribute reports which one did |
+| `invocation` | changes how the command runs or how its answer is printed, not what the answer is |
+
+The flags themselves:
+
+| Flag | Type | Default | Usage |
+| --- | --- | --- | --- |
+| `--format` | `enum` | — | output format: tsv\|xml\|json\|yaml\|markdown (default: tsv for lists, xml for records; markdown is for reading and is not a versioned contract). JIRA_FORMAT sets it for every command |
+| `--describe` | `bool` | — | print this command's schema instead of running it |
+| `--context` | `string` | — | use this context for one invocation, without selecting it |
+| `--site` | `string` | — | Jira site, overriding the context's |
+| `--project` | `string` | — | project key, overriding the context's |
+| `--board` | `string` | — | board id, overriding the context's |
+| `--api-version` | `string` | — | force the REST version, 2 or 3, and skip the deployment probe |
+| `--ca-bundle` | `string` | — | PEM file of certificates to trust in addition to the system roots |
+| `--readonly` | `bool` | — | refuse any command that would change Jira |
+| `--debug` | `bool` | — | trace HTTP requests to stderr; credentials are redacted in the transport |
+| `--refresh` | `bool` | — | ignore cached site metadata and probe again |
+| `--retries` | `int` | `3` | retry budget per request; exhausting it exits 8 or 9, never 0 |
+| `--max-requests` | `int` | `0` | cap total HTTP calls for this invocation; 0 means no cap |
 
 
 ## Contents
@@ -493,6 +518,13 @@ an absent one — `--project ""` and no --project at all arrive here identically
 so clearing needs its own spelling. --unset site is refused: a context without a
 site is not a context with one fewer setting, it is one that cannot be used, and
 `jr context delete` is how you say that.
+
+The --project here is this command's own, not the global one, and it is the
+reason an empty value is accepted here and refused everywhere else. Elsewhere
+`--project ""` is EMPTY_SCOPE, because an empty scope falls back to the
+context's rather than lifting it and the query runs against a project nobody
+named. Here there is no scope to fall back to: the value being cleared is the
+stored setting itself.
 
 --field replaces the whole stored set, exactly as --label does on issue edit.
 --unset field empties it. What is stored is added to whatever a read's own
@@ -2846,7 +2878,7 @@ jr schema --format json
 | Emits | Schema | When |
 | --- | --- | --- |
 | `schema.commands` | v1 | always |
-| `schema.command` | v1 | a command name is given |
+| `schema.command` | v2 | a command name is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `5` NOT_FOUND
 

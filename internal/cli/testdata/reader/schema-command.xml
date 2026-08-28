@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<result kind="schema.command" v="1">
+<result kind="schema.command" v="2">
   <command name="schema" use="schema" mutating="false" destructive="false" paginated="true" kind="schema.commands" v="1">
     <summary>Describe every command this build contains</summary>
     <description><![CDATA[Prints the command surface as data: flags with types and enums, required
@@ -12,7 +12,7 @@ the command tree, so it cannot drift from what the binary actually does — and
 it lists only what this build contains.]]></description>
     <outputs count="2">
       <output kind="schema.commands" v="1"/>
-      <output kind="schema.command" v="1" when="a command name is given"/>
+      <output kind="schema.command" v="2" when="a command name is given"/>
     </outputs>
     <args count="1">
       <arg name="command" required="false" variadic="false">dotted command name, e.g. issue.list</arg>
@@ -22,6 +22,53 @@ it lists only what this build contains.]]></description>
         <usage>maximum results, or "all" to exhaust the result set</usage>
       </flag>
     </flags>
+    <global-flags count="13">
+      <global-flag name="format" type="enum" required="false" repeatable="false" affects="invocation">
+        <usage>output format: tsv|xml|json|yaml (default: tsv for lists, xml for records). JIRA_FORMAT sets it for every command</usage>
+        <values count="4">
+          <value>tsv</value>
+          <value>xml</value>
+          <value>json</value>
+          <value>yaml</value>
+        </values>
+      </global-flag>
+      <global-flag name="describe" type="bool" required="false" repeatable="false" affects="invocation">
+        <usage>print this command's schema instead of running it</usage>
+      </global-flag>
+      <global-flag name="context" type="string" required="false" repeatable="false" affects="invocation">
+        <usage>use this context for one invocation, without selecting it</usage>
+      </global-flag>
+      <global-flag name="site" type="string" required="false" repeatable="false" affects="invocation">
+        <usage>Jira site, overriding the context's</usage>
+      </global-flag>
+      <global-flag name="project" type="string" required="false" repeatable="false" affects="invocation">
+        <usage>project key, overriding the context's</usage>
+      </global-flag>
+      <global-flag name="board" type="string" required="false" repeatable="false" affects="invocation">
+        <usage>board id, overriding the context's</usage>
+      </global-flag>
+      <global-flag name="api-version" type="string" required="false" repeatable="false" affects="invocation">
+        <usage>force the REST version, 2 or 3, and skip the deployment probe</usage>
+      </global-flag>
+      <global-flag name="ca-bundle" type="string" required="false" repeatable="false" affects="invocation">
+        <usage>PEM file of certificates to trust in addition to the system roots</usage>
+      </global-flag>
+      <global-flag name="readonly" type="bool" required="false" repeatable="false" affects="invocation">
+        <usage>refuse any command that would change Jira</usage>
+      </global-flag>
+      <global-flag name="debug" type="bool" required="false" repeatable="false" affects="invocation">
+        <usage>trace HTTP requests to stderr; credentials are redacted in the transport</usage>
+      </global-flag>
+      <global-flag name="refresh" type="bool" required="false" repeatable="false" affects="invocation">
+        <usage>ignore cached site metadata and probe again</usage>
+      </global-flag>
+      <global-flag name="retries" type="int" required="false" repeatable="false" default="3" affects="invocation">
+        <usage>retry budget per request; exhausting it exits 8 or 9, never 0</usage>
+      </global-flag>
+      <global-flag name="max-requests" type="int" required="false" repeatable="false" default="0" affects="invocation">
+        <usage>cap total HTTP calls for this invocation; 0 means no cap</usage>
+      </global-flag>
+    </global-flags>
     <exit-codes count="5">
       <exit-code code="0" name="OK">Success, result complete</exit-code>
       <exit-code code="1" name="ERROR">Generic runtime failure</exit-code>

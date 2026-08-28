@@ -109,8 +109,9 @@ func dateFlags() []registry.Flag {
 
 func createCommand() *registry.Command {
 	return &registry.Command{
-		Path:    []string{"sprint", "create"},
-		Summary: "Create a future sprint on a board",
+		Path:     []string{"sprint", "create"},
+		ScopedBy: []string{registry.GlobalBoard},
+		Summary:  "Create a future sprint on a board",
 		Description: strings.TrimSpace(`
 Adds an unstarted sprint to a board.
 

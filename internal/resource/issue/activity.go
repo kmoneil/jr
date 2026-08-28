@@ -223,8 +223,9 @@ const (
 
 func activityCommand() *registry.Command {
 	return &registry.Command{
-		Path:    []string{"issue", "activity"},
-		Summary: "List what happened across issues, as events rather than rows",
+		Path:     []string{"issue", "activity"},
+		ScopedBy: []string{registry.GlobalProject},
+		Summary:  "List what happened across issues, as events rather than rows",
 		Description: strings.TrimSpace(`
 Merges four sources into one time-ordered feed: comments, transitions, other
 field changes, and worklogs. Newest first.
