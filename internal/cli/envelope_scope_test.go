@@ -22,8 +22,20 @@ func emptyJira(t *testing.T, jql *atomic.Value) string {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
+		case strings.HasSuffix(r.URL.Path, "/myself"):
+			// The account's timezone, which `issue changes` needs before it
+			// will read a date at all. A date is evaluated by Jira in the
+			// account's zone, so the feed refuses NO_ACCOUNT_TIMEZONE rather
+			// than substituting this process's.
+			_, _ = w.Write([]byte(
+				`{"displayName":"Ada Lovelace","timeZone":"Etc/UTC"}`))
 		case strings.HasSuffix(r.URL.Path, "/serverInfo"):
-			_, _ = w.Write([]byte(`{"version":"9.12.0","deploymentType":"Server"}`))
+			// serverTime as well as the version, because `issue changes` bounds
+			// its window with the server's clock and refuses NO_SERVER_TIME
+			// without one. A fixture that answers the probe and not the clock
+			// covers `issue list` and quietly excludes the feed.
+			_, _ = w.Write([]byte(`{"version":"9.12.0","deploymentType":"Server",` +
+				`"serverTime":"2026-08-28T12:00:00.000+0000"}`))
 		default:
 			if q := r.URL.Query().Get("jql"); q != "" {
 				jql.Store(q)

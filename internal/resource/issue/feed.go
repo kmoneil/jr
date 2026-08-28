@@ -214,7 +214,25 @@ func validateChanges(ctx context.Context, inv *registry.Invocation) error {
 	if err := refuseQueryJiraDoesNotUnderstand(ctx, inv); err != nil {
 		return err
 	}
-	return requirePageSize(inv)
+	if err := requirePageSize(inv); err != nil {
+		return err
+	}
+
+	// After every refusal, for the reason `issue list` and `issue activity`
+	// give. It matters most here: a feed polls, so a scope that silently drops
+	// the caller's projects reports "nothing changed" on every tick rather than
+	// once.
+	warnScopeMismatch(inv, feedProject(inv), inv.Flags.String("jql"))
+	return nil
+}
+
+// feedProject is the scope this feed's candidate query is built with, read in
+// one place so the warning cannot name a scope the query did not use.
+func feedProject(inv *registry.Invocation) string {
+	if inv.Jira == nil {
+		return ""
+	}
+	return inv.Jira.Project()
 }
 
 func runChanges(
@@ -298,7 +316,7 @@ func feedRequest(
 	}
 	return ListOptions{
 		Query: QueryOptions{
-			Project:      inv.Jira.Project(),
+			Project:      feedProject(inv),
 			JQL:          inv.Flags.String("jql"),
 			UpdatedAfter: floor,
 		},

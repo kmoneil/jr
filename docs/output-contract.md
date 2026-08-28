@@ -558,7 +558,7 @@ what a further request would do.
 
 A warning is a structured document on stderr carrying a `code` and a `message`,
 in whatever format the invocation asked for. It never changes the exit code and
-never reaches stdout. There are three, and each exists because something true
+never reaches stdout. There are four, and each exists because something true
 about the answer cannot be read off the answer itself.
 
 | Code               | Emitted by                                      | What it says                                                                                                                                                                                                                        |
@@ -566,6 +566,7 @@ about the answer cannot be read off the answer itself.
 | `RESULT_TRUNCATED` | any collection                                  | The result is not exhaustive. It accompanies exit 3 and `complete="false"`, and carries the resume token where one exists.                                                                                                            |
 | `POSSIBLE_DUPLICATE` | `issue create`, `issue clone`                 | An identical request succeeded within the last 60 seconds and this one carried no idempotency key.                                                                                                                                   |
 | `UNKNOWN_LABEL`    | `issue list`, from `--label` and `--not-label`   | No issue on this site carries that label. The query still runs and still exits 0.                                                                                                                                                    |
+| `SCOPE_MISMATCH`   | `issue list`, `issue activity`, `issue changes` | A raw `--jql` selects a project the effective scope excludes, so those rows cannot come back. The query still runs and still exits 0.                                                                                                 |
 
 `UNKNOWN_LABEL` exists because an empty answer to a mistyped label and an empty
 answer to a correct one are the same bytes: `--label retyr` returns a header, no
@@ -647,6 +648,42 @@ truncation becomes a stderr warning plus exit 3 in that format.
 Neither attribute moves any kind's schema version. The envelope is written
 outside every registered kind shape — `jr contract` describes payloads — which
 `make golden` confirms by not moving a byte of `testdata/kinds`.
+
+### `SCOPE_MISMATCH`
+
+`jr` holds both halves of one contradiction inside a single process: the literal
+`GOV-208` in the caller's `--jql`, and `project = IDO` in its own context. It
+ANDs them, correctly and as documented, into a query that cannot match by
+construction, and answers with a complete, empty, exit-0 result — the same bytes
+as an honest "nothing matched".
+
+    jr issue list --jql 'key = OPS-208'      # context project = ENG
+    → SCOPE_MISMATCH on stderr, exit 0
+
+It reads the fragment as **tokens**, so the text inside `summary ~ "key = OPS-1"`
+is a value and does not warn, and it fires only on *positive* selection:
+`project = OPS` and `key in (…)` count, `project != OPS` and `project not in (…)`
+do not. A caller excluding a project is not asking for it.
+
+Exit 0 stays, because the query is legal and the rows that came back are real.
+`--all-projects` lifts the scope and silences it; so does naming the scope you
+meant with `--project`.
+
+Two things it does **not** say, in the same shape `UNKNOWN_LABEL` uses:
+
+- **It compares against the effective scope, not the site's catalogue.** A
+  renamed project key still resolves on the server, so `key = OLD-1` against a
+  scope of `NEW` is a mismatch by string comparison and not by meaning. That is
+  the one false positive it can produce; closing it would cost a request on
+  every invocation carrying a `--jql`, and a line of stderr is the cheaper side
+  of that trade.
+- **It says nothing about whether an in-scope project will match.** Naming the
+  project you are scoped to never warns, and such a query can still return
+  nothing for every other reason a query returns nothing.
+
+Over the 22 distinct `--jql` fragments in this repository's README, docs, skill
+assets, and command examples, exactly one warns against a scope of `ENG`, and it
+is `key = OPS-1`, which genuinely cannot match.
 
 ## Documents and mixed content
 
