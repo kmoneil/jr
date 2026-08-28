@@ -338,17 +338,40 @@ instead, so there the entire changelog arrives in one request or not at all. A
 Data Center history longer than that one response can carry is reported
 incomplete rather than silently cut.
 
+--changed-field narrows the rows to the fields you name, and it is the flag to
+reach for before reading this output at all. A description edit puts a whole
+description on each side of one row, twice for a revision, and an issue with a
+few of those costs more to read than every other question about it put
+together. --changed-field status is "did anybody move this, and when".
+
+It matches what the changelog records: the field's display name, and its id
+where the server sends one. It does not resolve names through the site's field
+catalogue, because Jira 9.12 Data Center sends no field id in a changelog at
+all, so resolving a name to an id would match nothing there. It is applied
+here rather than by the server — neither deployment's changelog route filters
+by field — so it saves output and context, not requests.
+
+A --changed-field that matches nothing, on an issue that has changes, warns
+and names the fields the issue does hold. Asking about a field nobody touched
+is a legal question, so it still exits 0.
+
 Comment authorship is not recorded here. Jira writes a field transition to the
 changelog and a comment is not a field transition, so "what did this person do
 to this issue" needs this and ` + "`issue comment list`" + ` both.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue history ENG-101",
+			buildinfo.App + " issue history ENG-101 --changed-field status",
 			buildinfo.App + " issue history ENG-101 --format json --limit all",
 		}, "\n"),
 		Args: []registry.Arg{{
 			Name: "key", Usage: "issue key, e.g. ENG-101", Required: true,
 		}},
 		Flags: []registry.Flag{{
+			Name: changedFieldFlag, Type: registry.TypeString, Repeatable: true,
+			Usage: "only changes to this field, by the name the changelog " +
+				"records or by its id; repeat for several; matched here rather " +
+				"than by the server, so it saves output and not requests",
+		}, {
 			Name: "page-size", Type: registry.TypeInt,
 			Usage: "results per HTTP request, 1 to 100; transport tuning only, " +
 				"and Cloud only — Data Center serves the whole changelog in " +
@@ -393,10 +416,16 @@ func runHistory(
 		return registry.StreamResult{}, err
 	}
 
+	// One filter for the whole run, because it accumulates what it rejected
+	// across every page in order to say what the issue holds when it matched
+	// nothing.
+	filter := newHistoryFilter(inv)
+	defer filter.warnIfNothingMatched(inv)
+
 	if info.Kind != site.Cloud {
-		return streamWholeHistory(ctx, inv, out, client)
+		return streamWholeHistory(ctx, inv, out, client, filter)
 	}
-	return streamPagedHistory(ctx, inv, out, client, pageSize)
+	return streamPagedHistory(ctx, inv, out, client, pageSize, filter)
 }
 
 // streamPagedHistory is the Cloud path.
@@ -408,7 +437,7 @@ func runHistory(
 // skip two saves per page and report the result complete.
 func streamPagedHistory(
 	ctx context.Context, inv *registry.Invocation, out *render.Stream,
-	client *Client, pageSize int,
+	client *Client, pageSize int, filter *historyFilter,
 ) (registry.StreamResult, error) {
 	startAt := 0
 	for {
@@ -422,7 +451,12 @@ func streamPagedHistory(
 			return registry.StreamResult{Complete: true}, nil
 		}
 
-		bounded, err := writeRows(inv, out, page.Changes,
+		// Filtered before the rows are written and after the page is counted.
+		// The offset advances by saves, which is what the server paginates,
+		// so removing rows cannot make the loop skip or repeat a save — and
+		// --limit therefore bounds the rows the caller asked for rather than
+		// the rows the server happened to send.
+		bounded, err := writeRows(inv, out, filter.apply(page.Changes),
 			func(c Change) *render.Node { return c.Node() })
 		if err != nil {
 			return registry.StreamResult{}, err
@@ -453,14 +487,15 @@ func streamPagedHistory(
 // Where the server says it holds more than it sent, that is reported rather
 // than resolved, because there is no second request that would get the rest.
 func streamWholeHistory(
-	ctx context.Context, inv *registry.Invocation, out *render.Stream, client *Client,
+	ctx context.Context, inv *registry.Invocation, out *render.Stream,
+	client *Client, filter *historyFilter,
 ) (registry.StreamResult, error) {
 	page, err := client.ListHistory(ctx, inv.Args[0], 0, 0)
 	if err != nil {
 		return registry.StreamResult{}, err
 	}
 
-	bounded, err := writeRows(inv, out, page.Changes,
+	bounded, err := writeRows(inv, out, filter.apply(page.Changes),
 		func(c Change) *render.Node { return c.Node() })
 	if err != nil {
 		return registry.StreamResult{}, err

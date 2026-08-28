@@ -558,7 +558,7 @@ what a further request would do.
 
 A warning is a structured document on stderr carrying a `code` and a `message`,
 in whatever format the invocation asked for. It never changes the exit code and
-never reaches stdout. There are four, and each exists because something true
+never reaches stdout. There are five, and each exists because something true
 about the answer cannot be read off the answer itself.
 
 | Code               | Emitted by                                      | What it says                                                                                                                                                                                                                        |
@@ -567,6 +567,7 @@ about the answer cannot be read off the answer itself.
 | `POSSIBLE_DUPLICATE` | `issue create`, `issue clone`                 | An identical request succeeded within the last 60 seconds and this one carried no idempotency key.                                                                                                                                   |
 | `UNKNOWN_LABEL`    | `issue list`, from `--label` and `--not-label`   | No issue on this site carries that label. The query still runs and still exits 0.                                                                                                                                                    |
 | `SCOPE_MISMATCH`   | `issue list`, `issue activity`, `issue changes` | A raw `--jql` selects a project the effective scope excludes, so those rows cannot come back. The query still runs and still exits 0.                                                                                                 |
+| `UNKNOWN_CHANGED_FIELD` | `issue history`, from `--changed-field`    | No recorded change on that issue touched any of the named fields. It names the fields the issue does hold, and still exits 0.                                                                                                         |
 
 `UNKNOWN_LABEL` exists because an empty answer to a mistyped label and an empty
 answer to a correct one are the same bytes: `--label retyr` returns a header, no

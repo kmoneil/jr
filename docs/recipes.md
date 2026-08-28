@@ -198,9 +198,20 @@ changed, and what I said.
 # What changed on an issue, and who changed it
 $ jr issue history ENG-101
 
+# Just the transitions, which is usually the question
+$ jr issue history ENG-101 --changed-field status
+
 # The issues, with every comment thread, in one request per page
 $ jr issue list --involving ada --updated-after -7d --with-comments --format json
 ```
+
+**Reach for `--changed-field` before reading a bare `issue history`.** A
+changelog carries every description and Acceptance Criteria edit as a full
+before-and-after body on a single row, so one issue with a few revisions can
+cost more to read than every other question about it put together. Repeat the
+flag for several fields, and pass the name the changelog records or the field's
+id. A field the issue never changed warns and names the ones it did, so a typo
+is not another empty answer to read.
 
 `--with-comments` is the one to understand before relying on it, because the two
 deployments answer differently and the row says which you got:
