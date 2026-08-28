@@ -84,9 +84,14 @@ envelope**, so a pipeline that needs to know its scope asks for `--format json`,
 exactly as it does for `site`. `--all-projects` lifts the scope where the
 command has it, and `jr context show` says what the scope currently is.
 
-An empty value does not lift it. `--project ""` is refused as `EMPTY_SCOPE`,
-because it used to fall back to the context and produce exactly the empty
-success above.
+**A `--jql` naming a project outside the scope warns rather than going quiet.**
+`SCOPE_MISMATCH` on stderr, exit 0, rows unchanged. It fires only on positive
+selection, so `project != OPS` says nothing, and it reads the fragment as
+tokens, so a key inside a string value is a value.
+
+An empty value does not lift the scope. `--project ""` is refused as
+`EMPTY_SCOPE`, because it used to fall back to the context and produce exactly
+the empty success above.
 
 ## Reading what comes back
 

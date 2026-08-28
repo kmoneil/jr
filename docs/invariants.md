@@ -288,6 +288,15 @@ do not catch, add the test in the same change and cite it here.
   would be stamped with a scope its rows did not come from.
   **Enforced by:** `TestTheEnvelopeNamesTheScopeTheAnswerWasComputedOver`,
   `TestTheScopeAttributeMatchesTheQueryThatWasSent`.
+- **A query whose `--jql` names a project the scope excludes says so.** The
+  fragment and the context scope are ANDed into a query that cannot match by
+  construction, and the answer is a complete, empty, exit-0 result that is the
+  same bytes as an honest "nothing matched". It fires only on positive
+  selection, reads the fragment as tokens so a project key inside a string
+  value is a value, and leaves the exit code alone.
+  **Enforced by:** `TestAnOutOfScopeJQLSaysSo`,
+  `TestTheScopeWarningStaysQuietOnQueriesThatAreFine`,
+  `TestProjectsSelectedIsNotAFieldScan`.
 - **An empty scope is refused, not reinterpreted.** `--project ""` falls back to
   the context's project rather than lifting the scope, so accepting it means
   running a query against a project the caller did not name and returning a
