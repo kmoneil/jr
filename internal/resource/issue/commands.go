@@ -640,9 +640,16 @@ func validateList(ctx context.Context, inv *registry.Invocation) error {
 		return err
 	}
 
-	// Last, and after every refusal above it. This one spends requests and
-	// cannot fail the command, so an invocation that was going to be refused
-	// is refused without paying for a diagnostic nobody will read.
+	// The two warnings go last, after every refusal above them. Neither can
+	// fail the command, so an invocation that was going to be refused is
+	// refused without paying for a diagnostic nobody will read.
+	//
+	// The scope one is built from listQuery rather than from the flags, so it
+	// asks about the query that will actually be sent: --all-projects arrives
+	// here as an empty Project and the check stays quiet, which is right,
+	// without this function knowing that --all-projects is what did it.
+	opt := listQuery(inv)
+	warnScopeMismatch(inv, opt.Project, opt.JQL)
 	warnUnknownLabels(ctx, inv)
 	return nil
 }

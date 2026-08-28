@@ -347,7 +347,27 @@ func validateActivity(ctx context.Context, inv *registry.Invocation) error {
 	if err := refuseQueryJiraDoesNotUnderstand(ctx, inv); err != nil {
 		return err
 	}
-	return requirePageSize(inv)
+	if err := requirePageSize(inv); err != nil {
+		return err
+	}
+
+	// After every refusal, because a warning in front of a rejection is noise
+	// in front of the answer. This command has no --all-projects, so its scope
+	// is the context's whenever there is one, which is exactly the invocation
+	// the warning exists for: it is the command the reviewer was running.
+	warnScopeMismatch(inv, activityProject(inv), inv.Flags.String("jql"))
+	return nil
+}
+
+// activityProject is the scope this command's candidate query is built with.
+//
+// One expression, read here and in runActivity, so the warning cannot describe
+// a scope the query did not use.
+func activityProject(inv *registry.Invocation) string {
+	if inv.Jira == nil {
+		return ""
+	}
+	return inv.Jira.Project()
 }
 
 // resolveActivityCutoff turns --since into the instant the event filter uses,
@@ -507,7 +527,7 @@ func runActivity(
 	var clipped, atLimit bool
 	result, err := client.ListStream(ctx, ListOptions{
 		Query: QueryOptions{
-			Project:      inv.Jira.Project(),
+			Project:      activityProject(inv),
 			JQL:          inv.Flags.String("jql"),
 			UpdatedAfter: inv.Flags.String(sinceFlag),
 		},

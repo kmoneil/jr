@@ -285,21 +285,66 @@ of `--involving`.
 
 ### Exit 0 with an empty result
 
-That is an honest "nothing matched" — `jr` goes to some trouble to make sure an
-empty result is never a silent failure. A user-valued filter that resolved to
-nobody is refused (`UNKNOWN_USER`, exit 2) rather than sent, precisely because
-`assignee = "Ada Lovelace"` against Cloud matches nothing and returns
-successfully.
+Usually that is an honest "nothing matched" — `jr` goes to some trouble to make
+sure an empty result is never a silent failure. A user-valued filter that
+resolved to nobody is refused (`UNKNOWN_USER`, exit 2) rather than sent,
+precisely because `assignee = "Ada Lovelace"` against Cloud matches nothing and
+returns successfully.
 
-So if a query is empty and you expected rows, the query is wrong, not the
-lookup. Check it:
+**Check the scope first, because the answer is complete within it.** A query is
+combined with the context's project, so a `--jql` naming an issue in another
+project cannot match:
 
 ```console
+$ jr context show                  # what project am I scoped to?
 $ jr jql explain --jql 'your query here'
 ```
 
-Remember that repeated flags OR together and different flags AND together:
-`--status Done --type Bug` means Done **and** a Bug.
+`jql explain` prints the query that would actually be sent, including the
+project scope it would be combined with, which is the fact the result document
+used to leave out. Two things now say it without being asked:
+
+- Every structured result carries the scope in its envelope:
+  `<result kind="issue.list" … project="ENG">`. Absent means no scope was
+  applied. TSV has no envelope, so use `--format json` when you need this in a
+  pipeline.
+- A `--jql` naming a project the scope excludes produces `SCOPE_MISMATCH` on
+  stderr at exit 0. See below.
+
+If neither fires and the result is still empty, the query is wrong, not the
+lookup. Remember that repeated flags OR together and different flags AND
+together: `--status Done --type Bug` means Done **and** a Bug.
+
+### `SCOPE_MISMATCH` — the query names a project the scope excludes
+
+```console
+$ jr issue list --jql 'key = OPS-208'      # context project is ENG
+```
+
+```xml
+<warning v="1">
+  <code>SCOPE_MISMATCH</code>
+  <message>--jql selects project OPS, and the scope is ENG, so those rows cannot be returned; use --all-projects or --project to widen it</message>
+</warning>
+```
+
+Exit 0, and the rows that did match still come back. The query is legal: `jr`
+ANDs your fragment with the context's project, so `project = ENG AND (key =
+OPS-208)` is a query that cannot match by construction. Three ways out:
+
+- `--all-projects`, on the commands that have it, lifts the scope entirely.
+- `--project OPS` names the scope you meant for one invocation.
+- `jr context edit <name> --project OPS`, or `--unset project`, changes it for
+  good.
+
+It fires only on positive selection. `project != OPS` names a project without
+asking for it and stays quiet, and so does a project key inside a string value,
+because the fragment is read as tokens rather than searched.
+
+One case it gets wrong: a **renamed** project key still resolves on the server,
+so `key = OLD-1` against a scope of `NEW` warns and the query would in fact have
+matched. Closing that would cost a request on every `--jql`, so it is a warning
+you can ignore rather than a refusal you cannot.
 
 ### `JQL_NOT_UNDERSTOOD`: Jira does not understand the query
 
