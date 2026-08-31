@@ -57,6 +57,23 @@
 # packages, byte for byte, which is a stronger agreement than two matching
 # totals would have been.
 #
+# `internal/render` went 13 to 12 on 2026-08-31, and the mutant that died is
+# CONDITIONALS_NEGATION at node.go:65:11, the `value == ""` guard in
+# `Node.AttrIf`. Nobody wrote a test for it. `fa6a640` put
+# `root.AttrIf("project", d.Project)` and its `board` twin in xml.go, and those
+# are the first calls in this package whose empty branch anything asserts: the
+# XML goldens hold documents where both values are empty, so the negated guard
+# emits `project=""` and `board=""` on every root element and TestGoldenOutput
+# fails on collection/xml, collection-truncated/xml, and record/xml. Before
+# that, the package's only caller was schema.go's `AttrIf("name", f.Name)`, and
+# no test in the package noticed what that one did: the mutant lived every
+# sweep from 2026-08-16 through 2026-08-24.
+#
+# Taken twice, on the rule two paragraphs up. The runner reported twelve and
+# this machine reported the same twelve, byte for byte by file, line, and
+# mutator, and the kill was confirmed by hand: negate node.go:65 and the three
+# golden cases above go red.
+#
 # Where these numbers come from, which this file could not tell you until
 # 2026-08-20 and now can.
 #
@@ -90,5 +107,5 @@
 # command took one minute. Issue 57 said exactly the right thing, "no conclusion
 # about the tests follows from this run", and was closed without one.
 internal/jql	3	the only place a value is quoted; an unexercised branch is an injection
-internal/render	13	the output contract itself, and the escaping rules under it
+internal/render	12	the output contract itself, and the escaping rules under it
 internal/site	34	deployment detection, field and user resolution, the cache

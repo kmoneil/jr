@@ -132,18 +132,21 @@ func TestTheMutationSweepExitCodesSayWhichFailureItWas(t *testing.T) {
 		gremlins string
 		baseline string
 		want     int
+		verdict  string
 	}{
 		{
 			"a package on its baseline",
 			"Mutation testing completed in 12s\nKilled: 40, Lived: 5, Not covered: 0",
 			"internal/jql\t5\tthe only place a value is quoted\n",
 			0,
+			"matched",
 		},
 		{
 			"a package that regressed",
 			"Mutation testing completed in 12s\nKilled: 38, Lived: 7, Not covered: 0",
 			"internal/jql\t5\tthe only place a value is quoted\n",
 			1,
+			"moved",
 		},
 		// Fewer is a failure too, and deliberately: a baseline nobody has to
 		// update stops describing the tree. It is still a finding about the
@@ -153,6 +156,7 @@ func TestTheMutationSweepExitCodesSayWhichFailureItWas(t *testing.T) {
 			"Mutation testing completed in 12s\nKilled: 42, Lived: 3, Not covered: 0",
 			"internal/jql\t5\tthe only place a value is quoted\n",
 			1,
+			"moved",
 		},
 		// What a tool that could not build its own mutants looks like: no
 		// summary line, so there is no count to compare and nothing to say
@@ -162,6 +166,7 @@ func TestTheMutationSweepExitCodesSayWhichFailureItWas(t *testing.T) {
 			"go: build failed\nexit status 1",
 			"internal/jql\t5\tthe only place a value is quoted\n",
 			2,
+			"broken",
 		},
 		// A partial sweep outranks a moved count in the same run. The table
 		// carries both; the exit code has to pick the headline, and it is the
@@ -172,6 +177,7 @@ func TestTheMutationSweepExitCodesSayWhichFailureItWas(t *testing.T) {
 			"internal/jql\t5\tthe only place a value is quoted\n" +
 				"internal/render\t13\tthe output contract itself\n",
 			2,
+			"broken",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -210,8 +216,128 @@ func TestTheMutationSweepExitCodesSayWhichFailureItWas(t *testing.T) {
 					"that opens an issue.\n%s",
 					mutationScript, got, tc.want, out)
 			}
+
+			// The same distinction in words, which is the copy that reaches
+			// the workflow. See TestTheMutationVerdictSurvivesTheMakefile for
+			// what happens to the number on the way there.
+			if got := sweepVerdict(string(out)); got != tc.verdict {
+				t.Errorf("%s recorded the verdict %q, want %q.\nEvery path out "+
+					"of the script writes one, so a missing line means an exit "+
+					"nobody described.\n%s",
+					mutationScript, got, tc.verdict, out)
+			}
 		})
 	}
+}
+
+// TestTheMutationVerdictSurvivesTheMakefile watches the sweep's finding cross
+// the layer its exit code cannot.
+//
+// Nothing schedules the script. CI schedules `make mutate`, and make exits 2
+// for any failed recipe whatever the recipe returned, so the 1 that means "a
+// count moved" and the 2 that means "no count could be taken" arrive at the
+// workflow as one number. The workflow mapped that number to a title, and every
+// moved baseline it ever found was therefore filed as a sweep that could not
+// produce a count. Issue 110 is one: it says the run measured nothing, about a
+// run that measured all three packages and found internal/render had improved
+// from 13 survivors to 12.
+//
+// Neither test around this one could see it. The exit-code table above runs the
+// script directly, where the codes are still distinct, and
+// TestTheMutationWorkflowKeepsTheSweepsOwnStatus asserts the step reads
+// PIPESTATUS rather than tee's status, which it does and always did:
+// PIPESTATUS[0] is make's status, and make is what lost the distinction. So the
+// sweep writes its verdict into the log it is already piping, and this drives
+// the real recipe to watch that line arrive where the number does not.
+func TestTheMutationVerdictSurvivesTheMakefile(t *testing.T) {
+	if _, err := exec.LookPath("make"); err != nil {
+		t.Fatalf("no make on PATH, and `make mutate` is how the sweep is run "+
+			"everywhere except a developer's shell: %v", err)
+	}
+
+	dir := t.TempDir()
+
+	// A count that moved: the one case the exit code cannot carry.
+	stub := filepath.Join(dir, "gremlins")
+	body := "#!/bin/sh\necho 'Mutation testing completed in 12s'\n" +
+		"echo 'Killed: 42, Lived: 3, Not covered: 0'\n"
+	if err := os.WriteFile(stub, []byte(body), 0o755); err != nil {
+		t.Fatalf("writing the stubbed gremlins: %v", err)
+	}
+	baseline := filepath.Join(dir, "baseline.tsv")
+	if err := os.WriteFile(baseline, []byte("internal/jql\t5\tthe reason\n"), 0o644); err != nil {
+		t.Fatalf("writing the baseline: %v", err)
+	}
+
+	// MAKEFLAGS is exported by the `make test` that usually runs this, and a
+	// sub-make that inherits a jobserver it was not handed warns into the
+	// output this test reads its answer out of.
+	var env []string
+	for _, kv := range os.Environ() {
+		if strings.HasPrefix(kv, "MAKEFLAGS=") ||
+			strings.HasPrefix(kv, "MFLAGS=") ||
+			strings.HasPrefix(kv, "MAKELEVEL=") {
+			continue
+		}
+		env = append(env, kv)
+	}
+
+	cmd := exec.Command("make", "mutate")
+	cmd.Dir = repoRoot
+	cmd.Env = append(env, "GREMLINS="+stub, "MUTATION_BASELINE="+baseline)
+	out, err := cmd.CombinedOutput()
+
+	code := 0
+	if err != nil {
+		exit, ok := errors.AsType[*exec.ExitError](err)
+		if !ok {
+			t.Fatalf("running `make mutate`: %v\n%s", err, out)
+		}
+		code = exit.ExitCode()
+	}
+
+	// The flattening, asserted rather than assumed, because everything else
+	// here is built on it. The script exited 1 and this is what came out. If a
+	// future make preserves the status, delete this assertion and not the
+	// verdict line: the line is what the workflow reads either way.
+	if code != 2 {
+		t.Errorf("`make mutate` exited %d where the sweep exited 1. Every comment "+
+			"written around this says make flattens a failed recipe to 2, and "+
+			"those comments are what somebody reads before touching it", code)
+	}
+
+	if got := sweepVerdict(string(out)); got != "moved" {
+		t.Errorf("`make mutate` reported the verdict %q, want \"moved\". The sweep "+
+			"found a count that disagreed with its baseline, and if the only "+
+			"thing that reaches the workflow is a 2 then the issue it files says "+
+			"the run measured nothing.\n%s", got, out)
+	}
+
+	// The workflow has to read that line. Mapping the status back to a verdict
+	// is the defect itself: at that point make decides the title.
+	workflow := readFile(t, mutationWorkflow)
+	if !regexp.MustCompile(`verdict=\$\([^)]*mutation\.log`).MatchString(workflow) {
+		t.Errorf("%s does not take its verdict from mutation.log, so what it reads "+
+			"has been through make, which cannot tell a moved count from an "+
+			"unmeasured one", mutationWorkflow)
+	}
+	if regexp.MustCompile(`(?s)case\s+"\$status".*?verdict=`).MatchString(workflow) {
+		t.Errorf("%s maps the sweep's exit status to a verdict. make exits 2 for "+
+			"every failed recipe, so that mapping files a moved baseline as a "+
+			"sweep that measured nothing", mutationWorkflow)
+	}
+}
+
+// sweepVerdict returns the last verdict the sweep printed, which is the line
+// the workflow reads and the only half of its finding that survives `make`.
+func sweepVerdict(out string) string {
+	verdict := ""
+	for line := range strings.SplitSeq(out, "\n") {
+		if v, ok := strings.CutPrefix(line, "sweep: "); ok {
+			verdict = strings.TrimSpace(v)
+		}
+	}
+	return verdict
 }
 
 // TestTheMutationSweepBoundsARunawayMutant holds the cap where it works.

@@ -476,7 +476,14 @@ A sweep has a third outcome and it is not a finding. A package that printed no
 summary line produced no count, so there is nothing to compare and nothing to
 conclude about its tests, and `scripts/mutate.sh` exits 2 for it where a moved
 count exits 1. The weekly workflow reads that verdict to decide what its issue
-says. It used to read `if: failure()` instead, which is a trigger rather than a
+says, and it reads it as a line the sweep prints rather than as the exit code,
+because the exit code does not survive the trip. CI runs `make mutate`, and make
+exits 2 for any failed recipe whatever the recipe returned, so read as a number
+the two outcomes are one number: every moved baseline the sweep found was filed
+as a run that could not produce a count, most recently on 2026-08-31, when
+`internal/render` came in at 12 survivors against a baseline of 13 and the issue
+said the run had measured nothing. It used to read `if: failure()` instead,
+which is a trigger rather than a
 result: the first scheduled run was killed by a reclaimed runner 80 seconds in,
 and the issue it filed announced a baseline regression from a run that had
 printed one header row. The same step piped `make mutate` into `tee` under

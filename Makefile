@@ -429,10 +429,16 @@ complexity:
 # threshold on it would redden a pull request that touched nothing near the
 # mutant. It runs on a schedule against a baseline that only goes down, and
 # scripts/mutate.sh is where both of those decisions are written out.
+#
+# The recipe hands the script nothing. GREMLINS and MUTATION_BASELINE are the
+# script's own overrides and each already defaults to exactly what was pinned
+# here, so the assignment bought nothing and cost the one thing worth having:
+# a test cannot drive `make mutate` against a stub, and make is precisely where
+# the sweep's exit code stops meaning anything.
 ## mutate: run mutation testing against the baseline in scripts/
 .PHONY: mutate
 mutate:
-	@GREMLINS="$(shell go env GOPATH)/bin/gremlins" ./scripts/mutate.sh
+	@./scripts/mutate.sh
 
 # An offline run fails rather than passing quietly, on the same principle as
 # everything else here: a check that did not run is not a check that passed.
