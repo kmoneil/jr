@@ -498,12 +498,20 @@ do not catch, add the test in the same change and cite it here.
   a real finding would have gone green. `scripts/mutate.sh` now gives a moved
   count and an unmeasurable one different exit codes, and the workflow titles
   the issue from the verdict the sweep recorded rather than from the fact that
-  the job went red. The nightly fuzz sweep had the same shape and could not use
+  the job went red. Different exit codes were not enough by themselves: CI runs
+  `make mutate`, and make exits 2 for any failed recipe whatever the recipe
+  returned, so the 1 and the 2 reached the workflow as one number and every
+  moved baseline was filed as a sweep that could not produce a count. Issue 110
+  is one of them, filed on 2026-08-31 against a run that measured all three
+  packages and found `internal/render` improved. The verdict is therefore a line
+  the sweep prints into the log it is already piping and archiving, and the
+  workflow reads that line. The nightly fuzz sweep had the same shape and could not use
   the same answer: `fuzz` is a matrix, and every leg writes to one job-output
   namespace, so it reads the run's own jobs back and reports which legs failed
   at their `fuzz` step and which never reached it.
   **Enforced by:** `TestTheMutationSweepExitCodesSayWhichFailureItWas`,
   `TestTheMutationWorkflowKeepsTheSweepsOwnStatus`,
+  `TestTheMutationVerdictSurvivesTheMakefile`,
   `TestTheMutationReportNamesWhatActuallyFailed`,
   `TestAScheduledSweepReportsWhatItMeasured`.
 - **A mutant runs under a memory bound, because some of them do not

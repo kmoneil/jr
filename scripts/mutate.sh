@@ -29,6 +29,20 @@
 # tests and somebody writes one or lowers a number. A 2 is a finding about the
 # run, and saying anything about the tests on the strength of it would be this
 # script inventing a result it does not have.
+#
+# The last line of stdout says the same thing in words: `sweep: matched`,
+# `sweep: moved`, or `sweep: broken`. That is not a second copy of the exit
+# code, it is the copy that survives the trip. Nothing runs this script
+# directly except a developer: CI runs `make mutate`, and make exits 2 for any
+# failed recipe whatever the recipe exited with, so the 1 and the 2 above reach
+# the workflow as one number. Every moved baseline this sweep ever found was
+# therefore filed as "could not produce a count", including the run on
+# 2026-08-31 that found internal/render had improved. A wrapper can flatten an
+# exit code. It cannot rewrite a line the sweep printed into the log it is
+# already piping and archiving.
+#
+# Every path out of here prints one, including the pre-flight refusals below, so
+# no line at all means the sweep was killed before it reached an exit.
 set -euo pipefail
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -49,10 +63,12 @@ TIMEOUT_COEFFICIENT=${TIMEOUT_COEFFICIENT:-60}
 
 if [ ! -x "$gremlins" ]; then
 	echo "no gremlins at $gremlins. Run 'make tools', or set GREMLINS." >&2
+	printf 'sweep: broken\n'
 	exit 2
 fi
 if [ ! -f "$baseline" ]; then
 	echo "no baseline at $baseline" >&2
+	printf 'sweep: broken\n'
 	exit 2
 fi
 
@@ -117,6 +133,7 @@ fi
 MUTATION_ADDRESS_SPACE_KIB=${MUTATION_ADDRESS_SPACE_KIB:-3145728}
 realgo=$(command -v go) || {
 	echo "no go on PATH" >&2
+	printf 'sweep: broken\n'
 	exit 2
 }
 shim=$(mktemp -d)
@@ -179,6 +196,12 @@ done <"$baseline"
 # a partial sweep's counts, and the first thing to fix is that it ran at all.
 # Both are in the table either way.
 if [ "$broken" -eq 1 ]; then
+	printf 'sweep: broken\n'
 	exit 2
 fi
-exit "$moved"
+if [ "$moved" -eq 1 ]; then
+	printf 'sweep: moved\n'
+	exit 1
+fi
+printf 'sweep: matched\n'
+exit 0

@@ -68,19 +68,28 @@ jobs:
           set +e
           make mutate | tee mutation.log
           status=${PIPESTATUS[0]}
-          case "$status" in
-            0) verdict=matched ;;
-            1) verdict=moved ;;
-            2) verdict=broken ;;
-            *) verdict=broken ;;
-          esac
+          # The verdict is the line the sweep wrote about itself, and reading
+          # the status instead was the same defect as the tee, one layer out.
+          # `make mutate` is what runs here, and make exits 2 for any failed
+          # recipe whatever the recipe returned: the sweep's 1 for a moved
+          # count and its 2 for a count it could not take arrive as one number.
+          # Mapped back to a title, that made every moved baseline a sweep that
+          # "could not produce a count", which is what issue 110 said about a
+          # run that had measured all three packages and found internal/render
+          # improved.
+          #
+          # The status is still what this step exits with, because that is what
+          # reddens the job and triggers the report. It is no longer what the
+          # report is told.
+          verdict=$(sed -n 's/^sweep: //p' mutation.log | tail -1)
           # The verdict rows, without the per-survivor lines indented under
-          # them: four lines somebody reads in an issue body. The artifact
-          # below carries every survivor by file, line, and mutator.
+          # them and without the sweep's own verdict line: four lines somebody
+          # reads in an issue body. The artifact below carries every survivor
+          # by file, line, and mutator.
           {
             echo "verdict=$verdict"
             echo "table<<END_OF_MUTATION_TABLE"
-            grep -v '^ ' mutation.log | grep -v '^END_OF_MUTATION_TABLE$'
+            grep -vE '^( |sweep: |END_OF_MUTATION_TABLE$)' mutation.log
             echo "END_OF_MUTATION_TABLE"
           } >> "$GITHUB_OUTPUT"
           exit "$status"
@@ -106,6 +115,11 @@ jobs:
   # So the trigger stays failure() and the claim comes from what the sweep
   # recorded about itself. An empty verdict is its own report: the step did not
   # live long enough to write one.
+  #
+  # "What the sweep recorded" is a line in the log, `sweep: <verdict>`, and not
+  # the exit code it was read from until 2026-08-31. The sweep writes one on
+  # every path it takes itself, so an empty verdict means it was killed rather
+  # than that it declined to say.
   report:
     name: report a regression
     needs: mutate
@@ -142,7 +156,7 @@ jobs:
               ;;
             broken)
               title="mutation: the weekly sweep could not produce a count"
-              detail="A package produced no summary line, which is how gremlins reports that it could not build or run its mutants. This says nothing about the tests in that package. It says the sweep did not measure them, so no count from this run is a count."
+              detail="A package produced no summary line, which is how gremlins reports that it could not build or run its mutants, or the sweep refused to start at all. This says nothing about the tests in that package. It says the sweep did not measure them, so no count from this run is a count."
               ;;
             *)
               title="mutation: the weekly sweep did not finish"
