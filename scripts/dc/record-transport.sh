@@ -3,8 +3,8 @@
 # Record internal/transport/testdata/serverinfo.datacenter.json.
 #
 # This one cassette needs its own script because the contract test plays four
-# exchanges — the deployment probe, the account, a 404 for a missing issue, and
-# a POST that must fail on the summary — and no single jr invocation produces
+# exchanges (the deployment probe, the account, a 404 for a missing issue, and
+# a POST that must fail on the summary) and no single jr invocation produces
 # all four. A cassette carrying anything else fails `Unplayed()`, and one
 # missing an exchange fails with FIXTURE_MISS.
 #
@@ -18,22 +18,9 @@ here=$(cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091
 . "$here/common.sh"
 
-profile=$here/profile
-jr=${JR:-$repo/bin/jr}
 out=internal/transport/testdata/serverinfo.datacenter.json
 
-export XDG_CONFIG_HOME=$profile/config
-export XDG_STATE_HOME=$profile/state
-export XDG_CACHE_HOME=$profile/cache
-
-[ -f "$profile/config/jr/config.toml" ] || {
-	say "no throwaway profile at $profile. Run: make dc-up"
-	exit 2
-}
-[ -x "$jr" ] || {
-	say "no binary at $jr — run 'make build', or set JR"
-	exit 2
-}
+require_rig >/dev/null || exit 2
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT

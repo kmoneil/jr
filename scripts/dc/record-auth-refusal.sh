@@ -4,8 +4,8 @@
 #
 # Jira Data Center 11 disables HTTP Basic by default. Every REST call answers
 # `403 {"message":"Basic Authentication has been disabled on this instance."}`
-# with no header saying so, and jr reported that as a permission problem — exit
-# 6, remedy "check the project permissions for this account" — for a credential
+# with no header saying so, and jr reported that as a permission problem: exit
+# 6, remedy "check the project permissions for this account", for a credential
 # the instance will never accept.
 #
 # This needs its own script for two reasons the manifest cannot express: the
@@ -21,13 +21,11 @@ here=$(cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091
 . "$here/common.sh"
 
-jr=${JR:-$repo/bin/jr}
 out=internal/transport/testdata/basic-refused.datacenter.json
 
-[ -x "$jr" ] || {
-	say "no binary at $jr — run 'make build', or set JR"
-	exit 2
-}
+# Not require_rig: this script never touches the throwaway profile, and the
+# profile guard would refuse a context that is beside the point here.
+require_jr || exit 2
 
 base=$(jira_base)
 
@@ -70,7 +68,7 @@ path = sys.argv[1]
 cassette = json.load(open(path))
 statuses = [i["response"]["status"] for i in cassette["interactions"]]
 if statuses != [403]:
-    sys.exit(f"recorded {statuses}, wanted a single 403 — nothing else should "
+    sys.exit(f"recorded {statuses}, wanted a single 403; nothing else should "
              "have been reachable with a credential the instance refuses")
 cassette["note"] = (
     "Recorded against Jira Software Data Center 11.3.5, which disables HTTP "

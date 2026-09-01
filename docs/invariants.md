@@ -524,6 +524,20 @@ do not catch, add the test in the same change and cite it here.
   which sizes itself from `NumCPU` and then dies copying the source tree per
   worker. The bound is on the children that run away.
   **Enforced by:** `TestTheMutationSweepBoundsARunawayMutant`.
+- **A recording script refuses a profile that names a Jira the rig is not
+  serving.** `make dc-up` recreates the compose network and Docker hands it the
+  first free subnet, so the container's address depends on what else is running
+  that day, and `auth login` leaves an existing context alone by design. For a
+  fortnight the throwaway profile named yesterday's container, `auth status`
+  reported authenticated for it without contacting Jira, and the first command
+  timed out in a way that read as a network failure. `require_rig` in
+  `scripts/dc/common.sh` compares the current context's site with the address
+  that answers `/status` and refuses with both values side by side, and `up.sh`
+  recreates the context on every run and runs the same guard last as its
+  post-condition. It also asks the binary to run rather than checking its mode,
+  because a build made on the host is executable by mode and cannot exec in
+  the container.
+  **Enforced by:** `TestTheRigRefusesAProfileThatNamesAnotherAddress`.
 
 ## Credentials and safety
 

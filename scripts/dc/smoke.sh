@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Run every read verb, and the writes that leave nothing behind, against the
-# rig — and report what each one did.
+# rig, and report what each one did.
 #
 # This is the version-compatibility check. The recordings pin what one Data
 # Center answered; this asks whether another one answers at all. Jira 11
@@ -10,7 +10,7 @@
 # lot of customers are still on.
 #
 # It prints one row per command: the exit code, and the error code when there
-# is one. Nothing is asserted — a sweep that decided what "wrong" means would
+# is one. Nothing is asserted: a sweep that decided what "wrong" means would
 # need to know which refusals are correct, and several here are.
 set -uo pipefail
 
@@ -19,27 +19,10 @@ here=$(cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091
 . "$here/common.sh"
 
-profile=$here/profile
-jr=${JR:-$repo/bin/jr}
 project=${SEED_PROJECT:-ENG}
 
-export XDG_CONFIG_HOME=$profile/config
-export XDG_STATE_HOME=$profile/state
-export XDG_CACHE_HOME=$profile/cache
-
-[ -f "$profile/config/jr/config.toml" ] || {
-	say "no throwaway profile at $profile. Run: make dc-up"
-	exit 2
-}
-[ -x "$jr" ] || {
-	say "no binary at $jr — run 'make build', or set JR"
-	exit 2
-}
-
-version=$(curl -sS -u "${ADMIN_USER:-ada}:${ADMIN_PASSWORD:-fixtures-only}" \
-	"$(jira_base)/rest/api/2/serverInfo" 2>/dev/null |
-	sed -E 's/.*"version" *: *"([^"]+)".*/\1/')
-say "sweeping Jira ${version:-unknown} at $(jira_base)"
+# require_rig names the version and the address it verified.
+require_rig >/dev/null || exit 2
 say
 
 fail=0
@@ -87,4 +70,4 @@ run "jql validate" jql validate --jql "project = $project ORDER BY key DESC"
 run "jql explain" jql explain --jql "project = $project"
 
 say
-say "$fail command(s) did not exit 0. Several refusals are correct — read them."
+say "$fail command(s) did not exit 0. Several refusals are correct; read them."
