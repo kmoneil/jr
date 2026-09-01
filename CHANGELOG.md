@@ -20,6 +20,81 @@ accident.
 
 Nothing yet.
 
+## [0.10.1] - 2026-09-01
+
+**`jr doctor` now reports what the connection did, not only what it was
+configured to do.** The transport check used to describe the TLS chain that was
+configured: the bundle path, the client certificate, and where each came from.
+It could not say whether the chain that verified went through the bundle at
+all, or which version was negotiated, because both are properties of a
+connection rather than of a configuration. A bundle that was named, read, and
+added to the pool is still one the site may never need, and "the system trust
+store plus corporate-root.pem" read the same either way.
+
+Patch: everything here is additive. One kind moved a schema version, and every
+attribute it gained is optional, so read **Output contract** below only if you
+parse `doctor`.
+
+### Added
+
+- **The transport check reports the connection a response arrived on.** Once
+  one has, it carries `tls`, `tls-version`, and `verified-against`, and its
+  summary says what happened rather than what was set:
+
+      TLS 1.3, verified against the system trust store, no proxy
+      TLS 1.3, verified against the system trust store (corporate-root.pem was not needed), no proxy
+      plain HTTP, nothing to verify, no proxy
+
+  `verified-against` is `system` or `bundle`. `bundle` means no chain verified
+  without a certificate from your `--ca-bundle`; `system` with a bundle
+  configured means the setting is doing nothing, and the summary names the
+  file. The issuer is deliberately not reported: a root's subject can name an
+  employer, and this document is what gets pasted into a bug report.
+
+  A site that never answered, and a replayed fixture, both leave the three
+  attributes absent and the summary ends `no connection observed`, because the
+  alternative was a claim about a chain nobody verified. `tls="false"` is only
+  ever a plain `http://` site that answered.
+
+  Measured against a public Jira over TLS with the system roots, and again with
+  an unrelated bundle on `--ca-bundle`: the second run names the bundle as not
+  needed, which is the finding this exists for.
+
+### Output contract
+
+One kind moved. No `code` string was added, no exit code means anything
+different, no default column set changed, and no kind was removed or renamed.
+
+- **`doctor` v1 → v2.** Three new optional attributes on the `transport` check:
+  `tls` (bool), `tls-version` (string, as `crypto/tls` names it), and
+  `verified-against` (enum: `system`, `bundle`). Present only once a response
+  has arrived. A consumer reading v1 reads v2 unchanged.
+
+### Internal
+
+Not user-visible, and here because two of them changed what a green run means.
+
+- **The Data Center recording rig refuses a profile that names a Jira it is not
+  serving.** `make dc-up` recreates the compose network and Docker hands it the
+  first free subnet, `auth login` leaves an existing context alone by design,
+  and for a fortnight the throwaway profile named yesterday's container: every
+  command against it timed out in a way that read as a network failure. Every
+  rig script now runs one guard first, which also refuses a binary this machine
+  cannot exec, and `dc-up` runs it last as its own post-condition.
+- **The weekly mutation sweep's verdict comes from its own log.** `make` exits 2
+  for any failed recipe, so a moved baseline and a sweep that measured nothing
+  reached the workflow as one number, and every moved baseline was filed as a
+  run that could not produce a count. The sweep now writes `sweep: matched`,
+  `moved`, or `broken` into the log it was already archiving and the workflow
+  reads that line. `internal/render`'s baseline drops from 13 surviving mutants
+  to 12.
+- **The commit-msg hook refuses tool attribution**, after a session trailer
+  reached ten commits on `main` unread and removing it cost a history rewrite.
+  0.9.3 is recorded above as withdrawn for the same reason.
+- **The README's authorship paragraph says authorship.** It stood next to the
+  word liability and was quotable as a warranty by somebody who had not opened
+  `LICENSE`, which is where Apache-2.0 sections 7 to 9 govern that.
+
 ## [0.10.0] - 2026-08-28
 
 **`jr` now says what its answers were computed over.** An agent used 0.9.3 for
@@ -1606,6 +1681,7 @@ recent enough to be worth reading.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
 [unreleased]: https://github.com/kmoneil/jr/compare/v0.10.0...main
+[0.10.1]: https://github.com/kmoneil/jr/releases/tag/v0.10.1
 [0.10.0]: https://github.com/kmoneil/jr/releases/tag/v0.10.0
 [0.9.2]: https://github.com/kmoneil/jr/releases/tag/v0.9.2
 [0.9.1]: https://github.com/kmoneil/jr/releases/tag/v0.9.1
