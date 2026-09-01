@@ -945,9 +945,10 @@ archive, so it reaches somebody holding only the tarball.
 
 ## How this was built
 
-Built with AI assistance. I directed, reviewed, and accepted every part of it,
-and I'm responsible for the result. Noted for transparency, not as a selling
-point or an excuse.
+Built with AI assistance. I directed, reviewed, and accepted every design
+decision in it, and the choices are mine. Noted for transparency, not as a
+selling point or an excuse. The warranty and liability terms are the Apache-2.0
+ones in [LICENSE](LICENSE); nothing here modifies them.
 
 - **Claims about Jira are measured, not remembered.** Five bugs shipped and were
   found by pointing a real build at a real instance, not by any test.
