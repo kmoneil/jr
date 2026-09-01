@@ -3,6 +3,7 @@ package transport
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"net/http"
 	"net/url"
 	"os"
@@ -56,19 +57,21 @@ func (o TLSOptions) Empty() bool {
 }
 
 // httpClient builds the client for these options, or nil when there is nothing
-// to configure.
+// to configure. Beside it come the bundle's certificates, which the client
+// keeps so a verified chain can be told apart from one the bundle was never
+// consulted for: see Connection.
 //
 // A nil return is not a failure: it means the default transport is right, and
 // keeping the default rather than rebuilding an identical one is what preserves
 // its connection pooling and its proxy behaviour for every caller who needs
 // nothing special.
-func (o TLSOptions) httpClient() (*http.Client, error) {
+func (o TLSOptions) httpClient() (*http.Client, []*x509.Certificate, error) {
 	if o.Empty() {
-		return nil, nil
+		return nil, nil, nil
 	}
-	cfg, err := o.tlsConfig()
+	cfg, bundle, err := o.tlsConfig()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Cloned from the default rather than built fresh, so proxy support,
@@ -77,12 +80,12 @@ func (o TLSOptions) httpClient() (*http.Client, error) {
 	// from them at the next Go release.
 	base, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {
-		return nil, errs.Runtime("NO_TLS_SUPPORT",
+		return nil, nil, errs.Runtime("NO_TLS_SUPPORT",
 			"this build's default HTTP transport cannot be configured for TLS")
 	}
 	t := base.Clone()
 	t.TLSClientConfig = cfg
-	return &http.Client{Transport: t}, nil
+	return &http.Client{Transport: t}, bundle, nil
 }
 
 // tlsConfig turns the options into a verified configuration, refusing anything
@@ -91,31 +94,34 @@ func (o TLSOptions) httpClient() (*http.Client, error) {
 // Falling back is the failure this whole file exists to prevent: a bundle that
 // was named and then ignored produces the same verification error the caller
 // was trying to fix, and nothing says the file was never read.
-func (o TLSOptions) tlsConfig() (*tls.Config, error) {
+func (o TLSOptions) tlsConfig() (*tls.Config, []*x509.Certificate, error) {
 	cfg := &tls.Config{MinVersion: tls.VersionTLS12}
 
+	var bundle []*x509.Certificate
 	if o.CABundle != "" {
-		pool, err := o.rootPool()
+		pool, certs, err := o.rootPool()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		cfg.RootCAs = pool
+		bundle = certs
 	}
 	if o.ClientCert != "" || o.ClientKey != "" {
 		cert, err := o.clientCertificate()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		cfg.Certificates = []tls.Certificate{cert}
 	}
-	return cfg, nil
+	return cfg, bundle, nil
 }
 
-// rootPool is the system trust plus the caller's bundle.
-func (o TLSOptions) rootPool() (*x509.CertPool, error) {
-	pem, err := os.ReadFile(o.CABundle) //nolint:gosec // the path is the caller's, and reading it is the point.
+// rootPool is the system trust plus the caller's bundle, and the bundle's own
+// certificates beside it.
+func (o TLSOptions) rootPool() (*x509.CertPool, []*x509.Certificate, error) {
+	raw, err := os.ReadFile(o.CABundle) //nolint:gosec // the path is the caller's, and reading it is the point.
 	if err != nil {
-		return nil, errs.Usage("INVALID_CA_BUNDLE",
+		return nil, nil, errs.Usage("INVALID_CA_BUNDLE",
 			"cannot read the CA bundle").
 			WithDetail("%s", o.CABundle).
 			WithRemedy("point --ca-bundle at a readable PEM file of certificates").
@@ -127,24 +133,46 @@ func (o TLSOptions) rootPool() (*x509.CertPool, error) {
 		// Not a fallback to an empty pool. An empty pool trusts nothing but the
 		// bundle, which is the "trust only this CA" tool this deliberately does
 		// not hand out by accident.
-		return nil, errs.Runtime("NO_SYSTEM_TRUST",
+		return nil, nil, errs.Runtime("NO_SYSTEM_TRUST",
 			"this system's root certificates cannot be read, so a bundle cannot be added to them").
 			WithRemedy("report this: the CA bundle is additive and needs the system roots to add to").
 			Wrap(err)
 	}
-	if !pool.AppendCertsFromPEM(pem) {
+	if !pool.AppendCertsFromPEM(raw) {
 		// AppendCertsFromPEM reports only whether *any* certificate was added,
 		// so this is "nothing in the file was a certificate" rather than "every
 		// certificate was fine". A file of one good and one malformed PEM block
 		// is accepted, which is the standard library's behaviour and not
 		// something to reimplement here.
-		return nil, errs.Usage("INVALID_CA_BUNDLE",
+		return nil, nil, errs.Usage("INVALID_CA_BUNDLE",
 			"the CA bundle holds no certificates this tool can read").
 			WithDetail("%s", o.CABundle).
 			WithRemedy("check the file is PEM, the -----BEGIN CERTIFICATE----- form, " +
 				"rather than DER or a private key")
 	}
-	return pool, nil
+	return pool, certificatesIn(raw), nil
+}
+
+// certificatesIn parses the certificates AppendCertsFromPEM would have added,
+// on the same terms: every CERTIFICATE block that parses, and nothing said
+// about the ones that do not.
+func certificatesIn(raw []byte) []*x509.Certificate {
+	var out []*x509.Certificate
+	for {
+		var block *pem.Block
+		block, raw = pem.Decode(raw)
+		if block == nil {
+			return out
+		}
+		if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
+			continue
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			continue
+		}
+		out = append(out, cert)
+	}
 }
 
 // clientCertificate loads the certificate this client presents.

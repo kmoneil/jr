@@ -99,7 +99,10 @@ Worth knowing what each check can tell you that no other command will:
   context path is the failure that produces an unexplainable 401.
 - **transport** reports the proxy in effect, which nobody configured here and
   which comes from `HTTPS_PROXY` and `NO_PROXY`, along with the CA bundle and
-  client certificate and where each came from.
+  client certificate and where each came from. Once a response has arrived it
+  also reports what the connection did: `tls-version`, and `verified-against`
+  as `system` or `bundle`. A bundle that is configured and never needed is a
+  setting doing nothing, and the summary says so.
 - **deployment** says whether the answer came from the probe, from its cache, or
   from `--api-version`. A stale cached answer and a fresh one are different
   claims. `--refresh` forces the probe.

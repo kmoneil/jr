@@ -1,6 +1,7 @@
 package cli_test
 
 import (
+	"encoding/pem"
 	"encoding/xml"
 	"fmt"
 	"net/http"
@@ -200,6 +201,107 @@ func TestDoctorReportsATLSBundleItCannotRead(t *testing.T) {
 	if got := doc.check(t, "deployment").Status; got != "skipped" {
 		t.Errorf("the deployment check is %q, want skipped: there is no "+
 			"connection to probe with:\n%s", got, doc.raw)
+	}
+}
+
+// TestDoctorReportsTheConnectionItObserved is the half of the transport check
+// the configured settings could not answer: what the connection did.
+//
+// The card that asked for doctor asked for "whether it verified against the
+// system roots, and the negotiated version", and both are properties of a
+// connection rather than of a configuration. A bundle that is configured and
+// read is still one the site may never need, and the report saying "plus
+// corporate-root.pem" cannot tell that case from this one.
+func TestDoctorReportsTheConnectionItObserved(t *testing.T) {
+	jira := newDoctorSite(t, doctorSite{tls: true})
+	env := doctorEnv(t, jira.URL, withCredential)
+	bundle := bundleOf(t, jira)
+
+	doc := runDoctorArgs(t, env, "--ca-bundle", bundle)
+
+	wire := doc.check(t, "transport")
+	if wire.Status != "ok" {
+		t.Fatalf("the transport check is %q, want ok:\n%s", wire.Status, doc.raw)
+	}
+	if got := wire.attr("tls"); got != "true" {
+		t.Errorf("tls = %q, want true", got)
+	}
+	if got := wire.attr("tls-version"); got != "TLS 1.3" {
+		t.Errorf("tls-version = %q, want TLS 1.3, which is what two Go endpoints negotiate", got)
+	}
+	// The one root that verifies this chain is the one the bundle supplied,
+	// so the bundle was needed, and the sentence names the file rather than
+	// the issuer: a root's subject can name an employer, and this document
+	// is what gets pasted into a bug report.
+	if got := wire.attr("verified-against"); got != "bundle" {
+		t.Errorf("verified-against = %q, want bundle", got)
+	}
+	if !strings.Contains(wire.Summary, "TLS 1.3") || !strings.Contains(wire.Summary, "verified against "+bundle) {
+		t.Errorf("summary = %q, want the version and the bundle it verified against", wire.Summary)
+	}
+	if got := wire.attr("ca-bundle"); got != bundle {
+		t.Errorf("ca-bundle = %q, want %q: the configured half is still reported", got, bundle)
+	}
+	if got := doc.check(t, "account").Status; got != "ok" {
+		t.Errorf("the account check is %q, want ok: the bundle should have made "+
+			"the site reachable end to end:\n%s", got, doc.raw)
+	}
+}
+
+// TestDoctorReportsAPlainSiteAsUnencrypted keeps "no TLS" and "nothing
+// observed" apart on the document: a plain http:// site that answered says
+// tls="false", and says nothing about a version or a chain because there was
+// neither.
+func TestDoctorReportsAPlainSiteAsUnencrypted(t *testing.T) {
+	jira := newDoctorSite(t, doctorSite{})
+	env := doctorEnv(t, jira.URL, withCredential)
+
+	doc := runDoctor(t, env)
+
+	wire := doc.check(t, "transport")
+	if got := wire.attr("tls"); got != "false" {
+		t.Errorf("tls = %q, want false: the site answered over plain HTTP", got)
+	}
+	for _, name := range []string{"tls-version", "verified-against"} {
+		if got := wire.attr(name); got != "" {
+			t.Errorf("%s = %q on a plain connection, want absent", name, got)
+		}
+	}
+	if !strings.HasPrefix(wire.Summary, "plain HTTP") {
+		t.Errorf("summary = %q, want it to open with plain HTTP", wire.Summary)
+	}
+}
+
+// TestDoctorSaysWhenNoConnectionWasObserved is the case the card warned
+// about: a check that has no answer about the chain has to say so rather
+// than report "not verified". A site that never answers is the reachable
+// version of a replayed fixture, and both leave the same three attributes
+// absent.
+func TestDoctorSaysWhenNoConnectionWasObserved(t *testing.T) {
+	// A site that was there and is not: its port answers nothing.
+	gone := newDoctorSite(t, doctorSite{})
+	siteURL := gone.URL
+	gone.Close()
+	env := doctorEnv(t, siteURL, withCredential)
+
+	doc := runDoctor(t, env)
+
+	wire := doc.check(t, "transport")
+	if wire.Status != "ok" {
+		t.Errorf("the transport check is %q, want ok: the settings loaded, and "+
+			"the site not answering is the deployment check's finding:\n%s",
+			wire.Status, doc.raw)
+	}
+	for _, name := range []string{"tls", "tls-version", "verified-against"} {
+		if got := wire.attr(name); got != "" {
+			t.Errorf("%s = %q with no response ever received, want absent", name, got)
+		}
+	}
+	if !strings.Contains(wire.Summary, "no connection observed") {
+		t.Errorf("summary = %q, want it to say no connection was observed", wire.Summary)
+	}
+	if got := doc.check(t, "deployment").Status; got != "failed" {
+		t.Errorf("the deployment check is %q, want failed:\n%s", got, doc.raw)
 	}
 }
 
@@ -415,6 +517,9 @@ type doctorSite struct {
 	probeStatus int
 	clockStatus int
 	selfStatus  int
+	// tls serves the site over TLS, with a certificate no trust store holds;
+	// bundleOf writes it where --ca-bundle can point.
+	tls bool
 }
 
 // newDoctorSite starts a site that answers the three requests doctor makes.
@@ -422,7 +527,7 @@ func newDoctorSite(t *testing.T, cfg doctorSite) *httptest.Server {
 	t.Helper()
 
 	var serverInfoCalls atomic.Int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/serverInfo"):
 			status := cfg.probeStatus
@@ -456,8 +561,26 @@ func newDoctorSite(t *testing.T, cfg doctorSite) *httptest.Server {
 			refuse(w, http.StatusNotFound)
 		}
 	}))
+	if cfg.tls {
+		srv.StartTLS()
+	} else {
+		srv.Start()
+	}
 	t.Cleanup(srv.Close)
 	return srv
+}
+
+// bundleOf writes the site's own certificate as a PEM bundle, which is what
+// somebody behind a private CA has: the one root that verifies the chain.
+func bundleOf(t *testing.T, srv *httptest.Server) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "corporate-root.pem")
+	block := &pem.Block{Type: "CERTIFICATE", Bytes: srv.Certificate().Raw}
+	if err := os.WriteFile(path, pem.EncodeToMemory(block), 0o600); err != nil {
+		t.Fatalf("write bundle: %v", err)
+	}
+	return path
 }
 
 func answer(w http.ResponseWriter, body string) {

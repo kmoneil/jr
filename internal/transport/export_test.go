@@ -108,3 +108,13 @@ func clientTLSConfig(c *Client) *tls.Config {
 	}
 	return t.TLSClientConfig
 }
+
+// VerifiedAgainstForTest is the classifier behind Connection.VerifiedAgainst,
+// reachable so the one case a test cannot dial can still be asserted: a bundle
+// that was configured and read, against a site whose chain verified through
+// the system roots without it. Producing that on loopback would need a
+// certificate the operating system already trusts, and the classifier is the
+// whole of the decision.
+func VerifiedAgainstForTest(chains [][]*x509.Certificate, bundle []*x509.Certificate) string {
+	return verifiedAgainst(chains, bundle)
+}

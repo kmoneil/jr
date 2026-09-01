@@ -6,7 +6,7 @@ board.list	1	board.list
 context.get	2	context.create,context.delete,context.edit,context.show,context.use
 context.list	2	context.list
 contract	2	contract
-doctor	1	doctor
+doctor	2	doctor
 dry-run	2	epic.add,epic.remove,issue.assign,issue.attachment.upload,issue.clone,issue.comment.add,issue.comment.delete,issue.comment.edit,issue.create,issue.delete,issue.edit,issue.link.add,issue.link.remove,issue.move,issue.watch,issue.worklog.add,issue.worklog.delete,sprint.add,sprint.create,sprint.start
 epic.add	2	epic.add
 epic.get	1	epic.get

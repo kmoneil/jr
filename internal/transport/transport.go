@@ -14,6 +14,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/x509"
 	"encoding/hex"
 	"errors"
 	"io"
@@ -162,6 +163,14 @@ type Client struct {
 	clock     Clock
 	jitter    func() float64
 	budget    *budget
+
+	// bundle is the configured CA bundle's own certificates, kept so a
+	// verified chain can be told apart from one the bundle was never
+	// consulted for. Nil when no bundle was configured.
+	bundle []*x509.Certificate
+	// connection is what the most recent response's connection looked like,
+	// or nil before any response has arrived. See LastConnection.
+	connection atomic.Pointer[Connection]
 }
 
 // Request is one call to Jira, described in terms this package can retry.
@@ -311,11 +320,12 @@ func (c *Client) dialThrough(opt Options) error {
 		// than swallowed: a CA bundle that was named and then ignored produces
 		// the same verification failure the caller was trying to fix, with
 		// nothing to say the file was never read.
-		tlsClient, err := opt.TLS.httpClient()
+		tlsClient, bundle, err := opt.TLS.httpClient()
 		if err != nil {
 			return err
 		}
 		c.http = tlsClient
+		c.bundle = bundle
 	}
 	if c.http == nil {
 		c.http = &http.Client{}
@@ -750,6 +760,7 @@ func (c *Client) receive(r Request, target *url.URL, requestID string, attempt i
 	}
 	c.tracer.Trace(responseEvent(target, r.Method, resp.StatusCode, resp.Header,
 		attempt, size, elapsed, id))
+	c.observe(target, resp.TLS)
 
 	out := &Response{
 		Status:    resp.StatusCode,
