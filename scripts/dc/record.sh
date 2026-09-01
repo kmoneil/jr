@@ -18,32 +18,17 @@ here=$(cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091
 . "$here/common.sh"
 
-profile=$here/profile
-jr=${JR:-$repo/bin/jr}
-
-export XDG_CONFIG_HOME=$profile/config
-export XDG_STATE_HOME=$profile/state
-export XDG_CACHE_HOME=$profile/cache
-
 # The profile guard, and the reason this script exists rather than a bare
 # JIRA_RECORD= in front of each command.
 #
 # Recording against production is refused, and the way that refusal fails is
 # somebody with a working production context running one of these lines. So
-# the throwaway profile is exported here and checked here: a config home with
-# exactly one context in it, pointing at the container. It is checkable, unlike
-# "did you mean to point at that host", and it makes the wrong instance
-# unreachable rather than merely discouraged.
-if [ ! -f "$profile/config/jr/config.toml" ]; then
-	say "no throwaway profile at $profile."
-	say "Run: make dc-up   (which sets one up against the container)"
-	exit 2
-fi
-
-if [ ! -x "$jr" ]; then
-	say "no binary at $jr — run 'make build', or set JR"
-	exit 2
-fi
+# the throwaway profile is exported and checked in common.sh: a config home
+# whose current context points at the address the container answers at. It
+# is checkable, unlike "did you mean to point at that host", and it makes the
+# wrong instance unreachable rather than merely discouraged. The address half
+# was added after a fortnight of the profile naming yesterday's container.
+require_rig >/dev/null || exit 2
 
 one() {
 	local out=$1
@@ -61,15 +46,15 @@ one() {
 
 	# JIRA_RECORD_SCRUB is deliberately not set.
 	#
-	# This instance is seeded with invented identifiers from the start — project
-	# ENG, the names in seed.sh — so there is no mapping from a real identifier
+	# This instance is seeded with invented identifiers from the start (project
+	# ENG, the names in seed.sh), so there is no mapping from a real identifier
 	# to a fictional one, which is the leak internal/lint/scrubpairs_test.go
 	# exists to refuse. Nothing to scrub beats scrubbing correctly. The host is
 	# rewritten to recorded.invalid by the recorder either way.
 	say "recording -> $out"
 	mkdir -p "$(dirname "$repo/$out")"
 	JIRA_RECORD="$repo/$out" "$jr" "$@" >/dev/null || {
-		say "  jr exited $? — see above; the cassette may be partial"
+		say "  jr exited $?, see above; the cassette may be partial"
 		return 1
 	}
 }

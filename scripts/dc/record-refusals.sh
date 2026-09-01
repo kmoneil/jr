@@ -9,7 +9,7 @@
 #
 #   create-twice   two identical creates, both accepted. The point of the test
 #                  is that the second really is sent, so it is two invocations
-#                  concatenated — every exchange real, only the assembly ours.
+#                  concatenated: every exchange real, only the assembly ours.
 #   delete-parent  deleting an issue that has subtasks, refused by Jira in
 #                  prose that this tool turns into a remedy naming --subtasks.
 #
@@ -21,23 +21,10 @@ here=$(cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091
 . "$here/common.sh"
 
-profile=$here/profile
-jr=${JR:-$repo/bin/jr}
 project=${SEED_PROJECT:-ENG}
 dir=internal/resource/issue/testdata
 
-export XDG_CONFIG_HOME=$profile/config
-export XDG_STATE_HOME=$profile/state
-export XDG_CACHE_HOME=$profile/cache
-
-[ -f "$profile/config/jr/config.toml" ] || {
-	say "no throwaway profile at $profile. Run: make dc-up"
-	exit 2
-}
-[ -x "$jr" ] || {
-	say "no binary at $jr — run 'make build', or set JR"
-	exit 2
-}
+require_rig >/dev/null || exit 2
 [ -z "${CONTEXT_PATH:-}" ] || {
 	say "refusing: these are the root cassettes and this instance is served"
 	say "under ${CONTEXT_PATH}."

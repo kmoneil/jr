@@ -10,7 +10,7 @@
 # work this file exists to remove.
 #
 # Every mutation lands on issues this script creates, so a re-run against a
-# freshly seeded instance produces the same conversation with different ids —
+# freshly seeded instance produces the same conversation with different ids,
 # and the ids are what the cassettes carry, so a re-run is a re-record rather
 # than a no-op.
 set -euo pipefail
@@ -20,22 +20,9 @@ here=$(cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091
 . "$here/common.sh"
 
-profile=$here/profile
-jr=${JR:-$repo/bin/jr}
 project=${SEED_PROJECT:-ENG}
 
-export XDG_CONFIG_HOME=$profile/config
-export XDG_STATE_HOME=$profile/state
-export XDG_CACHE_HOME=$profile/cache
-
-[ -f "$profile/config/jr/config.toml" ] || {
-	say "no throwaway profile at $profile. Run: make dc-up"
-	exit 2
-}
-[ -x "$jr" ] || {
-	say "no binary at $jr — run 'make build', or set JR"
-	exit 2
-}
+require_rig >/dev/null || exit 2
 [ -z "${CONTEXT_PATH:-}" ] || {
 	say "refusing: this instance is served under ${CONTEXT_PATH}, and these"
 	say "cassettes are the root ones. Clear CONTEXT_PATH and re-create it."
@@ -44,7 +31,7 @@ export XDG_CACHE_HOME=$profile/cache
 
 dir=internal/resource/issue/testdata
 
-# record <cassette> <jr args...> — writes the cassette and prints jr's stdout,
+# record <cassette> <jr args...> writes the cassette and prints jr's stdout,
 # so a step can read the key or id it just created.
 record() {
 	local out=$dir/$1
@@ -55,8 +42,8 @@ record() {
 
 # field reads one value out of a record document.
 #
-# TSV for a single record is a field/value table rather than a row of columns —
-# `@key<TAB>ENG-6` — so a column index reads the field *name* out of the second
+# TSV for a single record is a field/value table rather than a row of columns,
+# `@key<TAB>ENG-6`, so a column index reads the field *name* out of the second
 # row and hands back "@key". That is how the first run of this script sent
 # Jira the literal string "@key" as an issue key.
 field() { sed -n "s/^$1\t//p" | head -1; }
@@ -118,7 +105,7 @@ record link-add-recorded.datacenter.json issue link add \
 # The first offered transition is not automatically the right one to record.
 # Jira's default workflow offers "To Do" to an issue already in To Do, and a
 # move that changes nothing is a weak recording of a verb whose whole purpose
-# is changing something — so the one picked is the first whose destination
+# is changing something, so the one picked is the first whose destination
 # differs from where the issue is now.
 status=$("$jr" issue get "$subject" --format tsv | field @status)
 transition=$("$jr" meta transitions "$subject" --format tsv |
