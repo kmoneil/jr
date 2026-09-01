@@ -18,9 +18,13 @@ import (
 )
 
 // The kind `jr doctor` owns.
+//
+// v2 added the observed connection to the transport check: `tls`,
+// `tls-version`, and `verified-against`, present once a response has arrived.
+// Every addition is optional, so a consumer reading v1 reads v2 unchanged.
 const (
 	kindDoctor    = "doctor"
-	versionDoctor = 1
+	versionDoctor = 2
 )
 
 // The verdict one check carries.
@@ -54,6 +58,13 @@ Runs every check between this binary and an answer from Jira and reports all of
 them: the configuration, the credential, the site URL and its context path, the
 proxy and TLS settings, the deployment probe, the clock, the account, and
 whatever the site discloses about rate limits.
+
+The transport check reports the TLS settings that were configured and, once a
+response has arrived, the connection that carried it: whether it was encrypted,
+at which version, and whether the chain verified against the system trust store
+or needed the bundle. A bundle the chain never needed is a setting doing
+nothing, and a version below what the site speaks is a middlebox nobody
+mentioned; neither is knowable from configuration.
 
 It exists because the interesting failures are the ones where the first request
 fails and the reason is three layers below it. A 401 from a Data Center under a
@@ -113,10 +124,14 @@ func (a *app) runDoctor(ctx context.Context, _ *registry.Invocation) (*render.Do
 	credential := d.checkCredential()
 	d.connect()
 	reachable := d.checkSite()
-	wire := d.checkTransport()
 	deployment := d.checkDeployment(ctx)
 	clock, limits := d.checkClockAndLimits(ctx)
 	account := d.checkAccount(ctx)
+	// Built last, in its place in the document: it reports the connection
+	// the three checks above made, and it depends on none of their verdicts.
+	// The deployment probe may come from the cache, and the clock never
+	// does, so by here a response has arrived if one was going to.
+	wire := d.checkTransport()
 
 	return render.Record(kindDoctor, versionDoctor, tally([]*render.Node{
 		config, credential, reachable, wire, deployment, clock, account, limits,
@@ -323,13 +338,24 @@ func siteSummary(siteURL, path string) string {
 }
 
 // checkTransport reports what the connection is made through: the proxy nobody
-// configured here, and the TLS settings somebody did.
+// configured here, the TLS settings somebody did, and, once a response has
+// arrived, what the connection that carried it actually did.
 func (d *doctorRun) checkTransport() *render.Node {
 	if d.session == nil {
 		return checkSkipped("transport", waitingOn("config"))
 	}
 	r := d.session.resolved
 	proxy := transport.ProxyFor(r.Site)
+
+	// What the last response's connection looked like, when one arrived.
+	// Observed rather than derived: whether the bundle was needed and which
+	// version was negotiated are properties of a connection, and the
+	// configured chain cannot answer either.
+	var conn transport.Connection
+	observed := false
+	if d.client != nil {
+		conn, observed = d.client.LastConnection()
+	}
 
 	// The same attributes whatever the verdict: what was configured is worth
 	// reporting most when the connection could not be built, since it is the
@@ -342,6 +368,15 @@ func (d *doctorRun) checkTransport() *render.Node {
 		if r.CABundle != "" {
 			n.Attr("ca-bundle-source", string(r.CABundleSource))
 		}
+		// Present only when a connection was observed. A site that never
+		// answered and a replayed fixture both leave these absent, because
+		// absent is the honest answer for both: `tls="false"` is a plain
+		// http:// site that answered, never a chain nobody verified.
+		if observed {
+			n.Attr("tls", strconv.FormatBool(conn.TLS)).
+				AttrIf("tls-version", conn.Version).
+				AttrIf("verified-against", conn.VerifiedAgainst)
+		}
 		return n
 	}
 
@@ -351,23 +386,60 @@ func (d *doctorRun) checkTransport() *render.Node {
 	case d.client == nil:
 		return settings(checkSkipped("transport", waitingOn("site")))
 	}
-	return settings(checkOK("transport", transportSummary(proxy, r.CABundle, r.ClientCert)))
+	return settings(checkOK("transport",
+		transportSummary(proxy, r.CABundle, r.ClientCert, conn, observed)))
 }
 
 // transportSummary names what is in play, and says so when nothing is: "the
 // system trust store, no proxy" is a finding, and an empty line is not.
-func transportSummary(proxy, bundle, clientCert string) string {
-	parts := []string{"the system trust store"}
-	if bundle != "" {
-		parts = []string{"the system trust store plus " + bundle}
+//
+// Once a response has arrived it says what the connection did rather than
+// what it was configured to do, because the two differ in exactly the cases
+// worth reading: a bundle the chain never needed, a version below what the
+// site speaks. Before one arrives it says that too, so the configured chain is
+// not mistaken for a verified one.
+func transportSummary(proxy, bundle, clientCert string, conn transport.Connection, observed bool) string {
+	var parts []string
+	switch {
+	case !observed:
+		parts = append(parts, configuredTrust(bundle))
+	case !conn.TLS:
+		parts = append(parts, "plain HTTP, nothing to verify")
+	default:
+		parts = append(parts, conn.Version, verifiedSentence(conn, bundle))
 	}
 	if clientCert != "" {
 		parts = append(parts, "presenting "+clientCert)
 	}
 	if proxy == "" {
-		return strings.Join(append(parts, "no proxy"), ", ")
+		parts = append(parts, "no proxy")
+	} else {
+		parts = append(parts, "through "+proxy)
 	}
-	return strings.Join(append(parts, "through "+proxy), ", ")
+	if !observed {
+		parts = append(parts, "no connection observed")
+	}
+	return strings.Join(parts, ", ")
+}
+
+// configuredTrust is what a connection would verify against, before one has.
+func configuredTrust(bundle string) string {
+	if bundle == "" {
+		return "the system trust store"
+	}
+	return "the system trust store plus " + bundle
+}
+
+// verifiedSentence is what the chain did verify against, and names the bundle
+// that was configured for nothing when that is what happened.
+func verifiedSentence(conn transport.Connection, bundle string) string {
+	switch {
+	case conn.VerifiedAgainst == transport.VerifiedAgainstBundle:
+		return "verified against " + bundle
+	case bundle != "":
+		return "verified against the system trust store (" + bundle + " was not needed)"
+	}
+	return "verified against the system trust store"
 }
 
 // checkDeployment reports what the site is, and whether that was learned just
@@ -712,7 +784,22 @@ func transportCheckSchema() *render.Schema {
 		render.Field{Name: "ca-bundle", Type: render.TypeString, Optional: true},
 		render.Field{Name: "ca-bundle-source", Type: render.TypeString, Optional: true},
 		render.Field{Name: "client-cert", Type: render.TypeString, Optional: true},
-		render.Field{Name: "client-key", Type: render.TypeString, Optional: true})
+		render.Field{Name: "client-key", Type: render.TypeString, Optional: true},
+		// The connection a response arrived on, present only once one has.
+		// Absent on a site that never answered and on a replayed fixture,
+		// which are the two cases where "not verified" would be a claim about
+		// a chain nobody looked at. tls is false for a plain http:// site.
+		render.Field{Name: "tls", Type: render.TypeBool, Optional: true},
+		// As crypto/tls names it, "TLS 1.3". A 1.2 against a site that speaks
+		// 1.3 is a middlebox nobody mentioned.
+		render.Field{Name: "tls-version", Type: render.TypeString, Optional: true},
+		// system means the chain verified through the trust store, bundle or
+		// no bundle; with a bundle configured that is the setting doing
+		// nothing. bundle means no chain verified without it.
+		render.Field{
+			Name: "verified-against", Type: render.TypeString,
+			Optional: true, Enum: transport.VerifiedAgainstValues,
+		})
 }
 
 func deploymentCheckSchema() *render.Schema {

@@ -28,7 +28,7 @@ or `skipped`.
 | `config` | which context, from which file, and whether read-only is latched |
 | `credential` | which credential a request would carry, from where, and under which scheme |
 | `site` | the URL a request resolves to, and the context path it is under |
-| `transport` | the proxy in effect, the CA bundle, the client certificate |
+| `transport` | the proxy in effect, the CA bundle, the client certificate, and once a response has arrived the negotiated TLS version and whether the chain needed the bundle (`verified-against`: `system` or `bundle`) |
 | `deployment` | Cloud or Data Center, and whether that came from the probe, its cache, or `--api-version` |
 | `clock` | this machine against the site's, failing at a minute apart |
 | `account` | who the credential is, which is the only proof the credential works |

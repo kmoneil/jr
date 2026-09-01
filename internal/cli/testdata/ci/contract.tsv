@@ -6,7 +6,7 @@ board.list	1	board.list
 context.get	2	context.create,context.delete,context.edit,context.show,context.use
 context.list	2	context.list
 contract	2	contract
-doctor	1	doctor
+doctor	2	doctor
 epic.get	1	epic.get
 epic.list	1	epic.list
 field.list	2	field.list

@@ -447,6 +447,24 @@ saying the file was never read. Half a client certificate is
 `INVALID_CLIENT_CERT`, both refused before the request rather than at the
 handshake, where the error names the server instead of the file.
 
+`doctor`'s transport check reports the same three paths and the same proxy,
+and moved to **v2** on 2026-09-01 to add what a connection actually did, which
+configuration cannot say. All three are optional and present only once a
+response has arrived:
+
+- `tls` is whether the connection was encrypted. `false` is a plain `http://`
+  site that answered. Absent means no response was received, or the run was a
+  replayed fixture, which makes no connection at all; in both cases the check
+  says so in its summary rather than reporting a chain nobody verified.
+- `tls-version` is the negotiated protocol as `crypto/tls` names it, `TLS 1.3`.
+  A `TLS 1.2` against a site that speaks 1.3 is a middlebox nobody mentioned.
+- `verified-against` is `system` or `bundle`. `bundle` means no chain verified
+  without a certificate from the configured `ca-bundle`; `system` means the
+  chain went through the trust store, and with a bundle configured that is a
+  setting doing nothing, which the summary says in words. The issuer is
+  deliberately not reported: a root's subject can name an employer, and this
+  document is what gets pasted into a bug report.
+
 ### Provenance
 
 `site` names the instance, because an answer outlives the shell that produced

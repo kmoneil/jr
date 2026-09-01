@@ -702,6 +702,13 @@ them: the configuration, the credential, the site URL and its context path, the
 proxy and TLS settings, the deployment probe, the clock, the account, and
 whatever the site discloses about rate limits.
 
+The transport check reports the TLS settings that were configured and, once a
+response has arrived, the connection that carried it: whether it was encrypted,
+at which version, and whether the chain verified against the system trust store
+or needed the bundle. A bundle the chain never needed is a setting doing
+nothing, and a version below what the site speaks is a middlebox nobody
+mentioned; neither is knowable from configuration.
+
 It exists because the interesting failures are the ones where the first request
 fails and the reason is three layers below it. A 401 from a Data Center under a
 context path is indistinguishable, from the error alone, from a 401 because the
@@ -739,7 +746,7 @@ jr doctor --context work --refresh
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `doctor` | v1 | always |
+| `doctor` | v2 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE
 
