@@ -107,8 +107,23 @@ var flagPattern = regexp.MustCompile(`--[a-z][a-z0-9-]*`)
 // The union across every command, rather than the flags of the command the
 // example invokes. A flag named in a sentence beside an example often belongs
 // to a different command, and a gate that guessed which would be wrong often
-// enough to be turned off. The weaker question still catches the failure that
-// matters, which is a flag that no longer exists anywhere.
+// enough to be turned off.
+//
+// This paragraph used to end "the weaker question still catches the failure
+// that matters, which is a flag that no longer exists anywhere", and issue 122
+// falsified that on 2026-09-02. The skill's exit-3 row said to resume with
+// --page-token; `issue activity` declares exit 3 and has no --page-token and
+// never will, because an event feed is merged from three projections and an
+// offset into it names no place a request can start from. The flag exists on
+// `issue list`, so the union was satisfied and the gate stayed green while an
+// agent went looking for a flag that was not there.
+//
+// The stronger check is narrower than the one rejected above and would not have
+// the false positives that argument is about: a line inside a fenced console
+// block beginning `$ jr <command>` is an invocation somebody pastes, so its
+// flags can be held to that command's own set, while prose keeps the weak
+// check. Carded rather than built here, because it is a gate and this change
+// was prose.
 func TestEveryFlagInAWorkedExampleExists(t *testing.T) {
 	have := flagsInTheFullBuild(t)
 

@@ -545,6 +545,28 @@ $ jr issue list --page-token <token from the warning>   # resume
 If a script inherited a failure from this, it is checking `$?` without treating
 3 as a success — see [recipes.md](recipes.md#scripting-and-ci).
 
+**Exit 3 has a second meaning, and the warning's `remedy` tells them apart.**
+Everything above is the first one: the rows ran out against a bound. The other is
+that every row is present and a container *inside* one was clipped by the server.
+`jr issue activity` reports this when Cloud returns the newest twenty comments of
+a longer thread, or caps an inlined changelog at forty entries. There is nothing
+to resume and nothing to raise:
+
+```console
+$ jr issue activity --since -7d
+# stderr: RESULT_TRUNCATED, element: event, remedy: every row is here and one of
+#         them holds part of a paged subresource; read that subresource with the
+#         command that pages it
+$ jr issue comment list ENG-412      # the command that pages it
+$ jr issue history ENG-412           # or the changelog, in full
+```
+
+`issue activity` has no `--page-token` and never will: an event feed is merged
+and sorted from three projections across a page of issues, so an offset into the
+result would not describe a place any request could start from. Read the
+`remedy`, which is per-error and always right, rather than the generic advice for
+exit 3, which cannot be right for every command at once.
+
 ### `UNCONSTRAINED_QUERY` — `--limit all` with no filter
 
 Refused, because it would page until it had every issue in every project your
