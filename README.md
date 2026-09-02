@@ -169,6 +169,14 @@ commit that produced it:
 $ gh attestation verify jr-full_*_darwin_arm64.tar.gz --repo kmoneil/jr
 ```
 
+`gh` is in that first line for a second reason. macOS attaches
+`com.apple.quarantine` to anything a browser downloads, and Gatekeeper kills a
+quarantined executable that is not signed with an Apple Developer ID and
+notarized by Apple, which these are not: they are cross-compiled on Linux
+runners that hold no signing identity. Fetched with `gh` or `curl` the attribute
+is never set and nothing refuses. If you already have a browser copy that will
+not run, see [it will not start](docs/troubleshooting.md#it-will-not-start).
+
 Or build from source, which needs Go 1.26:
 
 ```
