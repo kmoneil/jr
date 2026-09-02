@@ -1058,6 +1058,8 @@ jr issue activity --since -1d --kind transition --format json
 | `--user` | `string` | — | only events by this person, by display name, email, or id; the word currentUser resolves to the caller |
 | `--kind` | `string` | — | only events of this kind: comment, transition, field, or worklog; repeat for several (repeatable) |
 | `--jql` | `string` | — | raw JQL narrowing the issues searched, combined with --since and always parenthesized |
+| `--changed-field` | `string` | — | only events about this field, by the name the changelog records or by its id; repeat for several; a comment and a worklog move no field and so never match (repeatable) |
+| `--not-changed-field` | `string` | — | drop events about this field, e.g. Rank on a groomed backlog; a comment and a worklog move no field and so are never dropped; wins over --changed-field (repeatable) |
 | `--raw-body` | `bool` | — | emit a Cloud body as the Atlassian Document Format document Jira sent it as, rather than converting it to markdown |
 | `--all-projects` | `bool` | — | search every project the credential can see, ignoring the context's; --since still bounds the sweep in time |
 | `--page-size` | `int` | — | issues per HTTP request, 1 to 100; transport tuning only |
@@ -1924,6 +1926,7 @@ jr issue history ENG-101 --format json --limit all
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--changed-field` | `string` | — | only changes to this field, by the name the changelog records or by its id; repeat for several; matched here rather than by the server, so it saves output and not requests (repeatable) |
+| `--not-changed-field` | `string` | — | drop changes to this field; repeat for several, and it wins over --changed-field where both name one (repeatable) |
 | `--page-size` | `int` | — | results per HTTP request, 1 to 100; transport tuning only, and Cloud only — Data Center serves the whole changelog in one response and has nothing to page |
 | `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
 

@@ -316,6 +316,16 @@ feed that exits 3 is not the same answer as an empty feed that exits 0.`),
 			Name: "jql", Type: registry.TypeString,
 			Usage: "raw JQL narrowing the issues searched, combined with " +
 				"--since and always parenthesized",
+		}, {
+			Name: changedFieldFlag, Type: registry.TypeString, Repeatable: true,
+			Usage: "only events about this field, by the name the changelog " +
+				"records or by its id; repeat for several; a comment and a " +
+				"worklog move no field and so never match",
+		}, {
+			Name: notChangedFieldFlag, Type: registry.TypeString, Repeatable: true,
+			Usage: "drop events about this field, e.g. Rank on a groomed " +
+				"backlog; a comment and a worklog move no field and so are " +
+				"never dropped; wins over --" + changedFieldFlag,
 		}, rawBodyFlag(), {
 			Name: allProjectsFlag, Type: registry.TypeBool,
 			Usage: "search every project the credential can see, ignoring " +
@@ -691,6 +701,10 @@ type activityWant struct {
 	kinds map[string]bool
 	user  site.User
 	since string
+	// fields is the shared --changed-field / --not-changed-field filter, the
+	// same one issue history uses, so the two commands cannot disagree about
+	// what a field name matches. Nil when neither flag was given.
+	fields *historyFilter
 }
 
 // accepts reports whether one event passes the filters.
@@ -704,6 +718,12 @@ func (w activityWant) accepts(e Event) bool {
 		return false
 	}
 	if w.since != "" && e.At < w.since {
+		return false
+	}
+	// Before the user check, because a field the caller excluded is not
+	// theirs to attribute either: --not-changed-field Rank means the Rank
+	// rows are gone whoever moved them.
+	if w.fields.active() && !w.fields.keepField(e.Field, "") {
 		return false
 	}
 	if w.user.ID == "" && w.user.Display == "" {
@@ -724,7 +744,10 @@ func activityFilter(inv *registry.Invocation) activityWant {
 	}
 	user, _ := inv.Value(activityUserKey).(site.User)
 	since, _ := inv.Value(activitySinceKey).(string)
-	return activityWant{kinds: kinds, user: user, since: since}
+	return activityWant{
+		kinds: kinds, user: user, since: since,
+		fields: newHistoryFilter(inv),
+	}
 }
 
 // activitySinceKey is where the resolved --since instant is left for the body.
