@@ -5,6 +5,7 @@ machine-stable `code` and, where there is anything useful to say, a `remedy`.
 **Read that first.** This page is for when it is not enough, or when you want to
 know why the tool is refusing something it could have guessed at.
 
+- [It will not start](#it-will-not-start)
 - [How to read an error](#how-to-read-an-error)
 - [Start with `jr doctor`](#start-with-jr-doctor)
 - [Nothing works yet](#nothing-works-yet)
@@ -14,6 +15,85 @@ know why the tool is refusing something it could have guessed at.
 - [Writes](#writes)
 - [When it is the network or the server](#when-it-is-the-network-or-the-server)
 - [Digging deeper](#digging-deeper)
+
+## It will not start
+
+Everything else on this page assumes a binary that runs. This section is for
+when it does not, and the cause is never `jr` itself: it is macOS refusing to
+execute a file it cannot attribute to a signed developer.
+
+### macOS says it cannot check `jr` for malware
+
+The wording depends on the version:
+
+- `Apple could not verify "jr" is free of malware that may harm your Mac or
+  compromise your privacy.` on macOS 15 and later.
+- `"jr" cannot be opened because the developer cannot be verified.` before that.
+
+Run from a shell, the process is killed as well, so the terminal answers
+`zsh: killed  ./jr` and stdout stays empty.
+
+Gatekeeper refuses any executable carrying the `com.apple.quarantine` attribute
+that is not signed with an Apple Developer ID and notarized by Apple. Released
+`jr` binaries are neither. They are cross-compiled on GitHub's Linux runners,
+which hold no Apple signing identity; the `darwin/arm64` binary carries the
+ad-hoc signature Go's linker writes, because Apple Silicon will not execute an
+unsigned Mach-O at all, and an ad-hoc signature is not a Developer ID.
+
+The attribute is attached by whatever fetched the file, not by the file. Ask it
+directly:
+
+```console
+$ xattr -l ./jr
+com.apple.quarantine: 0083;68b6d41f;Safari;9F2C...
+```
+
+A browser sets it. `curl`, `gh`, and `git clone` do not. If your browser expanded
+the archive on download, the attribute is on the extracted `jr` as well, which is
+the usual way somebody arrives here.
+
+Three fixes, cheapest first.
+
+**Fetch it without a browser.** Nothing attaches the attribute, and the
+attestation says where the archive came from:
+
+```console
+$ gh release download --repo kmoneil/jr --pattern 'jr-full_*_darwin_arm64.tar.gz'
+$ gh attestation verify jr-full_*_darwin_arm64.tar.gz --repo kmoneil/jr
+$ tar xzf jr-full_*_darwin_arm64.tar.gz
+$ install jr-full_*/jr ~/.local/bin/jr
+```
+
+That verify step answers a better question than notarization does. Notarization
+reports that Apple scanned a binary somebody signed; the attestation reports that
+this exact archive came out of this workflow, at this commit, in this repository,
+and `gh` fails it if a byte moved.
+
+**Or clear the attribute** on a copy you have already satisfied yourself about:
+
+```console
+$ xattr -d com.apple.quarantine ./jr
+$ ./jr version
+```
+
+**Or build from source**, which needs Go 1.26 and produces a binary that was
+never downloaded and so was never quarantined:
+
+```console
+$ git clone https://github.com/kmoneil/jr && cd jr && make build
+```
+
+The GUI route works too: after the first refusal, System Settings, then Privacy
+& Security, then **Open Anyway**. It is listed last because it approves one copy
+of one file and tells you nothing about where that file came from.
+
+### An antivirus or endpoint agent says the same thing in different words
+
+CrowdStrike, SentinelOne, and Microsoft Defender all flag unsigned Go binaries
+on reputation, and none of the fixes above touch that: the quarantine attribute
+is Apple's, and the detection is not. The archive's provenance attestation is
+the evidence to hand your administrator, along with the release it names. There
+is no workaround `jr` can ship for this one.
 
 ## How to read an error
 
