@@ -512,37 +512,47 @@ var probeAltByFlag = map[string]string{
 	// One row against a fixture that answers with two, which is the only way a
 	// bound is observable at all: `--limit 50` and `--limit 1` against an empty
 	// collection produce the same request and the same document.
-	"limit":          "1",
-	"since":          "-3651d",
-	"kind":           "worklog",
-	"jql":            "labels = second",
-	"sort":           "created",
-	"created-after":  "-8d",
-	"created-before": "-2d",
-	"updated-after":  "-8d",
-	"updated-before": "-2d",
-	"changed-after":  "-8d",
-	"changed-before": "-2d",
-	"worklog-after":  "-8d",
-	"worklog-before": "-2d",
-	"started":        "2026-03-01T00:00:00Z",
-	"start-date":     "2026-03-01T00:00:00Z",
-	"end-date":       "2026-04-01T00:00:00Z",
-	"parent":         "ENG-3",
-	"epic":           "ENG-3",
-	"assignee":       "currentUser",
-	"reporter":       "currentUser",
-	"creator":        "currentUser",
-	"involving":      "currentUser",
-	"watcher":        "currentUser",
-	"voter":          "currentUser",
-	"worklog-author": "currentUser",
-	"was-assignee":   "currentUser",
-	"changed-by":     "currentUser",
-	"time-spent":     "2h",
-	"board":          "2",
-	"sprint":         "2",
-	"page-size":      "25",
+	"limit": "1",
+	// The field the fixture's changelog actually moves, from sweepHistory.
+	//
+	// A negative filter can only be observed removing something that is there,
+	// and the sweep's default second value is the literal "other", which no
+	// changelog carries. Excluding a field nobody has is correctly a no-op, so
+	// the sweep read a working flag as dead. Its positive twin needs no entry
+	// for the opposite reason: keeping *only* a field nobody has empties the
+	// document, and an emptied document is a change too. That asymmetry is
+	// worth knowing before the next --not- flag is added here.
+	"not-changed-field": "status",
+	"since":             "-3651d",
+	"kind":              "worklog",
+	"jql":               "labels = second",
+	"sort":              "created",
+	"created-after":     "-8d",
+	"created-before":    "-2d",
+	"updated-after":     "-8d",
+	"updated-before":    "-2d",
+	"changed-after":     "-8d",
+	"changed-before":    "-2d",
+	"worklog-after":     "-8d",
+	"worklog-before":    "-2d",
+	"started":           "2026-03-01T00:00:00Z",
+	"start-date":        "2026-03-01T00:00:00Z",
+	"end-date":          "2026-04-01T00:00:00Z",
+	"parent":            "ENG-3",
+	"epic":              "ENG-3",
+	"assignee":          "currentUser",
+	"reporter":          "currentUser",
+	"creator":           "currentUser",
+	"involving":         "currentUser",
+	"watcher":           "currentUser",
+	"voter":             "currentUser",
+	"worklog-author":    "currentUser",
+	"was-assignee":      "currentUser",
+	"changed-by":        "currentUser",
+	"time-spent":        "2h",
+	"board":             "2",
+	"sprint":            "2",
+	"page-size":         "25",
 }
 
 // probeByFlag is where a flag's value has to be shaped rather than merely

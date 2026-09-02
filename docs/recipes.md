@@ -269,6 +269,29 @@ not pay for comment bodies:
 $ jr issue activity --since -1d --kind transition --kind field
 ```
 
+`--kind` cannot cut a *field*, though: `Rank`, `Sprint`, and `assignee` are all
+`kind=field`, and on a groomed backlog `Rank` is most of the feed by row count
+while carrying nothing you can act on. That is what the field filter is for:
+
+```console
+# Drop the grooming, keep everything else including the conversation
+$ jr issue activity --since -1d --not-changed-field Rank
+
+# Only what moved on one field
+$ jr issue activity --since -7d --changed-field assignee
+```
+
+A comment and a worklog move no field, so they are never dropped by
+`--not-changed-field` and never matched by `--changed-field`. Use `--kind` when
+the question is about kinds. Both flags are on `issue history` too, and both
+match the name the changelog records rather than the site's field catalogue,
+because Data Center sends no field id in a changelog at all.
+
+`Rank` is not excluded by default, and the reason is that it would be a
+different command answering the same invocation. `jr issue activity --since -1d`
+means every event, and a default that quietly held some back would be the thing
+this tool exists not to do. Name the exclusion and it is yours.
+
 Four things it will not pretend about:
 
 - **It is scoped to the context's project unless you say otherwise.** "What did

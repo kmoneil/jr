@@ -310,6 +310,18 @@ do not catch, add the test in the same change and cite it here.
   alone.
   **Enforced by:** `TestAnEmptyCollectionNamesTheFrameItWasEmptyIn`,
   `TestAPopulatedCollectionIsNotFramed`.
+- **An event that moves no field is never dropped by `--not-changed-field` and
+  never matched by `--changed-field`.** A comment and a worklog reach the filter
+  with an empty field name, and they survive because the filter's list cannot
+  contain the empty string: `lowerFields` drops a blank value, so the comparison
+  can never hit. This is stated rather than guarded on purpose. The guard it
+  replaced read `name != "" && slices.Contains(...)`, looked like the thing
+  keeping the conversation in the feed, and could not fire, because the only
+  value that would have reached it had already been dropped one call earlier.
+  Staging a red is what exposed it: removing that guard changed no behaviour and
+  every assertion stayed green.
+  **Enforced by:** `TestAFieldlessEventSurvivesBecauseTheFilterCannotHoldAnEmptyName`,
+  `TestTheFieldFilterCutsEventsAndNotKinds`.
 - **`issue activity` searches the context's project unless `--all-projects`
   lifts it, in the query and in the envelope together.** It is the command
   somebody points at "what did I do today", and a question about a person that

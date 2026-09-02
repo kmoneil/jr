@@ -372,6 +372,10 @@ to this issue" needs this and ` + "`issue comment list`" + ` both.`),
 				"records or by its id; repeat for several; matched here rather " +
 				"than by the server, so it saves output and not requests",
 		}, {
+			Name: notChangedFieldFlag, Type: registry.TypeString, Repeatable: true,
+			Usage: "drop changes to this field; repeat for several, and it " +
+				"wins over --" + changedFieldFlag + " where both name one",
+		}, {
 			Name: "page-size", Type: registry.TypeInt,
 			Usage: "results per HTTP request, 1 to 100; transport tuning only, " +
 				"and Cloud only — Data Center serves the whole changelog in " +
