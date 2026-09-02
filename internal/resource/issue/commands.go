@@ -394,7 +394,7 @@ to status and everything else has to be asked for.`),
 					"rather than assuming you have the whole conversation",
 			},
 			{
-				Name: "all-projects", Type: registry.TypeBool,
+				Name: allProjectsFlag, Type: registry.TypeBool,
 				Usage: "search every project the credential can see, ignoring " +
 					"the context's; required to exhaust an unfiltered query",
 			},
@@ -830,7 +830,7 @@ func refuseUncontainableJQL(inv *registry.Invocation) error {
 // be honored; it is that a request this wide should be stated rather than
 // arrived at.
 func refuseUnconstrainedSweep(inv *registry.Invocation) error {
-	if !inv.Limit.All || inv.Flags.Bool("all-projects") {
+	if !inv.Limit.All || inv.Flags.Bool(allProjectsFlag) {
 		return nil
 	}
 	if listQuery(inv).Constrained() {
@@ -1057,7 +1057,7 @@ func listQuery(inv *registry.Invocation) QueryOptions {
 	// --all-projects lifts it, which is the only way past a context that sets
 	// one — an empty --project falls back to the context rather than clearing
 	// it.
-	if inv.Jira != nil && !inv.Flags.Bool("all-projects") {
+	if inv.Jira != nil && !inv.Flags.Bool(allProjectsFlag) {
 		opt.Project = inv.Jira.Project()
 	}
 	return opt

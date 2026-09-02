@@ -1005,6 +1005,13 @@ Jira reads it in and costs one request to learn; a relative offset names an
 instant and costs nothing; a date function is refused, because computing one
 here would substitute this client's notion of a boundary for the server's.
 
+The context's project scopes the candidate search, exactly as it does on
+`issue list`, and --all-projects lifts it. That matters more here than it does
+there. This is the command somebody points at "what did I do today", and scoped
+to one project it answers a narrower question in bytes identical to the wider
+one: a complete, empty, exit-0 feed. There is no separate refusal for an
+unbounded sweep, because --since is required and already bounds one.
+
 **Where the comment half comes from.** Comment authorship is not searchable in
 JQL on either deployment, so comments are matched here rather than by the
 server, over the issues --since selected. That set is exact for a question about
@@ -1042,6 +1049,7 @@ jr issue activity --since -1d --kind transition --format json
 | `--kind` | `string` | — | only events of this kind: comment, transition, field, or worklog; repeat for several (repeatable) |
 | `--jql` | `string` | — | raw JQL narrowing the issues searched, combined with --since and always parenthesized |
 | `--raw-body` | `bool` | — | emit a Cloud body as the Atlassian Document Format document Jira sent it as, rather than converting it to markdown |
+| `--all-projects` | `bool` | — | search every project the credential can see, ignoring the context's; --since still bounds the sweep in time |
 | `--page-size` | `int` | — | issues per HTTP request, 1 to 100; transport tuning only |
 | `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
 

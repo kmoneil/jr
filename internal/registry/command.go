@@ -117,6 +117,21 @@ type Command struct {
 	// when set; Columns remains the documented default that `jr schema`
 	// reports.
 	ColumnsFor func(inv *Invocation) []render.Column
+	// EmptyFrame names the bounds this command computed a zero-row answer
+	// over, as `key=value` notes, for the EMPTY_RESULT warning.
+	//
+	// The scope the command read is added for every command and does not
+	// belong here. This is for the bounds only this command knows it applied:
+	// the instant a relative --since resolved to, the account a --user name
+	// resolved to. A bound the caller typed literally is worth reporting only
+	// when the command turned it into something else, because the value that
+	// misleads is the one nothing echoed back.
+	//
+	// It is consulted only when the collection came back empty and complete,
+	// so it may cost work a populated result would not pay for. It must not
+	// reach the network: everything it reports was resolved before the first
+	// request went out.
+	EmptyFrame func(inv *Invocation) []string
 	// OwnsStdout marks a command whose output is a stream it writes itself —
 	// a protocol server, not a result document.
 	//

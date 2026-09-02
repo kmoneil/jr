@@ -221,6 +221,15 @@ const (
 	kindFlag  = "kind"
 )
 
+// allProjectsFlag lifts the context's project scope.
+//
+// It is one constant rather than a literal in each command because two commands
+// now declare it and a third would be a typo away from declaring something
+// else. The name is load-bearing in both directions: `issue list` names it in
+// constrainingFlags and in refuseUnconstrainedSweep, and both this command and
+// that one read it to decide whether to consult the session for a project.
+const allProjectsFlag = "all-projects"
+
 func activityCommand() *registry.Command {
 	return &registry.Command{
 		Path:     []string{"issue", "activity"},
@@ -244,6 +253,13 @@ events. An absolute date is read in the Jira account's timezone, which is what
 Jira reads it in and costs one request to learn; a relative offset names an
 instant and costs nothing; a date function is refused, because computing one
 here would substitute this client's notion of a boundary for the server's.
+
+The context's project scopes the candidate search, exactly as it does on
+` + "`issue list`" + `, and --all-projects lifts it. That matters more here than it does
+there. This is the command somebody points at "what did I do today", and scoped
+to one project it answers a narrower question in bytes identical to the wider
+one: a complete, empty, exit-0 feed. There is no separate refusal for an
+unbounded sweep, because --since is required and already bounds one.
 
 **Where the comment half comes from.** Comment authorship is not searchable in
 JQL on either deployment, so comments are matched here rather than by the
@@ -291,6 +307,10 @@ feed that exits 3 is not the same answer as an empty feed that exits 0.`),
 			Usage: "raw JQL narrowing the issues searched, combined with " +
 				"--since and always parenthesized",
 		}, rawBodyFlag(), {
+			Name: allProjectsFlag, Type: registry.TypeBool,
+			Usage: "search every project the credential can see, ignoring " +
+				"the context's; --since still bounds the sweep in time",
+		}, {
 			Name: "page-size", Type: registry.TypeInt,
 			Usage: "issues per HTTP request, 1 to 100; transport tuning only",
 		}},
@@ -305,8 +325,9 @@ feed that exits 3 is not the same answer as an empty feed that exits 0.`),
 			exitcode.Partial, exitcode.Usage, exitcode.Auth, exitcode.NotFound,
 			exitcode.Permission, exitcode.RateLimit, exitcode.Remote,
 		},
-		Validate: validateActivity,
-		Stream:   runActivity,
+		Validate:   validateActivity,
+		Stream:     runActivity,
+		EmptyFrame: activityEmptyFrame,
 	}
 }
 
@@ -352,9 +373,9 @@ func validateActivity(ctx context.Context, inv *registry.Invocation) error {
 	}
 
 	// After every refusal, because a warning in front of a rejection is noise
-	// in front of the answer. This command has no --all-projects, so its scope
-	// is the context's whenever there is one, which is exactly the invocation
-	// the warning exists for: it is the command the reviewer was running.
+	// in front of the answer. Reading the scope through activityProject means
+	// --all-projects reports no scope and so cannot mismatch one, which is the
+	// same rule the envelope follows.
 	warnScopeMismatch(inv, activityProject(inv), inv.Flags.String("jql"))
 	return nil
 }
@@ -363,8 +384,14 @@ func validateActivity(ctx context.Context, inv *registry.Invocation) error {
 //
 // One expression, read here and in runActivity, so the warning cannot describe
 // a scope the query did not use.
+//
+// --all-projects returns the empty string without consulting the session at
+// all, which is deliberate: ScopeWatcher records what a command *read*, so
+// asking for the project and then discarding it would stamp a project onto the
+// envelope of an answer that came from every project on the site. Not asking is
+// how the answer reports no scope.
 func activityProject(inv *registry.Invocation) string {
-	if inv.Jira == nil {
+	if inv.Jira == nil || inv.Flags.Bool(allProjectsFlag) {
 		return ""
 	}
 	return inv.Jira.Project()
@@ -692,6 +719,30 @@ func activityFilter(inv *registry.Invocation) activityWant {
 
 // activitySinceKey is where the resolved --since instant is left for the body.
 const activitySinceKey = "issue.activity.since"
+
+// activityEmptyFrame names the bounds an empty feed was computed over.
+//
+// Both notes report a *resolved* value rather than the flag that produced it,
+// which is the whole reason they are worth a line. A bare `--since 2026-09-02`
+// is read in the Jira account's timezone, not the caller's, and that costs a
+// request to learn and is the boundary somebody most reasonably assumes is
+// their own; the instant it became is on no envelope in any format.
+// `--user currentUser` resolves to an account id that nothing else echoes back.
+//
+// --kind is deliberately absent. The caller typed it, it is still on their
+// command line, and repeating input at somebody cannot tell them anything they
+// did not already know. What earns a note here is a bound this command chose.
+func activityEmptyFrame(inv *registry.Invocation) []string {
+	want := activityFilter(inv)
+	var notes []string
+	if want.since != "" {
+		notes = append(notes, "since="+want.since)
+	}
+	if want.user.ID != "" {
+		notes = append(notes, "user="+want.user.ID)
+	}
+	return notes
+}
 
 // ActivityCutoff turns --since into the instant an event is compared against.
 //

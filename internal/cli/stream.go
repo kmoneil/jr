@@ -44,7 +44,7 @@ func (a *app) stream(ctx context.Context, rc *registry.Command, inv *registry.In
 		return withPartialStdout(err, out.Emitted())
 	}
 	if result.Complete {
-		return nil
+		return a.warnEmptyResult(rc, inv, spec, out.Count(), format)
 	}
 
 	// A truncated result is data plus a structured warning plus exit 3. TSV
@@ -55,6 +55,70 @@ func (a *app) stream(ctx context.Context, rc *registry.Command, inv *registry.In
 	}
 	a.exit = exitcode.Partial
 	return nil
+}
+
+// EmptyResultCode is the warning a complete collection carries when it holds no
+// rows.
+const EmptyResultCode = "EMPTY_RESULT"
+
+// warnEmptyResult says what bounds a zero-row answer was computed over.
+//
+// Zero rows is the one result whose frame cannot be inferred from the result.
+// A populated collection shows its own scope: the rows name their projects and
+// their dates, so a caller who narrowed the question by accident can see it in
+// what came back. An empty one is bytes-identical whatever the frame was, and
+// `internal/resource/issue/scopewarn.go` already spells out where that leads,
+// for the one case where the caller typed the contradiction themselves.
+// SCOPE_MISMATCH fires when a raw --jql names a project the scope excludes.
+// This is the same defect where the caller named nothing at all, so there was
+// nothing to compare and nothing was said.
+//
+// XML, JSON and YAML already carry the scope on the envelope, and
+// TestTheEnvelopeNamesTheScopeTheAnswerWasComputedOver pins it against an empty
+// result for exactly this reason. TSV has no envelope and is the default, so
+// for the format most callers get, this line is the whole signal. It is written
+// in every format regardless: the resolved bounds an EmptyFrame contributes are
+// on no envelope at all, and a warning that appeared under some formats and not
+// others would be a second rule for a reader to learn.
+//
+// Exit stays 0. The query was legal, the answer is honest, and an empty result
+// is not a failure. Not being able to tell what it was empty *about* is what
+// was missing.
+func (a *app) warnEmptyResult(
+	rc *registry.Command,
+	inv *registry.Invocation,
+	spec render.StreamSpec,
+	count int,
+	format render.Format,
+) error {
+	if count > 0 || a.stderr == nil {
+		return nil
+	}
+
+	notes := []string{fmt.Sprintf("0 %s", spec.Name)}
+	// The scope goes through the same reader the envelope uses, so the warning
+	// and the document cannot disagree about what the answer covered, and
+	// --all-projects reports no project here for the same reason it reports
+	// none there.
+	if project, board := scopeOf(inv); project != "" || board != "" {
+		if project != "" {
+			notes = append(notes, "project="+project)
+		}
+		if board != "" {
+			notes = append(notes, "board="+board)
+		}
+	} else if inv.Jira != nil {
+		// Said out loud rather than left to the absence of a project= note. An
+		// unscoped sweep and a sweep whose scope nobody reported look the same
+		// from a missing key, and they are opposite answers.
+		notes = append(notes, "scope=none")
+	}
+	if rc.EmptyFrame != nil {
+		notes = append(notes, rc.EmptyFrame(inv)...)
+	}
+
+	return render.WriteWarning(a.stderr, EmptyResultCode,
+		strings.Join(notes, ", "), format)
 }
 
 // withPartialStdout tells a mid-stream failure what it left behind.

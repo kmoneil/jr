@@ -576,7 +576,7 @@ what a further request would do.
 
 A warning is a structured document on stderr carrying a `code` and a `message`,
 in whatever format the invocation asked for. It never changes the exit code and
-never reaches stdout. There are five, and each exists because something true
+never reaches stdout. There are six, and each exists because something true
 about the answer cannot be read off the answer itself.
 
 | Code               | Emitted by                                      | What it says                                                                                                                                                                                                                        |
@@ -586,6 +586,7 @@ about the answer cannot be read off the answer itself.
 | `UNKNOWN_LABEL`    | `issue list`, from `--label` and `--not-label`   | No issue on this site carries that label. The query still runs and still exits 0.                                                                                                                                                    |
 | `SCOPE_MISMATCH`   | `issue list`, `issue activity`, `issue changes` | A raw `--jql` selects a project the effective scope excludes, so those rows cannot come back. The query still runs and still exits 0.                                                                                                 |
 | `UNKNOWN_CHANGED_FIELD` | `issue history`, from `--changed-field`    | No recorded change on that issue touched any of the named fields. It names the fields the issue does hold, and still exits 0.                                                                                                         |
+| `EMPTY_RESULT`     | any collection, when it is complete and holds no rows | The bounds the zero-row answer was computed over: the row count, the context scope or `scope=none`, and any bound the command resolved rather than the caller typed. Still exits 0.                                                    |
 
 `UNKNOWN_LABEL` exists because an empty answer to a mistyped label and an empty
 answer to a correct one are the same bytes: `--label retyr` returns a header, no
@@ -667,6 +668,43 @@ truncation becomes a stderr warning plus exit 3 in that format.
 Neither attribute moves any kind's schema version. The envelope is written
 outside every registered kind shape — `jr contract` describes payloads — which
 `make golden` confirms by not moving a byte of `testdata/kinds`.
+
+### `EMPTY_RESULT`
+
+`SCOPE_MISMATCH` covers the case where the caller typed the contradiction
+themselves. This covers the case where they typed nothing, so there was nothing
+to compare and nothing was said.
+
+A populated collection describes its own frame. The rows name their projects and
+their dates, so somebody who narrowed the question by accident can see it in what
+came back. Zero rows is the one result with no data left to infer a frame from,
+and it is byte-identical whatever the frame was.
+
+    jr issue activity --since 2026-09-02 --user currentUser   # context project = ENG
+    → EMPTY_RESULT: 0 events, project=ENG, since=2026-09-02T05:00:00Z, user=<id>
+
+Three kinds of note, and the rule for what earns one is whether `jr` chose it:
+
+- **the count**, always, as `0 <collection>`;
+- **the scope**, read through the same watcher the envelope uses, so the warning
+  and the document cannot disagree. A command that lifted the scope with
+  `--all-projects` reports `scope=none` rather than omitting the note, because
+  an unscoped sweep and a sweep whose scope nobody reported are opposite answers
+  and a missing key cannot tell them apart;
+- **bounds the command resolved**, contributed per command. `issue activity`
+  reports the instant a bare `--since` became, which is read in the Jira
+  account's timezone rather than the caller's and appears on no envelope in any
+  format, and the account a `--user currentUser` resolved to.
+
+A flag the caller typed literally never appears. `--kind comment` is still on
+their command line, and repeating input at somebody cannot tell them anything
+they did not already know.
+
+XML, JSON and YAML already carry the scope on the envelope. The warning is
+written in every format anyway: the resolved bounds are on no envelope at all,
+and a warning that appeared under some formats and not others would be a second
+rule to learn. Exit 0 stays, because an empty answer is an honest one. Not being
+able to tell what it was empty *about* is what was missing.
 
 ### `SCOPE_MISMATCH`
 
