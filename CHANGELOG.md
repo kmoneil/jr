@@ -20,6 +20,92 @@ accident.
 
 Nothing yet.
 
+## [0.10.2] - 2026-09-02
+
+**`jr` installs from Homebrew now, and that is the headline because it is the
+one that unblocked somebody.** A user could not run the tool at all: macOS
+reported that Apple could not verify the binary is free of malware and killed
+it. Released binaries are cross-compiled on Linux runners with no Apple signing
+identity, so they are not notarized, and Gatekeeper refuses a quarantined
+executable that is not signed with a Developer ID. The attribute is attached by
+whatever *fetched* the file, and `brew` fetches with `curl`, which does not
+attach it.
+
+```console
+$ brew install kmoneil/tap/jr
+```
+
+The rest of the release is about answers that were narrower than they looked. An
+empty collection now says what it was empty *about*, and `issue activity` gained
+the two filters it needed to be asked a question about a person rather than
+about one project.
+
+Patch: everything here is additive. No kind moved a schema version. One new
+warning `code` appears on stderr, which changes no exit code and reaches no
+stdout, so read **Output contract** below only if something parses stderr.
+
+### Added
+
+- **`brew install kmoneil/tap/jr`.** The full profile, macOS and Linux, both
+  architectures, from [kmoneil/homebrew-tap][tap]. It also sidesteps Gatekeeper
+  entirely. `jr-agent`, `jr-reader` and `jr-ci` stay tarball-only: they exist for
+  containers, and a container does not run Homebrew.
+- **`--all-projects` on `issue activity`.** "What did I do today" is a question
+  about a person, not about one project, and scoped to the context's project it
+  answered the narrower one in bytes identical to the wider one. The flag lifts
+  the scope in the query and in the envelope together.
+- **`--changed-field` and `--not-changed-field` on `issue activity`**, and
+  `--not-changed-field` on `issue history`. One day of one project can be 110
+  events of which fifteen carry signal, and `--kind` cannot cut the rest because
+  `Rank`, `Sprint` and `assignee` are all `kind=field`. An event that moves no
+  field, which is every comment and every worklog, is never dropped by the
+  negative and never matched by the positive. `Rank` is **not** excluded by
+  default: a default that quietly withholds rows is the one thing this tool does
+  not do.
+
+### Output contract
+
+- **`EMPTY_RESULT`, a new warning `code`,** on any collection that comes back
+  complete and holding no rows. It carries the row count, the context scope, or
+  `scope=none` where `--all-projects` lifted it, and any bound the command
+  resolved rather than the caller typing it: the instant a bare `--since` became
+  in the Jira account's timezone, the account `currentUser` resolved to.
+
+      EMPTY_RESULT: 0 events, project=ENG, since=2026-09-02T05:00:00Z, user=<id>
+
+  A populated collection describes its own frame, because the rows name their
+  projects and their dates. Zero rows is the one result with no data left to
+  infer one from, and it is byte-identical however narrow the question was.
+  `SCOPE_MISMATCH` already covered the caller who typed the contradiction; this
+  covers the caller who typed nothing. Exit stays 0 and stdout is unchanged.
+
+- No kind moved a schema version, and no exit code changed meaning.
+
+### Fixed
+
+- **The exit-3 advice named a flag that `issue activity` does not have.** The
+  skill's exit table said to resume with `--page-token`; that command declares
+  exit 3 and has no such flag, because an event feed is merged from three
+  projections and an offset into it names no place a request can start from. The
+  per-error `remedy` was correct all along and the generic table was not.
+- **`--user` on `issue activity` is documented as matching who Jira recorded**,
+  which is not always who did the work. An integration writes as itself, so
+  commit links and build results carry its service account and never match a
+  person. Somebody who spent a day on an issue entirely through commits has no
+  events, and that empty answer is correct.
+- **The install docs said nothing about Gatekeeper.** `docs/troubleshooting.md`
+  gains an *It will not start* section, placed first because every other section
+  there presumes a binary that runs.
+
+### Internal
+
+- `registry.Command` gains `EmptyFrame`, so a command contributes the bounds it
+  resolved to the warning above without `internal/cli` knowing what a query is.
+- `TestEveryFlagChangesWhatTheCommandDoes` learned that a negative filter can
+  only be observed removing something that is there, which its positive twin
+  never needs, because keeping only a value nobody has empties the document and
+  an emptied document is a change too.
+
 ## [0.10.1] - 2026-09-01
 
 **`jr doctor` now reports what the connection did, not only what it was
@@ -1681,6 +1767,7 @@ recent enough to be worth reading.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
 [unreleased]: https://github.com/kmoneil/jr/compare/v0.10.0...main
+[0.10.2]: https://github.com/kmoneil/jr/releases/tag/v0.10.2
 [0.10.1]: https://github.com/kmoneil/jr/releases/tag/v0.10.1
 [0.10.0]: https://github.com/kmoneil/jr/releases/tag/v0.10.0
 [0.9.2]: https://github.com/kmoneil/jr/releases/tag/v0.9.2
@@ -1700,3 +1787,4 @@ recent enough to be worth reading.
 [0.2.0]: https://github.com/kmoneil/jr/releases/tag/v0.2.0
 [0.1.1]: https://github.com/kmoneil/jr/releases/tag/v0.1.1
 [0.1.0]: https://github.com/kmoneil/jr/releases/tag/v0.1.0
+[tap]: https://github.com/kmoneil/homebrew-tap
