@@ -52,10 +52,17 @@ A browser sets it. `curl`, `gh`, and `git clone` do not. If your browser expande
 the archive on download, the attribute is on the extracted `jr` as well, which is
 the usual way somebody arrives here.
 
-Three fixes, cheapest first.
+Four fixes, cheapest first.
 
-**Fetch it without a browser.** Nothing attaches the attribute, and the
-attestation says where the archive came from:
+**Install it with Homebrew**, which fetches with `curl` and so never attaches
+the attribute at all:
+
+```console
+$ brew install kmoneil/tap/jr
+```
+
+**Or fetch the archive without a browser.** Nothing attaches the attribute, and
+the attestation says where the archive came from:
 
 ```console
 $ gh release download --repo kmoneil/jr --pattern 'jr-full_*_darwin_arm64.tar.gz'
