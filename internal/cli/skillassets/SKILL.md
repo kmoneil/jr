@@ -89,6 +89,14 @@ command has it, and `jr context show` says what the scope currently is.
 selection, so `project != OPS` says nothing, and it reads the fragment as
 tokens, so a key inside a string value is a value.
 
+**A complete collection with no rows names its own frame.** `EMPTY_RESULT` on
+stderr, exit 0, in every format including TSV. It carries the row count, the
+scope (or `scope=none` where `--all-projects` lifted it), and any bound the
+command resolved rather than you typing it: the instant a bare `--since` became
+in the account's timezone, the account `currentUser` resolved to. Read it before
+reporting "nothing matched", because zero rows is the one answer that looks the
+same however narrow the question was.
+
 An empty value does not lift the scope. `--project ""` is refused as
 `EMPTY_SCOPE`, because it used to fall back to the context and produce exactly
 the empty success above.

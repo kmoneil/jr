@@ -392,18 +392,50 @@ $ jr jql explain --jql 'your query here'
 
 `jql explain` prints the query that would actually be sent, including the
 project scope it would be combined with, which is the fact the result document
-used to leave out. Two things now say it without being asked:
+used to leave out. Three things now say it without being asked:
 
+- **An empty collection names its own frame.** `EMPTY_RESULT` on stderr at
+  exit 0, in every format, carrying the row count, the scope, and any bound the
+  command resolved for you. This is the one to read first, because it fires on
+  exactly the result that cannot describe itself. See below.
 - Every structured result carries the scope in its envelope:
   `<result kind="issue.list" … project="ENG">`. Absent means no scope was
-  applied. TSV has no envelope, so use `--format json` when you need this in a
-  pipeline.
+  applied. TSV has no envelope, which is why `EMPTY_RESULT` exists.
 - A `--jql` naming a project the scope excludes produces `SCOPE_MISMATCH` on
   stderr at exit 0. See below.
 
 If neither fires and the result is still empty, the query is wrong, not the
 lookup. Remember that repeated flags OR together and different flags AND
 together: `--status Done --type Bug` means Done **and** a Bug.
+
+### `EMPTY_RESULT` — what the zero rows were zero of
+
+```console
+$ jr issue activity --since 2026-09-02 --user currentUser
+at	issue	kind	author	field	time-spent	from	to	body
+# stderr: EMPTY_RESULT: 0 events, project=ENG, since=2026-09-02T05:00:00Z, user=<id>
+$ echo $?
+0
+```
+
+Read it as three separate questions, because a wrong answer to any one of them
+produces the same empty feed:
+
+- **`project=ENG`.** Was the question meant to be about one project? `issue
+  list` and `issue activity` both take `--all-projects`, and when a run used it
+  the note reads `scope=none` rather than going quiet, so you can tell a lifted
+  scope from an unreported one.
+- **`since=...Z`.** Is that the boundary you meant? A bare date is read in the
+  **Jira account's** timezone, not your machine's, so `--since 2026-09-02` from
+  a laptop five hours west of the account starts at 19:00 the previous evening
+  in your terms. Pass a relative offset like `-1d` to name an instant directly.
+- **`user=...`.** That is the account `currentUser` or a display name resolved
+  to. Events created by an integration are authored by the integration's service
+  account, so commit links and build results never match a human's `--user`.
+
+Exit 0 is correct: the query was legal and the answer is honest. The warning
+exists because the honest empty answer and the accidentally-narrowed one are the
+same bytes.
 
 ### `SCOPE_MISMATCH` — the query names a project the scope excludes
 

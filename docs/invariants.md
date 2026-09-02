@@ -297,6 +297,27 @@ do not catch, add the test in the same change and cite it here.
   **Enforced by:** `TestAnOutOfScopeJQLSaysSo`,
   `TestTheScopeWarningStaysQuietOnQueriesThatAreFine`,
   `TestProjectsSelectedIsNotAFieldScan`.
+- **A complete collection with no rows names the frame it was computed over.**
+  The invariant above covers the caller who typed the contradiction; this covers
+  the caller who typed nothing, so there was nothing to compare and nothing was
+  said. A populated collection describes its own frame because the rows name
+  their projects and their dates; zero rows is the one result with no data left
+  to infer one from. `EMPTY_RESULT` carries the count, the scope read through
+  the same `registry.ScopeWatcher` the envelope uses, `scope=none` where
+  `--all-projects` lifted it, and the bounds a command resolved rather than the
+  caller typing them. It never reports a flag the caller typed literally, it
+  never fires on a populated or a truncated result, and it leaves the exit code
+  alone.
+  **Enforced by:** `TestAnEmptyCollectionNamesTheFrameItWasEmptyIn`,
+  `TestAPopulatedCollectionIsNotFramed`.
+- **`issue activity` searches the context's project unless `--all-projects`
+  lifts it, in the query and in the envelope together.** It is the command
+  somebody points at "what did I do today", and a question about a person that
+  silently answers about one project returns the narrow answer in bytes
+  identical to the wide one. Lifting the scope drops the clause from the
+  candidate query *and* reports no scope, because either half alone is a claim
+  about the answer that the other half contradicts.
+  **Enforced by:** `TestActivitySearchesEveryProjectWithAllProjects`.
 - **`issue history --changed-field` matches the changelog's own names, and says
   so when it matches nothing.** It compares against the field name and id the
   changelog carries, never through the site's field catalogue: Jira 9.12 Data

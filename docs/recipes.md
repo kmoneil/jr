@@ -269,8 +269,14 @@ not pay for comment bodies:
 $ jr issue activity --since -1d --kind transition --kind field
 ```
 
-Two things it will not pretend about:
+Three things it will not pretend about:
 
+- **It is scoped to the context's project unless you say otherwise.** "What did
+  I do today" is a question about you, not about one project, and scoped to one
+  it answers a narrower question in bytes identical to the wider one. Pass
+  `--all-projects` to mean the wider one. When the feed comes back empty either
+  way, `EMPTY_RESULT` on stderr names the scope it searched, the instant
+  `--since` resolved to, and the account `--user` resolved to.
 - **The feed is bounded by the issues `--since` matched.** Somebody who
   commented on an issue they never otherwise touched is not in it, because JQL
   cannot search comment authorship and no number of requests changes that.
