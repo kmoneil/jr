@@ -1029,6 +1029,16 @@ rest, so an issue with more saves than that is reported clipped rather than
 topped up. Anything still clipped is reported: the run exits 3 and the rows say
 which issue and which source.
 
+**--user matches the account an event is recorded against, which is not always
+the person who did the work.** Jira attributes an event to whoever wrote it, and
+an integration writes as itself: a commit link, a build result, and
+RemoteIssueLink changes generally carry the integration's service account as
+their author, not the developer whose commit named the issue. So a day spent on
+an issue entirely through commits produces no events for that person, and this
+command correctly reports none. That is Jira's data model rather than something
+to paper over here, and knowing it is the difference between reading the empty
+answer and believing it.
+
 Exit 3 is sharper than it looks when --user is given. It means some events were
 not sent, so it also means this person may have events here that you cannot
 see — a comment of theirs can sit outside the twenty Cloud returned. An empty

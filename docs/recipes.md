@@ -269,7 +269,7 @@ not pay for comment bodies:
 $ jr issue activity --since -1d --kind transition --kind field
 ```
 
-Three things it will not pretend about:
+Four things it will not pretend about:
 
 - **It is scoped to the context's project unless you say otherwise.** "What did
   I do today" is a question about you, not about one project, and scoped to one
@@ -280,6 +280,11 @@ Three things it will not pretend about:
 - **The feed is bounded by the issues `--since` matched.** Somebody who
   commented on an issue they never otherwise touched is not in it, because JQL
   cannot search comment authorship and no number of requests changes that.
+- **`--user` matches who Jira recorded, not who did the work.** An integration
+  writes as itself, so commit links and build results carry the integration's
+  service account and never match a person. A developer who spent the day on an
+  issue entirely through commits has no events here, and the empty answer is
+  correct rather than wrong.
 - **Some of it may be clipped**, and then the run exits 3 rather than looking
   whole. Cloud sends the newest twenty comments of a longer thread; both
   deployments send the *oldest* twenty worklogs, which for a feed about recent

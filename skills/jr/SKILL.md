@@ -140,7 +140,7 @@ will not change.
 | --- | --- | --- |
 | 0 | `OK` | Result is complete. Use it |
 | 2 | `USAGE` | You built the command wrong. Read `remedy`, fix, retry once |
-| 3 | `PARTIAL` | Truncated. Resume with `--page-token` or report it as partial |
+| 3 | `PARTIAL` | Incomplete. Read the warning's `remedy`: it names the fix, and not every command has a resume token |
 | 4 | `AUTH` | Credentials missing or expired. Stop and tell the user |
 | 5 | `NOT_FOUND` | The thing does not exist. Do not search for a near match unless asked |
 | 6 | `PERMISSION` | Authenticated but not allowed. Stop and report |
@@ -149,6 +149,15 @@ will not change.
 | 10 | `BLOCKED` | Local policy refused. Stop. Do not work around it |
 
 Codes never change meaning. New conditions get new codes.
+
+**Exit 3 means two different things and the `remedy` tells them apart.** Usually
+the rows ran out against a bound, and the fix is `--page-token` where the command
+has one or `--limit` where it does not. But every row can be present and a
+container *inside* one be clipped, which is what `issue activity` reports when
+Cloud returns twenty comments of a longer thread: there the remedy names the
+element and sends you to the command that pages it, and raising `--limit` changes
+nothing. Do not reach for a flag the table implies; `issue activity` has no
+`--page-token` at all. Read the `remedy` that arrived.
 
 ## Cost
 
