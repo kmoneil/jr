@@ -17,7 +17,12 @@ nothing about Jira's API, JQL, or how `jr` is put together.
 
 ## 1. Get it
 
-Download a release archive:
+```console
+$ brew install kmoneil/tap/jr
+```
+
+That is the whole step on macOS and Linux, and it brings the shell completions
+with it. If you would rather not use Homebrew, download a release archive:
 
 ```console
 $ gh release download --repo kmoneil/jr --pattern 'jr-full_*_darwin_arm64.tar.gz'
@@ -28,11 +33,12 @@ $ install jr-full_*/jr ~/.local/bin/jr
 Substitute `linux` or `amd64` as needed, and see
 [the README](../README.md#install) for verifying the download.
 
-On macOS, fetch it with `gh` or `curl` rather than a browser. A browser marks
-the file with `com.apple.quarantine`, and Gatekeeper then refuses to run a
+Fetch it with `gh` or `curl` rather than through a browser. On macOS a browser
+marks the file with `com.apple.quarantine`, and Gatekeeper then refuses to run a
 binary that is not signed with an Apple Developer ID, which released `jr`
-binaries are not. [It will not start](troubleshooting.md#it-will-not-start) has
-the fix if you have already hit it.
+binaries are not. Homebrew and `gh` both sidestep that.
+[It will not start](troubleshooting.md#it-will-not-start) has the fix if you have
+already hit it.
 
 Or build from source, which needs Go 1.26:
 

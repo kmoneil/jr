@@ -32,8 +32,11 @@ steps below are in this order.
 
    - the badge reads the latest release from GitHub, so it updates itself;
    - the banner says the tool is pinnable without saying at what version;
-   - both install paths use `gh release download --pattern`, which needs no
-     version number at all.
+   - no install instruction names a version. `brew install kmoneil/tap/jr`
+     carries none, and the archive paths use `gh release download --pattern`.
+     The formula in `kmoneil/homebrew-tap` does pin one, and it is in another
+     repository, which makes it the single place a release bump is still a
+     manual step. `brew livecheck` sees the new tag; nothing pushes it.
 
    So this step is a check rather than an edit.
 

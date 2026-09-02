@@ -150,10 +150,21 @@ product, which is the same idea from the other end.
 
 ## Install
 
-Every release carries four profiles for linux and darwin, on amd64 and arm64.
-`jr-full` is everything; the others are in [build profiles](#build-profiles),
-and the one you want for an agent is probably `jr-reader`, which cannot change
-anything in Jira because it does not contain the code that could.
+```console
+$ brew install kmoneil/tap/jr
+```
+
+Shortest path on both macOS and Linux, and on macOS it is also the one that
+never meets Gatekeeper: Homebrew fetches with `curl`, which does not attach
+`com.apple.quarantine`, and an unsigned binary without that attribute is not
+refused. It installs the full profile and the shell completions.
+
+Every release also carries four profiles for linux and darwin, on amd64 and
+arm64. `jr-full` is everything; the others are in
+[build profiles](#build-profiles), and the one you want for an agent is probably
+`jr-reader`, which cannot change anything in Jira because it does not contain the
+code that could. Those are tarballs rather than formulae, because the machine
+running an agent is usually a container:
 
 ```console
 $ gh release download --repo kmoneil/jr --pattern 'jr-full_*_darwin_arm64.tar.gz'
@@ -169,7 +180,7 @@ commit that produced it:
 $ gh attestation verify jr-full_*_darwin_arm64.tar.gz --repo kmoneil/jr
 ```
 
-`gh` is in that first line for a second reason. macOS attaches
+`gh` is in that download line for a second reason. macOS attaches
 `com.apple.quarantine` to anything a browser downloads, and Gatekeeper kills a
 quarantined executable that is not signed with an Apple Developer ID and
 notarized by Apple, which these are not: they are cross-compiled on Linux
