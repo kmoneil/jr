@@ -33,6 +33,7 @@ const preconditionAt = "2026-08-04T11:32:07.412+0000"
 // shape `mcp serve` shipped with: the wrapper above the tested layer.
 func editWith(
 	t *testing.T, kind site.Kind, fixture, token string,
+	opts ...func(registry.Flags),
 ) (*render.Doc, *transport.Replayer, error) {
 	t.Helper()
 
@@ -46,6 +47,9 @@ func editWith(
 	flags.SetString("summary", "a better summary")
 	if token != "" {
 		flags.SetString("if-unchanged", token)
+	}
+	for _, opt := range opts {
+		opt(flags)
 	}
 	inv := &registry.Invocation{
 		Jira:   &stubSession{conn: conn, kind: kind},
@@ -65,6 +69,14 @@ func editWith(
 		t.Fatal("the edit returned no record")
 	}
 	return doc, replayer, nil
+}
+
+// withEmptyPrecondition types `--if-unchanged ""`, which is what a shell loop
+// produces from a row that carried no token. Distinct from omitting the flag,
+// which is what editWith does with an empty token, and that distinction is the
+// whole point of the test that uses this.
+func withEmptyPrecondition(flags registry.Flags) {
+	flags.SetString("if-unchanged", "")
 }
 
 // theWriteWasNeverSent reads the fixture rather than the error.

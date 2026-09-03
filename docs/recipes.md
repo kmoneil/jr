@@ -832,6 +832,41 @@ Note `--limit all`. Without it you get the first 50 and **exit 3**, and a bulk
 loop that silently processed the first page would be the exact failure this tool
 exists to prevent.
 
+### Editing what you listed, without losing somebody else's edit
+
+The loops above read a set, then write to it. Between those two moments somebody
+else can change one of the issues, and their change is gone with nothing to say
+so: both commands exit 0.
+
+`--if-unchanged` is the answer, and `issue list --precondition` is what makes it
+affordable in a loop. Every row carries the baseline for its own issue, in the
+listing you were already running:
+
+```console
+$ jr issue list --label needs-triage --limit all --precondition |
+  tail -n +2 |
+  while IFS=$'\t' read -r key _ _ _ _ precondition; do
+      jr issue edit "$key" --add-label triaged --if-unchanged "$precondition" && continue
+      status=$?
+      [ "$status" -eq 7 ] || exit "$status"
+      echo "skipped $key: somebody changed it since the listing" >&2
+  done
+```
+
+Exit 7 is the one failure this loop expects, and it is the whole point: that row
+moved, so nothing was written to it. Every other exit stops the loop, because a
+permission error or a rate limit is not something to keep going through. A bare
+`||` would treat all three the same and report a throttled run as a busy team.
+
+The alternative is an `issue get` per row to fetch a baseline the listing
+already held. The token is the same value either way, so the only difference is
+the request count.
+
+A row for an issue Jira reports no `updated` for carries no token, and the cell
+is empty. Passing an empty `--if-unchanged` is a usage error rather than an
+unchecked write, which is the refusal you want: there was no baseline to check
+against, and the loop should say so rather than write anyway.
+
 ### Resuming a truncated run
 
 If a run is cut short, the stderr warning carries a token:

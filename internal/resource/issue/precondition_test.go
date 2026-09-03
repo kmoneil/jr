@@ -12,14 +12,18 @@ import (
 	"github.com/kmoneil/jr/internal/site"
 )
 
-// TestIssueGetReportsAPreconditionAndIssueListDoesNot is the shape decision.
+// TestIssueGetAlwaysReportsAPrecondition is the half of the shape decision that
+// takes no flag.
 //
-// A row nobody read is not a baseline, so the token is on the record and not on
-// the listing — and because the two deliberately share Schema(), putting it in
-// the wrong place would have widened issue.list's shape without changing its
-// version. This asserts the split from the output rather than from the schema,
-// because the schema is what `make golden` already pins.
-func TestIssueGetReportsAPreconditionAndIssueListDoesNot(t *testing.T) {
+// A caller cannot ask for a baseline they do not yet know they need: the
+// decision to write comes after the read. So get mints one every time, and it
+// costs no request, because the issue is already here. `issue list` mints one
+// per row only with --precondition, for the byte reason rather than a
+// correctness one, and TestTheListingMintsNoBaselineUnlessAsked holds that end.
+//
+// This asserts the token from the output rather than from the schema, because
+// the schema is what `make golden` already pins.
+func TestIssueGetAlwaysReportsAPrecondition(t *testing.T) {
 	cmd, ok := registry.Lookup("issue.get")
 	if !ok {
 		t.Fatal("issue get is not registered")
@@ -80,9 +84,18 @@ func TestIssueGetReportsAPreconditionAndIssueListDoesNot(t *testing.T) {
 	}
 }
 
-// TestAListedRowCarriesNoPrecondition is the other half, asserted through the
-// listing rather than through issue get's absence of one.
-func TestAListedRowCarriesNoPrecondition(t *testing.T) {
+// TestTheClientMintsNoPreconditionOfItsOwn keeps the flag as the only door.
+//
+// Stamping a listing is a command-layer decision, made in stampPage from
+// --precondition, and Client.List has no opinion about it. That split is what
+// makes the flag mean anything: if the client minted tokens on its own, every
+// caller of List would carry them whatever the command asked for, and §2.4
+// would be decided somewhere no flag can reach.
+//
+// This used to assert that a listed row could never carry one, on the reasoning
+// that issue.list did not declare the attribute. It does declare it as of v8,
+// so the claim worth holding moved down a layer rather than disappearing.
+func TestTheClientMintsNoPreconditionOfItsOwn(t *testing.T) {
 	client, _ := replayClient(t, site.Cloud)
 	result, err := client.List(t.Context(), issue.ListOptions{
 		JQL: `project = "ENG"`, Limit: registry.Limit{All: true},
@@ -96,8 +109,8 @@ func TestAListedRowCarriesNoPrecondition(t *testing.T) {
 	}
 	for _, i := range result.Issues {
 		if _, has := i.Node().AttrValue("precondition"); has {
-			t.Errorf("%s carries a precondition; issue.list does not declare one, "+
-				"so this row would fail validation", i.Key)
+			t.Errorf("%s carries a precondition the command never asked for, "+
+				"so --precondition is no longer what decides", i.Key)
 		}
 	}
 }
