@@ -166,8 +166,18 @@ func TestAListedRowCarriesABaselineForItsOwnIssue(t *testing.T) {
 		if got.Key != want {
 			t.Errorf("row %d holds a baseline for %s, want %s", i, got.Key, want)
 		}
-		if got.Updated != "2026-08-04T11:32:07.412Z" {
-			t.Errorf("row %d version = %q", i, got.Updated)
+		// Second precision, and the token says so. A listing's baseline comes
+		// from a search, and Data Center's search index keeps only the second:
+		// minting these at the millisecond made every one of them compare
+		// `.000` against the issue endpoint's real value and refuse every
+		// write. See Precondition.Precision.
+		if got.Updated != "2026-08-04T11:32:07Z" {
+			t.Errorf("row %d version = %q, want it at second precision", i, got.Updated)
+		}
+		if got.Precision != issue.PrecisionSecond {
+			t.Errorf("row %d precision = %q, want %q; a baseline that does not "+
+				"say how sharp it is gets compared at a sharpness it never had",
+				i, got.Precision, issue.PrecisionSecond)
 		}
 		if got.Deployment != site.Cloud {
 			t.Errorf("row %d deployment = %q", i, got.Deployment)
@@ -197,7 +207,7 @@ func TestAListedBaselineIsTheOneGetWouldHaveMinted(t *testing.T) {
 		t.Fatalf("got %d tokens for 1 row:\n%s", len(tokens), out)
 	}
 	want, err := issue.EncodePrecondition(
-		site.Info{Kind: site.Cloud}, "ENG-101", listedAt)
+		site.Info{Kind: site.Cloud}, "ENG-101", listedAt, issue.PrecisionSecond)
 	if err != nil {
 		t.Fatalf("mint: %v", err)
 	}
@@ -291,7 +301,7 @@ func TestAMalformedVersionFailsTheListingWithOrWithoutTheFlag(t *testing.T) {
 // --if-unchanged.
 func TestEncodePreconditionRefusesAVersionItCannotParse(t *testing.T) {
 	_, err := issue.EncodePrecondition(
-		site.Info{Kind: site.Cloud}, "ENG-101", "not a timestamp")
+		site.Info{Kind: site.Cloud}, "ENG-101", "not a timestamp", issue.PrecisionSecond)
 	if err == nil {
 		t.Fatal("a baseline was minted from a timestamp this tool cannot read")
 	}
@@ -374,7 +384,8 @@ func TestThePreconditionColumnCarriesTheToken(t *testing.T) {
 // "minted implies accepted" is a property rather than a coincidence.
 func TestAVersionOutsideTheRecordableRangeIsRefusedRatherThanMinted(t *testing.T) {
 	_, err := issue.EncodePrecondition(
-		site.Info{Kind: site.Cloud}, "ENG-101", "0000-01-01T0:00:00+0010")
+		site.Info{Kind: site.Cloud}, "ENG-101", "0000-01-01T0:00:00+0010",
+		issue.PrecisionSecond)
 	if err == nil {
 		t.Fatal("minted a baseline the write verbs would refuse")
 	}

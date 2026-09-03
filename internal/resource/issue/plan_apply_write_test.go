@@ -71,7 +71,17 @@ func (s *jiraStub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		for key, updated := range s.updated {
 			issues = append(issues, map[string]any{
 				"id": "1", "key": key,
-				"fields": map[string]any{"updated": updated},
+				// Truncated, because a real Data Center truncates. The search
+				// answers from the index and the index keeps only the second;
+				// the issue endpoint below answers from the store and keeps the
+				// millisecond. Measured on Jira 10.4.0, one issue, one moment:
+				// the search said 21:57:13.000 and the issue said 21:57:13.679.
+				//
+				// This stub answered both from one value until 2026-09-03, and
+				// that is why the whole suite passed while `--precondition` and
+				// every plan refused every write on that deployment. Two sides
+				// defined to be equal cannot be observed to differ.
+				"fields": map[string]any{"updated": truncateToSecond(updated)},
 			})
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -103,6 +113,16 @@ func (s *jiraStub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		w.WriteHeader(http.StatusNotFound)
 	}
+}
+
+// truncateToSecond zeroes the milliseconds the way a Data Center search index
+// does, so a baseline minted from a search here is as coarse as a real one.
+func truncateToSecond(updated string) string {
+	dot := strings.LastIndex(updated, ".")
+	if dot < 0 || len(updated) < dot+4 {
+		return updated
+	}
+	return updated[:dot+1] + "000" + updated[dot+4:]
 }
 
 func lastSegment(path string) string {
@@ -164,6 +184,79 @@ func planFile(t *testing.T, stub *jiraStub, keys ...string) string {
 		t.Fatalf("plan: %v", err)
 	}
 	return path
+}
+
+// TestABaselineFromASearchStillMatchesTheIssueItDescribes is the regression for
+// a bug that shipped in two releases and that nothing here could have caught.
+//
+// Jira Data Center serves `updated` at second precision from the search and at
+// millisecond precision from the issue endpoint, for one issue at one moment.
+// Every baseline a plan minted therefore carried `.000` while every comparison
+// read `.679`, so every row of every plan came back STALE_WRITE. Measured
+// against a real instance; Cloud does not do it.
+//
+// The token now carries the precision it was minted at and the comparison uses
+// it. What makes this test able to fail is not the assertion but jiraStub
+// truncating the search the way the server does.
+func TestABaselineFromASearchStillMatchesTheIssueItDescribes(t *testing.T) {
+	// Milliseconds the search will zero and the issue endpoint will keep.
+	stub := newJiraStub(map[string]string{"ENG-1": "2026-08-04T11:32:07.679+0000"})
+	path := planFile(t, stub, "ENG-1")
+
+	doc, err := runEditCmd(t, stub, ledgerIn(t), nil, map[string]string{"apply": path})
+	if err != nil {
+		t.Fatalf("a plan of an unchanged issue was refused: %v", err)
+	}
+	assertApplyCounts(t, doc, 1, 0, 0)
+
+	if _, _, puts := stub.counts(); len(puts) != 1 {
+		t.Errorf("puts = %v, want the row written", puts)
+	}
+}
+
+// TestAnIssueThatMovedWithinTheSecondIsNotDetected states the cost of the fix
+// rather than hiding it.
+//
+// A search-sourced baseline knows the second and no more, so two edits inside
+// one second are indistinguishable to it. That window is the server's: Data
+// Center's index does not carry the millisecond, and the alternatives were to
+// spend one request per row fetching what the search already returned, or to go
+// on refusing every write. Naming the limit in a test keeps it a decision
+// rather than a surprise.
+func TestAnIssueThatMovedWithinTheSecondIsNotDetected(t *testing.T) {
+	stub := newJiraStub(map[string]string{"ENG-1": "2026-08-04T11:32:07.100+0000"})
+	path := planFile(t, stub, "ENG-1")
+
+	// Somebody edits it 500ms later. The second is unchanged.
+	stub.moveOn("ENG-1", "2026-08-04T11:32:07.600+0000")
+
+	doc, err := runEditCmd(t, stub, ledgerIn(t), nil, map[string]string{"apply": path})
+	if err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	assertApplyCounts(t, doc, 1, 0, 0)
+}
+
+// TestAnIssueThatMovedAcrossTheSecondIsStillRefused is the other side, and the
+// one that matters: the guarantee is weaker, not absent.
+func TestAnIssueThatMovedAcrossTheSecondIsStillRefused(t *testing.T) {
+	stub := newJiraStub(map[string]string{"ENG-1": "2026-08-04T11:32:07.100+0000"})
+	path := planFile(t, stub, "ENG-1")
+
+	stub.moveOn("ENG-1", "2026-08-04T11:32:09.100+0000")
+
+	_, err := runEditCmd(t, stub, ledgerIn(t), nil, map[string]string{"apply": path})
+	if err == nil {
+		t.Fatal("an issue that moved two seconds on was written anyway")
+	}
+	partial, ok := errors.AsType[*registry.PartiallyApplied](err)
+	if !ok {
+		t.Fatalf("err = %T, want PartiallyApplied", err)
+	}
+	if code := errs.Coerce(partial.Cause).Code; code != "STALE_WRITE" {
+		t.Errorf("code = %q, want STALE_WRITE", code)
+	}
+	assertApplyCounts(t, partial.Doc, 0, 0, 1)
 }
 
 // TestAPlanCostsOneRequestHoweverManyRows is the arithmetic the whole surface
@@ -374,4 +467,111 @@ func assertApplyCounts(t *testing.T, doc *render.Doc, applied, skipped, failed i
 			t.Errorf("%s = %q, want %d", tc.attr, got, tc.want)
 		}
 	}
+}
+
+// TestAListingBaselineWritesAgainstTheIssueEndpoint covers the path that
+// shipped broken in 0.11.0, which the plan tests above do not reach.
+//
+// Staging a red found this gap rather than a green did: reverting the *listing*
+// mint site left every plan test passing, because a plan collects its baselines
+// through BuildPlan and not through the listing's stamp. Two code paths mint
+// from a search and only one of them was covered.
+//
+// It runs both halves against one jiraStub on purpose. The listing reads the
+// search, which truncates; the write reads the issue endpoint, which does not.
+// A harness that served the listing from its own handler could not observe the
+// disagreement at all, which is exactly how this reached two releases.
+func TestAListingBaselineWritesAgainstTheIssueEndpoint(t *testing.T) {
+	stub := newJiraStub(map[string]string{"ENG-1": "2026-08-04T11:32:07.679+0000"})
+
+	token := listingTokenFrom(t, stub, "ENG-1")
+	if token == "" {
+		t.Fatal("the listing minted no baseline")
+	}
+
+	_, err := runEditCmd(t, stub, ledgerIn(t), []string{"ENG-1"}, map[string]string{
+		"summary": "written against a listing baseline", "if-unchanged": token,
+	})
+	if err != nil {
+		t.Fatalf("a baseline from a listing was refused by the write it exists "+
+			"to authorise: %v", err)
+	}
+	if _, _, puts := stub.counts(); len(puts) != 1 {
+		t.Errorf("puts = %v, want the write to have gone out", puts)
+	}
+}
+
+// TestAListingBaselineStillRefusesAWriteToAMovedIssue is the other direction,
+// so the test above cannot pass by the check having been switched off.
+func TestAListingBaselineStillRefusesAWriteToAMovedIssue(t *testing.T) {
+	stub := newJiraStub(map[string]string{"ENG-1": "2026-08-04T11:32:07.679+0000"})
+
+	token := listingTokenFrom(t, stub, "ENG-1")
+	stub.moveOn("ENG-1", "2026-08-04T11:41:55.008+0000")
+
+	_, err := runEditCmd(t, stub, ledgerIn(t), []string{"ENG-1"}, map[string]string{
+		"summary": "should be refused", "if-unchanged": token,
+	})
+	if err == nil {
+		t.Fatal("a write against a moved issue was applied")
+	}
+	if code := errs.Coerce(err).Code; code != "STALE_WRITE" {
+		t.Errorf("code = %q, want STALE_WRITE", code)
+	}
+	if _, _, puts := stub.counts(); len(puts) != 0 {
+		t.Errorf("puts = %v, want nothing sent", puts)
+	}
+}
+
+// listingTokenFrom runs `issue list --precondition` against the stub and
+// returns the one row's baseline.
+func listingTokenFrom(t *testing.T, stub *jiraStub, key string) string {
+	t.Helper()
+
+	srv := httptest.NewServer(stub)
+	t.Cleanup(srv.Close)
+	conn, err := transport.New(transport.Options{BaseURL: srv.URL, Retries: -1})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	cmd, ok := registry.Lookup("issue.list")
+	if !ok {
+		t.Fatal("issue list is not registered")
+	}
+	flags := registry.NewFlags()
+	flags.SetBool("precondition", true)
+	inv := &registry.Invocation{
+		Jira: &stubSession{
+			doer: &stubDoer{body: catalogueJSON}, conn: conn,
+			kind: site.Cloud, project: "ENG",
+		},
+		Flags: flags, Limit: registry.Limit{N: 10},
+		Stderr: io.Discard, Progress: registry.NoProgress,
+	}
+	if err := cmd.Validate(t.Context(), inv); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+
+	var buf strings.Builder
+	stream, err := render.NewStream(&buf, render.XML, render.StreamSpec{
+		Kind: cmd.Kind(), Version: cmd.KindVersion(),
+		Name: cmd.CollectionName, Columns: cmd.ColumnsFor(inv),
+	})
+	if err != nil {
+		t.Fatalf("stream: %v", err)
+	}
+	result, err := cmd.Stream(t.Context(), inv, stream)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if err := stream.Close(result.Complete, result.NextPageToken); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+
+	tokens := tokensIn(t, buf.String())
+	if len(tokens) != 1 {
+		t.Fatalf("got %d baselines for %s:\n%s", len(tokens), key, buf.String())
+	}
+	return tokens[0]
 }

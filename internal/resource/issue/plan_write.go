@@ -189,7 +189,10 @@ func BuildPlan(
 				"%s is not an issue this credential can read", key).
 				WithRemedy("check the key, or drop it from the set")
 		}
-		token, err := EncodePrecondition(info, key, raw)
+		// Second, because these came from a search: on Data Center the index
+		// keeps only the second, and a plan whose baselines claimed the
+		// millisecond failed every row it had.
+		token, err := EncodePrecondition(info, key, raw, PrecisionSecond)
 		if err != nil {
 			return nil, err
 		}

@@ -131,7 +131,7 @@ func TestAPreconditionSurvivesATimestampReformatting(t *testing.T) {
 
 	var first string
 	for i, spelling := range spellings {
-		token, err := issue.EncodePrecondition(info, "ENG-101", spelling)
+		token, err := issue.EncodePrecondition(info, "ENG-101", spelling, issue.PrecisionMillisecond)
 		if err != nil {
 			t.Fatalf("%q: %v", spelling, err)
 		}
@@ -153,7 +153,7 @@ func TestAPreconditionSurvivesATimestampReformatting(t *testing.T) {
 // minted the same way, which is a check that always passes — worse than no
 // check, because the caller believes they have one.
 func TestAnIssueWithNoUpdatedGetsNoPrecondition(t *testing.T) {
-	token, err := issue.EncodePrecondition(site.Info{Kind: site.Cloud}, "ENG-101", "")
+	token, err := issue.EncodePrecondition(site.Info{Kind: site.Cloud}, "ENG-101", "", issue.PrecisionMillisecond)
 	if err != nil {
 		t.Fatalf("an absent timestamp is not an error: %v", err)
 	}

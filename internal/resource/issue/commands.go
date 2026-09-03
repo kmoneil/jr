@@ -1540,7 +1540,11 @@ func runGet(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) 
 	// they do not yet know they need — the decision to write comes after the
 	// read — and a safety value that has to be requested in advance is one
 	// nobody has when it matters. It costs no request: the issue is already here.
-	issue.Precondition, err = EncodePrecondition(info, issue.Key, issue.updatedRaw)
+	// Millisecond, because this came from the issue endpoint, which serves the
+	// store's own value on both deployments. A listing's baseline is weaker and
+	// says so; see Precondition.Precision.
+	issue.Precondition, err = EncodePrecondition(
+		info, issue.Key, issue.updatedRaw, PrecisionMillisecond)
 	if err != nil {
 		return nil, err
 	}
