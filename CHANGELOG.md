@@ -20,6 +20,106 @@ accident.
 
 Nothing yet.
 
+## [0.11.0] - 2026-09-03
+
+**`jr issue list --precondition` puts the stale-write baseline on every row, so
+editing what you listed stops costing a request per issue.**
+
+`--if-unchanged` has been the answer to a lost write since the first release,
+and getting a value to pass it has been the problem. `issue get` mints one every time, because
+the decision to write comes after the read and nobody can ask in advance for a
+safety value they do not yet know they need. A listing minted none, and the
+argument for that was sound: a token is sixty-odd bytes on every row of every
+listing, and no field appears in this tool's output unless it was requested.
+
+The consequence was that the sequence people actually run paid for it. "List the
+blocked issues, edit the three that matter" cost one request for the listing and
+then one `issue get` per row, to fetch a baseline the listing already held: the
+row carries Jira's own `updated`, which is all a token is minted from.
+
+```console
+$ jr issue list --label needs-triage --limit all --precondition |
+  tail -n +2 |
+  while IFS=$'\t' read -r key _ _ _ _ precondition; do
+      jr issue edit "$key" --add-label triaged --if-unchanged "$precondition" && continue
+      status=$?
+      [ "$status" -eq 7 ] || exit "$status"
+      echo "skipped $key: somebody changed it since the listing" >&2
+  done
+```
+
+Minor, and for one line of it: `jr issue edit --if-unchanged ""` used to write
+unconditionally and now exits 2. If nothing you run passes that flag an empty
+value, everything here is additive and `issue.list` moving to v8 is the only
+thing to read. **Output contract** has both.
+
+### Added
+
+- **`--precondition` on `issue list`.** Off by default. On, every row carries
+  the same opaque token `jr issue get` reports, and a `precondition` column is
+  appended to the TSV. It is derived from the `updated` the row already holds,
+  so it costs no extra request; it is off by default because most listings are
+  not read by somebody about to write, and it appends rather than inserts, so
+  turning it on cannot move a column a script already counts. This is the same
+  bargain `--url` and `--age` make.
+
+  A row for an issue Jira reports no `updated` for carries no token, and the
+  attribute is absent rather than empty. A baseline that matches anything is
+  worse than no baseline, because it turns the check into a formality exactly
+  when it is needed.
+
+### Output contract
+
+- **`issue.list` moves to v8**, gaining an optional `precondition` attribute on
+  each row. It is present only with `--precondition` and absent otherwise, so a
+  consumer that does not pass the flag parses byte-identical documents.
+  `issue.get` is unchanged at v9 and has carried the attribute since v5.
+
+- **`INVALID_PRECONDITION` now also covers an empty `--if-unchanged`.** Exit 2,
+  as it already was for every other unusable value. The error `code` is
+  unchanged and no new one appears; what widened is the set of inputs that
+  reach it. See **Fixed**.
+
+- No other kind moved, and no exit code changed meaning.
+
+### Fixed
+
+- **`--if-unchanged ""` wrote unconditionally.** A flag given an empty value and
+  a flag nobody typed are the same string once they reach the command, and they
+  are opposite requests: one caller asked for a stale-write check and has no
+  baseline to make one from, the other asked for no check at all. Writing for
+  both is the worse half in every case, because the caller who typed the flag
+  believes a check ran, and a lost edit then looks exactly like a successful
+  write.
+
+  This is the breaking line, and it is in this release rather than a later one
+  because `--precondition` is what makes the empty value easy to produce: a row
+  with no `updated` has an empty cell, and a shell loop hands it straight to the
+  flag. Omitting the flag still writes unconditionally, which is unchanged.
+
+- **A `precondition` could be minted that `--if-unchanged` then refused.** An
+  issue dated before year 1 UTC canonicalizes to a negative year, which the
+  token's own layout cannot read back, so the write verbs reported
+  `INVALID_PRECONDITION` about a value this tool had just handed the caller. No
+  Jira serves such a date, so nobody hit this; it is fixed because "anything
+  `jr` mints, `jr` accepts" should be a property rather than a coincidence.
+  Found by a fuzz target that mints and then parses, added in this release.
+
+### Internal
+
+- The get-only schema is gone. It existed to declare what only a record could
+  carry, and that set is now empty: the comment thread moved to the shared shape
+  when `issue list --with-comments` shipped, and the precondition moves for the
+  same reason now. One shape serves both kinds, which is what a row and a record
+  parsing identically always meant.
+- `FuzzAMintedBaselineIsAlwaysAcceptedBack` is the round trip in the direction
+  the existing precondition target does not cover. It found the bug above in
+  under a second.
+- A test that asserted stamping refuses an unparseable timestamp was passing for
+  the wrong reason: the decoder rejects the value first, so the branch it named
+  is unreachable from the command. It now pins the mechanism that does the work,
+  and a second test covers the branch where it can fire.
+
 ## [0.10.2] - 2026-09-03
 
 **`jr` installs from Homebrew now, and that is the headline because it is the
@@ -1766,7 +1866,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.10.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.11.0...main
+[0.11.0]: https://github.com/kmoneil/jr/releases/tag/v0.11.0
 [0.10.2]: https://github.com/kmoneil/jr/releases/tag/v0.10.2
 [0.10.1]: https://github.com/kmoneil/jr/releases/tag/v0.10.1
 [0.10.0]: https://github.com/kmoneil/jr/releases/tag/v0.10.0
