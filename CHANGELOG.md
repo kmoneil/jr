@@ -20,6 +20,88 @@ accident.
 
 Nothing yet.
 
+## [0.13.0] - 2026-09-03
+
+**If you run Data Center, take this one.** Two features shipped earlier today
+did not work there at all, and both are fixed here.
+
+`issue list --precondition`, from 0.11.0, handed out baselines that every write
+refused. `issue edit --plan-out` and `--apply`, from 0.12.0, failed every row of
+every plan with `STALE_WRITE`, against issues nobody had touched. Cloud was
+unaffected by both.
+
+The cause is one measurement. Data Center serves `updated` at second precision
+from the search endpoint and millisecond precision from the issue endpoint, for
+the same issue at the same moment:
+
+    search:  2026-09-03T21:57:13.000+0000
+    issue:   2026-09-03T21:57:13.679+0000
+
+The search answers from the index, and the index keeps only the second. Every
+baseline minted from a listing therefore carried `.000` while every comparison
+read `.679`.
+
+Both bugs in this release were found by running against a real Jira rather than
+against the test fixtures, which were green throughout. The fixtures answered
+both endpoints from one value, so the two halves of every round trip were
+defined to be equal and nothing could observe them differing.
+
+Minor: two refusals changed, and a baseline from a listing is now a different
+string. **Output contract** has both.
+
+### Fixed
+
+- **A baseline is compared at the precision it was minted at.** The token now
+  carries whether it knows the second or the millisecond, and the comparison
+  reads the current value back at that precision. `issue get` mints
+  milliseconds; `issue list --precondition` and a plan mint seconds, because
+  both take their value from a search.
+
+  One rule rather than a table of deployments: a listing's baseline is
+  second-precise on Cloud too, where the search happens to return the
+  millisecond. Which command handed you the token is explainable; which
+  precision a given deployment's index keeps is not.
+
+- **`issue move --comment` no longer reports success for a comment that was
+  never added.** It worked on neither deployment. Cloud refused every transition
+  comment this tool ever built, because the body was sent as a plain string and
+  API v3 takes an Atlassian Document; `--comment` had therefore never once
+  worked there. Data Center accepted the request with 204 and discarded the
+  comment, because the transition's screen has no comment field, and reported
+  success.
+
+  The body is now encoded per deployment, and a comment the transition cannot
+  accept is refused before anything is sent, from the field list the tool
+  already had in hand.
+
+### Output contract
+
+- **A baseline from `issue list --precondition` or from a plan is now
+  second-precise**, so the `precondition` attribute is a different string for
+  the same issue than it was in 0.11.0 and 0.12.0. The value is opaque and
+  nothing parses it, but a token held across this upgrade is refused as one this
+  tool did not issue, and a write conditioned on a listing's baseline no longer
+  detects an edit made inside the same second. That window belongs to the
+  server. Baselines from `issue get` are unchanged and still millisecond-precise.
+
+- **`TRANSITION_TAKES_NO_COMMENT`, exit 2**, is new. `--comment` given for a
+  transition whose screen has no comment field is refused, and nothing is sent.
+  On Data Center that invocation used to exit 0, apply the transition, and drop
+  the comment, so a script relying on the transition happening will now see it
+  refused. On Cloud the exit is unchanged, since it already failed; only the
+  code and the round trip differ. `jr meta transitions` shows which transitions
+  accept one.
+
+- No kind moved a schema version.
+
+### Internal
+
+- `jiraStub` truncates its search the way Data Center does, which is what makes
+  the regression test able to fail. The general shape is worth stating: a round
+  trip whose two halves come from one source tests the round trip and not the
+  halves.
+- Five invariants added across the two fixes, each naming the test that holds it.
+
 ## [0.12.0] - 2026-09-03
 
 **A bulk edit is a document you read before anything is sent.**
@@ -1962,7 +2044,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.12.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.13.0...main
+[0.13.0]: https://github.com/kmoneil/jr/releases/tag/v0.13.0
 [0.12.0]: https://github.com/kmoneil/jr/releases/tag/v0.12.0
 [0.11.0]: https://github.com/kmoneil/jr/releases/tag/v0.11.0
 [0.10.2]: https://github.com/kmoneil/jr/releases/tag/v0.10.2
