@@ -105,3 +105,38 @@ func harvestCommand(t *testing.T, rc *registry.Command, args []string) registry.
 	}
 	return collect(cc)
 }
+
+// TestHarvestTellsAnExplicitEmptyStringFromAnAbsentFlag is the string half of
+// the same mechanism, and the one `--if-unchanged` now rests on.
+//
+// An empty string flag and an absent one are the same value to Flags.String,
+// exactly as an explicit zero was to Flags.Int. For `--if-unchanged` the two
+// are opposite requests: `--if-unchanged ""` asked for a stale-write check and
+// has no baseline to make one from, while omitting the flag asked to write
+// unconditionally. The refusal for the first lives in the issue package and is
+// tested there; what cannot be tested there is whether the binding layer
+// reports the distinction at all, because a registry.Flags built by hand says
+// whatever the test says.
+//
+// This became load-bearing when `issue list --precondition` shipped: a row for
+// an issue with no `updated` carries no token, so a shell loop produces
+// `--if-unchanged ""` without anybody typing it.
+func TestHarvestTellsAnExplicitEmptyStringFromAnAbsentFlag(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		args    []string
+		wantSet bool
+	}{
+		{"omitted", nil, false},
+		{"explicit empty", []string{"--jql", ""}, true},
+		{"explicit value", []string{"--jql", "project = ENG"}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			flags := harvestArgs(t, tc.args)
+
+			if got := flags.WasSet("jql"); got != tc.wantSet {
+				t.Errorf("WasSet = %v, want %v", got, tc.wantSet)
+			}
+		})
+	}
+}

@@ -937,9 +937,18 @@ edit silently.
 ### `INVALID_PRECONDITION` (exit 2)
 
 The value passed to `--if-unchanged` is not one this tool issued: not a token at
-all, one describing a different issue, or one minted against your other site.
-It comes from the `precondition` attribute of `jr issue get`, and nowhere else —
-it is deliberately opaque, so there is nothing to assemble by hand.
+all, one describing a different issue, one minted against your other site, or
+empty. It comes from the `precondition` attribute of `jr issue get`, or from
+`jr issue list --precondition`, which puts the same value on every row. Nowhere
+else: it is deliberately opaque, so there is nothing to assemble by hand.
+
+**An empty value is refused rather than ignored**, and that case is worth
+naming, because a loop produces it without anybody typing it. A row for an issue
+Jira reports no `updated` for carries no token, so its cell is empty, and
+`--if-unchanged "$precondition"` then passes `""`. Writing unconditionally there
+would be the worst available outcome: you asked for the check, no check ran, and
+a lost edit is indistinguishable from a successful one. Omitting the flag
+entirely still writes unconditionally, because that is a different request.
 
 Refused rather than compared, because comparing a value from somewhere else
 would report "the issue changed", which is a claim about your issue that nobody

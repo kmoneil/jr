@@ -327,7 +327,7 @@ Every successful XML response:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<result kind="issue.list" v="7" site="https://acme.atlassian.net">
+<result kind="issue.list" v="8" site="https://acme.atlassian.net">
   <issues count="3" complete="true">
     <issue key="ENG-101">
       <summary>Retry logic drops the last error</summary>
@@ -400,7 +400,7 @@ the XML tree:
 ```json
 {
   "kind": "issue.list",
-  "v": 7,
+  "v": 8,
   "site": "https://acme.atlassian.net",
   "count": 3,
   "complete": true,
@@ -647,7 +647,7 @@ flags that ever carry it are `--project` and `--board`.
 *did*:
 
 ```xml
-<result kind="issue.list" v="7" site="https://jira.example/jira" project="ENG">
+<result kind="issue.list" v="8" site="https://jira.example/jira" project="ENG">
 ```
 
 **It reports the scope the command read, not the scope the context holds**, and
@@ -949,7 +949,7 @@ container's `count` is derived from its children and cannot disagree with them.
 
 ### The reporter is reported
 
-`issue.list` v7 and `issue.get` v9 carry a `reporter` element, on the same terms
+`issue.list` v8 and `issue.get` v9 carry a `reporter` element, on the same terms
 as `assignee`: always present, and empty when the server discloses nobody.
 
 It was asked for on every request from the first version of this tool — it is in
@@ -1470,9 +1470,25 @@ It is opaque: what it holds is the millisecond timestamp Jira served, and the
 `updated` element is RFC 3339 to the second, so conditioning on the published
 value would leave a whole second in which another edit is invisible. It also
 names the issue and the deployment, so one from another issue or another site is
-refused rather than compared. `issue.list` does **not** carry one — a baseline
-you did not read is not a baseline, and a caller holding one has by construction
-fetched the issue.
+refused rather than compared.
+
+`issue.list` v8 carries the same attribute per row, but only with
+`--precondition`, and it is absent otherwise. The flag exists because the
+arithmetic without it is bad: "list the blocked issues, edit the three that
+matter" otherwise costs one request for the listing and one `issue get` per row
+to obtain a baseline the listing already held. A row carries Jira's own
+`updated`, which is all a token is minted from, so the flag spends bytes rather
+than requests. It is off by default because most listings are not read by a
+caller about to write, and §2.4 says no field appears unless it was requested.
+
+A token from a row and a token from `issue get` are the same value for the same
+version of the same issue: both are minted from the `updated` the server sent.
+Neither is a promise that the issue has not changed since. That is what
+`--if-unchanged` checks, one round trip before the write.
+
+An issue Jira reports no `updated` for gets no token from either command. The
+attribute is absent rather than empty, because a baseline that matches anything
+is worse than no baseline at all.
 
 **The check is not atomic, and says so.** Neither deployment offers a validator
 on an issue: there is no `ETag`, no `Last-Modified`, and `PUT /issue/{key}`
@@ -1500,7 +1516,7 @@ did not happen.
 | `CONFIRMATION_REQUIRED`    | 10   | A destructive command was run without `--yes`. Not raised for `--dry-run`: a preview is not the thing being confirmed, and you look at it in order to decide.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `IDEMPOTENT_IN_FLIGHT`     | 7    | Another run holds this key and has not finished; it may already have done the work.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `STALE_WRITE`              | 7    | `--if-unchanged` was given a precondition and the issue has changed since it was taken, so nothing was sent. `detail` carries both versions. This is the §6.3 stale write: without the flag the later write silently overwrites the earlier one and both callers exit 0.                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `INVALID_PRECONDITION`     | 2    | `--if-unchanged` was given something this tool did not issue: not a token at all, one naming no issue, one for another issue, or one minted against the other deployment. Refused rather than compared, because comparing a foreign value would report "the issue changed", which is a claim about this issue that nobody checked. Everything but the deployment is settled locally, so a typo costs no round trip.                                                                                                                                                                                                                                                                     |
+| `INVALID_PRECONDITION`     | 2    | `--if-unchanged` was given something this tool did not issue: not a token at all, one naming no issue, one for another issue, one minted against the other deployment, or an empty value. An empty one is refused rather than read as an absent flag, because a row with no `updated` carries no token and a loop hands that empty cell straight to the flag; omitting the flag still writes unconditionally, which is a different request. Refused rather than compared, because comparing a foreign value would report "the issue changed", which is a claim about this issue that nobody checked. Everything but the deployment is settled locally, so a typo costs no round trip.                                                                                                                                                                                                                                                                     |
 | `INVALID_ENCODING`         | 2    | Text that is not valid UTF-8. It is refused, never repaired: substituting U+FFFD would put a character in Jira the caller never wrote.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `CONFLICTING_LABEL_FLAGS`  | 2    | `--label` replaces the whole set, so it cannot be combined with `--add-label` or `--remove-label`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `AMBIGUOUS_LINK_DIRECTION` | 2    | A link type's name was given where a direction was needed. `"Blocks"` reads either way; `detail` offers both phrasings.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |

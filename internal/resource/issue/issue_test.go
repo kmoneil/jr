@@ -2805,6 +2805,11 @@ var notAFilter = map[string]string{
 	"changed-field":     "it selects what --changed-by asks about and filters nothing",
 	"url":               "it adds a column, not a condition",
 	"age":               "same: it renders a timestamp the row already carries",
+	// Same family as --url and --age: derived from what the row already
+	// carries. Worth spelling out separately because this one looks like it
+	// might be about writing, and a flag that narrows nothing must not be
+	// offered as a way past the unbounded-query guard however useful it is.
+	"precondition": "it encodes a timestamp the row already carries",
 	// It makes each row bigger and the set no smaller, which is the opposite
 	// of what the guard is for. Offering it as a way past an unbounded query
 	// would be the worst possible advice: a whole-instance sweep that also

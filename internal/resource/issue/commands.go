@@ -21,11 +21,25 @@ func init() {
 	registry.Register(getCommand())
 
 	render.RegisterSchema(KindList, Schema())
-	render.RegisterSchema(KindGet, GetSchema())
+	render.RegisterSchema(KindGet, Schema())
 }
 
 // Schema is the shape of an issue, as `jr contract` reports it and as
 // render.Doc.Validate holds every emitted issue to.
+//
+// One shape serves `issue.list` and `issue.get`, because a row and a record
+// parse identically and get "simply has more of it filled in". There was a
+// `GetSchema` superset for as long as get could carry something a row could
+// not: the comment thread until `issue list --with-comments`, then the
+// precondition token until `issue list --precondition`. Nothing is left in that
+// set, so the function is gone rather than kept as an alias that adds an
+// attribute list of length zero.
+//
+// The rule it enforced still holds and is worth restating, because it is what
+// makes the two kinds safe to share: declaring an attribute a row cannot carry
+// widens `issue.list` without changing its version, and `make golden` is what
+// refuses that. Both times, the honest fix was to make the row able to carry
+// it, not to widen the declaration and hope.
 func Schema() *render.Schema {
 	return &render.Schema{
 		Element: "issue",
@@ -37,6 +51,20 @@ func Schema() *render.Schema {
 			{Name: "project", Type: render.TypeString, Optional: true},
 			{Name: "resolution", Type: render.TypeString, Optional: true},
 			{Name: "parent", Type: render.TypeString, Optional: true},
+			// The baseline `issue edit --if-unchanged` compares against.
+			//
+			// Shared rather than get-only since `issue list --precondition`
+			// existed, and by the same reasoning that moved the comment thread
+			// here: a row could not carry one, so declaring that it could was a
+			// lie `make golden` caught, and a row can now. Both commands mint
+			// it from the same `updated` Jira served, so a listed issue and a
+			// fetched one yield the same token for the same version.
+			//
+			// Optional in both directions. `issue get` always mints one and
+			// `issue list` only when asked, and an issue Jira reports no
+			// `updated` for cannot be given one at all: saying so by absence
+			// beats a token that matches anything.
+			{Name: "precondition", Type: render.TypeString, Optional: true},
 		},
 		Children: []render.Child{
 			{Schema: render.Leaf("summary", render.TypeString)},
@@ -103,12 +131,10 @@ func Schema() *render.Schema {
 				render.Leaf("fix-version", render.TypeString)), Optional: true},
 			// Present only with --with-comments, on either command.
 			//
-			// This lived on GetSchema alone until `issue list --with-comments`
-			// existed, and the reason was exact rather than cautious: a row
-			// could not carry a thread, so declaring that it could was a lie
-			// `make golden` caught. A row can now, and the two kinds share this
-			// shape for the same reason they share every other part of it — a
-			// listed issue and a fetched one parse identically.
+			// This lived on the get-only schema until `issue list
+			// --with-comments` existed, and the reason was exact rather than
+			// cautious: a row could not carry a thread, so declaring that it
+			// could was a lie `make golden` caught. A row can now.
 			{Schema: commentsSchema(), Optional: true},
 		},
 		Extra: &render.Extra{
@@ -116,36 +142,6 @@ func Schema() *render.Schema {
 			Type:  render.TypeString,
 		},
 	}
-}
-
-// GetSchema is the issue shape plus what only `issue get` can carry.
-//
-// `issue list` and `issue get` deliberately share `Schema()` — a row and a
-// record parse identically, and get "simply has more of it filled in". Adding
-// the comment thread to the shared schema said that a *list row* could carry
-// one, which is false, and changed the shape of `issue.list` without changing
-// its version. `make golden` refused it, which is the gate doing exactly its
-// job: one edit, two kinds, and only one of them meant.
-//
-// So get gets a superset instead. Everything list has, plus one element list
-// cannot have, which keeps the shared-shape promise true in the direction it
-// was actually making.
-func GetSchema() *render.Schema {
-	s := Schema()
-	s.Attrs = append(s.Attrs, render.Field{
-		// The baseline `issue edit --if-unchanged` compares against. It is on
-		// get and not on the shared shape because a baseline you did not read
-		// is not a baseline: a caller holding one has, by construction, fetched
-		// the issue. Putting it on a row as well would also mean sixty-odd
-		// bytes on every row of every listing to serve the one caller in a
-		// hundred who is about to write.
-		//
-		// Optional because an issue Jira reports no `updated` for cannot be
-		// given one, and saying so by absence beats a token that matches
-		// anything.
-		Name: "precondition", Type: render.TypeString, Optional: true,
-	})
-	return s
 }
 
 // commentsSchema is the thread an issue carries with --with-comments.
@@ -386,6 +382,7 @@ to status and everything else has to be asked for.`),
 			contextFieldsFlag(),
 			urlFlag(),
 			ageFlag(),
+			preconditionFlag(),
 			{
 				Name: withCommentsFlag, Type: registry.TypeBool,
 				Usage: "include each issue's comment thread, in the request " +
@@ -508,7 +505,7 @@ func anyThreadClipped(page []Issue) bool {
 	return false
 }
 
-// stampPage applies the two flags that derive a column from what already
+// stampPage applies the flags that derive a column from what already
 // arrived rather than asking Jira for more.
 func stampPage(inv *registry.Invocation, info site.Info, page []Issue) error {
 	if inv.Flags.Bool(urlFlagName) {
@@ -520,6 +517,11 @@ func stampPage(inv *registry.Invocation, info site.Info, page []Issue) error {
 		// One instant for the whole page, so two rows a slow page apart are
 		// not reported as different ages for that reason alone.
 		stampAges(page, time.Now())
+	}
+	if inv.Flags.Bool(preconditionFlagName) {
+		if err := stampPreconditions(page, info); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -958,6 +960,9 @@ func listColumnsFor(inv *registry.Invocation) []render.Column {
 	}
 	if inv.Flags.Bool(ageFlagName) {
 		cols = append(cols, ageColumn())
+	}
+	if inv.Flags.Bool(preconditionFlagName) {
+		cols = append(cols, preconditionColumn())
 	}
 	if inv.Flags.Bool(withCommentsFlag) {
 		cols = append(cols, threadColumns()...)

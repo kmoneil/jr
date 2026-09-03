@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"time"
 
 	"github.com/kmoneil/jr/internal/buildinfo"
 	"github.com/kmoneil/jr/internal/errs"
@@ -103,16 +102,6 @@ func ParsePrecondition(encoded string) (Precondition, error) {
 	return p, nil
 }
 
-// isCanonicalVersion reports whether a token's version is spelled the way
-// EncodePrecondition spells one: UTC, to the millisecond, and nothing else.
-func isCanonicalVersion(version string) bool {
-	t, err := time.Parse(preconditionLayout, version)
-	if err != nil {
-		return false
-	}
-	return t.UTC().Format(preconditionLayout) == version
-}
-
 func invalidPrecondition() *errs.Error {
 	return errs.Usage("INVALID_PRECONDITION",
 		"--"+ifUnchangedFlag+" is not a precondition this tool issued").
@@ -127,6 +116,26 @@ func invalidPrecondition() *errs.Error {
 func validatePrecondition(inv *registry.Invocation) error {
 	encoded := inv.Flags.String(ifUnchangedFlag)
 	if encoded == "" {
+		// An empty value and an absent flag are the same string at this layer
+		// and are opposite requests: one asked for a guarantee and has nothing
+		// to check it against, the other asked for no guarantee at all. Writing
+		// unconditionally for both is the worse half of that in every case,
+		// because the caller who typed the flag believes a check ran.
+		//
+		// It became reachable without typing it when `issue list
+		// --precondition` shipped. A row for an issue Jira reports no `updated`
+		// for carries no token, so the cell is empty, and a loop reading that
+		// column hands the empty cell straight to this flag. That loop is in
+		// docs/recipes.md; the refusal is what makes the example honest.
+		if inv.Flags.WasSet(ifUnchangedFlag) {
+			return errs.Usage("INVALID_PRECONDITION",
+				"--"+ifUnchangedFlag+" was given an empty value").
+				WithDetail("an empty precondition is not a baseline, and this " +
+					"write would otherwise be sent with no check at all").
+				WithRemedy("a row with no `precondition` had no version to " +
+					"mint one from: read it with `" + buildinfo.App +
+					" issue get`, or omit the flag to write unconditionally")
+		}
 		return nil
 	}
 	p, err := ParsePrecondition(encoded)

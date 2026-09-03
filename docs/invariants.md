@@ -574,6 +574,26 @@ do not catch, add the test in the same change and cite it here.
 
 ## Credentials and safety
 
+- **A baseline from a listing is the baseline a fetch would have minted.**
+  `issue get` always reports a `precondition`, and `issue list --precondition`
+  reports one per row; both are minted from the `updated` the server sent, so
+  the two are the same value for the same version of the same issue. If they
+  diverged, the flag would cost bytes and still leave a caller fetching per row
+  to get a token the write verbs accept, and a token refused for the wrong
+  reason reads exactly like an issue somebody else changed.
+  **Enforced by:** `TestAListedBaselineIsTheOneGetWouldHaveMinted`,
+  `TestABaselineFromAListingWrites`, `TestABaselineFromAListingRefusesAStaleWrite`.
+- **An empty `--if-unchanged` is refused, not read as an absent flag.** The two
+  are the same string once the value reaches the command and they are opposite
+  requests: one caller asked for a guarantee and has no baseline to check
+  against, the other asked for no guarantee. A row for an issue with no
+  `updated` carries no token, so a shell loop over
+  `issue list --precondition` produces the empty value without anybody typing
+  it, and writing unconditionally there means the caller believes a check ran
+  when none did.
+  **Enforced by:** `TestAnEmptyPreconditionIsRefusedRatherThanIgnored`,
+  `TestOmittingThePreconditionStillWrites`.
+
 - **Certificate verification cannot be turned off, by any surface.** A private
   CA is trusted with `--ca-bundle` and mTLS is answered with a client
   certificate; skipping verification is not one of the legitimate needs, and

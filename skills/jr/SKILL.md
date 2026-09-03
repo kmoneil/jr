@@ -75,7 +75,7 @@ and exit 0, which is the same answer as "nothing matched".
 answer was actually computed over, beside the site:
 
 ```xml
-<result kind="issue.list" v="7" site="https://jira.example" project="ENG">
+<result kind="issue.list" v="8" site="https://jira.example" project="ENG">
 ```
 
 Absent means the command asked for no scope, which is what `--all-projects`
@@ -194,7 +194,10 @@ Mutations are gated on purpose, and the gates are cheap to satisfy honestly.
 3. **`--if-unchanged <precondition>` on edits you based on a read.** It refuses a
    changed issue with `STALE_WRITE` at exit 7, having sent nothing. It is a
    read-compare with a one-round-trip window, not an atomic swap, and it says so
-   in its own output.
+   in its own output. The token is the `precondition` attribute, which
+   `issue get` always reports and `issue list --precondition` puts on every row:
+   use the listing when you are about to edit several, because it is the same
+   value and it costs one request instead of one per issue.
 4. **`--field id=value` for anything without a flag of its own.** Story points,
    acceptance criteria, and every other custom field are reachable:
    `jr issue edit ENG-1 --field 'Story Points=5'`. The id or the name both work

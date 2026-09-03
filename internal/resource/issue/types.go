@@ -22,7 +22,7 @@ import (
 // commit that changes the corresponding golden file.
 const (
 	KindList    = "issue.list"
-	VersionList = 7
+	VersionList = 8
 	KindGet     = "issue.get"
 	VersionGet  = 9
 )
@@ -773,10 +773,10 @@ func (i Issue) Node() *render.Node {
 	n.AttrIf("project", i.Project)
 	n.AttrIf("resolution", i.Resolution)
 	n.AttrIf("parent", i.Parent)
-	// Only `issue get` mints one, so this is absent on a listed row and the
-	// shared Schema does not declare it — GetSchema does. AttrIf rather than a
-	// branch on the command, because a row that ever did carry one would then
-	// fail validation loudly instead of quietly widening issue.list's shape.
+	// `issue get` always mints one and `issue list` mints one per row when
+	// asked, so both kinds declare it and neither requires it. AttrIf rather
+	// than a branch on the command: an issue Jira reports no `updated` for
+	// gets no token, and absence is how that is said.
 	n.AttrIf("precondition", i.Precondition)
 	n.LeafIf("created", i.Created)
 	n.LeafIf("updated", i.Updated)
