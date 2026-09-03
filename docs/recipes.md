@@ -799,8 +799,47 @@ $ jr issue list --limit 50 --format json | jq '{count, complete}'
 
 ## Bulk operations
 
-There is no bulk verb, deliberately: a half-completed bulk edit is worse than a
-loop you can see. Loop in the shell, and let the exit codes stop you.
+### Editing a set through a plan
+
+`issue edit` takes more than one key only through a plan, and a plan is a
+document you read before anything is sent:
+
+```console
+$ jr issue edit ENG-101 ENG-102 ENG-103 --add-label triaged --plan-out plan.xml
+```
+
+That makes no mutating request. It writes the plan to the file and prints the
+same document, so you can read it, diff it, or hand it to somebody for approval.
+Each row carries the issue, the baseline that issue was at, and the key that
+makes applying it twice a no-op. Collecting those baselines costs one request
+for the whole set, not one per row.
+
+Then run it:
+
+```console
+$ jr issue edit --apply plan.xml
+```
+
+Every row is attempted. Each is reported `applied`, `skipped` or `failed` with
+its own error code, and a row somebody edited since you planned it is refused
+with nothing sent while the rest still go through. The exit is whatever stopped
+the rows that failed, so `7` means somebody moved a ticket and `8` means you are
+being throttled.
+
+**Re-running the same apply is the resume.** There is no flag for it: a row that
+already landed is skipped, because that is what the idempotency key on it means.
+So a run interrupted halfway is finished by running it again, and nothing is
+edited twice.
+
+Two things a plan will not do. It applies **one** change to many issues, so a
+different change per row is a different job and a second plan. And it caps at
+fifty rows, which is about how much anybody reads honestly rather than what the
+API can carry.
+
+### Or loop, when a plan is the wrong shape
+
+For anything a plan does not cover, loop in the shell and let the exit codes
+stop you.
 
 ```console
 # Transition everything matching a query
