@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -357,7 +358,7 @@ func versionScript(t *testing.T) string {
 // repository somewhere above the temporary directory.
 func gitEnv(dir string) []string {
 	return append(
-		os.Environ(),
+		inheritedGitEnv(),
 		"GIT_CONFIG_GLOBAL=/dev/null",
 		"GIT_CONFIG_SYSTEM=/dev/null",
 		"GIT_CEILING_DIRECTORIES="+dir,
@@ -366,6 +367,53 @@ func gitEnv(dir string) []string {
 		"GIT_COMMITTER_NAME=jr test",
 		"GIT_COMMITTER_EMAIL=jr@example.invalid",
 	)
+}
+
+// pointerEnv are the variables git exports to a hook to say which repository it
+// is operating on. They are removed rather than overridden, because the correct
+// value for a fresh temporary repository is "unset": git then discovers the
+// repository from the working directory, which is what cmd.Dir already says.
+//
+// **cmd.Dir does not override them.** GIT_INDEX_FILE wins over the directory a
+// process was started in, so `git add .` inside a temporary repository writes
+// into whatever index the variable names.
+var pointerEnv = []string{
+	"GIT_INDEX_FILE",
+	"GIT_DIR",
+	"GIT_WORK_TREE",
+	"GIT_COMMON_DIR",
+	"GIT_OBJECT_DIRECTORY",
+	"GIT_ALTERNATE_OBJECT_DIRECTORIES",
+	"GIT_PREFIX",
+}
+
+// inheritedGitEnv is the environment with git's own pointers stripped out.
+//
+// This was found on 2026-09-03, from a release that could not be tagged. Every
+// commit ran the pre-commit hook, the hook ran `go test ./...`, and this file's
+// `git add .` wrote `first.txt` into the real repository's index, because git
+// runs a hook with GIT_INDEX_FILE set to the index being committed. The blob
+// went into the temporary repository's object store, so the real index then
+// held an entry pointing at an object that does not exist there:
+//
+//	error: invalid object 100644 9c59e24b… for 'first.txt'
+//	error: Error building trees
+//
+// It is invisible to CI, which runs `make test` directly and sets none of these,
+// and it only bites when the test runs uncached inside a hook. That is the worst
+// shape a defect can have: it fails on the developer's machine, at the moment
+// they are trying to commit, and never where the gates run.
+func inheritedGitEnv() []string {
+	env := os.Environ()
+	out := make([]string, 0, len(env))
+	for _, kv := range env {
+		name, _, _ := strings.Cut(kv, "=")
+		if slices.Contains(pointerEnv, name) {
+			continue
+		}
+		out = append(out, kv)
+	}
+	return out
 }
 
 // git runs one git command in dir and fails the test if it does not succeed.
@@ -414,4 +462,39 @@ func run(t *testing.T, script, dir string) (stdout, stderr string, err error) {
 	cmd.Stdout, cmd.Stderr = &out, &errs
 	err = cmd.Run()
 	return out.String(), errs.String(), err
+}
+
+// TestTheVersionHarnessNeverTouchesTheRealIndex is the guard for the defect
+// that produced inheritedGitEnv.
+//
+// It sets GIT_INDEX_FILE the way git sets it for a hook, runs the same helpers
+// the tests above run, and requires that nothing was written there. Before the
+// fix this file left two entries in it, `first.txt` and `second.txt`, pointing
+// at blobs living in a temporary repository's object store. In a real commit
+// that index is the repository's own, and the next `git commit` fails with
+// "invalid object ... Error building trees" against a tree it cannot build.
+//
+// Asserting on the file rather than on the environment is deliberate. A test
+// that checked `gitEnv` omits the variable would pass on a helper that omits it
+// and a `git` call that does not use the helper, which is exactly how this got
+// in: gitEnv was careful about config and silent about pointers.
+func TestTheVersionHarnessNeverTouchesTheRealIndex(t *testing.T) {
+	sentinel := filepath.Join(t.TempDir(), "sentinel-index")
+	t.Setenv("GIT_INDEX_FILE", sentinel)
+
+	// The same two calls every version test makes, which between them write a
+	// file, stage it, and commit it.
+	dir := t.TempDir()
+	initRepo(t, dir)
+	commit(t, dir, "second")
+
+	if _, err := os.Stat(sentinel); err == nil {
+		data, _ := os.ReadFile(sentinel)
+		t.Fatalf("the harness wrote %d bytes into the index git pointed it at.\n"+
+			"In a pre-commit hook that file is the repository's own index, and "+
+			"the entries name blobs that live in a temporary repository, so the "+
+			"commit fails building its tree.", len(data))
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("stat %s: %v", sentinel, err)
+	}
 }
