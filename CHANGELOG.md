@@ -20,7 +20,7 @@ accident.
 
 Nothing yet.
 
-## [0.10.2] - 2026-09-02
+## [0.10.2] - 2026-09-03
 
 **`jr` installs from Homebrew now, and that is the headline because it is the
 one that unblocked somebody.** A user could not run the tool at all: macOS
