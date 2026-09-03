@@ -1472,6 +1472,23 @@ value would leave a whole second in which another edit is invisible. It also
 names the issue and the deployment, so one from another issue or another site is
 refused rather than compared.
 
+**A baseline knows the second or the millisecond, and says which.** The two
+endpoints it can come from do not agree. Measured on Data Center 10.4.0, for one
+issue at one moment: the search returned `2026-09-03T21:57:13.000+0000` and the
+issue endpoint returned `2026-09-03T21:57:13.679+0000`. The search answers from
+the index and the index keeps only the second. Cloud returns the millisecond
+from both.
+
+So a baseline from `issue get` is millisecond-precise, one from
+`issue list --precondition` or from a plan is second-precise, and the token
+carries which. The comparison is as sharp as the token and no sharper.
+
+What that costs, stated rather than implied: two edits inside one second are
+indistinguishable to a listing's baseline. That window is the server's, and the
+alternative was what shipped in 0.11.0 and 0.12.0, where a listing's baseline
+was compared at a precision it never had and refused **every** write on Data
+Center.
+
 `issue.list` v8 carries the same attribute per row, but only with
 `--precondition`, and it is absent otherwise. The flag exists because the
 arithmetic without it is bad: "list the blocked issues, edit the three that

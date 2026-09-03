@@ -50,8 +50,59 @@ type Precondition struct {
 	// and a token from a different issue would otherwise compare one issue's
 	// timestamp against another's and refuse every write for the wrong reason.
 	Key string `json:"k"`
-	// Updated is the issue's last-modified time, canonical to the millisecond.
+	// Updated is the issue's last-modified time, canonical to the precision
+	// below.
 	Updated string `json:"u"`
+	// Precision is how sharp this baseline is, and it is here because the two
+	// endpoints a baseline can come from do not agree.
+	//
+	// Measured on Jira Data Center 10.4.0, for one issue at one moment:
+	//
+	//	GET /rest/api/2/search?jql=key=ENG-7&fields=updated
+	//	  2026-09-03T21:57:13.000+0000
+	//	GET /rest/api/2/issue/ENG-7?fields=updated
+	//	  2026-09-03T21:57:13.679+0000
+	//
+	// The search answers from the index and the issue from the store, and on
+	// Data Center the index keeps the second. Cloud returns the millisecond
+	// from both. Without this field every baseline a listing minted was
+	// compared at a precision it never had, so it read `.000` against `.679`
+	// and refused every write on that deployment: `issue list --precondition`
+	// handed out tokens nothing accepted, and every row of every plan failed
+	// STALE_WRITE.
+	//
+	// So the token carries the precision it was minted at and the comparison
+	// uses it. A baseline from a listing is second-precision, on both
+	// deployments, because that is what the weaker of its two sources supports
+	// and one rule is easier to reason about than a table of them. A baseline
+	// from `issue get` keeps the millisecond.
+	//
+	// Empty means millisecond, which is what every token minted before this
+	// field existed was formatted as.
+	Precision string `json:"p,omitempty"`
+}
+
+// The precisions a baseline can be minted at.
+const (
+	// PrecisionMillisecond is what the issue endpoint serves, on both
+	// deployments.
+	PrecisionMillisecond = "ms"
+	// PrecisionSecond is what a search-sourced baseline is held to. It is a
+	// weaker guarantee and the token says so rather than implying the stronger
+	// one: two edits inside one second are indistinguishable to it, and that
+	// window is the server's, not this tool's.
+	PrecisionSecond = "s"
+)
+
+// preconditionSecondLayout is preconditionLayout without the milliseconds.
+const preconditionSecondLayout = "2006-01-02T15:04:05Z07:00"
+
+// layoutFor returns the spelling a precision is written in.
+func layoutFor(precision string) string {
+	if precision == PrecisionSecond {
+		return preconditionSecondLayout
+	}
+	return preconditionLayout
 }
 
 // preconditionLayout is RFC 3339 with milliseconds, which is the precision both
@@ -68,11 +119,13 @@ const preconditionLayout = "2006-01-02T15:04:05.000Z07:00"
 // of nothing. The attribute is optional in the schema for exactly this case: a
 // caller who cannot be given a baseline is told so by its absence, which is
 // better than a token that compares equal to everything.
-func EncodePrecondition(info site.Info, key, rawUpdated string) (string, error) {
+func EncodePrecondition(
+	info site.Info, key, rawUpdated, precision string,
+) (string, error) {
 	if rawUpdated == "" || key == "" {
 		return "", nil
 	}
-	stamp, err := preconditionStamp(rawUpdated)
+	stamp, err := preconditionStamp(rawUpdated, precision)
 	if err != nil {
 		return "", err
 	}
@@ -80,6 +133,7 @@ func EncodePrecondition(info site.Info, key, rawUpdated string) (string, error) 
 		Deployment: info.Kind,
 		Key:        key,
 		Updated:    stamp,
+		Precision:  precision,
 	})
 	if err != nil {
 		return "", errs.Runtime("ENCODE_FAILED",
@@ -96,7 +150,7 @@ func EncodePrecondition(info site.Info, key, rawUpdated string) (string, error) 
 // normalized `+0000` to `Z` between two reads would otherwise report an
 // untouched issue as changed, and a false stale write is as wrong as a missed
 // one.
-func preconditionStamp(rawUpdated string) (string, error) {
+func preconditionStamp(rawUpdated, precision string) (string, error) {
 	t, ok := site.ParseTime(rawUpdated)
 	if !ok {
 		return "", errs.Remote("MALFORMED_TIMESTAMP",
@@ -105,7 +159,7 @@ func preconditionStamp(rawUpdated string) (string, error) {
 			WithRemedy("report this: the timestamp format changed")
 	}
 
-	stamp := t.Format(preconditionLayout)
+	stamp := t.Format(layoutFor(precision))
 	// Parseable is not the same as representable, and the minter has to hold
 	// itself to the spelling the parser accepts or it can hand out a token its
 	// own write verbs refuse.
@@ -116,7 +170,7 @@ func preconditionStamp(rawUpdated string) (string, error) {
 	// which tells the caller they typed something wrong about a token this tool
 	// minted for them. No Jira serves such a date. Refusing here costs nothing
 	// and keeps "minted implies accepted" true rather than true-in-practice.
-	if !isCanonicalVersion(stamp) {
+	if !isCanonicalVersion(stamp, precision) {
 		return "", errs.Remote("MALFORMED_TIMESTAMP",
 			"Jira returned an updated timestamp this tool cannot use as a version").
 			WithDetail("%q canonicalizes to %q, which is not a version this "+
@@ -134,12 +188,13 @@ func preconditionStamp(rawUpdated string) (string, error) {
 // agree, and the way to make two things agree is to give them one definition.
 // The fuzz targets compare against a definition of their own for the case where
 // this one is itself wrong.
-func isCanonicalVersion(version string) bool {
-	t, err := time.Parse(preconditionLayout, version)
+func isCanonicalVersion(version, precision string) bool {
+	layout := layoutFor(precision)
+	t, err := time.Parse(layout, version)
 	if err != nil {
 		return false
 	}
-	return t.UTC().Format(preconditionLayout) == version
+	return t.UTC().Format(layout) == version
 }
 
 // preconditionFlagName asks a listing to mint a baseline for every row.
@@ -195,7 +250,8 @@ func preconditionColumn() render.Column {
 // holding.
 func stampPreconditions(issues []Issue, info site.Info) error {
 	for i := range issues {
-		token, err := EncodePrecondition(info, issues[i].Key, issues[i].updatedRaw)
+		token, err := EncodePrecondition(
+			info, issues[i].Key, issues[i].updatedRaw, PrecisionSecond)
 		if err != nil {
 			return err
 		}

@@ -582,6 +582,19 @@ do not catch, add the test in the same change and cite it here.
 
 ## Credentials and safety
 
+- **A baseline is compared at the precision it was minted at.** Jira Data
+  Center serves `updated` at second precision from the search and millisecond
+  precision from the issue endpoint, so a baseline from a listing compared at
+  the millisecond can never match and refused every write on that deployment for
+  two releases. The token carries its precision and the comparison uses it. The
+  test that holds this is only able to fail because the stub truncates its
+  search the way the server does: a harness answering both endpoints from one
+  value cannot observe them disagreeing, which is how this shipped twice.
+  **Enforced by:** `TestABaselineFromASearchStillMatchesTheIssueItDescribes`,
+  `TestAListingBaselineWritesAgainstTheIssueEndpoint`,
+  `TestAListingBaselineStillRefusesAWriteToAMovedIssue`,
+  `TestAnIssueThatMovedAcrossTheSecondIsStillRefused`.
+
 - **A write never reports success for something the server discarded.** Jira
   takes a transition carrying a comment its screen has no field for, answers
   204, and drops the comment. Measured on Data Center 10.4.0: the comment count

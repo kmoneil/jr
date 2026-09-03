@@ -94,7 +94,13 @@ func ParsePrecondition(encoded string) (Precondition, error) {
 	// STALE_WRITE at exit 7, telling the caller the issue changed when what
 	// actually happened is that they passed something this tool did not issue.
 	// Two causes with different remedies are two errors.
-	if !isCanonicalVersion(p.Updated) {
+	if p.Precision != "" && p.Precision != PrecisionSecond &&
+		p.Precision != PrecisionMillisecond {
+		return Precondition{}, invalidPrecondition().
+			WithDetail("it claims precision %q, which this tool does not mint",
+				p.Precision)
+	}
+	if !isCanonicalVersion(p.Updated, p.Precision) {
 		return Precondition{}, invalidPrecondition().
 			WithDetail("it carries %q, which is not a version this tool records",
 				p.Updated)
@@ -210,7 +216,14 @@ func compareUnchanged(ctx context.Context, c *Client, key, encoded string) error
 	if err != nil {
 		return err
 	}
-	stamp, err := preconditionStamp(current.updatedRaw)
+	// Read back at the token's own precision, not at this endpoint's.
+	//
+	// The issue endpoint serves the millisecond and a search-sourced baseline
+	// holds only the second, so comparing what arrives here against a token
+	// minted from a listing compared `.679` with `.000` and refused every write
+	// on Data Center. The token says how sharp it is; the comparison is that
+	// sharp and no sharper.
+	stamp, err := preconditionStamp(current.updatedRaw, p.Precision)
 	if err != nil {
 		return err
 	}

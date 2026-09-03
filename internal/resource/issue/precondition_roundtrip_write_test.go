@@ -89,7 +89,11 @@ func TestABaselineFromAListingRefusesAStaleWrite(t *testing.T) {
 			if e.Exit != exitcode.Conflict {
 				t.Errorf("exit = %d, want %d", e.Exit, exitcode.Conflict)
 			}
-			if !strings.Contains(e.Detail, "2026-08-04T11:32:07.412Z") {
+			// Second precision, not the millisecond `issue get` reports. A
+			// listing's baseline is minted from a search, and on Data Center
+			// the search index keeps only the second, so the token says so and
+			// the comparison is that sharp and no sharper.
+			if !strings.Contains(e.Detail, "2026-08-04T11:32:07Z") {
 				t.Errorf("detail = %q, want the version the listing reported",
 					e.Detail)
 			}
@@ -192,33 +196,57 @@ func FuzzAMintedBaselineIsAlwaysAcceptedBack(f *testing.F) {
 	// is what a future change is measured against.
 	f.Add("Aa0-0", "0000-01-01T0:00:00+0010")
 
+	// Both precisions, because both are minted in production and each has its
+	// own layout: `issue get` mints milliseconds and a listing mints seconds. A
+	// round trip that held for only one of them would leave the other exactly
+	// as broken as a search-sourced baseline was before it carried its
+	// precision at all.
 	f.Fuzz(func(t *testing.T, key, rawUpdated string) {
 		for _, kind := range []site.Kind{site.Cloud, site.DataCenter} {
-			token, err := issue.EncodePrecondition(
-				site.Info{Kind: kind}, key, rawUpdated)
-			if err != nil || token == "" {
-				// A version this tool cannot read, or nothing to mint from.
-				// Both are refusals the caller is told about by absence.
-				continue
-			}
-			if _, ok := issue.ParseKey(key); !ok {
-				continue
-			}
-
-			p, err := issue.ParsePrecondition(token)
-			if err != nil {
-				t.Fatalf("minted a baseline for %q at %q that the write verbs "+
-					"refuse: %v", key, rawUpdated, err)
-			}
-			if p.Deployment != kind {
-				t.Fatalf("minted against %q and parsed back as %q", kind, p.Deployment)
-			}
-			// Same issue, however either side spells the key.
-			want, _ := issue.ParseKey(key)
-			got, ok := issue.ParseKey(p.Key)
-			if !ok || got.String() != want.String() {
-				t.Fatalf("minted for %q and parsed back as %q", key, p.Key)
+			for _, precision := range []string{
+				issue.PrecisionMillisecond, issue.PrecisionSecond,
+			} {
+				assertMintedBaselineParses(t, kind, precision, key, rawUpdated)
 			}
 		}
 	})
+}
+
+// assertMintedBaselineParses is the fuzz body above, lifted out so two loops
+// around it do not push the target past the complexity gate.
+func assertMintedBaselineParses(
+	t *testing.T, kind site.Kind, precision, key, rawUpdated string,
+) {
+	t.Helper()
+
+	token, err := issue.EncodePrecondition(
+		site.Info{Kind: kind}, key, rawUpdated, precision)
+	if err != nil || token == "" {
+		// A version this tool cannot read, or nothing to mint from. Both are
+		// refusals the caller is told about by absence.
+		return
+	}
+	if _, ok := issue.ParseKey(key); !ok {
+		return
+	}
+
+	p, err := issue.ParsePrecondition(token)
+	if err != nil {
+		t.Fatalf("minted a baseline for %q at %q (%s) that the write verbs "+
+			"refuse: %v", key, rawUpdated, precision, err)
+	}
+	if p.Deployment != kind {
+		t.Fatalf("minted against %q and parsed back as %q", kind, p.Deployment)
+	}
+	// Same issue, however either side spells the key.
+	want, _ := issue.ParseKey(key)
+	got, ok := issue.ParseKey(p.Key)
+	if !ok || got.String() != want.String() {
+		t.Fatalf("minted for %q and parsed back as %q", key, p.Key)
+	}
+	// The precision has to survive, or the comparison uses one the baseline was
+	// not minted at, which is the whole defect this carries.
+	if p.Precision != precision {
+		t.Fatalf("minted at %q and parsed back at %q", precision, p.Precision)
+	}
 }

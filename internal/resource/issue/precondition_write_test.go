@@ -102,7 +102,7 @@ func theWriteWasNeverSent(t *testing.T, replayer *transport.Replayer) {
 // mint builds the token `issue get` would have reported for a given version.
 func mint(t *testing.T, kind site.Kind, key, updated string) string {
 	t.Helper()
-	token, err := issue.EncodePrecondition(site.Info{Kind: kind}, key, updated)
+	token, err := issue.EncodePrecondition(site.Info{Kind: kind}, key, updated, issue.PrecisionMillisecond)
 	if err != nil {
 		t.Fatalf("mint: %v", err)
 	}
@@ -425,7 +425,7 @@ func canonicalVersion(version string) (string, bool) {
 
 func mintFuzzSeed(f *testing.F, kind site.Kind, key, updated string) string {
 	f.Helper()
-	token, err := issue.EncodePrecondition(site.Info{Kind: kind}, key, updated)
+	token, err := issue.EncodePrecondition(site.Info{Kind: kind}, key, updated, issue.PrecisionMillisecond)
 	if err != nil {
 		f.Fatalf("mint: %v", err)
 	}
