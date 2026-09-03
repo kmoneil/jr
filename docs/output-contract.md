@@ -1545,6 +1545,73 @@ did not happen.
 | `INVALID_SPRINT_WINDOW`    | 2    | The sprint would end before it starts. Jira refuses the same thing — "the start date of a sprint must be before the end date" — so this is that verdict without the round trip. On `sprint start` the pair checked is the effective one, so `--end` alone can be backwards against a start date the sprint already holds.                                                                                                                                                                                                                                                                                                                                                               |
 | `INVALID_SPRINT_NAME`      | 2    | `sprint create` was given no name, or one that is entirely whitespace. Anything else is accepted: a sprint name is free text, it never reaches a URL path, and what a team calls its iteration is not this tool's business.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
+### Plans and applies
+
+`issue edit` takes more than one key only through a plan, and there is no other
+path to a bulk write. `--plan-out <file>` writes `issue.plan` v1 and sends
+nothing; `--apply <file>` runs one and emits `issue.apply` v1. Both documents
+also go to stdout, so a caller with no shell to redirect with, which is every
+caller over MCP, still gets the document every other command produces.
+
+```console
+$ jr issue edit ENG-101 ENG-102 ENG-103 --add-label triaged --plan-out plan.xml
+$ jr issue edit --apply plan.xml
+```
+
+**A plan costs one request, whatever its row count.** Each row carries the
+baseline `--if-unchanged` would take, and all of them come from a single
+`key IN (...)` search rather than an `issue get` each. Fifty rows is the cap,
+and it is about how much a person reads rather than about what the API can
+carry: a plan nobody read is the failure this surface exists to prevent.
+
+**A plan carries intent, never requests.** A row names an issue, its baseline
+and its idempotency key; the change is written once because a plan applies one
+change to many issues. `--apply` rebuilds every request through the same builder
+the single-issue edit uses, so nothing in the file becomes a method, a path or a
+body. That is deliberate and it is the reason the shape is what it is: a plan of
+recorded requests would make any file executable input carrying the caller's
+credential.
+
+**A failing row does not stop the run.** Every row is attempted, and each is
+reported `applied`, `skipped` or `failed` with its own error `code`. This is the
+opposite of `epic add`, which stops at the first failure and reports the rest
+`not-attempted`, and the difference is deliberate: `epic add` moves a set into
+an epic as one coherent operation, and a plan is a batch of independent edits
+that happen to share a change. One stale ticket is no reason to abandon
+thirty-nine others.
+
+**A partial apply writes its document and exits non-zero.** The exit is the
+cause's own, not a new code: `7` for a stale row, `6` for permission, `8` for a
+rate limit. There is no "partial write" exit code, because `3` means a truncated
+*result set*, which a write does not have, and minting a second one would
+flatten the reason into a number that cannot tell a caller whether backing off
+would help. The document says which rows landed, and it reaches stdout, which is
+the single exception to "a failing command writes nothing to stdout".
+
+When more than one row fails, the exit is the first failure that is **not**
+`STALE_WRITE`, and the first otherwise. A stale row is the ordinary outcome of
+two people touching one ticket; a permission error or a rate limit is systemic
+and makes every row after it suspect.
+
+**Re-running an apply is the resume, and takes no flag.** Each row claims the
+ledger under the idempotency key the plan recorded, so a row that already landed
+is reported `skipped` and no request is sent. An idempotency key means "do this
+at most once"; honouring that only when asked would make the default the
+duplicate.
+
+| Code                       | Exit | Means                                                                                                                                                                                                                                                                          |
+| -------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `BULK_NEEDS_A_PLAN`        | 2    | More than one key was given without `--plan-out`. The convenient spelling is refused on purpose: it would give up the reviewable document, and then nobody writes a plan again.                                                                                                   |
+| `INVALID_PLAN`             | 2    | The file `--apply` was given is not a plan this build can run: not a plan document, a version this build does not read, a plan for another verb, no rows, more rows than the cap, one issue twice, a row whose key is not an issue key, or an idempotency key the ledger cannot record. Refused rather than read leniently, because what this reader accepts becomes an edit sent with your credential. |
+| `NO_BASELINE`              | 2    | A row was planned for an issue Jira reported no `updated` for, so there is no baseline to check it against. Reported per row: the run continues and that row is not written, because writing it would be the unchecked write `--if-unchanged` exists to refuse.                   |
+| `PLAN_NOT_READ`            | 2    | The plan file could not be opened.                                                                                                                                                                                                                                              |
+| `PLAN_NOT_WRITTEN`         | 1    | The plan could not be written to the path `--plan-out` named. Nothing was sent either way: a plan makes no mutating request.                                                                                                                                                     |
+| `PLAN_TAKES_NO_KEYS`       | 2    | `--apply` was given issue keys as well. It takes its issues from the plan.                                                                                                                                                                                                       |
+| `PLAN_CARRIES_THE_CHANGE`  | 2    | `--apply` was given field flags as well. Whether the flag overrode the plan or the plan won, the document somebody reviewed would stop being the change that runs.                                                                                                                |
+| `PLAN_CARRIES_THE_BASELINE`| 2    | `--apply` was given `--if-unchanged` as well. The plan already holds one baseline per row.                                                                                                                                                                                        |
+| `CONFLICTING_PLAN_FLAGS`   | 2    | `--plan-out` with `--apply`, or `--plan-out` with `--dry-run`. The first pair writes a plan and runs one; the second both send nothing and each names a different document, and a command emits one.                                                                              |
+| `UNKNOWN_ISSUE`            | 5    | A key given to `--plan-out` is not an issue this credential can read. Refused while planning rather than recorded, because a plan is what you read *instead* of finding out at apply time.                                                                                        |
+
 ### The sprint lifecycle
 
 A sprint is created, started, and closed, and the three verbs are gated

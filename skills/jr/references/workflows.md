@@ -51,10 +51,36 @@ construct one, and do not try to convert it to an offset: there is no offset
 flag, by design, because an offset shifts when a row is inserted above it and a
 long run then skips or repeats while reporting itself complete.
 
-## Bulk changes across a query
+## Bulk changes across a set
 
-There is no bulk verb, deliberately. A half-completed bulk edit is worse than a
-loop you can see fail. Loop, and let the exit codes stop you.
+`issue edit` takes several keys only through a plan, and that is the only path
+to a bulk write. `--plan-out <file>` sends nothing and writes a document: one
+row per issue, each carrying its own baseline and an idempotency key, with the
+change written once because a plan applies one change to many issues. Read it,
+then `--apply <file>`.
+
+```console
+jr issue edit ENG-101 ENG-102 ENG-103 --add-label triaged --plan-out plan.xml
+jr issue edit --apply plan.xml
+```
+
+Every row is attempted. Each is reported `applied`, `skipped` or `failed` with
+its own error code, and a row somebody changed since the plan was built is
+refused with nothing sent while the rest still go through. The exit is whatever
+stopped the rows that failed, so exit 7 means somebody moved a ticket and exit 8
+means you are being throttled.
+
+Running the same apply again is the resume, and there is no flag for it: a row
+that already landed is skipped, because that is what its idempotency key means.
+An interrupted run is finished by running it again.
+
+The cap is fifty rows, which is about how much a person reads rather than what
+the API can carry, and a plan applies one change to every row. A different
+change per row is a second plan.
+
+## Bulk changes a plan cannot express
+
+For a set a plan does not fit, loop, and let the exit codes stop you.
 
 Rehearse first. Read the set before changing it:
 

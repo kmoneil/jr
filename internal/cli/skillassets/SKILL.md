@@ -198,7 +198,15 @@ Mutations are gated on purpose, and the gates are cheap to satisfy honestly.
    `issue get` always reports and `issue list --precondition` puts on every row:
    use the listing when you are about to edit several, because it is the same
    value and it costs one request instead of one per issue.
-4. **`--field id=value` for anything without a flag of its own.** Story points,
+4. **A plan for more than one issue.** `issue edit` refuses several keys unless
+   `--plan-out <file>` is given, and that writes a document instead of sending
+   anything: one row per issue, each carrying its own baseline, and the change
+   written once. Read it, then run it with `--apply <file>`. Every row is
+   attempted and reported `applied`, `skipped` or `failed` with its own code, a
+   row somebody changed since the plan is refused with nothing sent, and running
+   the same apply again skips whatever already landed. This is the only path to
+   a bulk write, and hand-rolling a loop gives up the per-row report.
+5. **`--field id=value` for anything without a flag of its own.** Story points,
    acceptance criteria, and every other custom field are reachable:
    `jr issue edit ENG-1 --field 'Story Points=5'`. The id or the name both work
    and the value is typed from the site's catalogue, so a bad value is refused

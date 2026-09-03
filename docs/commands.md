@@ -1723,7 +1723,7 @@ Change fields on an issue
 - **build tags** — needs `write`
 
 ```
-jr issue edit <key> [flags]
+jr issue edit [key...] [flags]
 ```
 
 Sets fields on an existing issue. Only what you name is sent, so a field you do
@@ -1785,7 +1785,7 @@ jr issue edit ENG-101 --field-json customfield_11350='"ENG-42"'
 
 | Argument | Required | Description |
 | --- | --- | --- |
-| `key` | yes | issue key, e.g. ENG-101 |
+| `key...` | no | issue key, e.g. ENG-101; repeat for a plan, and pass none with --apply |
 
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -1802,10 +1802,14 @@ jr issue edit ENG-101 --field-json customfield_11350='"ENG-42"'
 | `--body-format` | `text\|markdown\|adf` | `text` | how to read the body: text sends it uninterpreted, markdown converts it, adf takes a document as JSON; the last two are Cloud only |
 | `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
+| `--plan-out` | `string` | — | write a plan for these issues to this file and send nothing; apply it later with --apply |
+| `--apply` | `string` | — | run a plan written by --plan-out; takes no issue keys and no field flags, because the plan carries both |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.edit` | v2 | always |
+| `issue.edit` | v2 | one issue is edited |
+| `issue.plan` | v1 | --plan-out is given |
+| `issue.apply` | v1 | --apply is given |
 | `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED

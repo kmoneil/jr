@@ -1,0 +1,26 @@
+      <element name="apply">
+        <attributes count="5">
+          <attribute name="verb" type="string" optional="false" enum="issue.edit"/>
+          <attribute name="requested" type="int" optional="false"/>
+          <attribute name="applied" type="int" optional="false"/>
+          <attribute name="skipped" type="int" optional="false"/>
+          <attribute name="failed" type="int" optional="false"/>
+        </attributes>
+        <elements count="1">
+          <element name="rows" list-of="row" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="row" optional="true" repeated="true">
+                <attributes count="3">
+                  <attribute name="key" type="string" optional="false"/>
+                  <attribute name="outcome" type="string" optional="false" enum="applied,skipped,failed"/>
+                  <attribute name="code" type="string" optional="true"/>
+                </attributes>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>

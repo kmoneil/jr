@@ -1,0 +1,103 @@
+      <element name="plan">
+        <attributes count="2">
+          <attribute name="verb" type="string" optional="false" enum="issue.edit"/>
+          <attribute name="count" type="int" optional="false"/>
+        </attributes>
+        <elements count="2">
+          <element name="change" optional="false" repeated="false">
+            <attributes count="0"/>
+            <elements count="9">
+              <element name="summary" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="description" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="priority" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="assignee" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="parent" optional="true" repeated="false">
+                <attributes count="0"/>
+                <text name="text" type="string" optional="false"/>
+                <elements count="0"/>
+              </element>
+              <element name="labels" list-of="label" optional="true" repeated="false">
+                <attributes count="1">
+                  <attribute name="count" type="int" optional="false"/>
+                </attributes>
+                <elements count="1">
+                  <element name="label" optional="true" repeated="true">
+                    <attributes count="0"/>
+                    <text name="text" type="string" optional="false"/>
+                    <elements count="0"/>
+                  </element>
+                </elements>
+              </element>
+              <element name="add-labels" list-of="add-label" optional="true" repeated="false">
+                <attributes count="1">
+                  <attribute name="count" type="int" optional="false"/>
+                </attributes>
+                <elements count="1">
+                  <element name="add-label" optional="true" repeated="true">
+                    <attributes count="0"/>
+                    <text name="text" type="string" optional="false"/>
+                    <elements count="0"/>
+                  </element>
+                </elements>
+              </element>
+              <element name="remove-labels" list-of="remove-label" optional="true" repeated="false">
+                <attributes count="1">
+                  <attribute name="count" type="int" optional="false"/>
+                </attributes>
+                <elements count="1">
+                  <element name="remove-label" optional="true" repeated="true">
+                    <attributes count="0"/>
+                    <text name="text" type="string" optional="false"/>
+                    <elements count="0"/>
+                  </element>
+                </elements>
+              </element>
+              <element name="fields" list-of="field" optional="true" repeated="false">
+                <attributes count="1">
+                  <attribute name="count" type="int" optional="false"/>
+                </attributes>
+                <elements count="1">
+                  <element name="field" optional="true" repeated="true">
+                    <attributes count="1">
+                      <attribute name="id" type="string" optional="false"/>
+                    </attributes>
+                    <text name="text" type="string" optional="false"/>
+                    <elements count="0"/>
+                  </element>
+                </elements>
+              </element>
+            </elements>
+          </element>
+          <element name="rows" list-of="row" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="row" optional="true" repeated="true">
+                <attributes count="3">
+                  <attribute name="key" type="string" optional="false"/>
+                  <attribute name="precondition" type="string" optional="true"/>
+                  <attribute name="idempotency-key" type="string" optional="false"/>
+                </attributes>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>

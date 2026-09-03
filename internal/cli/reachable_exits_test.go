@@ -214,8 +214,12 @@ var namedFlagInput = map[string]string{
 
 // extraArgs is the handful whose required input cannot be derived from a name.
 var extraArgs = map[string][]string{
-	// An edit naming no field is refused as a no-op, before anything resolves.
-	"issue.edit": {"--summary", "probe"},
+	// An edit naming no field is refused as a no-op, before anything resolves,
+	// and its key is here rather than derived because the argument stopped
+	// being Required when --apply arrived: an apply takes its issues from the
+	// plan, so probeArgs, which supplies only required positionals, now
+	// supplies none and the run is refused with NO_ISSUES.
+	"issue.edit": {"--summary", "probe", "eng-1"},
 }
 
 // probeArgs builds a command line that gets past cobra and past the command's

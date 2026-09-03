@@ -154,6 +154,14 @@ do not catch, add the test in the same change and cite it here.
 
 ## Queries and pagination
 
+- **A plan costs one request however many rows it has.** Every row needs the
+  baseline `--if-unchanged` would take, and the obvious way to collect fifty is
+  fifty `issue get` calls. `key IN (...)` returns `updated` for the whole set in
+  one page. A regression to a get per row would still work and would quietly
+  cost fifty times what it should, which is why the request count is asserted
+  and not the result.
+  **Enforced by:** `TestAPlanCostsOneRequestHoweverManyRows`.
+
 - **No offset flag.** `--limit`, `--page-size`, `--page-token`. Never
   `--paginate`, `--offset`, `--start-at`. The page token is opaque and carries
   the deployment it was minted against; a token from one is refused against the
@@ -573,6 +581,33 @@ do not catch, add the test in the same change and cite it here.
   **Enforced by:** `TestTheRigRefusesAProfileThatNamesAnotherAddress`.
 
 ## Credentials and safety
+
+- **A plan carries intent, and never a request.** `--apply` reads a key, a
+  baseline and an idempotency key, then rebuilds every request through the same
+  builder the single-issue edit uses. Nothing in the file becomes a method, a
+  path or a body, so the worst a hostile or corrupt plan achieves is a
+  `jr`-shaped edit to an issue whose key `ParseKey` accepted. This is the first
+  document reader in the tree, and what it accepts becomes a write sent with the
+  caller's credential, which is why the bound is asserted rather than assumed.
+  **Enforced by:** `TestAPlanCannotNameSomethingThatIsNotAnIssue`,
+  `FuzzParsePlanAcceptsOnlyWhatIsSafeToApply`, `TestAPlanThisToolDidNotWriteIsRefused`.
+- **Re-running an apply sends nothing for a row that already landed.** Each row
+  claims the ledger under the idempotency key the plan recorded, so a resume
+  needs no flag: an idempotency key means "do this at most once", and honouring
+  it only when asked would make the default the duplicate. The second half of
+  the pair matters as much as the first, because a skip that happened for any
+  other reason would look identical: the same plan against a *fresh* ledger
+  re-applies every row.
+  **Enforced by:** `TestReapplyingAPlanSkipsWhatAlreadyLanded`,
+  `TestAFreshLedgerReappliesEverything`.
+- **A failing row does not stop an apply, and every row is attempted.** A stale
+  row is refused with nothing sent and the rest still apply, which is what lets
+  a forty-row sweep survive one person touching one ticket. The document reports
+  each row's outcome and the exit is the cause's own. Deliberately the opposite
+  of `epic add`, which stops at the first failure: that moves a set into an epic
+  as one operation, and a plan is a batch of independent edits.
+  **Enforced by:** `TestAStaleRowFailsAndTheRunGoesOn`,
+  `TestASystemicFailureDecidesTheExitOverAStaleRow`.
 
 - **A baseline from a listing is the baseline a fetch would have minted.**
   `issue get` always reports a `precondition`, and `issue list --precondition`

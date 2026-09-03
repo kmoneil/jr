@@ -14,6 +14,7 @@ epic.list	1	epic.list
 epic.remove	2	epic.remove
 field.list	2	field.list
 issue.activity	1	issue.activity
+issue.apply	1	issue.edit
 issue.assign	2	issue.assign
 issue.attachment.download	1	issue.attachment.download
 issue.attachment.list	1	issue.attachment.list
@@ -34,6 +35,7 @@ issue.link.list	1	issue.link.list
 issue.link.remove	1	issue.link.remove
 issue.list	8	issue.list
 issue.move	3	issue.move
+issue.plan	1	issue.edit
 issue.watch	1	issue.watch
 issue.worklog.add	2	issue.worklog.add
 issue.worklog.delete	1	issue.worklog.delete

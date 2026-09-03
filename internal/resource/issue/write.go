@@ -613,7 +613,14 @@ write is a silent last-one-wins.`),
 			buildinfo.App + " issue edit ENG-101 --field-json customfield_11350='\"ENG-42\"'",
 		}, "\n"),
 		Args: []registry.Arg{{
-			Name: "key", Usage: "issue key, e.g. ENG-101", Required: true,
+			Name: "key",
+			Usage: "issue key, e.g. ENG-101; repeat for a plan, and pass none " +
+				"with --apply",
+			// Not Required, because --apply takes its keys from the plan file
+			// and would otherwise have to be given one it ignores. Everything
+			// this loosens is checked in validateEdit, which can name the flag
+			// that made a given count right or wrong.
+			Required: false, Variadic: true,
 		}},
 		Flags: []registry.Flag{
 			{Name: "summary", Type: registry.TypeString, Usage: "replace the summary"},
@@ -649,12 +656,22 @@ write is a silent last-one-wins.`),
 			bodyFormatFlag(),
 			ifUnchangedFlagDecl(),
 			dryRunFlag(),
+			planOutFlag(),
+			applyFlag(),
 		},
 		Mutating:     true,
 		NeedsJira:    true,
 		RequiresTags: []string{"write"},
 		Outputs: []registry.Output{
-			{Kind: KindEdit, Version: VersionEdit},
+			{Kind: KindEdit, Version: VersionEdit, When: "one issue is edited"},
+			{
+				Kind: KindPlan, Version: VersionPlan,
+				When: "--" + planOutFlagName + " is given",
+			},
+			{
+				Kind: KindApply, Version: VersionApply,
+				When: "--" + applyFlagName + " is given",
+			},
 			registry.DryRunOutput(),
 		},
 		ExitCodes: writeExits(),
@@ -664,16 +681,29 @@ write is a silent last-one-wins.`),
 }
 
 func validateEdit(ctx context.Context, inv *registry.Invocation) error {
+	if err := validateEditShape(inv); err != nil {
+		return err
+	}
+	// An apply carries its change set in the plan, so every check below is
+	// about flags it does not have. The plan's own validation is ParsePlan,
+	// which runs when the file is read rather than here: a plan is a document
+	// and reading it is the first thing the run does.
+	if inv.Flags.String(applyFlagName) != "" {
+		return nil
+	}
+
 	if err := validateAssignee(ctx, inv, inv.Flags.String("assignee")); err != nil {
 		return err
 	}
-	if _, ok := ParseKey(inv.Args[0]); !ok {
-		return errs.Usage("INVALID_KEY", "%q is not an issue key", inv.Args[0]).
-			WithDetail("an issue key looks like ENG-123").
-			WithRemedy("pass a key, not an id or a summary")
-	}
-	if err := validateParent(inv.Args[0], inv.Flags.String("parent")); err != nil {
-		return err
+	for _, arg := range inv.Args {
+		if _, ok := ParseKey(arg); !ok {
+			return errs.Usage("INVALID_KEY", "%q is not an issue key", arg).
+				WithDetail("an issue key looks like ENG-123").
+				WithRemedy("pass a key, not an id or a summary")
+		}
+		if err := validateParent(arg, inv.Flags.String("parent")); err != nil {
+			return err
+		}
 	}
 	if err := validatePrecondition(inv); err != nil {
 		return err
@@ -849,23 +879,21 @@ func runEdit(ctx context.Context, inv *registry.Invocation) (*render.Doc, error)
 		BodyFormat: inv.Flags.String("body-format"),
 	}
 
-	opt := EditOptions{
-		Key:          inv.Args[0],
-		Summary:      inv.Flags.String("summary"),
-		Description:  inv.Flags.String("description"),
-		Priority:     inv.Flags.String("priority"),
-		AddLabels:    inv.Flags.StringSlice("add-label"),
-		RemoveLabels: inv.Flags.StringSlice("remove-label"),
-		Fields:       fieldWrites(inv),
+	// An apply's change set comes out of the plan, so it is answered before the
+	// flags are read at all: there are none to read.
+	if path := inv.Flags.String(applyFlagName); path != "" {
+		return runApply(ctx, inv, client, path)
 	}
-	if labels := inv.Flags.StringSlice("label"); labels != nil {
-		opt.Labels = labels
-	}
-	if assignee := inv.Flags.String("assignee"); assignee != "" {
-		opt.Assignee, opt.SetAssignee = resolvedAssignee(inv, assignee), true
-	}
-	if parent := inv.Flags.String("parent"); parent != "" {
-		opt.Parent, opt.SetParent = parent, true
+
+	opt := editOptionsFor(inv, inv.Args[0])
+
+	if path := inv.Flags.String(planOutFlagName); path != "" {
+		// The change set is the same one a single-issue edit would have built,
+		// from the same flags through the same function. A plan that described
+		// the change some other way would be a second implementation of it, and
+		// the two would drift, which is the reason CreateRequest is separate
+		// from Create for --dry-run.
+		return runPlanOut(ctx, inv, client, info, opt, path)
 	}
 
 	req, err := client.EditRequest(opt)
@@ -887,6 +915,34 @@ func runEdit(ctx context.Context, inv *registry.Invocation) (*render.Doc, error)
 	return stampPrecondition(
 		EditedDoc(KindEdit, VersionEdit, opt.Key, "edited"), checked,
 	), nil
+}
+
+// editOptionsFor reads the change set out of the flags.
+//
+// Shared by the single-issue path and by --plan-out so that one set of flags
+// means one change however it is spelled, and a field added to one is a field
+// the other gets. The key is a parameter because a plan's rows each supply
+// their own and the change set itself carries none.
+func editOptionsFor(inv *registry.Invocation, key string) EditOptions {
+	opt := EditOptions{
+		Key:          key,
+		Summary:      inv.Flags.String("summary"),
+		Description:  inv.Flags.String("description"),
+		Priority:     inv.Flags.String("priority"),
+		AddLabels:    inv.Flags.StringSlice("add-label"),
+		RemoveLabels: inv.Flags.StringSlice("remove-label"),
+		Fields:       fieldWrites(inv),
+	}
+	if labels := inv.Flags.StringSlice("label"); labels != nil {
+		opt.Labels = labels
+	}
+	if assignee := inv.Flags.String("assignee"); assignee != "" {
+		opt.Assignee, opt.SetAssignee = resolvedAssignee(inv, assignee), true
+	}
+	if parent := inv.Flags.String("parent"); parent != "" {
+		opt.Parent, opt.SetParent = parent, true
+	}
+	return opt
 }
 
 // send performs a request whose success carries no body worth parsing. Jira

@@ -178,29 +178,44 @@ func checkUnchanged(
 	if encoded == "" {
 		return false, nil
 	}
+	if err := compareUnchanged(ctx, c, key, encoded); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// compareUnchanged is the check itself, with the token supplied rather than
+// read from a flag.
+//
+// Split out for `--apply`, whose token comes from a row of a plan and not from
+// the command line. Both callers must run the identical comparison: an apply
+// that checked a baseline any less sharply than `--if-unchanged` does would
+// give the weaker guarantee to the caller who asked for the stronger one, and
+// nothing in the output would say which had run.
+func compareUnchanged(ctx context.Context, c *Client, key, encoded string) error {
 	p, err := ParsePrecondition(encoded)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if p.Deployment != c.Site.Kind {
 		// Two sites' timestamps have nothing to say to each other, and
 		// comparing them would refuse the write with "the issue changed",
 		// which is a statement about this issue that nobody checked.
-		return false, invalidPrecondition().
+		return invalidPrecondition().
 			WithDetail("it was issued for a %s site and this is %s",
 				deploymentName(p.Deployment), deploymentName(c.Site.Kind))
 	}
 
 	current, err := c.Get(ctx, key, []string{"updated"})
 	if err != nil {
-		return false, err
+		return err
 	}
 	stamp, err := preconditionStamp(current.updatedRaw)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if stamp != p.Updated {
-		return false, errs.Conflict("STALE_WRITE",
+		return errs.Conflict("STALE_WRITE",
 			"%s changed after the precondition was taken, so this write was not sent", key).
 			WithDetail("the precondition describes %s and the issue now reads %s",
 				p.Updated, stamp).
@@ -208,7 +223,7 @@ func checkUnchanged(
 				"what it says now, and retry with the precondition from that read",
 				buildinfo.App, key)
 	}
-	return true, nil
+	return nil
 }
 
 // stampPrecondition records that a check ran, on the document a verb returns.
