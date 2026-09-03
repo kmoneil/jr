@@ -20,6 +20,102 @@ accident.
 
 Nothing yet.
 
+## [0.12.0] - 2026-09-03
+
+**A bulk edit is a document you read before anything is sent.**
+
+Nothing in this tool changed an arbitrary set of issues in one invocation.
+`epic add` and `sprint add` take fifty keys, but those are one request to an API
+that accepts a list; an edit is one request per row, so forty of them meant a
+shell loop. A loop gives up every guarantee the rest of this project
+establishes: when request twenty-three fails, the exit status says something
+failed and nothing says which twenty-two succeeded, because each invocation was
+a separate process with a separate result document and the shell kept none of
+them.
+
+```console
+$ jr issue edit ENG-101 ENG-102 ENG-103 --add-label triaged --plan-out plan.xml
+$ jr issue edit --apply plan.xml
+```
+
+The first command sends nothing. It writes a plan: one row per issue, each
+carrying the baseline that issue was at and the key that makes applying it twice
+a no-op, with the change written once. Read it, diff it, hand it to somebody for
+approval. The second runs it and reports every row.
+
+Minor, and for two error codes rather than for the feature. `jr issue edit` with
+no key and `jr issue edit A B` both used to be refused with `INVALID_USAGE`, and
+now carry codes that say what is actually wrong. If nothing you run branches on
+that string, everything here is additive. **Output contract** has both.
+
+### Added
+
+- **`--plan-out <file>` and `--apply <file>` on `issue edit`.** More than one
+  key goes through a plan, and only through a plan: the direct multi-key
+  spelling is refused, because it would be the convenient one and then nobody
+  writes a plan again.
+
+  A plan costs **one** request whatever its row count. Every row needs the
+  baseline `--if-unchanged` would take, and the obvious way to collect fifty is
+  fifty `issue get` calls; `key IN (...)` returns them in one page.
+
+  Fifty rows is the cap, and it is about how much a person reads rather than
+  what the API can carry. A plan applies one change to many issues; a different
+  change per row is a second plan.
+
+- **Re-running an apply is the resume, and there is no flag for it.** A row that
+  already landed is reported `skipped` and no request is sent, because that is
+  what the idempotency key recorded on it means. An interrupted run is finished
+  by running it again, and nothing is edited twice.
+
+### Output contract
+
+- **`issue.plan` v1 and `issue.apply` v1 are new kinds.** A plan carries intent
+  and never requests: a row names an issue, a baseline and an idempotency key,
+  and `--apply` rebuilds every request through the same builder the single-issue
+  edit uses. Nothing in the file becomes a method, a path or a body. That is the
+  whole reason for the shape, because a plan of recorded requests would make any
+  file executable input carrying your credential.
+
+- **A failing row does not stop an apply.** Every row is attempted and reported
+  `applied`, `skipped` or `failed` with its own error `code`. This is the
+  opposite of `epic add`, which stops at the first failure and reports the rest
+  `not-attempted`, and the difference is deliberate: `epic add` moves a set into
+  an epic as one operation, and a plan is a batch of independent edits that
+  happen to share a change.
+
+- **A partial apply writes its document and exits with the cause's own code**,
+  not a new one: `7` for a stale row, `6` for permission, `8` for a rate limit.
+  There is no "partial write" code, because `3` means a truncated *result set*,
+  which a write does not have. Where several rows fail, the exit is the first
+  that is not `STALE_WRITE`: a stale row is the ordinary outcome of two people
+  touching one ticket, and a permission error or a rate limit is systemic.
+
+- **Two refusals on `issue edit` changed their `code`, and this is the breaking
+  line.** `jr issue edit` with no key was `INVALID_USAGE` and is now
+  `NO_ISSUES`. `jr issue edit A B` was `INVALID_USAGE`, because the command
+  accepted exactly one argument, and is now `BULK_NEEDS_A_PLAN`. Both stay exit
+  2. A script branching on the exit sees no change; one branching on `code`
+  does, and `code` is the field this contract tells people to branch on.
+
+- Nine other new codes, all exit 2 except two, all listed under **Plans and
+  applies** in `docs/output-contract.md`: `INVALID_PLAN`, `NO_BASELINE`,
+  `PLAN_NOT_READ`, `PLAN_NOT_WRITTEN` (1), `PLAN_TAKES_NO_KEYS`,
+  `PLAN_CARRIES_THE_CHANGE`, `PLAN_CARRIES_THE_BASELINE`,
+  `CONFLICTING_PLAN_FLAGS`, `UNKNOWN_ISSUE` (5).
+
+- No other kind moved, and no exit code changed meaning.
+
+### Internal
+
+- `ParsePlan` is the first document reader in this tree. Nothing here parsed a
+  document before, in any format: `jr` had only ever written its contract. What
+  that reader accepts becomes an edit sent with the caller's credential, so
+  `FuzzParsePlanAcceptsOnlyWhatIsSafeToApply` asserts a postcondition rather
+  than absence of panic: every accepted row names a key `ParseKey`
+  canonicalizes, carries a key the ledger can record, and appears once.
+- Four invariants added to `docs/invariants.md`, citing seven tests.
+
 ## [0.11.0] - 2026-09-03
 
 **`jr issue list --precondition` puts the stale-write baseline on every row, so
@@ -1866,7 +1962,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.11.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.12.0...main
+[0.12.0]: https://github.com/kmoneil/jr/releases/tag/v0.12.0
 [0.11.0]: https://github.com/kmoneil/jr/releases/tag/v0.11.0
 [0.10.2]: https://github.com/kmoneil/jr/releases/tag/v0.10.2
 [0.10.1]: https://github.com/kmoneil/jr/releases/tag/v0.10.1
