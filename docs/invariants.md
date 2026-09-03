@@ -582,6 +582,24 @@ do not catch, add the test in the same change and cite it here.
 
 ## Credentials and safety
 
+- **A write never reports success for something the server discarded.** Jira
+  takes a transition carrying a comment its screen has no field for, answers
+  204, and drops the comment. Measured on Data Center 10.4.0: the comment count
+  went 0 to 0 across two accepted POSTs while a control comment through
+  `issue comment add` landed on the same issue. The transition is refused before
+  it is sent, from the field list `expand=transitions.fields` already returns,
+  because a caller who asked for a comment and got exit 0 has no way to learn
+  there is no comment. A warning would not do: it still exits 0.
+  **Enforced by:** `TestACommentIsRefusedWhereTheTransitionCannotTakeOne`,
+  `TestACommentIsAcceptedWhereTheScreenTakesOne`.
+- **Every body this tool sends is encoded for the deployment it is going to.**
+  Cloud stores documents and refuses a string where a comment body belongs;
+  Data Center stores wiki markup and refuses a document. `bodyValue` is the one
+  place that decides, and a request builder that bypassed it shipped a string to
+  Cloud for the life of `issue move --comment`, which therefore never once
+  worked there.
+  **Enforced by:** `TestATransitionCommentIsADocumentOnCloudAndAStringOnDataCenter`.
+
 - **A plan carries intent, and never a request.** `--apply` reads a key, a
   baseline and an idempotency key, then rebuilds every request through the same
   builder the single-issue edit uses. Nothing in the file becomes a method, a

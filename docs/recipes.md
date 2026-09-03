@@ -492,10 +492,24 @@ name, not the destination status:
 ```console
 $ jr issue move ENG-101 'Start Progress'
 $ jr issue move ENG-101 'Close Issue' --resolution Fixed
-$ jr issue move ENG-101 'Done' --comment 'Fixed by the retry rework'
 
 # Preview it
 $ jr issue move ENG-101 Done --dry-run
+```
+
+**`--comment` only works where the transition's screen has a comment field**,
+and on a default workflow it does not. Where it does not, the transition is
+refused with `TRANSITION_TAKES_NO_COMMENT` and nothing is sent, rather than the
+transition being applied and the comment quietly dropped, which is what Jira
+does with it. Check with `jr meta transitions <key>`: a transition showing
+`has-screen="false"` and no fields will not take one.
+
+Two commands is the reliable spelling, and the second is what the first would
+have done anyway:
+
+```console
+$ jr issue move ENG-101 'Done' --resolution Fixed
+$ jr issue comment add ENG-101 'Fixed by the retry rework'
 ```
 
 A transition the issue does not offer _right now_ is refused with the list of

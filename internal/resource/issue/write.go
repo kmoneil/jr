@@ -945,6 +945,40 @@ func editOptionsFor(inv *registry.Invocation, key string) EditOptions {
 	return opt
 }
 
+// commentIsAccepted refuses a comment the transition will not take.
+//
+// Data Center answers a transition carrying a comment its screen has no field
+// for with 204 and no comment. The transition applies, the comment is discarded,
+// and every layer above reports success: measured on Jira 10.4.0, where the
+// comment count went 0 to 0 across two accepted POSTs while a control comment
+// through `issue comment add` landed on the same issue. A caller who asked for a
+// comment, got exit 0, and has no comment is §0 exactly inverted.
+//
+// The check costs nothing, because `expand=transitions.fields` is already on the
+// request that resolved the transition and `Transition.Fields` already holds the
+// answer. `meta transitions` has been publishing `has-screen="false"` and
+// `fields count="0"` for these transitions the whole time.
+//
+// A refusal rather than a warning. A warning on a write that did not do what was
+// asked still exits 0, and the exit is what a script reads.
+func commentIsAccepted(transition site.Transition, comment string) error {
+	if comment == "" {
+		return nil
+	}
+	for _, f := range transition.Fields {
+		if strings.EqualFold(f.ID, "comment") || strings.EqualFold(f.Name, "comment") {
+			return nil
+		}
+	}
+	return errs.Usage("TRANSITION_TAKES_NO_COMMENT",
+		"the %s transition has no comment field, so --comment cannot be applied",
+		transition.Name).
+		WithDetail("this transition's screen accepts %d field(s); Jira would "+
+			"take the transition and discard the comment", len(transition.Fields)).
+		WithRemedy("make the transition without --comment, then add one with " +
+			"`" + buildinfo.App + " issue comment add <key> <body>`")
+}
+
 // send performs a request whose success carries no body worth parsing. Jira
 // answers an edit and a transition with 204.
 func (c *Client) send(ctx context.Context, req transport.Request) error {
@@ -1077,8 +1111,21 @@ func (c *Client) MoveRequest(key, transitionID, resolution, comment string) (tra
 		}
 	}
 	if comment != "" {
+		// Through the same encoder every other body in this tool goes through.
+		// It did not, and sent the string on both deployments: Cloud takes a
+		// document on v3 and refused every transition comment this tool ever
+		// built with "Operation value must be an Atlassian Document", so
+		// --comment had never once worked there.
+		//
+		// FormatText rather than a --body-format flag on this command. A
+		// transition comment is a line, the flag's other two values exist for
+		// documents, and adding a flag is a wider change than the fix.
+		body, err := bodyValue(c.Site.Kind, comment, FormatText)
+		if err != nil {
+			return transport.Request{}, err
+		}
 		payload["update"] = map[string]any{
-			"comment": []any{map[string]any{"add": map[string]any{"body": comment}}},
+			"comment": []any{map[string]any{"add": map[string]any{"body": body}}},
 		}
 	}
 
@@ -1152,6 +1199,9 @@ func sendMove(
 	// one read and no write.
 	transition, err := transitions.Resolve(inv.Args[1])
 	if err != nil {
+		return nil, claim.releaseUnsent(err)
+	}
+	if err := commentIsAccepted(transition, inv.Flags.String("comment")); err != nil {
 		return nil, claim.releaseUnsent(err)
 	}
 
