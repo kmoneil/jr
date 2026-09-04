@@ -165,3 +165,42 @@ jobs:
             --title "${GITHUB_REF_NAME}" \
             --notes-file notes.md \
             dist/*.tar.gz dist/checksums.txt
+
+  # The Homebrew formula pins four URLs and four digests, and moving them was
+  # the one step of a release still done by hand. kmoneil/homebrew-tap does the
+  # move now; this tells it there is one to do.
+  #
+  # A separate job rather than a step on publish, so its failure says what it
+  # means. By the time it runs the release exists and cannot be withdrawn, so a
+  # red here is never "the release is bad": it is "the release is out and brew
+  # still installs the previous one", which is worth a red rather than a line
+  # in a log nobody opens.
+  bump-the-tap:
+    name: tell the tap
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: dispatch to kmoneil/homebrew-tap
+        env:
+          # Not github.token: that is scoped to this repository and cannot
+          # dispatch to another. A fine-grained PAT limited to the tap, with
+          # Contents: read and write, is the smallest thing that can.
+          GH_TOKEN: ${{ secrets.TAP_DISPATCH_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "TAP_DISPATCH_TOKEN is not set, so the formula was not bumped." >&2
+            echo "brew install kmoneil/tap/jr still fetches the previous release." >&2
+            echo >&2
+            echo "To fix it for good: create a fine-grained PAT scoped to" >&2
+            echo "kmoneil/homebrew-tap with Contents: read and write, and add it" >&2
+            echo "as the TAP_DISPATCH_TOKEN secret on this repository." >&2
+            echo >&2
+            echo "To fix it for ${TAG} now:" >&2
+            echo "  gh workflow run bump-jr.yml --repo kmoneil/homebrew-tap -f tag=${TAG}" >&2
+            exit 1
+          fi
+          gh api repos/kmoneil/homebrew-tap/dispatches \
+            -f event_type=jr-released \
+            -F client_payload[tag]="${TAG}"
+          echo "asked the tap to bump to ${TAG}"

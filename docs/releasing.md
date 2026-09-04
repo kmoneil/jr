@@ -34,9 +34,9 @@ steps below are in this order.
    - the banner says the tool is pinnable without saying at what version;
    - no install instruction names a version. `brew install kmoneil/tap/jr`
      carries none, and the archive paths use `gh release download --pattern`.
-     The formula in `kmoneil/homebrew-tap` does pin one, and it is in another
-     repository, which makes it the single place a release bump is still a
-     manual step. `brew livecheck` sees the new tag; nothing pushes it.
+     The formula in `kmoneil/homebrew-tap` does pin one, in another
+     repository, and that used to be the single place a release bump was still
+     a manual step. It is not any more: see **The tap bumps itself** below.
 
    So this step is a check rather than an edit.
 
@@ -70,6 +70,37 @@ $ git push origin v0.1.0
 
 The tag goes on `main` after the changelog has landed, not before — the workflow
 reads `CHANGELOG.md` **from the tagged commit**.
+
+## The tap bumps itself
+
+The formula in `kmoneil/homebrew-tap` pins four URLs and four digests, one per
+platform, and moving them was the last hand-typed step of a release. The
+`bump-the-tap` job dispatches `jr-released` at that repository once the archives
+are published, and its `bump-jr` workflow does the rest: rewrite the eight
+lines, re-derive every digest from the archive it just downloaded, verify build
+provenance on all four, then audit, install and test the rewritten formula on a
+macOS runner before the commit exists.
+
+**It needs one secret, and it says so when it does not have it.**
+`TAP_DISPATCH_TOKEN` is a fine-grained PAT scoped to `kmoneil/homebrew-tap`
+alone, with Contents: read and write, because `github.token` is scoped to this
+repository and cannot dispatch to another. Without it the job fails, which is
+the honest signal: the release is out and `brew install` still fetches the
+previous one. Its failure message carries the one command that fixes that
+release by hand:
+
+```console
+$ gh workflow run bump-jr.yml --repo kmoneil/homebrew-tap -f tag=v1.2.0
+```
+
+That command is also how to bump the tap for a release the dispatch missed, and
+how to re-run one that failed. Running it twice is harmless: the script writes
+nothing when the formula already names the tag.
+
+**A red `bump-the-tap` does not mean the release is bad.** It runs after
+`publish`, so by then the tag, the archives and the notes are all out and none
+of them can be withdrawn. It means exactly one thing: Homebrew has not caught
+up yet.
 
 ## Which number to bump
 
