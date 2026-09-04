@@ -1884,6 +1884,20 @@ The rows:
   branch. **Moving text between `remedy` and `detail` is not this row** and is
   breaking, because that is a consumer reading a different field: see 0.6.0,
   where the near misses moved and the release took the minor.
+- Adding an error `code` for a condition that used to be reported as a
+  successful answer: **additive, so the patch position moves.** The invocation
+  it changes is one whose previous answer was wrong, and a consumer branching on
+  `code` sees a string it has never seen only where it was previously handed
+  exit 0 and a result that was not true. Reading it under the refusal row would
+  price *fixing a wrong answer* the same as *changing what a caller has to
+  send*, and that row is careful to be about inputs: its reader is somebody who
+  must edit a command line, and there is nothing here for them to edit. The row
+  was written on 2026-09-04 for 0.13.2, whose `PAGINATION_SHORT` fires where a
+  paged walk stopped holding fewer rows than the server counted, a state that
+  used to be `complete="true"` at exit 0. **The boundary is whether the old
+  answer was right.** A new code for a condition that used to produce a correct
+  result is refusing something that used to work, which is the breaking row
+  above and not this one.
 - Adding a command: **additive, so the patch position moves.** No invocation
   anybody makes changes, no document anybody parses changes shape, and
   `jr schema` grows by a leaf. The reader it matters to is looking for a

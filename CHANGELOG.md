@@ -20,6 +20,95 @@ accident.
 
 Nothing yet.
 
+## [0.13.2] - 2026-09-04
+
+**`issue list` and `issue activity` dropped every project but one, and said the
+answer was complete.** Reported as issue 143 against a Data Center instance
+where `jr issue list --all-projects --updated-after 2026-09-04 --limit all`
+returned 111 rows of 697 at `complete="true"`, exit 0, and nothing on stderr.
+The same query with `--order asc` returned all 697, and the short result was a
+strict subset of the long one, so the walk had stopped early rather than
+selected differently. `issue activity` shares the candidate scan and reported
+433 events of 2763.
+
+If you have scripted a whole-instance sweep on either command against Data
+Center, the answers it gave were short and nothing in them said so. Re-run it.
+Cloud is unaffected: it pages by cursor and never took this path.
+
+Patch: no kind moved a schema version, no exit code changed meaning, and no
+error `code` changed. One is added, and **Output contract** has the policy row
+that had to be written before this release could price itself.
+
+### Fixed
+
+- **A keyset walk now stays inside one project.** `ORDER BY issuekey` orders
+  across projects, by project key and then by number. `issuekey <` does not
+  compare across them at all: measured on Jira 10.4.0 Data Center and on Cloud
+  with projects ABC and ENG, `ORDER BY issuekey DESC` runs `ENG-1` straight into
+  `ABC-6`, while `issuekey < "ENG-1"` returns nothing and `issuekey > "ENG-1"`
+  returns no ABC row either.
+
+  So the bound taken from the last row of a page selected inside that row's own
+  project and excluded every project the walk had not reached. The short page
+  that came back read as the result set running out. Data Center now pages by
+  offset for any query not already confined to a project, which is the fallback
+  every other non-key sort has always used and the one `--order asc` was using
+  when it returned the whole set. Scoped to one project the two orderings agree,
+  which is why `--project ENG` was always right, and why every test in the tree
+  was too: all of them scope to `ENG`.
+
+  The comment authorising the bound said the sort order "is the order JQL's
+  issuekey comparison uses". True of `ORDER BY`, false of `<`, and never
+  measured.
+
+### Added
+
+- **`PAGINATION_SHORT` (exit 9): a walk that stopped holding fewer rows than
+  Jira counted for the query it started from.** This is the check that would
+  have made the defect above loud on the day it shipped. Every stop condition a
+  paged walk had, a page shorter than the one asked for, an offset past the
+  total, a page with no rows, is the server answering about the *narrowed* query
+  it was just sent, so a bound that excludes too much makes all of them true at
+  once. The count on the first response is the only number in the exchange about
+  the whole query, and the walk now reconciles against it before claiming to be
+  complete.
+
+  It names both numbers and it is `retryable`. Retry it once: rows deleted
+  while a long `--limit all` was paging produce it, and a re-run answers
+  cleanly. The same failure twice is the count and the pages disagreeing, and
+  then the way through is a narrower query or a smaller `--page-size`. Cloud's
+  cursor API reports no count and the check is inert there, which is right:
+  those cursors are authoritative about where a set ends.
+
+### Documentation
+
+- **A project key that is a reserved JQL word.** Raised in the same report, and
+  not a defect: every fragment `jr` builds goes through the JQL builder, which
+  quotes every value unconditionally, so `--project GO` renders
+  `project = "GO"` and has always worked. Only a `--jql` written by hand can
+  carry a bare `TRANS`. `docs/troubleshooting.md` now says so under
+  `JQL_NOT_UNDERSTOOD`, with the output a project named `GO` actually produces.
+- `docs/tour.md`'s pagination section named two conditions that fall back to
+  offsets and there are three. It also said the result records which mode was
+  used, which no output attribute does; `ListResult.Keyset` records it for the
+  tests.
+
+### Output contract
+
+- No kind moved a schema version, no exit code changed meaning, and no error
+  `code` changed. `PAGINATION_SHORT` is new, at the existing exit 9.
+- **A `--limit all` walk can now fail rather than truncate.** Truncation says
+  the answer stops where a bound put it. A walk that stops on its own while
+  short of the server's own count cannot say that: nothing bounded it, so there
+  is no bound to raise, and the rows it is missing were never requested, so
+  there is no position to resume from. Documented under Truncation.
+- **The stability policy gains a row: adding an error `code` for a condition
+  that used to be reported as a successful answer is additive and moves the
+  patch position.** The invocation it changes is one whose previous answer was
+  wrong, and nothing a caller sends has to change. The boundary is whether the
+  old answer was right: a new code for a condition that used to produce a
+  correct result is refusing something that used to work, which is breaking.
+
 ## [0.13.1] - 2026-09-04
 
 **Documentation, and the shape of it rather than the words.** A user reported
@@ -2106,7 +2195,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.13.1...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.13.2...main
+[0.13.2]: https://github.com/kmoneil/jr/releases/tag/v0.13.2
 [0.13.1]: https://github.com/kmoneil/jr/releases/tag/v0.13.1
 [0.13.0]: https://github.com/kmoneil/jr/releases/tag/v0.13.0
 [0.12.0]: https://github.com/kmoneil/jr/releases/tag/v0.12.0
