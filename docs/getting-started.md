@@ -346,6 +346,8 @@ code told you otherwise.
   here.
 - **[output-contract.md](output-contract.md)** — read this before writing a
   script that parses the output.
+- **[tour.md](tour.md)** — what makes `jr` different, one promise at a time,
+  with the failure each one exists to prevent.
 - `jr <command> --help` — the same reference, offline, always current.
 
 Two habits worth forming early:
