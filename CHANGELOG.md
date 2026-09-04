@@ -20,6 +20,68 @@ accident.
 
 Nothing yet.
 
+## [0.13.1] - 2026-09-04
+
+**Documentation, and the shape of it rather than the words.** A user reported
+the docs as "extremely hard to follow. Lots of text, good info, but really hard
+to understand". Measuring that falsified most of the obvious readings: the
+reading level is ordinary technical prose, the paragraphs are short, and every
+document already opened with a table of contents. What was true is that the
+good information was placed where somebody trying to get something done had to
+read past it.
+
+Nothing was deleted to fix it. Every sentence that moved is still in the tree.
+
+Patch: no kind moved a schema version, no exit code changed meaning, and no
+error `code` changed. **Output contract** has the one policy row this release
+had to write before it could price itself.
+
+### Fixed
+
+- **`jr <command> --help` leads with the reference instead of the argument.**
+  Cobra prints a command's long description before its usage and flags, and
+  these descriptions are prose: `jr issue list --help` was 119 lines with the
+  first of its 38 flags on line 66, so on an 80x24 terminal the flag you opened
+  `--help` to find was two screens below the fold. The description now prints
+  after the flags. The first flag arrives on line 14 for `issue list`, 11 for
+  `issue activity`, 10 for `auth login`.
+
+  Nothing is shortened. Eight of the ten paragraphs on `issue list` are things
+  a caller needs, and the reorder costs nothing precisely because the operative
+  half is also in the flag usages printed above: `--sort` says the ordering is
+  by issue key, `--label` says a comma is part of the label. `docs/commands.md`
+  is generated from the same declaration and is generated in the new order too,
+  so the two surfaces read the same way.
+
+- **A value that meant the caller is answered with the word that works.**
+  `--assignee me` is refused correctly, since no user is called "me", but the
+  remedy offered near-miss display names or a search for a person who does not
+  exist, and never named `currentUser`. Both branches now lead with the
+  sentinel and keep the original suggestion after it.
+
+### Changed
+
+- **The README leads with an install and a first query.** It was 1057 lines
+  whose Quickstart taught a source build at line 65 while `brew install
+  kmoneil/tap/jr` waited at line 154, and whose table of links to every other
+  document sat at line 869. Install is now at line 55, the table at 149, and
+  the README is 539 lines. The tour it used to carry moves whole, unedited, to
+  `docs/tour.md`, which is linked from the table and from the getting-started
+  guide.
+
+### Output contract
+
+- No kind moved a schema version, no exit code changed meaning, and no error
+  `code` changed.
+- **The stability policy gains a row: changing an error's `remedy` or `detail`
+  wording, with the `code` and the exit unchanged, is additive and moves the
+  patch position.** It had no row, and the nearest one read both ways: a remedy
+  is deterministic for a fixed input, which the stable-text row would call
+  breaking. `code` is the field this contract tells a consumer to branch on and
+  a remedy is guidance for a person, so the other reading would have frozen the
+  part of the output most worth improving. Moving text *between* `remedy` and
+  `detail` is a different change and stays breaking, as in 0.6.0.
+
 ## [0.13.0] - 2026-09-03
 
 **If you run Data Center, take this one.** Two features shipped earlier today
@@ -2044,7 +2106,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.13.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.13.1...main
+[0.13.1]: https://github.com/kmoneil/jr/releases/tag/v0.13.1
 [0.13.0]: https://github.com/kmoneil/jr/releases/tag/v0.13.0
 [0.12.0]: https://github.com/kmoneil/jr/releases/tag/v0.12.0
 [0.11.0]: https://github.com/kmoneil/jr/releases/tag/v0.11.0
