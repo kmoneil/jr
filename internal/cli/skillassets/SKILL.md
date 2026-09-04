@@ -232,8 +232,8 @@ indistinguishable from an honest "nothing matched".
 | Who changed its status | `--changed-by` (defaults to the status field; `--changed-field` picks another) |
 
 `--updated-after` means *somebody* updated it, not that the named person did.
-Pairing `--assignee me --updated-after -7d` answers "assigned to me and touched
-by anyone this week", which is usually not the question asked.
+Pairing `--assignee currentUser --updated-after -7d` answers "assigned to me and
+touched by anyone this week", which is usually not the question asked.
 
 **A filter never orders anything.** Without `--sort`, results come back by issue
 key descending, which on a busy project looks enough like creation order to be

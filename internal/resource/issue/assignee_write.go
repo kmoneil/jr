@@ -57,7 +57,7 @@ func validateAssignee(ctx context.Context, inv *registry.Invocation, input strin
 	}
 	user, err := meta.ResolveUser(ctx, input)
 	if err != nil {
-		return err
+		return suggestCurrentUser(err, input)
 	}
 	inv.SetValue(resolvedAssigneeKey, user.ID)
 	return nil

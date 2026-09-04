@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/nearest"
 	"github.com/kmoneil/jr/internal/registry"
 )
 
@@ -121,7 +122,7 @@ func resolveUserFilter(
 	}
 	user, err := meta.ResolveUser(ctx, value)
 	if err != nil {
-		return "", err
+		return "", suggestCurrentUser(err, value)
 	}
 	return user.ID, nil
 }
@@ -135,4 +136,69 @@ func resolvedUser(inv *registry.Invocation, name string) string {
 		}
 	}
 	return inv.Flags.String(name)
+}
+
+// currentUserAliases are the words somebody reaches for when they mean
+// themselves and `currentUser` is not what they typed.
+//
+// They are not typos of the sentinel, which is why they are listed rather than
+// measured: `me` is two characters and shares none of them with `currentUser`,
+// so no edit distance will ever connect the two. What connects them is meaning,
+// and meaning has to be written down.
+var currentUserAliases = map[string]bool{
+	"me": true, "@me": true, "self": true, "myself": true, "mine": true,
+}
+
+// meansTheCaller reports whether a value that did not resolve was probably an
+// attempt to name the authenticated account.
+//
+// Two ways in, because there are two ways to miss. An alias above is a semantic
+// miss. Anything close to the sentinel by edit distance is a spelling miss,
+// which catches `current-user`, `current_user` and `currentusr` without listing
+// them, and goes through internal/nearest because that package exists to stop
+// this tool having four ideas of "close".
+func meansTheCaller(input string) bool {
+	v := strings.ToLower(strings.TrimSpace(input))
+	if v == "" {
+		return false
+	}
+	if currentUserAliases[v] {
+		return true
+	}
+	return nearest.Distance(v, "currentuser") <= nearest.Threshold(v)
+}
+
+// suggestCurrentUser leads an UNKNOWN_USER remedy with the sentinel when the
+// caller was probably naming themselves.
+//
+// The refusal itself is right and stays: no user on the site is called `me`.
+// What was wrong is that the remedy pointed away from the fix. On a site with
+// people whose display names contain "me" it offered four of them and said
+// "pass one of these exactly", which reads as though one of those humans was
+// meant; on a site with none it offered `user list`, which is a search for a
+// person who does not exist. Neither branch named the word that works, and the
+// word appears two functions away in this file, in the refusal `--reporter
+// unassigned` already gets.
+//
+// It fires only on a value that was already going to be refused, so the happy
+// path costs nothing.
+//
+// The hint leads and the original remedy follows rather than being replaced,
+// because the guess can be wrong: somebody may genuinely have a colleague whose
+// display name did not match, and taking the name list away from them to make
+// room for a suggestion would trade one misdirection for another.
+func suggestCurrentUser(err error, input string) error {
+	if err == nil || !meansTheCaller(input) {
+		return err
+	}
+	e := errs.Coerce(err)
+	if e.Code != "UNKNOWN_USER" {
+		return err
+	}
+	if e.Remedy == "" {
+		return e.WithRemedy("did you mean currentUser? it resolves to the " +
+			"account this credential belongs to")
+	}
+	return e.WithRemedy("did you mean currentUser? it resolves to the "+
+		"account this credential belongs to. otherwise, %s", e.Remedy)
 }

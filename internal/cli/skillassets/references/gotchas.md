@@ -116,8 +116,9 @@ plausible substitute silently answers a different question:
   named explicitly.
 
 Related, and the most common misreading: **`--updated-after` means somebody
-updated it**, not that the named person did. `--assignee me --updated-after -7d`
-answers "assigned to me and touched by anyone this week."
+updated it**, not that the named person did.
+`--assignee currentUser --updated-after -7d` answers "assigned to me and touched
+by anyone this week."
 
 The five who-touched-it flags are genuinely different questions:
 
