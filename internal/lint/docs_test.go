@@ -309,9 +309,6 @@ func writeCommand(b *strings.Builder, c *registry.Command) {
 
 	fmt.Fprintf(b, "\n```\njr %s\n```\n", strings.TrimSpace(c.UseLine()+" "+usageTail(c)))
 
-	if d := strings.TrimSpace(c.Description); d != "" {
-		fmt.Fprintf(b, "\n%s\n", escapeMarkdownText(d))
-	}
 	if e := strings.TrimSpace(c.Example); e != "" {
 		fmt.Fprintf(b, "\nExamples:\n\n```console\n%s\n```\n", e)
 	}
@@ -320,6 +317,16 @@ func writeCommand(b *strings.Builder, c *registry.Command) {
 	writeFlags(b, c)
 	writeOutputs(b, c)
 	writeExits(b, c)
+
+	// The prose comes last, for the reason `--help` prints it last: a reader
+	// arrives at a command's entry to look something up, and the tables are
+	// what they came for. `issue list` carries 527 words, which put its flag
+	// table 54 lines below the heading in this document and its first flag on
+	// line 60 of `jr issue list --help`. The two surfaces are generated from
+	// one declaration and now read in one order.
+	if d := strings.TrimSpace(c.Description); d != "" {
+		fmt.Fprintf(b, "\n%s\n", escapeMarkdownText(d))
+	}
 }
 
 // commandBadges renders the properties a caller has to know before running it.

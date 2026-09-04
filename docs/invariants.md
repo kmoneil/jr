@@ -372,6 +372,15 @@ do not catch, add the test in the same change and cite it here.
   because a reader binary that could not create a context could not be
   configured at all.
   **Enforced by:** `TestLocalStateCommandsExistInEveryBuild`, `TestReaderBuildCannotMutate`.
+- **A leaf's `--help` prints its detail after its flags, never before them.** A
+  caller opens `--help` already holding the command name, to find a flag.
+  Cobra's default puts the long description first, and these are prose: `jr
+  issue list --help` was 119 lines with the first of its 38 flags on line 66,
+  two 80x24 screens below the top. The prose is not shortened, because the
+  operative half of it is also in the flag usages printed above, so moving it
+  below the reference costs a reader nothing. `docs/commands.md` is generated
+  in the same order for the same reason.
+  **Enforced by:** `TestHelpLeadsWithTheReference`, `TestTheCommandReferenceIsCurrent`.
 
 ## Data fidelity
 

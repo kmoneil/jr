@@ -83,6 +83,29 @@ Store a credential for a site
 jr auth login [flags]
 ```
 
+Examples:
+
+```console
+printf '%s' "$TOKEN" | jr auth login --site your-site.atlassian.net --email ada@example.com --token-stdin
+printf '%s' "$PAT" | jr auth login --site jira.acme.internal --token-stdin
+```
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--site` | `string` | — | Jira site, e.g. your-site.atlassian.net (required) |
+| `--email` | `string` | — | Cloud account email |
+| `--user` | `string` | — | Data Center username |
+| `--token-stdin` | `bool` | — | read the token from stdin; required unless --token-file is given |
+| `--token-file` | `string` | — | read the token from this file; - means stdin |
+| `--scheme` | `basic\|bearer` | — | authentication scheme; inferred from whether a user was given |
+| `--no-verify` | `bool` | — | store the credential without checking it against the site |
+
+| Emits | Schema | When |
+| --- | --- | --- |
+| `auth.status` | v2 | always |
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `9` REMOTE
+
 Writes a credential to the credential store, which lives under the state
 directory at mode 0600 and is separate from the config file. The config file is
 meant to be hand-edited and kept in a dotfiles repository; a credential in it
@@ -132,29 +155,6 @@ somewhere to point. If contexts already exist, none are touched: the caller has
 a setup, and guessing which one this credential belongs to would be worse than
 doing nothing.
 
-Examples:
-
-```console
-printf '%s' "$TOKEN" | jr auth login --site your-site.atlassian.net --email ada@example.com --token-stdin
-printf '%s' "$PAT" | jr auth login --site jira.acme.internal --token-stdin
-```
-
-| Flag | Type | Default | Description |
-| --- | --- | --- | --- |
-| `--site` | `string` | — | Jira site, e.g. your-site.atlassian.net (required) |
-| `--email` | `string` | — | Cloud account email |
-| `--user` | `string` | — | Data Center username |
-| `--token-stdin` | `bool` | — | read the token from stdin; required unless --token-file is given |
-| `--token-file` | `string` | — | read the token from this file; - means stdin |
-| `--scheme` | `basic\|bearer` | — | authentication scheme; inferred from whether a user was given |
-| `--no-verify` | `bool` | — | store the credential without checking it against the site |
-
-| Emits | Schema | When |
-| --- | --- | --- |
-| `auth.status` | v2 | always |
-
-Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `9` REMOTE
-
 ### `jr auth logout`
 
 Remove a stored credential
@@ -165,11 +165,6 @@ Remove a stored credential
 ```
 jr auth logout [flags]
 ```
-
-Deletes the credential this tool stored for a site. It cannot remove one that
-came from the environment or from .netrc, and says so if that is where the
-credential is coming from — otherwise `auth logout` would report success
-while the site stayed authenticated.
 
 Examples:
 
@@ -188,6 +183,11 @@ jr auth logout --site your-site.atlassian.net --yes
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `10` BLOCKED
 
+Deletes the credential this tool stored for a site. It cannot remove one that
+came from the environment or from .netrc, and says so if that is where the
+credential is coming from — otherwise `auth logout` would report success
+while the site stayed authenticated.
+
 ### `jr auth status`
 
 Report which credential a site would use, and where it comes from
@@ -195,17 +195,6 @@ Report which credential a site would use, and where it comes from
 ```
 jr auth status [flags]
 ```
-
-Reports the credential that would be used and the source it came from, without
-revealing it.
-
-Sources are tried in a fixed order: the environment first, so a CI job can
-override what is on disk without editing it; then this tool's credential store;
-then .netrc last, because it is shared with every other tool on the machine and
-is the least specific statement of intent.
-
-This does not contact Jira. It answers "which credential would be used", not
-"does that credential still work".
 
 Examples:
 
@@ -224,6 +213,17 @@ jr auth status --site your-site.atlassian.net
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND
 
+Reports the credential that would be used and the source it came from, without
+revealing it.
+
+Sources are tried in a fixed order: the environment first, so a CI job can
+override what is on disk without editing it; then this tool's credential store;
+then .netrc last, because it is shared with every other tool on the machine and
+is the least specific statement of intent.
+
+This does not contact Jira. It answers "which credential would be used", not
+"does that credential still work".
+
 ### `jr auth token`
 
 Print the credential for a site, for use in another tool
@@ -231,6 +231,24 @@ Print the credential for a site, for use in another tool
 ```
 jr auth token [flags]
 ```
+
+Examples:
+
+```console
+jr auth token --site your-site.atlassian.net
+jr auth token --header
+```
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--site` | `string` | — | site to print the credential for; defaults to the current context's |
+| `--header` | `bool` | — | print `Authorization: &lt;value>` on one line and nothing else, for a shell to interpolate whole |
+
+| Emits | Schema | When |
+| --- | --- | --- |
+| `auth.token` | v1 | --header was not given |
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND
 
 Prints the Authorization header value a request to this site would carry.
 
@@ -258,24 +276,6 @@ Everywhere else in this tool a credential is redacted. Here it is the requested
 output, and it goes to stdout like any other result — so redirect it
 deliberately, and do not pass it through a command that logs its arguments.
 
-Examples:
-
-```console
-jr auth token --site your-site.atlassian.net
-jr auth token --header
-```
-
-| Flag | Type | Default | Description |
-| --- | --- | --- | --- |
-| `--site` | `string` | — | site to print the credential for; defaults to the current context's |
-| `--header` | `bool` | — | print `Authorization: &lt;value>` on one line and nothing else, for a shell to interpolate whole |
-
-| Emits | Schema | When |
-| --- | --- | --- |
-| `auth.token` | v1 | --header was not given |
-
-Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND
-
 ## board
 
 ### `jr board get`
@@ -285,15 +285,6 @@ Fetch one board
 ```
 jr board get [id]
 ```
-
-Returns a single board by id.
-
-The id defaults to the context's board, so a configured caller can ask without
-repeating themselves. It is the same board every other agile command defaults
-to.
-
-Boards are addressed by id and never by name: two projects can have boards with
-the same name, and resolving a name would pick one of them without saying so.
 
 Examples:
 
@@ -312,6 +303,15 @@ jr board get --format json
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns a single board by id.
+
+The id defaults to the context's board, so a configured caller can ask without
+repeating themselves. It is the same board every other agile command defaults
+to.
+
+Boards are addressed by id and never by name: two projects can have boards with
+the same name, and resolving a name would pick one of them without saying so.
+
 ### `jr board list`
 
 List the boards this credential can see
@@ -321,20 +321,6 @@ List the boards this credential can see
 ```
 jr board list [flags]
 ```
-
-Returns the boards visible to the credential, ordered by id.
-
-Scoped to the resolved project when the context sets one, exactly as issue list
-is. --all-projects lifts the scope and returns every board on the site, which is
-a different and much larger question — and the only way past a context that sets
-a project, since an empty --project falls back to it rather than clearing it.
-
-The type matters more than it looks. A sprint listing exists only for a scrum
-board, so `jr sprint list` against a kanban board is refused by the
-server rather than answered with nothing.
-
-Ordered by id numerically rather than by whatever order the server returned,
-which the agile API does not document — so two runs of a script agree.
 
 Examples:
 
@@ -359,6 +345,20 @@ Default TSV columns: `id`, `name`, `type`, `project`
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns the boards visible to the credential, ordered by id.
+
+Scoped to the resolved project when the context sets one, exactly as issue list
+is. --all-projects lifts the scope and returns every board on the site, which is
+a different and much larger question — and the only way past a context that sets
+a project, since an empty --project falls back to it rather than clearing it.
+
+The type matters more than it looks. A sprint listing exists only for a scrum
+board, so `jr sprint list` against a kanban board is refused by the
+server rather than answered with nothing.
+
+Ordered by id numerically rather than by whatever order the server returned,
+which the agile API does not document — so two runs of a script agree.
+
 ## completion
 
 ### `jr completion`
@@ -370,19 +370,6 @@ Print a shell completion script
 ```
 jr completion <shell>
 ```
-
-Writes a completion script for the named shell to stdout.
-
-It is declared here rather than left to cobra's generated command, which is not
-in the registry and would therefore appear in --help while `jr schema` denied
-it existed. Self-description that disagrees with the binary is the drift this
-design exists to prevent.
-
-It is behind the prompt tag because completion is an interactive convenience,
-and a build made for an agent has nobody to complete for.
-
-The script is the output, so nothing else is written to stdout — there is no
-result envelope, and --format does not apply.
 
 Examples:
 
@@ -399,6 +386,19 @@ Emits no result document: this command owns stdout.
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE
 
+Writes a completion script for the named shell to stdout.
+
+It is declared here rather than left to cobra's generated command, which is not
+in the registry and would therefore appear in --help while `jr schema` denied
+it existed. Self-description that disagrees with the binary is the drift this
+design exists to prevent.
+
+It is behind the prompt tag because completion is an interactive convenience,
+and a build made for an agent has nobody to complete for.
+
+The script is the output, so nothing else is written to stdout — there is no
+result envelope, and --format does not apply.
+
 ## context
 
 ### `jr context create`
@@ -410,25 +410,6 @@ Create or replace a named site and project pairing
 ```
 jr context create <name> [flags]
 ```
-
-A context is {site, credential ref, default project, default board, default
-fields}. Naming an existing context replaces it.
-
-The project is a default, not a requirement: any command can override it with
---project or omit it entirely. The few commands that genuinely cannot proceed
-without one exit 2 and name the flag.
-
---field is the set of custom fields every issue read should include, by id or by
-name, so a team's own fields do not have to be named on each command. It is
-added to what --field asks for rather than replacing it, because an ad-hoc field
-should not silently drop the set; --no-context-fields on a read ignores it for
-one invocation.
-
---readonly bakes read-only mode into the context. It is a one-way latch: an
-invocation that simply omits --readonly does not become read-write, because a
-context created read-only is a statement about what it is for.
-
-Credentials are not stored here. Store one with "jr auth login".
 
 Examples:
 
@@ -459,6 +440,25 @@ jr context create audit --site your-site.atlassian.net --readonly
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND
 
+A context is {site, credential ref, default project, default board, default
+fields}. Naming an existing context replaces it.
+
+The project is a default, not a requirement: any command can override it with
+--project or omit it entirely. The few commands that genuinely cannot proceed
+without one exit 2 and name the flag.
+
+--field is the set of custom fields every issue read should include, by id or by
+name, so a team's own fields do not have to be named on each command. It is
+added to what --field asks for rather than replacing it, because an ad-hoc field
+should not silently drop the set; --no-context-fields on a read ignores it for
+one invocation.
+
+--readonly bakes read-only mode into the context. It is a one-way latch: an
+invocation that simply omits --readonly does not become read-write, because a
+context created read-only is a statement about what it is for.
+
+Credentials are not stored here. Store one with "jr auth login".
+
 ### `jr context delete`
 
 Delete a context
@@ -469,12 +469,6 @@ Delete a context
 ```
 jr context delete <name> [flags]
 ```
-
-Removes the context from the config file. Any credential stored for its site is
-left alone; remove that with "jr auth logout".
-
-Deleting the current context leaves no context selected, unless exactly one
-remains, in which case that one is selected because the choice is unambiguous.
 
 Examples:
 
@@ -496,6 +490,12 @@ jr context delete work --yes
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND, `10` BLOCKED
 
+Removes the context from the config file. Any credential stored for its site is
+left alone; remove that with "jr auth logout".
+
+Deleting the current context leaves no context selected, unless exactly one
+remains, in which case that one is selected because the choice is unambiguous.
+
 ### `jr context edit`
 
 Change one setting of a context, leaving the rest alone
@@ -505,36 +505,6 @@ Change one setting of a context, leaving the rest alone
 ```
 jr context edit <name> [flags]
 ```
-
-Changes only what you name. Everything else is left as it was.
-
-`jr context create` replaces a context wholesale, which is right for
-creating one and wrong for adjusting one: re-stating a context to change its
-project is how a board and a default field set get dropped without anyone
-noticing. That has already happened once.
-
---unset clears a setting, because an empty flag value cannot be told apart from
-an absent one — `--project ""` and no --project at all arrive here identically,
-so clearing needs its own spelling. --unset site is refused: a context without a
-site is not a context with one fewer setting, it is one that cannot be used, and
-`jr context delete` is how you say that.
-
-The --project here is this command's own, not the global one, and it is the
-reason an empty value is accepted here and refused everywhere else. Elsewhere
-`--project ""` is EMPTY_SCOPE, because an empty scope falls back to the
-context's rather than lifting it and the query runs against a project nobody
-named. Here there is no scope to fall back to: the value being cleared is the
-stored setting itself.
-
---field replaces the whole stored set, exactly as --label does on issue edit.
---unset field empties it. What is stored is added to whatever a read's own
---field asks for, so editing here changes every issue read rather than
-overriding one.
-
---unset readonly makes a read-only context writable again. The one-way latch
-governs an invocation — nothing a command does can promote itself — and not the
-configuration: changing what a context is for is a deliberate edit, and this is
-where it happens rather than by deleting and re-creating it.
 
 Examples:
 
@@ -566,6 +536,36 @@ jr context edit work --unset board --unset field
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND
 
+Changes only what you name. Everything else is left as it was.
+
+`jr context create` replaces a context wholesale, which is right for
+creating one and wrong for adjusting one: re-stating a context to change its
+project is how a board and a default field set get dropped without anyone
+noticing. That has already happened once.
+
+--unset clears a setting, because an empty flag value cannot be told apart from
+an absent one — `--project ""` and no --project at all arrive here identically,
+so clearing needs its own spelling. --unset site is refused: a context without a
+site is not a context with one fewer setting, it is one that cannot be used, and
+`jr context delete` is how you say that.
+
+The --project here is this command's own, not the global one, and it is the
+reason an empty value is accepted here and refused everywhere else. Elsewhere
+`--project ""` is EMPTY_SCOPE, because an empty scope falls back to the
+context's rather than lifting it and the query runs against a project nobody
+named. Here there is no scope to fall back to: the value being cleared is the
+stored setting itself.
+
+--field replaces the whole stored set, exactly as --label does on issue edit.
+--unset field empties it. What is stored is added to whatever a read's own
+--field asks for, so editing here changes every issue read rather than
+overriding one.
+
+--unset readonly makes a read-only context writable again. The one-way latch
+governs an invocation — nothing a command does can promote itself — and not the
+configuration: changing what a context is for is a deliberate edit, and this is
+where it happens rather than by deleting and re-creating it.
+
 ### `jr context list`
 
 List every configured context
@@ -575,9 +575,6 @@ List every configured context
 ```
 jr context list [flags]
 ```
-
-The current context is marked. A context is a local setting; nothing here
-contacts Jira.
 
 Examples:
 
@@ -595,6 +592,9 @@ jr context list
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL
 
+The current context is marked. A context is a local setting; nothing here
+contacts Jira.
+
 ### `jr context show`
 
 Show one context, or the effective settings for this invocation
@@ -602,12 +602,6 @@ Show one context, or the effective settings for this invocation
 ```
 jr context show [name]
 ```
-
-With a name, prints that context as stored.
-
-With no name, prints what this invocation would actually use once flags, the
-environment, and the current context have all been applied — which is the
-question worth asking when a command is not doing what you expected.
 
 Examples:
 
@@ -627,6 +621,12 @@ jr context show --project OPS
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND
 
+With a name, prints that context as stored.
+
+With no name, prints what this invocation would actually use once flags, the
+environment, and the current context have all been applied — which is the
+question worth asking when a command is not doing what you expected.
+
 ### `jr context use`
 
 Select the context every command uses by default
@@ -636,9 +636,6 @@ Select the context every command uses by default
 ```
 jr context use <name>
 ```
-
-Sets the current context. A single command can still override it with
---context without changing this setting.
 
 Examples:
 
@@ -656,6 +653,9 @@ jr context use work
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND
 
+Sets the current context. A single command can still override it with
+--context without changing this setting.
+
 ## contract
 
 ### `jr contract`
@@ -665,15 +665,6 @@ Dump the machine-readable output contract for every kind
 ```
 jr contract
 ```
-
-Lists every output kind this build can emit, its schema version, and the
-commands that emit it.
-
-A consumer pins the kinds it parses and verifies them against this, so a shape
-change shows up as a version mismatch rather than as a parse that quietly
-succeeds against the wrong fields.
-
-jr --contract is a shorthand for this command.
 
 Examples:
 
@@ -687,6 +678,15 @@ jr contract --format json
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE
 
+Lists every output kind this build can emit, its schema version, and the
+commands that emit it.
+
+A consumer pins the kinds it parses and verifies them against this, so a shape
+change shows up as a version mismatch rather than as a parse that quietly
+succeeds against the wrong fields.
+
+jr --contract is a shorthand for this command.
+
 ## doctor
 
 ### `jr doctor`
@@ -696,6 +696,20 @@ Explain, layer by layer, why this tool will not work here
 ```
 jr doctor
 ```
+
+Examples:
+
+```console
+jr doctor
+jr doctor --format json
+jr doctor --context work --refresh
+```
+
+| Emits | Schema | When |
+| --- | --- | --- |
+| `doctor` | v2 | always |
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE
 
 Runs every check between this binary and an answer from Jira and reports all of
 them: the configuration, the credential, the site URL and its context path, the
@@ -736,20 +750,6 @@ The deployment probe is read from its cache when a valid entry exists, and says
 which. Pass --refresh to force it. The clock is never cached, because a cached
 clock is not a clock.
 
-Examples:
-
-```console
-jr doctor
-jr doctor --format json
-jr doctor --context work --refresh
-```
-
-| Emits | Schema | When |
-| --- | --- | --- |
-| `doctor` | v2 | always |
-
-Exit codes: `0` OK, `1` ERROR, `2` USAGE
-
 ## epic
 
 ### `jr epic add`
@@ -762,20 +762,6 @@ Move issues into an epic
 ```
 jr epic add <epic> <issue...> [flags]
 ```
-
-Moves one or more issues under an epic.
-
-An issue belongs to at most one epic, so this is a move and not an addition: an
-issue already under another epic leaves it. Use `jr epic remove` to take
-an issue out of an epic without putting it in another.
-
-The epic is a key or an id, exactly as on `jr epic get`.
-
-At most 50 issues at a time, which is the API's own cap. More than that is
-refused rather than split across requests, because two requests can half-succeed
-and the result would be neither moved nor not moved.
-
---dry-run prints the exact request, body included, and sends nothing.
 
 Examples:
 
@@ -800,6 +786,20 @@ jr epic add 10101 ENG-101 --dry-run
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Moves one or more issues under an epic.
+
+An issue belongs to at most one epic, so this is a move and not an addition: an
+issue already under another epic leaves it. Use `jr epic remove` to take
+an issue out of an epic without putting it in another.
+
+The epic is a key or an id, exactly as on `jr epic get`.
+
+At most 50 issues at a time, which is the API's own cap. More than that is
+refused rather than split across requests, because two requests can half-succeed
+and the result would be neither moved nor not moved.
+
+--dry-run prints the exact request, body included, and sends nothing.
+
 ### `jr epic get`
 
 Fetch one epic
@@ -807,14 +807,6 @@ Fetch one epic
 ```
 jr epic get <epic>
 ```
-
-Returns a single epic by key or id.
-
-An epic is an issue, so it has both, and either addresses it. A key is what a
-person has; an id is what a listing reports.
-
-Unlike the listing, this needs no board — an epic exists whether or not a board
-shows it.
 
 Examples:
 
@@ -833,6 +825,14 @@ jr epic get 10101 --format json
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns a single epic by key or id.
+
+An epic is an issue, so it has both, and either addresses it. A key is what a
+person has; an id is what a listing reports.
+
+Unlike the listing, this needs no board — an epic exists whether or not a board
+shows it.
+
 ### `jr epic list`
 
 List a board's epics
@@ -842,26 +842,6 @@ List a board's epics
 ```
 jr epic list [flags]
 ```
-
-Returns the epics on a board, ordered by id.
-
-The board comes from --board, JIRA_BOARD, or the context, and there is no
-default: the epics on a board are the epics that board shows, and every board
-has a different answer.
-
-An epic has a name and a summary, and they are different fields. The board shows
-the name; a JQL search shows the summary. Both are reported, because reporting
-one as the other would make two views of the same epic disagree with nothing to
-explain it.
-
---done narrows to complete or incomplete epics, and omitting it returns both. It
-takes true or false rather than being a bare flag, because a bare --done would
-default to false and silently hide every finished epic from a caller who never
-passed it.
-
-Ordered by id, which is the order the epics were created. Keys are deliberately
-not sorted as text — ENG-999 is below ENG-1000 as an issue and above it as a
-string — and id order needs no such parsing.
 
 Examples:
 
@@ -884,6 +864,26 @@ Default TSV columns: `key`, `name`, `summary`, `done`
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns the epics on a board, ordered by id.
+
+The board comes from --board, JIRA_BOARD, or the context, and there is no
+default: the epics on a board are the epics that board shows, and every board
+has a different answer.
+
+An epic has a name and a summary, and they are different fields. The board shows
+the name; a JQL search shows the summary. Both are reported, because reporting
+one as the other would make two views of the same epic disagree with nothing to
+explain it.
+
+--done narrows to complete or incomplete epics, and omitting it returns both. It
+takes true or false rather than being a bare flag, because a bare --done would
+default to false and silently hide every finished epic from a caller who never
+passed it.
+
+Ordered by id, which is the order the epics were created. Keys are deliberately
+not sorted as text — ENG-999 is below ENG-1000 as an issue and above it as a
+string — and id order needs no such parsing.
+
 ### `jr epic remove`
 
 Take issues out of their epic
@@ -894,19 +894,6 @@ Take issues out of their epic
 ```
 jr epic remove <issue...> [flags]
 ```
-
-Removes one or more issues from whichever epic they are in.
-
-The epic is not named, because it does not need to be: an issue belongs to at
-most one, and this takes it out of that one. An issue that is in no epic is
-unaffected.
-
-Nothing is deleted. The issues stay exactly as they were apart from no longer
-having a parent epic.
-
-At most 50 issues at a time, which is the API's own cap.
-
---dry-run prints the exact request, body included, and sends nothing.
 
 Examples:
 
@@ -930,6 +917,19 @@ jr epic remove ENG-101 --dry-run
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Removes one or more issues from whichever epic they are in.
+
+The epic is not named, because it does not need to be: an issue belongs to at
+most one, and this takes it out of that one. An issue that is in no epic is
+unaffected.
+
+Nothing is deleted. The issues stay exactly as they were apart from no longer
+having a parent epic.
+
+At most 50 issues at a time, which is the API's own cap.
+
+--dry-run prints the exact request, body included, and sends nothing.
+
 ## field
 
 ### `jr field list`
@@ -941,19 +941,6 @@ List every field this site has
 ```
 jr field list [flags]
 ```
-
-Returns the site's whole field catalogue: the id a request has to use, the name
-a person calls it, and its type.
-
-This is what makes --field "Story Points" work. The catalogue is cached under
-$XDG_CACHE_HOME for a day, so resolving a name costs a round trip once rather
-than on every invocation; --refresh fetches it again, and running this command
-is what warms the cache.
-
-Jira serves the catalogue whole rather than a page at a time, so --limit here
-bounds what is printed rather than what is fetched. A bounded result is still
-reported as incomplete and still exits 3, because a caller that asked for
-everything and got some of it has to be told either way.
 
 Examples:
 
@@ -975,6 +962,19 @@ Default TSV columns: `id`, `name`, `type`, `custom`
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns the site's whole field catalogue: the id a request has to use, the name
+a person calls it, and its type.
+
+This is what makes --field "Story Points" work. The catalogue is cached under
+$XDG_CACHE_HOME for a day, so resolving a name costs a round trip once rather
+than on every invocation; --refresh fetches it again, and running this command
+is what warms the cache.
+
+Jira serves the catalogue whole rather than a page at a time, so --limit here
+bounds what is printed rather than what is fetched. A bounded result is still
+reported as incomplete and still exits 3, because a caller that asked for
+everything and got some of it has to be told either way.
+
 ## issue
 
 ### `jr issue activity`
@@ -986,6 +986,35 @@ List what happened across issues, as events rather than rows
 ```
 jr issue activity [flags]
 ```
+
+Examples:
+
+```console
+jr issue activity --since -7d
+jr issue activity --since -7d --user ada
+jr issue activity --since -1d --kind transition --format json
+```
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--since` | `string` | — | only events at or after this date or offset, e.g. -7d; required, and it bounds the issues searched as well as the events reported; a date function like startOfWeek() is refused here, because this command compares dates itself (required) |
+| `--user` | `string` | — | only events by this person, by display name, email, or id; the word currentUser resolves to the caller |
+| `--kind` | `string` | — | only events of this kind: comment, transition, field, or worklog; repeat for several (repeatable) |
+| `--jql` | `string` | — | raw JQL narrowing the issues searched, combined with --since and always parenthesized |
+| `--changed-field` | `string` | — | only events about this field, by the name the changelog records or by its id; repeat for several; a comment and a worklog move no field and so never match (repeatable) |
+| `--not-changed-field` | `string` | — | drop events about this field, e.g. Rank on a groomed backlog; a comment and a worklog move no field and so are never dropped; wins over --changed-field (repeatable) |
+| `--raw-body` | `bool` | — | emit a Cloud body as the Atlassian Document Format document Jira sent it as, rather than converting it to markdown |
+| `--all-projects` | `bool` | — | search every project the credential can see, ignoring the context's; --since still bounds the sweep in time |
+| `--page-size` | `int` | — | issues per HTTP request, 1 to 100; transport tuning only |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
+
+| Emits | Schema | When |
+| --- | --- | --- |
+| `issue.activity` | v1 | always |
+
+Default TSV columns: `at`, `issue`, `kind`, `author`, `field`, `time-spent`, `from`, `to`, `body`
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
 Merges four sources into one time-ordered feed: comments, transitions, other
 field changes, and worklogs. Newest first.
@@ -1044,35 +1073,6 @@ not sent, so it also means this person may have events here that you cannot
 see — a comment of theirs can sit outside the twenty Cloud returned. An empty
 feed that exits 3 is not the same answer as an empty feed that exits 0.
 
-Examples:
-
-```console
-jr issue activity --since -7d
-jr issue activity --since -7d --user ada
-jr issue activity --since -1d --kind transition --format json
-```
-
-| Flag | Type | Default | Description |
-| --- | --- | --- | --- |
-| `--since` | `string` | — | only events at or after this date or offset, e.g. -7d; required, and it bounds the issues searched as well as the events reported; a date function like startOfWeek() is refused here, because this command compares dates itself (required) |
-| `--user` | `string` | — | only events by this person, by display name, email, or id; the word currentUser resolves to the caller |
-| `--kind` | `string` | — | only events of this kind: comment, transition, field, or worklog; repeat for several (repeatable) |
-| `--jql` | `string` | — | raw JQL narrowing the issues searched, combined with --since and always parenthesized |
-| `--changed-field` | `string` | — | only events about this field, by the name the changelog records or by its id; repeat for several; a comment and a worklog move no field and so never match (repeatable) |
-| `--not-changed-field` | `string` | — | drop events about this field, e.g. Rank on a groomed backlog; a comment and a worklog move no field and so are never dropped; wins over --changed-field (repeatable) |
-| `--raw-body` | `bool` | — | emit a Cloud body as the Atlassian Document Format document Jira sent it as, rather than converting it to markdown |
-| `--all-projects` | `bool` | — | search every project the credential can see, ignoring the context's; --since still bounds the sweep in time |
-| `--page-size` | `int` | — | issues per HTTP request, 1 to 100; transport tuning only |
-| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
-
-| Emits | Schema | When |
-| --- | --- | --- |
-| `issue.activity` | v1 | always |
-
-Default TSV columns: `at`, `issue`, `kind`, `author`, `field`, `time-spent`, `from`, `to`, `body`
-
-Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
-
 ### `jr issue assign`
 
 Set or clear an issue's assignee
@@ -1083,28 +1083,6 @@ Set or clear an issue's assignee
 ```
 jr issue assign <key> <assignee> [flags]
 ```
-
-Assigns an issue, through the endpoint Jira provides for it rather than through
-a general edit — the two differ in what permission they need, and a caller who
-may assign is not always a caller who may edit.
-
-The user is named by their display name, their email address, or the id this
-deployment identifies them by — an accountId on Cloud, a username on Data
-Center. A name is resolved against the directory before anything is sent, so a
-name matching nobody, or two people, is refused here rather than by a 400 that
-says nothing about which field was wrong.
-
-A name has to match exactly. A partial one is refused with what it nearly
-matched, because a short name that means one person today and a different one
-after somebody joins is worse than being asked to be specific.
-
-The word unassigned clears the assignee. The word default hands the issue to
-whatever the project's default assignee is, which is not the same thing. The
-word currentUser means whoever holds the credential, as it does on issue list.
-
---if-unchanged refuses the assignment if the issue changed since you read it,
-exactly as on issue edit. Reassigning work somebody else has just picked up is
-the case it is for.
 
 Examples:
 
@@ -1132,6 +1110,28 @@ jr issue assign ENG-101 'Ada Lovelace' --if-unchanged eyJkIjo
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Assigns an issue, through the endpoint Jira provides for it rather than through
+a general edit — the two differ in what permission they need, and a caller who
+may assign is not always a caller who may edit.
+
+The user is named by their display name, their email address, or the id this
+deployment identifies them by — an accountId on Cloud, a username on Data
+Center. A name is resolved against the directory before anything is sent, so a
+name matching nobody, or two people, is refused here rather than by a 400 that
+says nothing about which field was wrong.
+
+A name has to match exactly. A partial one is refused with what it nearly
+matched, because a short name that means one person today and a different one
+after somebody joins is worse than being asked to be specific.
+
+The word unassigned clears the assignee. The word default hands the issue to
+whatever the project's default assignee is, which is not the same thing. The
+word currentUser means whoever holds the credential, as it does on issue list.
+
+--if-unchanged refuses the assignment if the issue changed since you read it,
+exactly as on issue edit. Reassigning work somebody else has just picked up is
+the case it is for.
+
 ### `jr issue attachment download`
 
 Download an attachment
@@ -1139,26 +1139,6 @@ Download an attachment
 ```
 jr issue attachment download <key> <id> [flags]
 ```
-
-Streams one attachment to a file, or to stdout.
-
-Nothing is held in memory. A 50MB file costs 50MB of disk and a constant amount
-of everything else, which is the difference between this and reading a response
-the ordinary way.
-
---output takes a path, or - for stdout. With a path, the result is the usual
-document saying what was written and how many bytes. With -, the file *is* the
-output and there is no document: a result and a file on the same channel is one
-of them corrupting the other, and the caller asked for the file.
-
---output defaults to the attachment's own filename in the working directory. An
-existing file is never overwritten without --force, because a download that
-silently replaced a file would be indistinguishable from one that worked.
-
-The two deployments differ in where the bytes live. Cloud serves them from the
-REST API. Data Center reports an absolute URL on the attachment itself, and this
-follows it only after checking it names the configured site — a server-supplied
-URL is not a place to send a credential on trust.
 
 Examples:
 
@@ -1184,6 +1164,26 @@ jr issue attachment download ENG-101 10042 --output - | file -
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE
 
+Streams one attachment to a file, or to stdout.
+
+Nothing is held in memory. A 50MB file costs 50MB of disk and a constant amount
+of everything else, which is the difference between this and reading a response
+the ordinary way.
+
+--output takes a path, or - for stdout. With a path, the result is the usual
+document saying what was written and how many bytes. With -, the file *is* the
+output and there is no document: a result and a file on the same channel is one
+of them corrupting the other, and the caller asked for the file.
+
+--output defaults to the attachment's own filename in the working directory. An
+existing file is never overwritten without --force, because a download that
+silently replaced a file would be indistinguishable from one that worked.
+
+The two deployments differ in where the bytes live. Cloud serves them from the
+REST API. Data Center reports an absolute URL on the attachment itself, and this
+follows it only after checking it names the configured site — a server-supplied
+URL is not a place to send a credential on trust.
+
 ### `jr issue attachment list`
 
 List the files attached to an issue
@@ -1193,16 +1193,6 @@ List the files attached to an issue
 ```
 jr issue attachment list <key> [flags]
 ```
-
-Returns an issue's attachments, oldest first.
-
-The size is in bytes and is worth reading before downloading: this tool streams
-a file to disk rather than into memory, but the network cost is still yours.
-
-The content URL is deliberately not reported. It is an absolute URL the server
-supplies, and `jr issue attachment download` is what follows it — after
-checking it points at the configured site. Printing it would invite a caller to
-fetch it with their own credentials and skip that check.
 
 Examples:
 
@@ -1227,6 +1217,16 @@ Default TSV columns: `id`, `filename`, `size`, `created`
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns an issue's attachments, oldest first.
+
+The size is in bytes and is worth reading before downloading: this tool streams
+a file to disk rather than into memory, but the network cost is still yours.
+
+The content URL is deliberately not reported. It is an absolute URL the server
+supplies, and `jr issue attachment download` is what follows it — after
+checking it points at the configured site. Printing it would invite a caller to
+fetch it with their own credentials and skip that check.
+
 ### `jr issue attachment upload`
 
 Attach a file to an issue
@@ -1237,23 +1237,6 @@ Attach a file to an issue
 ```
 jr issue attachment upload <key> <file> [flags]
 ```
-
-Uploads a file and attaches it to an issue.
-
-The file is streamed rather than read into memory, so its size is bounded by
-what Jira accepts and not by this process.
-
-The name Jira stores is the file's own base name. --name overrides it, which is
-the only way to attach something under a name other than the one on disk.
-
-A retry re-reads the file from the start, which is why this takes a path rather
-than accepting input on stdin: an upload retried after a 429 has to send the
-same bytes again, and a pipe cannot do that. Reading from a pipe would mean
-either refusing every retry or sending a truncated file, and one of those is
-much worse than the other.
-
---dry-run prints the request without the file's contents. The body is the file,
-and printing it would be neither useful nor safe.
 
 Examples:
 
@@ -1279,6 +1262,23 @@ jr issue attachment upload ENG-101 ./out.log --name run-42.log
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Uploads a file and attaches it to an issue.
+
+The file is streamed rather than read into memory, so its size is bounded by
+what Jira accepts and not by this process.
+
+The name Jira stores is the file's own base name. --name overrides it, which is
+the only way to attach something under a name other than the one on disk.
+
+A retry re-reads the file from the start, which is why this takes a path rather
+than accepting input on stdin: an upload retried after a 429 has to send the
+same bytes again, and a pipe cannot do that. Reading from a pipe would mean
+either refusing every retry or sending a truncated file, and one of those is
+much worse than the other.
+
+--dry-run prints the request without the file's contents. The body is the file,
+and printing it would be neither useful nor safe.
+
 ### `jr issue changes`
 
 Report what changed since the last poll, and where to resume
@@ -1288,6 +1288,29 @@ Report what changed since the last poll, and where to resume
 ```
 jr issue changes [flags]
 ```
+
+Examples:
+
+```console
+jr issue changes --since -1h --format json
+jr issue changes --since eyJkIjoiY2xvdWQi… --format json
+jr issue changes --since -1d --jql "project = ENG" --format json
+```
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--since` | `string` | — | the next-since-token from a previous answer, or a date or offset like -1h for a first poll; required, and a date function like startOfWeek() is refused because this command has to resolve the bound itself (required) |
+| `--jql` | `string` | — | raw JQL narrowing the issues watched, combined with the window bound and always parenthesized |
+| `--page-size` | `int` | — | issues per HTTP request, 1 to 100; transport tuning only |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
+
+| Emits | Schema | When |
+| --- | --- | --- |
+| `issue.changes` | v1 | always |
+
+Default TSV columns: `created`, `issue`, `author`, `field`, `from`, `to`
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
 An incremental feed of recorded changes: every field that moved on every issue in
 scope, oldest first, with a cursor to poll again from.
@@ -1327,29 +1350,6 @@ One row is one field, as in `issue history`, and rows from one save share its id
 and timestamp. Comments are not here: Jira writes a field transition to the
 changelog and a comment is not a field transition.
 
-Examples:
-
-```console
-jr issue changes --since -1h --format json
-jr issue changes --since eyJkIjoiY2xvdWQi… --format json
-jr issue changes --since -1d --jql "project = ENG" --format json
-```
-
-| Flag | Type | Default | Description |
-| --- | --- | --- | --- |
-| `--since` | `string` | — | the next-since-token from a previous answer, or a date or offset like -1h for a first poll; required, and a date function like startOfWeek() is refused because this command has to resolve the bound itself (required) |
-| `--jql` | `string` | — | raw JQL narrowing the issues watched, combined with the window bound and always parenthesized |
-| `--page-size` | `int` | — | issues per HTTP request, 1 to 100; transport tuning only |
-| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
-
-| Emits | Schema | When |
-| --- | --- | --- |
-| `issue.changes` | v1 | always |
-
-Default TSV columns: `created`, `issue`, `author`, `field`, `from`, `to`
-
-Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
-
 ### `jr issue clone`
 
 Create a copy of an issue
@@ -1360,25 +1360,6 @@ Create a copy of an issue
 ```
 jr issue clone <key> [flags]
 ```
-
-Reads an issue and creates a new one from it. Jira has no clone endpoint, so
-this is a read followed by a create, and it is worth being exact about what
-crosses over.
-
-Copied: summary, issue type, priority, labels, description, and parent.
-
-Not copied: status, resolution, assignee, reporter, comments, attachments,
-links, worklogs, watchers, and every custom field. A copy that silently brought
-half an issue's history along would be worse than one that says what it is.
-
-A Cloud description is also not copied. It arrives as a document, and
-re-encoding it as plain text would flatten every mark and link in it.
-
---summary replaces the copied summary. --idempotency-key makes a retry safe, the
-same as on issue create.
-
---dry-run prints the create it would send, after doing the read it needs to
-build one.
 
 Examples:
 
@@ -1405,6 +1386,25 @@ jr issue clone ENG-101 --idempotency-key retry-1
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Reads an issue and creates a new one from it. Jira has no clone endpoint, so
+this is a read followed by a create, and it is worth being exact about what
+crosses over.
+
+Copied: summary, issue type, priority, labels, description, and parent.
+
+Not copied: status, resolution, assignee, reporter, comments, attachments,
+links, worklogs, watchers, and every custom field. A copy that silently brought
+half an issue's history along would be worse than one that says what it is.
+
+A Cloud description is also not copied. It arrives as a document, and
+re-encoding it as plain text would flatten every mark and link in it.
+
+--summary replaces the copied summary. --idempotency-key makes a retry safe, the
+same as on issue create.
+
+--dry-run prints the create it would send, after doing the read it needs to
+build one.
+
 ### `jr issue comment add`
 
 Add a comment to an issue
@@ -1415,22 +1415,6 @@ Add a comment to an issue
 ```
 jr issue comment add <key> <body> [flags]
 ```
-
-Adds one comment.
-
-The text is sent as plain text by default. No markup is interpreted: **bold**
-reaches Jira as six characters and Jira decides what to do with them, which is
-also what happens on Data Center. On Cloud the text is wrapped in the document
-structure the API requires — a blank line starts a paragraph and a single
-newline is a line break — because containing text is exact where interpreting
-it is not.
-
---body-format markdown parses it instead. A construct the subset cannot hold is
-refused by name rather than approximated, and a single newline joins its lines,
-which is what markdown means by one. --body-format adf takes a document as
-JSON. Both are Cloud only, because Data Center stores wiki markup.
-
---dry-run prints the exact request, body included, and sends nothing.
 
 Examples:
 
@@ -1458,6 +1442,22 @@ jr issue comment add ENG-101 "$(cat notes.md)" --body-format markdown
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Adds one comment.
+
+The text is sent as plain text by default. No markup is interpreted: **bold**
+reaches Jira as six characters and Jira decides what to do with them, which is
+also what happens on Data Center. On Cloud the text is wrapped in the document
+structure the API requires — a blank line starts a paragraph and a single
+newline is a line break — because containing text is exact where interpreting
+it is not.
+
+--body-format markdown parses it instead. A construct the subset cannot hold is
+refused by name rather than approximated, and a single newline joins its lines,
+which is what markdown means by one. --body-format adf takes a document as
+JSON. Both are Cloud only, because Data Center stores wiki markup.
+
+--dry-run prints the exact request, body included, and sends nothing.
+
 ### `jr issue comment delete`
 
 Delete a comment
@@ -1469,13 +1469,6 @@ Delete a comment
 ```
 jr issue comment delete <key> <id> [flags]
 ```
-
-Deletes one comment permanently. Jira has no undo for this, which is why --yes
-is required: a confirmation this tool cannot ask for is a refusal rather than a
-question nobody can answer.
-
---dry-run shows the request without needing --yes, because you look at what
-would happen in order to decide whether to allow it.
 
 Examples:
 
@@ -1500,6 +1493,13 @@ jr issue comment delete ENG-101 10042 --yes
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Deletes one comment permanently. Jira has no undo for this, which is why --yes
+is required: a confirmation this tool cannot ask for is a refusal rather than a
+question nobody can answer.
+
+--dry-run shows the request without needing --yes, because you look at what
+would happen in order to decide whether to allow it.
+
 ### `jr issue comment edit`
 
 Replace the text of a comment
@@ -1510,13 +1510,6 @@ Replace the text of a comment
 ```
 jr issue comment edit <key> <id> <body> [flags]
 ```
-
-Replaces a comment's body. The comment is named by its id, which
-`jr issue comment list` reports — not by its position, which changes as
-comments are added.
-
-The text and --body-format are handled exactly as on add: sent uninterpreted by
-default, parsed as markdown or taken as a document when asked for.
 
 Examples:
 
@@ -1543,6 +1536,13 @@ jr issue comment edit ENG-101 10042 'Corrected: it was 9.12.7'
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Replaces a comment's body. The comment is named by its id, which
+`jr issue comment list` reports — not by its position, which changes as
+comments are added.
+
+The text and --body-format are handled exactly as on add: sent uninterpreted by
+default, parsed as markdown or taken as a document when asked for.
+
 ### `jr issue comment list`
 
 List an issue's comments
@@ -1552,19 +1552,6 @@ List an issue's comments
 ```
 jr issue comment list <key> [flags]
 ```
-
-Returns the comments on an issue, oldest first.
-
-Data Center serves wiki markup, which is carried through unchanged. Cloud
-serves an Atlassian Document Format document, which is converted to markdown —
-losslessly, or not at all: a body holding something markdown cannot represent
-is an error naming it rather than an approximation. --raw-body emits the
-document itself. The format attribute says which you have.
-
-A restricted comment carries the role or group it is limited to. That is worth
-reading before quoting one: a comment that looks public in a list may not be.
-
-Reading takes no write tag, so this is in every build.
 
 Examples:
 
@@ -1592,6 +1579,19 @@ Default TSV columns: `id`, `author`, `created`, `body`
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns the comments on an issue, oldest first.
+
+Data Center serves wiki markup, which is carried through unchanged. Cloud
+serves an Atlassian Document Format document, which is converted to markdown —
+losslessly, or not at all: a body holding something markdown cannot represent
+is an error naming it rather than an approximation. --raw-body emits the
+document itself. The format attribute says which you have.
+
+A restricted comment carries the role or group it is limited to. That is worth
+reading before quoting one: a comment that looks public in a list may not be.
+
+Reading takes no write tag, so this is in every build.
+
 ### `jr issue create`
 
 Create an issue
@@ -1602,6 +1602,37 @@ Create an issue
 ```
 jr issue create [flags]
 ```
+
+Examples:
+
+```console
+jr issue create --type Bug --summary 'Retry drops the last error'
+jr issue create --type Task --summary Ship --idempotency-key deploy-42
+jr issue create --type Bug --summary Probe --dry-run
+jr issue create --type Story --summary Retry --field 'Story Points=5'
+```
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--type`, `-t` | `string` | — | issue type, by name or id, e.g. Bug (required) |
+| `--summary` | `string` | — | the issue summary (required) |
+| `--description` | `string` | — | the issue description, as plain text |
+| `--priority` | `string` | — | priority name, e.g. High |
+| `--label` | `string` | — | label to set; repeat for several (repeatable) |
+| `--assignee`, `-a` | `string` | — | assignee, by display name, email, or id; the word unassigned leaves it unset |
+| `--parent` | `string` | — | parent issue key: the epic on Cloud, or the issue a subtask belongs to |
+| `--idempotency-key` | `string` | — | make a retry safe: the same key returns the original issue |
+| `--field` | `string` | — | set a field by id or name, as id=value, e.g. customfield_10140=5 or 'Story Points=5'; repeat for several, and repeat one id to build an array (repeatable) |
+| `--field-json` | `string` | — | set a field to a JSON value sent as written, as id=&lt;json>, e.g. customfield_11350='"ENG-42"'; for a field whose type this tool will not guess at (repeatable) |
+| `--body-format` | `text\|markdown\|adf` | `text` | how to read the body: text sends it uninterpreted, markdown converts it, adf takes a document as JSON; the last two are Cloud only |
+| `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
+
+| Emits | Schema | When |
+| --- | --- | --- |
+| `issue.create` | v1 | always |
+| `dry-run` | v2 | --dry-run is given |
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
 Creates one issue in the resolved project.
 
@@ -1639,37 +1670,6 @@ case, and Epic Link is one: --field-json customfield_11350='"ENG-42"'. A field
 a typed flag already owns is refused by name, because two spellings of one
 write is a silent last-one-wins.
 
-Examples:
-
-```console
-jr issue create --type Bug --summary 'Retry drops the last error'
-jr issue create --type Task --summary Ship --idempotency-key deploy-42
-jr issue create --type Bug --summary Probe --dry-run
-jr issue create --type Story --summary Retry --field 'Story Points=5'
-```
-
-| Flag | Type | Default | Description |
-| --- | --- | --- | --- |
-| `--type`, `-t` | `string` | — | issue type, by name or id, e.g. Bug (required) |
-| `--summary` | `string` | — | the issue summary (required) |
-| `--description` | `string` | — | the issue description, as plain text |
-| `--priority` | `string` | — | priority name, e.g. High |
-| `--label` | `string` | — | label to set; repeat for several (repeatable) |
-| `--assignee`, `-a` | `string` | — | assignee, by display name, email, or id; the word unassigned leaves it unset |
-| `--parent` | `string` | — | parent issue key: the epic on Cloud, or the issue a subtask belongs to |
-| `--idempotency-key` | `string` | — | make a retry safe: the same key returns the original issue |
-| `--field` | `string` | — | set a field by id or name, as id=value, e.g. customfield_10140=5 or 'Story Points=5'; repeat for several, and repeat one id to build an array (repeatable) |
-| `--field-json` | `string` | — | set a field to a JSON value sent as written, as id=&lt;json>, e.g. customfield_11350='"ENG-42"'; for a field whose type this tool will not guess at (repeatable) |
-| `--body-format` | `text\|markdown\|adf` | `text` | how to read the body: text sends it uninterpreted, markdown converts it, adf takes a document as JSON; the last two are Cloud only |
-| `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
-
-| Emits | Schema | When |
-| --- | --- | --- |
-| `issue.create` | v1 | always |
-| `dry-run` | v2 | --dry-run is given |
-
-Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
-
 ### `jr issue delete`
 
 Delete an issue
@@ -1681,14 +1681,6 @@ Delete an issue
 ```
 jr issue delete <key> [flags]
 ```
-
-Deletes an issue permanently. Jira has no undo for this.
-
---yes is required, because nothing here ever blocks on input: a confirmation
-this tool cannot ask for is a refusal rather than a question nobody can answer.
-
-An issue with subtasks is refused unless --subtasks says to take them too.
-Cascading silently would delete work the caller never named.
 
 Examples:
 
@@ -1715,6 +1707,14 @@ jr issue delete ENG-101 --dry-run
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Deletes an issue permanently. Jira has no undo for this.
+
+--yes is required, because nothing here ever blocks on input: a confirmation
+this tool cannot ask for is a refusal rather than a question nobody can answer.
+
+An issue with subtasks is refused unless --subtasks says to take them too.
+Cascading silently would delete work the caller never named.
+
 ### `jr issue edit`
 
 Change fields on an issue
@@ -1725,50 +1725,6 @@ Change fields on an issue
 ```
 jr issue edit [key...] [flags]
 ```
-
-Sets fields on an existing issue. Only what you name is sent, so a field you do
-not mention is left alone.
-
---label replaces the whole set. --add-label and --remove-label modify it
-instead, and combining the two forms is refused rather than resolved to
-whichever the implementation happened to apply last.
-
---assignee unassigned clears the assignee, by sending an explicit null. Omitting
-the flag leaves it as it was, which is a different thing.
-
---parent sets what this issue sits under, and the word none clears it. On Cloud
-that is how an issue joins or leaves an epic: the parent field carries epic
-membership on both company-managed and team-managed projects, where the agile
-endpoint behind jr epic add serves company-managed ones only. It is also how a
-subtask names the issue it belongs to, because Jira spells both with the one
-field.
-
---if-unchanged refuses the write if somebody else edited the issue since you
-read it. Pass the precondition attribute from issue get; a stale one exits 7
-and sends nothing. Without it the last write wins and the earlier one is lost
-silently, which is the ordinary outcome of two callers editing one issue.
-
-Jira offers no conditional request on an issue, so the check is a read, a
-comparison, and then the write, and the window between the read and the write
-is one round trip wide. The result says method="read-compare" rather than
-letting the word precondition imply an atomic one.
-
---dry-run prints the exact request, body included, and sends nothing.
-
---description and --body-format work exactly as on issue create.
-
---field sets anything the flags above do not name, by field id or by field
-name: --field customfield_10140=5 or --field 'Story Points=5'. The value is
-typed from the site's own catalogue, so a number field refuses a value that is
-not a number, and an unknown field is refused with the near misses rather than
-sent. Repeat one id to build an array; nothing is split on commas, because a
-comma is a character a value may contain.
-
---field-json sets a field to a JSON value sent exactly as written, for a field
-whose type this tool will not guess at. A schema type of "any" is the common
-case, and Epic Link is one: --field-json customfield_11350='"ENG-42"'. A field
-a typed flag already owns is refused by name, because two spellings of one
-write is a silent last-one-wins.
 
 Examples:
 
@@ -1814,6 +1770,50 @@ jr issue edit ENG-101 --field-json customfield_11350='"ENG-42"'
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Sets fields on an existing issue. Only what you name is sent, so a field you do
+not mention is left alone.
+
+--label replaces the whole set. --add-label and --remove-label modify it
+instead, and combining the two forms is refused rather than resolved to
+whichever the implementation happened to apply last.
+
+--assignee unassigned clears the assignee, by sending an explicit null. Omitting
+the flag leaves it as it was, which is a different thing.
+
+--parent sets what this issue sits under, and the word none clears it. On Cloud
+that is how an issue joins or leaves an epic: the parent field carries epic
+membership on both company-managed and team-managed projects, where the agile
+endpoint behind jr epic add serves company-managed ones only. It is also how a
+subtask names the issue it belongs to, because Jira spells both with the one
+field.
+
+--if-unchanged refuses the write if somebody else edited the issue since you
+read it. Pass the precondition attribute from issue get; a stale one exits 7
+and sends nothing. Without it the last write wins and the earlier one is lost
+silently, which is the ordinary outcome of two callers editing one issue.
+
+Jira offers no conditional request on an issue, so the check is a read, a
+comparison, and then the write, and the window between the read and the write
+is one round trip wide. The result says method="read-compare" rather than
+letting the word precondition imply an atomic one.
+
+--dry-run prints the exact request, body included, and sends nothing.
+
+--description and --body-format work exactly as on issue create.
+
+--field sets anything the flags above do not name, by field id or by field
+name: --field customfield_10140=5 or --field 'Story Points=5'. The value is
+typed from the site's own catalogue, so a number field refuses a value that is
+not a number, and an unknown field is refused with the near misses rather than
+sent. Repeat one id to build an array; nothing is split on commas, because a
+comma is a character a value may contain.
+
+--field-json sets a field to a JSON value sent exactly as written, for a field
+whose type this tool will not guess at. A schema type of "any" is the common
+case, and Epic Link is one: --field-json customfield_11350='"ENG-42"'. A field
+a typed flag already owns is refused by name, because two spellings of one
+write is a silent last-one-wins.
+
 ### `jr issue get`
 
 Fetch one issue in full
@@ -1821,18 +1821,6 @@ Fetch one issue in full
 ```
 jr issue get <key> [flags]
 ```
-
-Returns a single issue with its description, resolution, components, and fix
-versions — the fields worth fetching one issue at a time.
-
-Data Center serves wiki markup, which is carried through unchanged. Cloud
-serves an Atlassian Document Format object, which is converted to markdown —
-losslessly, or not at all: a description holding something markdown cannot
-represent is an error naming it rather than an approximation. --raw-body emits
-the document itself. The format attribute says which you have.
-
-The issue shape here is the same one issue list emits for a row, so a caller
-parses both identically. It simply has more of it filled in.
 
 Examples:
 
@@ -1863,6 +1851,18 @@ jr issue get ENG-101 --url
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns a single issue with its description, resolution, components, and fix
+versions — the fields worth fetching one issue at a time.
+
+Data Center serves wiki markup, which is carried through unchanged. Cloud
+serves an Atlassian Document Format object, which is converted to markdown —
+losslessly, or not at all: a description holding something markdown cannot
+represent is an error naming it rather than an approximation. --raw-body emits
+the document itself. The format attribute says which you have.
+
+The issue shape here is the same one issue list emits for a row, so a caller
+parses both identically. It simply has more of it filled in.
+
 ### `jr issue history`
 
 List what changed on an issue, and who changed it
@@ -1872,6 +1872,33 @@ List what changed on an issue, and who changed it
 ```
 jr issue history <key> [flags]
 ```
+
+Examples:
+
+```console
+jr issue history ENG-101
+jr issue history ENG-101 --changed-field status
+jr issue history ENG-101 --format json --limit all
+```
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `key` | yes | issue key, e.g. ENG-101 |
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--changed-field` | `string` | — | only changes to this field, by the name the changelog records or by its id; repeat for several; matched here rather than by the server, so it saves output and not requests (repeatable) |
+| `--not-changed-field` | `string` | — | drop changes to this field; repeat for several, and it wins over --changed-field where both name one (repeatable) |
+| `--page-size` | `int` | — | results per HTTP request, 1 to 100; transport tuning only, and Cloud only — Data Center serves the whole changelog in one response and has nothing to page |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
+
+| Emits | Schema | When |
+| --- | --- | --- |
+| `issue.history` | v1 | always |
+
+Default TSV columns: `created`, `author`, `field`, `from`, `to`
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
 Returns an issue's recorded changes, oldest first: who moved which field, when,
 and what it moved between.
@@ -1915,33 +1942,6 @@ Comment authorship is not recorded here. Jira writes a field transition to the
 changelog and a comment is not a field transition, so "what did this person do
 to this issue" needs this and `issue comment list` both.
 
-Examples:
-
-```console
-jr issue history ENG-101
-jr issue history ENG-101 --changed-field status
-jr issue history ENG-101 --format json --limit all
-```
-
-| Argument | Required | Description |
-| --- | --- | --- |
-| `key` | yes | issue key, e.g. ENG-101 |
-
-| Flag | Type | Default | Description |
-| --- | --- | --- | --- |
-| `--changed-field` | `string` | — | only changes to this field, by the name the changelog records or by its id; repeat for several; matched here rather than by the server, so it saves output and not requests (repeatable) |
-| `--not-changed-field` | `string` | — | drop changes to this field; repeat for several, and it wins over --changed-field where both name one (repeatable) |
-| `--page-size` | `int` | — | results per HTTP request, 1 to 100; transport tuning only, and Cloud only — Data Center serves the whole changelog in one response and has nothing to page |
-| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
-
-| Emits | Schema | When |
-| --- | --- | --- |
-| `issue.history` | v1 | always |
-
-Default TSV columns: `created`, `author`, `field`, `from`, `to`
-
-Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
-
 ### `jr issue link add`
 
 Link two issues
@@ -1952,24 +1952,6 @@ Link two issues
 ```
 jr issue link add <from> <relationship> <to> [flags]
 ```
-
-Creates a link, written as a sentence: &lt;from> &lt;relationship> &lt;to>. So
-
-    jr issue link add ENG-1 blocks ENG-2
-
-reads "ENG-1 blocks ENG-2", and reversing the relationship reverses the link.
-
-The relationship is a phrase, not a type name, and that is deliberate. A type
-name says nothing about which way the link runs: "Duplicate" is refused with
-both of its readings rather than resolved to one, and so is "relates", whose
-type offers "relates to" in both directions. Guessing would be wrong half the
-time, and the issue that ends up blocked is the one nobody was watching.
-
-"Blocks" works, and by coincidence rather than by rule: it is the outward
-phrase as well as the type name, and phrases are matched first.
-
-An unknown phrase is refused with every phrase the site offers. Link wording is
-customizable, so showing what exists beats guessing at a near match.
 
 Examples:
 
@@ -1996,6 +1978,24 @@ jr issue link add ENG-1 "relates to" ENG-2 --dry-run
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Creates a link, written as a sentence: &lt;from> &lt;relationship> &lt;to>. So
+
+    jr issue link add ENG-1 blocks ENG-2
+
+reads "ENG-1 blocks ENG-2", and reversing the relationship reverses the link.
+
+The relationship is a phrase, not a type name, and that is deliberate. A type
+name says nothing about which way the link runs: "Duplicate" is refused with
+both of its readings rather than resolved to one, and so is "relates", whose
+type offers "relates to" in both directions. Guessing would be wrong half the
+time, and the issue that ends up blocked is the one nobody was watching.
+
+"Blocks" works, and by coincidence rather than by rule: it is the outward
+phrase as well as the type name, and phrases are matched first.
+
+An unknown phrase is refused with every phrase the site offers. Link wording is
+customizable, so showing what exists beats guessing at a near match.
+
 ### `jr issue link list`
 
 List the issues linked to one issue
@@ -2005,15 +2005,6 @@ List the issues linked to one issue
 ```
 jr issue link list <key> [flags]
 ```
-
-Returns every link on an issue, each read from this issue's side.
-
-The relationship is the phrase that applies here — "blocks" or "is blocked by",
-not the type's name. They are the same link seen from opposite ends, and a
-caller acting on the wrong reading acts on the wrong issue.
-
-Links arrive with the issue rather than from an endpoint of their own, so this
-costs one request and takes no write tag.
 
 Examples:
 
@@ -2038,6 +2029,15 @@ Default TSV columns: `id`, `relationship`, `key`, `status`, `summary`
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns every link on an issue, each read from this issue's side.
+
+The relationship is the phrase that applies here — "blocks" or "is blocked by",
+not the type's name. They are the same link seen from opposite ends, and a
+caller acting on the wrong reading acts on the wrong issue.
+
+Links arrive with the issue rather than from an endpoint of their own, so this
+costs one request and takes no write tag.
+
 ### `jr issue link remove`
 
 Remove a link between two issues
@@ -2049,12 +2049,6 @@ Remove a link between two issues
 ```
 jr issue link remove <id> [flags]
 ```
-
-Removes one link by its id, which `jr issue link list` reports.
-
-The id rather than the pair of issues, because two issues can be linked more
-than once with different relationships, and removing "the link between A and B"
-would be ambiguous exactly when it mattered.
 
 Examples:
 
@@ -2078,6 +2072,12 @@ jr issue link remove 10042 --yes
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Removes one link by its id, which `jr issue link list` reports.
+
+The id rather than the pair of issues, because two issues can be linked more
+than once with different relationships, and removing "the link between A and B"
+would be ambiguous exactly when it mattered.
+
 ### `jr issue list`
 
 List issues matching a query
@@ -2087,60 +2087,6 @@ List issues matching a query
 ```
 jr issue list [flags]
 ```
-
-Builds a JQL query from the flags, or takes one whole with --jql, and returns
-the matching issues.
-
---limit says how many results you want and is not capped: the client pages
-until it has them. --page-size tunes the transport and is rarely worth setting.
-There is deliberately no offset flag — Cloud pages by cursor, so an offset
-could not be honored, and --page-token is opaque precisely so the same flag
-works against both deployments.
-
-A result cut short by --limit or by --max-requests is never reported as
-complete. It exits 3, says so on stderr, and carries a token to resume from.
-
-Raw JQL from --jql is always parenthesized before being combined with the other
-filters, so an OR inside it cannot escape the project scope. A fragment whose
-own parentheses do not balance is refused rather than sent, because wrapping
-contains only a fragment that balances.
-
-Results come back ordered by issue key descending unless --sort names a field.
-That is close to creation order and is not update order: a date filter narrows
-the set and never orders it, so "everything touched today, newest first" is
---updated-after -1d --sort updated --order desc.
-
-Every list filter has both directions: --status and --not-status, --type and
---not-type, --label and --not-label. Each repeats, so --not-status Done
---not-status Closed sends status NOT IN (Done, Closed).
-
-None of them splits on commas. --label a,b asks for one label whose name
-contains a comma, which Jira genuinely stores, so splitting it would make that
-label unaskable. What differs is what the server does with the mistake, and it
-differs by field: Jira validates a status and an issue type, so a comma typo
-there comes back as a 400 naming the value. It does not validate a label at
-all. Repeat the flag rather than joining values with a comma.
-
-A label filter is checked here instead, because a label nothing carries is a
-legal question and an empty answer to it looks exactly like an empty answer to
-a correct one. A label no issue on this site carries produces the warning
-UNKNOWN_LABEL on stderr, and the query still runs and still exits 0: asking
-about a label nobody uses is allowed, and not being able to tell that is what
-was not. It costs one request per label, it is not cached, and a site that
-cannot answer is left alone rather than guessed at. It says nothing about
-whether a label that does exist will match here: this query may be scoped to
-one project and a label lives site-wide.
-
---assignee and --reporter ask who an issue belongs to. --involving,
---was-assignee, --worklog-author, and --changed-by ask who touched it, which is
-a different question: --updated-after means somebody updated the issue, not
-that you did.
-
-Two limits are worth knowing rather than discovering. JQL cannot search comment
-authorship at all, so nothing here finds "issues I commented on" and --involving
-says so rather than approximating it. And CHANGED names one field at a time —
-there is no way to ask whether any field changed — so --changed-field defaults
-to status and everything else has to be asked for.
 
 Examples:
 
@@ -2201,6 +2147,60 @@ Default TSV columns: `key`, `status`, `assignee`, `updated`, `summary`
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Builds a JQL query from the flags, or takes one whole with --jql, and returns
+the matching issues.
+
+--limit says how many results you want and is not capped: the client pages
+until it has them. --page-size tunes the transport and is rarely worth setting.
+There is deliberately no offset flag — Cloud pages by cursor, so an offset
+could not be honored, and --page-token is opaque precisely so the same flag
+works against both deployments.
+
+A result cut short by --limit or by --max-requests is never reported as
+complete. It exits 3, says so on stderr, and carries a token to resume from.
+
+Raw JQL from --jql is always parenthesized before being combined with the other
+filters, so an OR inside it cannot escape the project scope. A fragment whose
+own parentheses do not balance is refused rather than sent, because wrapping
+contains only a fragment that balances.
+
+Results come back ordered by issue key descending unless --sort names a field.
+That is close to creation order and is not update order: a date filter narrows
+the set and never orders it, so "everything touched today, newest first" is
+--updated-after -1d --sort updated --order desc.
+
+Every list filter has both directions: --status and --not-status, --type and
+--not-type, --label and --not-label. Each repeats, so --not-status Done
+--not-status Closed sends status NOT IN (Done, Closed).
+
+None of them splits on commas. --label a,b asks for one label whose name
+contains a comma, which Jira genuinely stores, so splitting it would make that
+label unaskable. What differs is what the server does with the mistake, and it
+differs by field: Jira validates a status and an issue type, so a comma typo
+there comes back as a 400 naming the value. It does not validate a label at
+all. Repeat the flag rather than joining values with a comma.
+
+A label filter is checked here instead, because a label nothing carries is a
+legal question and an empty answer to it looks exactly like an empty answer to
+a correct one. A label no issue on this site carries produces the warning
+UNKNOWN_LABEL on stderr, and the query still runs and still exits 0: asking
+about a label nobody uses is allowed, and not being able to tell that is what
+was not. It costs one request per label, it is not cached, and a site that
+cannot answer is left alone rather than guessed at. It says nothing about
+whether a label that does exist will match here: this query may be scoped to
+one project and a label lives site-wide.
+
+--assignee and --reporter ask who an issue belongs to. --involving,
+--was-assignee, --worklog-author, and --changed-by ask who touched it, which is
+a different question: --updated-after means somebody updated the issue, not
+that you did.
+
+Two limits are worth knowing rather than discovering. JQL cannot search comment
+authorship at all, so nothing here finds "issues I commented on" and --involving
+says so rather than approximating it. And CHANGED names one field at a time —
+there is no way to ask whether any field changed — so --changed-field defaults
+to status and everything else has to be asked for.
+
 ### `jr issue move`
 
 Transition an issue to another status
@@ -2211,34 +2211,6 @@ Transition an issue to another status
 ```
 jr issue move <key> <transition> [flags]
 ```
-
-Moves an issue through its workflow.
-
-The transition is named the way a person names it — "Close Issue" — and resolved
-against what the issue can actually do right now. A name that is not available
-is refused with the whole available set, because a missing transition is far
-more often blocked from the current status than misspelled. A name matching two
-transitions is refused with both, since they lead to different statuses.
-
-That list is fetched fresh every time and never cached: it depends on where the
-issue is now, and acting on a stale copy sends an id the workflow no longer
-offers.
-
---if-unchanged refuses the transition if the issue changed since you read it,
-exactly as on issue edit. Resolving the transition already guards against a
-status that moved underneath you; this guards against everything else, which
-matters most when the transition sets a resolution or adds a comment.
-
---idempotency-key makes a retry safe. A transition is the one mutation here
-that is not idempotent — applying "Start Progress" twice is not applying it
-once — so without a key an ambiguous failure leaves nothing to do but look. A
-second run with the same key returns the recorded result, marked replayed, and
-sends nothing at all: it does not even re-read the transitions, because after a
-transition that did apply the name is no longer on offer. The key must be used
-for the same issue and the same transition; anything else is refused rather
-than answered with another request's result.
-
---dry-run prints the exact request, body included, and sends nothing.
 
 Examples:
 
@@ -2270,6 +2242,34 @@ jr issue move ENG-101 Done --idempotency-key deploy-42
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Moves an issue through its workflow.
+
+The transition is named the way a person names it — "Close Issue" — and resolved
+against what the issue can actually do right now. A name that is not available
+is refused with the whole available set, because a missing transition is far
+more often blocked from the current status than misspelled. A name matching two
+transitions is refused with both, since they lead to different statuses.
+
+That list is fetched fresh every time and never cached: it depends on where the
+issue is now, and acting on a stale copy sends an id the workflow no longer
+offers.
+
+--if-unchanged refuses the transition if the issue changed since you read it,
+exactly as on issue edit. Resolving the transition already guards against a
+status that moved underneath you; this guards against everything else, which
+matters most when the transition sets a resolution or adds a comment.
+
+--idempotency-key makes a retry safe. A transition is the one mutation here
+that is not idempotent — applying "Start Progress" twice is not applying it
+once — so without a key an ambiguous failure leaves nothing to do but look. A
+second run with the same key returns the recorded result, marked replayed, and
+sends nothing at all: it does not even re-read the transitions, because after a
+transition that did apply the name is no longer on offer. The key must be used
+for the same issue and the same transition; anything else is refused rather
+than answered with another request's result.
+
+--dry-run prints the exact request, body included, and sends nothing.
+
 ### `jr issue watch`
 
 Start or stop watching an issue
@@ -2280,13 +2280,6 @@ Start or stop watching an issue
 ```
 jr issue watch <key> [flags]
 ```
-
-Adds the authenticated user to an issue's watchers, or removes them with
---remove.
-
-It costs one extra request: to watch as yourself the tool has to know who you
-are, and who you are is an accountId on Cloud and a username on Data Center.
-Guessing either would send a watcher Jira does not recognize.
 
 Examples:
 
@@ -2311,6 +2304,13 @@ jr issue watch ENG-101 --remove
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Adds the authenticated user to an issue's watchers, or removes them with
+--remove.
+
+It costs one extra request: to watch as yourself the tool has to know who you
+are, and who you are is an accountId on Cloud and a username on Data Center.
+Guessing either would send a watcher Jira does not recognize.
+
 ### `jr issue worklog add`
 
 Log work against an issue
@@ -2321,18 +2321,6 @@ Log work against an issue
 ```
 jr issue worklog add <key> <time> [flags]
 ```
-
-Records time spent on an issue.
-
-The time is Jira's own format — "3h", "1d 4h", "2w 3d" — and is checked before
-it is sent, because a mistyped duration is the kind that logs 3 minutes where 3
-hours was meant. It is never converted: a working week is a site setting, and
-this tool does not decide how long anyone's day is.
-
---started says when the work happened, which is not when it is being logged.
-It defaults to now, and takes an RFC 3339 timestamp otherwise.
-
---comment and --body-format work exactly as on issue comment add.
 
 Examples:
 
@@ -2361,6 +2349,18 @@ jr issue worklog add ENG-101 30m --started 2026-08-05T09:00:00Z
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Records time spent on an issue.
+
+The time is Jira's own format — "3h", "1d 4h", "2w 3d" — and is checked before
+it is sent, because a mistyped duration is the kind that logs 3 minutes where 3
+hours was meant. It is never converted: a working week is a site setting, and
+this tool does not decide how long anyone's day is.
+
+--started says when the work happened, which is not when it is being logged.
+It defaults to now, and takes an RFC 3339 timestamp otherwise.
+
+--comment and --body-format work exactly as on issue comment add.
+
 ### `jr issue worklog delete`
 
 Delete a worklog entry
@@ -2372,10 +2372,6 @@ Delete a worklog entry
 ```
 jr issue worklog delete <key> <id> [flags]
 ```
-
-Deletes one worklog entry permanently, by the id `jr issue worklog list` reports.
-
-Jira has no undo for this, which is why --yes is required.
 
 Examples:
 
@@ -2400,6 +2396,10 @@ jr issue worklog delete ENG-101 10042 --yes
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Deletes one worklog entry permanently, by the id `jr issue worklog list` reports.
+
+Jira has no undo for this, which is why --yes is required.
+
 ### `jr issue worklog list`
 
 List the work logged against an issue
@@ -2409,22 +2409,6 @@ List the work logged against an issue
 ```
 jr issue worklog list <key> [flags]
 ```
-
-Returns every worklog entry on an issue, oldest first.
-
-Time is reported twice: as Jira words it, e.g. "3h 30m", and in seconds. One is
-for reading and the other is for arithmetic, and deriving either from the other
-means re-implementing the site's working day — which is configurable, so a
-client that guessed at it would be wrong on exactly the sites that care.
-
-Started is when the work happened. Created is when somebody said so. They are
-often different, and summing the wrong one answers a different question.
-
-An entry's note follows the same rule every body does: wiki markup on Data
-Center is carried through, a Cloud document is converted to markdown or refused
-naming what stopped it, and --raw-body emits the document itself.
-
-Reading takes no write tag, so this is in every build.
 
 Examples:
 
@@ -2451,6 +2435,22 @@ Default TSV columns: `id`, `author`, `started`, `seconds`, `time-spent`
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns every worklog entry on an issue, oldest first.
+
+Time is reported twice: as Jira words it, e.g. "3h 30m", and in seconds. One is
+for reading and the other is for arithmetic, and deriving either from the other
+means re-implementing the site's working day — which is configurable, so a
+client that guessed at it would be wrong on exactly the sites that care.
+
+Started is when the work happened. Created is when somebody said so. They are
+often different, and summing the wrong one answers a different question.
+
+An entry's note follows the same rule every body does: wiki markup on Data
+Center is carried through, a Cloud document is converted to markdown or refused
+naming what stopped it, and --raw-body emits the document itself.
+
+Reading takes no write tag, so this is in every build.
+
 ## jql
 
 ### `jr jql explain`
@@ -2460,6 +2460,25 @@ Show the query this tool would send
 ```
 jr jql explain [flags]
 ```
+
+Examples:
+
+```console
+jr jql explain --jql 'status = Open OR status = Closed'
+jr jql explain --jql 'labels = retry' --sort updated --order desc
+```
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--jql` | `string` | — | the query to check (required) |
+| `--sort` | `string` | — | field to order by; the issue key stays as a tiebreaker |
+| `--order` | `asc\|desc` | — | direction for --sort, or for the issue key ordering when there is no --sort |
+
+| Emits | Schema | When |
+| --- | --- | --- |
+| `jql.explain` | v1 | always |
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND
 
 Renders a query the way it would go out, and makes no request at all.
 
@@ -2485,25 +2504,6 @@ It also lists the fields the query references, tokenized rather than
 pattern-matched: the text inside `summary ~ "project = FOO"` is a value,
 not a project scope, and a regular expression cannot tell the difference.
 
-Examples:
-
-```console
-jr jql explain --jql 'status = Open OR status = Closed'
-jr jql explain --jql 'labels = retry' --sort updated --order desc
-```
-
-| Flag | Type | Default | Description |
-| --- | --- | --- | --- |
-| `--jql` | `string` | — | the query to check (required) |
-| `--sort` | `string` | — | field to order by; the issue key stays as a tiebreaker |
-| `--order` | `asc\|desc` | — | direction for --sort, or for the issue key ordering when there is no --sort |
-
-| Emits | Schema | When |
-| --- | --- | --- |
-| `jql.explain` | v1 | always |
-
-Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND
-
 ### `jr jql validate`
 
 Ask Jira whether a query parses, without running it
@@ -2511,6 +2511,23 @@ Ask Jira whether a query parses, without running it
 ```
 jr jql validate [flags]
 ```
+
+Examples:
+
+```console
+jr jql validate --jql 'project = ENG AND status = Open'
+jr jql validate --jql 'assignee = currentUser()' --format json
+```
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--jql` | `string` | — | the query to check (required) |
+
+| Emits | Schema | When |
+| --- | --- | --- |
+| `jql.validate` | v1 | always |
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
 Sends a query to Jira to be parsed and reports what it says, without returning
 any issues.
@@ -2544,23 +2561,6 @@ The output says which was used, because "valid" from a parse and "valid" from a
 zero-row search are not quite the same claim, and "local" means this tool
 answered without asking.
 
-Examples:
-
-```console
-jr jql validate --jql 'project = ENG AND status = Open'
-jr jql validate --jql 'assignee = currentUser()' --format json
-```
-
-| Flag | Type | Default | Description |
-| --- | --- | --- | --- |
-| `--jql` | `string` | — | the query to check (required) |
-
-| Emits | Schema | When |
-| --- | --- | --- |
-| `jql.validate` | v1 | always |
-
-Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
-
 ## mcp
 
 ### `jr mcp serve`
@@ -2572,6 +2572,16 @@ Serve this build's commands as MCP tools over stdio
 ```
 jr mcp serve
 ```
+
+Examples:
+
+```console
+jr mcp serve
+```
+
+Emits no result document: this command owns stdout.
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `9` REMOTE
 
 Speaks the Model Context Protocol on stdin and stdout, exposing this build's
 commands as tools.
@@ -2598,16 +2608,6 @@ A single frame may not exceed 8 MiB. One larger is refused, naming the limit,
 and the session carries on — a request that is too big is one call failing, not
 the end of the conversation.
 
-Examples:
-
-```console
-jr mcp serve
-```
-
-Emits no result document: this command owns stdout.
-
-Exit codes: `0` OK, `1` ERROR, `2` USAGE, `9` REMOTE
-
 ## meta
 
 ### `jr meta createmeta`
@@ -2619,20 +2619,6 @@ List the fields a new issue of one type requires
 ```
 jr meta createmeta [flags]
 ```
-
-Returns every field a create screen offers for one project and issue type, with
-the required ones first and the values Jira will accept where it constrains
-them.
-
---project defaults to the context's project. --type is required, and is
-resolved by name or by id: an unknown one is refused with the types the project
-does offer, and an ambiguous one with the candidates.
-
-The two deployments answer this very differently — Data Center serves it whole,
-Cloud pages it and wants an issue type id rather than a name — so a Cloud run
-costs one more request than a Data Center one. The result is the same shape
-either way, and it is cached for a day because it changes when an administrator
-edits a screen, not when an issue moves.
 
 Examples:
 
@@ -2655,6 +2641,20 @@ Default TSV columns: `id`, `name`, `required`, `type`
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns every field a create screen offers for one project and issue type, with
+the required ones first and the values Jira will accept where it constrains
+them.
+
+--project defaults to the context's project. --type is required, and is
+resolved by name or by id: an unknown one is refused with the types the project
+does offer, and an ambiguous one with the candidates.
+
+The two deployments answer this very differently — Data Center serves it whole,
+Cloud pages it and wants an issue type id rather than a name — so a Cloud run
+costs one more request than a Data Center one. The result is the same shape
+either way, and it is cached for a day because it changes when an administrator
+edits a screen, not when an issue moves.
+
 ### `jr meta transitions`
 
 List the transitions available on an issue right now
@@ -2664,18 +2664,6 @@ List the transitions available on an issue right now
 ```
 jr meta transitions <key> [flags]
 ```
-
-Returns what this issue can do next, given its current status and this
-credential's permissions: the transition id to send, the name a person uses,
-and the status it lands in.
-
-This is deliberately not cached. Transitions depend on where the issue is now,
-so a stored copy answers the question as it stood when it was stored — and an
-agent acting on a stale list sends an id the workflow no longer offers.
-
-A transition missing from this list is usually blocked from the current status
-rather than misspelled, which is why a name that does not resolve is refused
-with the whole available set rather than with near matches.
 
 Examples:
 
@@ -2700,6 +2688,18 @@ Default TSV columns: `id`, `name`, `to`, `category`
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns what this issue can do next, given its current status and this
+credential's permissions: the transition id to send, the name a person uses,
+and the status it lands in.
+
+This is deliberately not cached. Transitions depend on where the issue is now,
+so a stored copy answers the question as it stood when it was stored — and an
+agent acting on a stale list sends an id the workflow no longer offers.
+
+A transition missing from this list is usually blocked from the current status
+rather than misspelled, which is why a name that does not resolve is refused
+with the whole available set rather than with near matches.
+
 ## project
 
 ### `jr project components`
@@ -2711,11 +2711,6 @@ List a project's components
 ```
 jr project components [key] [flags]
 ```
-
-Returns the components of a project, ordered by name.
-
-Each carries how Jira assigns issues filed against it. That is worth knowing
-before filing one: a component can hand an issue to somebody nobody chose.
 
 Examples:
 
@@ -2739,6 +2734,11 @@ Default TSV columns: `id`, `name`, `lead`, `assignee-type`
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns the components of a project, ordered by name.
+
+Each carries how Jira assigns issues filed against it. That is worth knowing
+before filing one: a component can hand an issue to somebody nobody chose.
+
 ### `jr project get`
 
 Fetch one project
@@ -2746,11 +2746,6 @@ Fetch one project
 ```
 jr project get [key]
 ```
-
-Returns a single project by key or id.
-
-The key defaults to the context's project, so a configured caller can ask
-without repeating themselves.
 
 Examples:
 
@@ -2769,6 +2764,11 @@ jr project get --format json
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns a single project by key or id.
+
+The key defaults to the context's project, so a configured caller can ask
+without repeating themselves.
+
 ### `jr project list`
 
 List the projects this credential can see
@@ -2778,15 +2778,6 @@ List the projects this credential can see
 ```
 jr project list [flags]
 ```
-
-Returns every project visible to the credential, ordered by key.
-
-The two deployments answer this differently — Cloud pages a search endpoint,
-Data Center returns the lot from one request — and the split is behind the
-client, so the result is the same shape either way.
-
-Ordered by key rather than by whatever the server felt like, so two runs of a
-script agree.
 
 Examples:
 
@@ -2807,6 +2798,15 @@ Default TSV columns: `key`, `name`, `type`, `lead`
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns every project visible to the credential, ordered by key.
+
+The two deployments answer this differently — Cloud pages a search endpoint,
+Data Center returns the lot from one request — and the split is behind the
+client, so the result is the same shape either way.
+
+Ordered by key rather than by whatever the server felt like, so two runs of a
+script agree.
+
 ### `jr project statuses`
 
 List the statuses each issue type can be in
@@ -2816,15 +2816,6 @@ List the statuses each issue type can be in
 ```
 jr project statuses [key] [flags]
 ```
-
-Returns, for every issue type in a project, the statuses its workflow allows.
-
-Each status carries its category as well as its name. The category is what
-anything automated should branch on: a project can rename "In Progress" to
-whatever it likes, but the category stays one of three values.
-
-This is what a workflow permits in principle. What one issue can do right now
-is `jr meta transitions`, and it is a shorter list.
 
 Examples:
 
@@ -2848,6 +2839,15 @@ Default TSV columns: `type`, `statuses`
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns, for every issue type in a project, the statuses its workflow allows.
+
+Each status carries its category as well as its name. The category is what
+anything automated should branch on: a project can rename "In Progress" to
+whatever it likes, but the category stays one of three values.
+
+This is what a workflow permits in principle. What one issue can do right now
+is `jr meta transitions`, and it is a shorter list.
+
 ### `jr project versions`
 
 List a project's versions
@@ -2857,16 +2857,6 @@ List a project's versions
 ```
 jr project versions [key] [flags]
 ```
-
-Returns the release versions of a project, newest first.
-
-Released and archived are reported separately, because they are separate: an
-archived version is hidden from pickers and a released one is not, and a
-version can be either, both, or neither.
-
-A release date is a date and stays one. Jira stores it without a time, and
-turning it into a timestamp would put a midnight in some timezone that nobody
-set.
 
 Examples:
 
@@ -2890,6 +2880,16 @@ Default TSV columns: `id`, `name`, `released`, `archived`, `release-date`
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns the release versions of a project, newest first.
+
+Released and archived are reported separately, because they are separate: an
+archived version is hidden from pickers and a released one is not, and a
+version can be either, both, or neither.
+
+A release date is a date and stays one. Jira stores it without a time, and
+turning it into a timestamp would put a midnight in some timezone that nobody
+set.
+
 ## schema
 
 ### `jr schema`
@@ -2901,15 +2901,6 @@ Describe every command this build contains
 ```
 jr schema [command] [flags]
 ```
-
-Prints the command surface as data: flags with types and enums, required
-inputs, whether a command mutates or destroys, its output kind, and the exit
-codes it can produce.
-
-With no argument it lists every command. With a dotted command name it prints
-that one command in full. It is generated from the same registry that builds
-the command tree, so it cannot drift from what the binary actually does — and
-it lists only what this build contains.
 
 Examples:
 
@@ -2934,6 +2925,15 @@ jr schema --format json
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `5` NOT_FOUND
 
+Prints the command surface as data: flags with types and enums, required
+inputs, whether a command mutates or destroys, its output kind, and the exit
+codes it can produce.
+
+With no argument it lists every command. With a dotted command name it prints
+that one command in full. It is generated from the same registry that builds
+the command tree, so it cannot drift from what the binary actually does — and
+it lists only what this build contains.
+
 ## skill
 
 ### `jr skill`
@@ -2943,6 +2943,21 @@ Print the agent skill for this build
 ```
 jr skill [reference]
 ```
+
+Examples:
+
+```console
+jr skill
+jr skill workflows
+```
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `reference` | no | one of: failures, gotchas, workflows |
+
+Emits no result document: this command owns stdout.
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE
 
 Writes the instructions an agent needs to drive this tool correctly, as
 Markdown, to stdout.
@@ -2964,21 +2979,6 @@ result envelope, and --format does not apply. It is deliberately in every
 profile, including the smallest, because a build made for an agent is the one
 that most needs to explain itself.
 
-Examples:
-
-```console
-jr skill
-jr skill workflows
-```
-
-| Argument | Required | Description |
-| --- | --- | --- |
-| `reference` | no | one of: failures, gotchas, workflows |
-
-Emits no result document: this command owns stdout.
-
-Exit codes: `0` OK, `1` ERROR, `2` USAGE
-
 ## sprint
 
 ### `jr sprint add`
@@ -2991,18 +2991,6 @@ Move issues into a sprint
 ```
 jr sprint add <sprint> <issue...> [flags]
 ```
-
-Moves one or more issues into a sprint.
-
-An issue belongs to at most one sprint, so this is a move and not an addition:
-an issue already in another sprint leaves it. Nothing is removed from the issue
-otherwise — its status, its epic, and its assignee are untouched.
-
-At most 50 issues at a time, which is the API's own cap. More than that is
-refused rather than split across requests, because two requests can half-succeed
-and the result would be neither moved nor not moved.
-
---dry-run prints the exact request, body included, and sends nothing.
 
 Examples:
 
@@ -3027,6 +3015,18 @@ jr sprint add 128 ENG-1 --dry-run
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Moves one or more issues into a sprint.
+
+An issue belongs to at most one sprint, so this is a move and not an addition:
+an issue already in another sprint leaves it. Nothing is removed from the issue
+otherwise — its status, its epic, and its assignee are untouched.
+
+At most 50 issues at a time, which is the API's own cap. More than that is
+refused rather than split across requests, because two requests can half-succeed
+and the result would be neither moved nor not moved.
+
+--dry-run prints the exact request, body included, and sends nothing.
+
 ### `jr sprint close`
 
 Close an active sprint
@@ -3038,21 +3038,6 @@ Close an active sprint
 ```
 jr sprint close <id> [flags]
 ```
-
-Ends a running sprint.
-
-This is not only a state change. Every issue in the sprint that is not complete
-leaves it and returns to the backlog, and Jira offers no undo — reopening the
-sprint is not something the API can do. That is why --yes is required and why
-this needs the admin tag as well as write: an agent build can edit an issue and
-cannot end an iteration.
-
-The sprint is read first, so a sprint that is not active is refused before
-anything is sent. A future sprint has not started and a closed one is already
-finished; both are a precondition failure rather than a request worth making.
-
---dry-run prints the exact request, body included, and sends nothing. The read
-still happens, so a dry run tells you whether the close would be allowed.
 
 Examples:
 
@@ -3077,6 +3062,21 @@ jr sprint close 128 --dry-run
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Ends a running sprint.
+
+This is not only a state change. Every issue in the sprint that is not complete
+leaves it and returns to the backlog, and Jira offers no undo — reopening the
+sprint is not something the API can do. That is why --yes is required and why
+this needs the admin tag as well as write: an agent build can edit an issue and
+cannot end an iteration.
+
+The sprint is read first, so a sprint that is not active is refused before
+anything is sent. A future sprint has not started and a closed one is already
+finished; both are a precondition failure rather than a request worth making.
+
+--dry-run prints the exact request, body included, and sends nothing. The read
+still happens, so a dry run tells you whether the close would be allowed.
+
 ### `jr sprint create`
 
 Create a future sprint on a board
@@ -3087,22 +3087,6 @@ Create a future sprint on a board
 ```
 jr sprint create <name> [flags]
 ```
-
-Adds an unstarted sprint to a board.
-
-The sprint is created in the future state. Nothing about the board changes for
-anybody working on it until the sprint is started, so this is safe to run: an
-unstarted sprint holds no issues and appears only in the backlog view.
-
-The board comes from --board, JIRA_BOARD, or the context, exactly as for
-`jr sprint list`. Only a scrum board has sprints, and a kanban board is
-refused by the server.
-
---start and --end are optional here. A sprint can be planned without dates and
-given them when it is started, which is what the Jira UI does; passing them now
-records the intended window up front.
-
---dry-run prints the exact request, body included, and sends nothing.
 
 Examples:
 
@@ -3130,6 +3114,22 @@ jr sprint create "Sprint 14" --start 2026-08-11T09:00:00Z --end 2026-08-25T09:00
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Adds an unstarted sprint to a board.
+
+The sprint is created in the future state. Nothing about the board changes for
+anybody working on it until the sprint is started, so this is safe to run: an
+unstarted sprint holds no issues and appears only in the backlog view.
+
+The board comes from --board, JIRA_BOARD, or the context, exactly as for
+`jr sprint list`. Only a scrum board has sprints, and a kanban board is
+refused by the server.
+
+--start and --end are optional here. A sprint can be planned without dates and
+given them when it is started, which is what the Jira UI does; passing them now
+records the intended window up front.
+
+--dry-run prints the exact request, body included, and sends nothing.
+
 ### `jr sprint get`
 
 Fetch one sprint
@@ -3137,15 +3137,6 @@ Fetch one sprint
 ```
 jr sprint get <id>
 ```
-
-Returns a single sprint by id.
-
-A sprint is addressed by id and never by name, because a name is not unique: two
-boards can both have a "Sprint 1", and resolving a name would pick one of them
-without saying so. `jr sprint list` reports the ids.
-
-Unlike the listing, this needs no board — a sprint id addresses a sprint on its
-own, whichever board it came from.
 
 Examples:
 
@@ -3164,6 +3155,15 @@ jr sprint get 128 --format json
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns a single sprint by id.
+
+A sprint is addressed by id and never by name, because a name is not unique: two
+boards can both have a "Sprint 1", and resolving a name would pick one of them
+without saying so. `jr sprint list` reports the ids.
+
+Unlike the listing, this needs no board — a sprint id addresses a sprint on its
+own, whichever board it came from.
+
 ### `jr sprint list`
 
 List a board's sprints
@@ -3173,23 +3173,6 @@ List a board's sprints
 ```
 jr sprint list [flags]
 ```
-
-Returns the sprints on a board, ordered by id.
-
-The board comes from --board, JIRA_BOARD, or the context, and there is no
-default: a sprint listing is a question about one board, and every board has a
-different answer.
-
-Only a scrum board has sprints. A kanban board is refused by the server, and the
-refusal says which board it was and how to check its type.
-
---state narrows to future, active, or closed, and repeats: --state active
---state future is the pair a planner wants. An unknown state is refused rather
-than sent, because the server answers one with an empty page and no complaint.
-
-A date is RFC 3339 in UTC, and is empty when the event has not happened — a
-future sprint has no start. Empty is never rendered as a zero time, which would
-compare as the year 1 rather than as absent.
 
 Examples:
 
@@ -3212,6 +3195,23 @@ Default TSV columns: `id`, `name`, `state`, `start`, `end`
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns the sprints on a board, ordered by id.
+
+The board comes from --board, JIRA_BOARD, or the context, and there is no
+default: a sprint listing is a question about one board, and every board has a
+different answer.
+
+Only a scrum board has sprints. A kanban board is refused by the server, and the
+refusal says which board it was and how to check its type.
+
+--state narrows to future, active, or closed, and repeats: --state active
+--state future is the pair a planner wants. An unknown state is refused rather
+than sent, because the server answers one with an empty page and no complaint.
+
+A date is RFC 3339 in UTC, and is empty when the event has not happened — a
+future sprint has no start. Empty is never rendered as a zero time, which would
+compare as the year 1 rather than as absent.
+
 ### `jr sprint start`
 
 Start a future sprint
@@ -3222,20 +3222,6 @@ Start a future sprint
 ```
 jr sprint start <id> [flags]
 ```
-
-Begins a sprint that has been planned but not yet started.
-
-The sprint is read first, so a sprint that cannot be started is refused before
-anything is sent. Only a future sprint can be started: an active one is already
-running and a closed one cannot be reopened by any API, so both are a
-precondition failure rather than a request worth making.
-
-This is not destructive and takes no --yes. Starting a sprint is undone by
-`jr sprint close`, which is the half that needs both the write and admin
-tags, because ending an iteration returns every unfinished issue to the backlog.
-
---dry-run prints the exact request, body included, and sends nothing. The read
-still happens, so a dry run tells you whether the start would be allowed.
 
 Examples:
 
@@ -3262,6 +3248,20 @@ jr sprint start 128 --dry-run
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
 
+Begins a sprint that has been planned but not yet started.
+
+The sprint is read first, so a sprint that cannot be started is refused before
+anything is sent. Only a future sprint can be started: an active one is already
+running and a closed one cannot be reopened by any API, so both are a
+precondition failure rather than a request worth making.
+
+This is not destructive and takes no --yes. Starting a sprint is undone by
+`jr sprint close`, which is the half that needs both the write and admin
+tags, because ending an iteration returns every unfinished issue to the backlog.
+
+--dry-run prints the exact request, body included, and sends nothing. The read
+still happens, so a dry run tells you whether the start would be allowed.
+
 ## user
 
 ### `jr user get`
@@ -3271,13 +3271,6 @@ Fetch one user by id
 ```
 jr user get <id>
 ```
-
-Returns a single user.
-
-The id is an accountId on Cloud and a username on Data Center — the value
-`jr user list` reports. The two are not interchangeable, and the query
-parameter differs with them, so passing one deployment's id to the other is a
-404 rather than a wrong answer.
 
 Examples:
 
@@ -3296,6 +3289,13 @@ jr user get 712020:8f3a --format json
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns a single user.
+
+The id is an accountId on Cloud and a username on Data Center — the value
+`jr user list` reports. The two are not interchangeable, and the query
+parameter differs with them, so passing one deployment's id to the other is a
+404 rather than a wrong answer.
+
 ### `jr user list`
 
 Search for users
@@ -3305,25 +3305,6 @@ Search for users
 ```
 jr user list <query> [flags]
 ```
-
-Searches for users matching a query, ordered by display name.
-
-The id is what every other command wants when it asks for a user — an
-accountId on Cloud, a username on Data Center. The two are not interchangeable,
-and this is where you get the right one.
-
-An email is often absent on Cloud, where disclosure is a privacy setting rather
-than a missing value. An empty column means "not disclosed", which is not the
-same as "has none", and nothing here infers one from the other.
-
-A query is required. Listing every user on an instance is not a thing this tool
-does: it is slow, it is rarely what was meant, and the endpoint that allows it
-is not the same on both deployments.
-
-This command does not page, so --limit all is bounded like any other limit and
-is not a way to get the whole directory. Whatever the bound, a search with more
-matches than it allows is never reported as complete: it says so in the output,
-warns on stderr, and exits 3. Narrow the query, or raise --limit.
 
 Examples:
 
@@ -3348,6 +3329,25 @@ Default TSV columns: `id`, `display`, `email`, `active`
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Searches for users matching a query, ordered by display name.
+
+The id is what every other command wants when it asks for a user — an
+accountId on Cloud, a username on Data Center. The two are not interchangeable,
+and this is where you get the right one.
+
+An email is often absent on Cloud, where disclosure is a privacy setting rather
+than a missing value. An empty column means "not disclosed", which is not the
+same as "has none", and nothing here infers one from the other.
+
+A query is required. Listing every user on an instance is not a thing this tool
+does: it is slow, it is rarely what was meant, and the endpoint that allows it
+is not the same on both deployments.
+
+This command does not page, so --limit all is bounded like any other limit and
+is not a way to get the whole directory. Whatever the bound, a search with more
+matches than it allows is never reported as complete: it says so in the output,
+warns on stderr, and exits 3. Narrow the query, or raise --limit.
+
 ### `jr user me`
 
 Show who this credential authenticates as
@@ -3355,16 +3355,6 @@ Show who this credential authenticates as
 ```
 jr user me
 ```
-
-Returns the account the configured credential belongs to.
-
-It is the cheapest way to find your own id, which is the value every command
-that takes a user wants — and the one thing a token cannot tell you by looking
-at it.
-
-It is also the check that proves a credential works: the deployment probe
-answers anonymously on most instances, so it establishes that a site is really
-Jira and nothing about whether the token is any good.
 
 Examples:
 
@@ -3378,6 +3368,16 @@ jr user me
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
+Returns the account the configured credential belongs to.
+
+It is the cheapest way to find your own id, which is the value every command
+that takes a user wants — and the one thing a token cannot tell you by looking
+at it.
+
+It is also the check that proves a credential works: the deployment probe
+answers anonymously on most instances, so it establishes that a site is really
+Jira and nothing about whether the token is any good.
+
 ## version
 
 ### `jr version`
@@ -3387,12 +3387,6 @@ Print the build identity and its compiled-in capabilities
 ```
 jr version
 ```
-
-Reports the release, the build profile, and the build tags this binary was
-compiled with.
-
-The tag list is the truth about what this binary can do. A capability that was
-compiled out is not merely refused at runtime — it is not present.
 
 Examples:
 
@@ -3405,6 +3399,12 @@ jr version --format json
 | `version` | v1 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE
+
+Reports the release, the build profile, and the build tags this binary was
+compiled with.
+
+The tag list is the truth about what this binary can do. A capability that was
+compiled out is not merely refused at runtime — it is not present.
 
 ## Keeping this current
 
