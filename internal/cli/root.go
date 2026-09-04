@@ -218,12 +218,40 @@ func (a *app) newLeaf(rc *registry.Command) *cobra.Command {
 		// renames the binary.
 		Annotations: map[string]string{annotationCommand: rc.Name()},
 	}
+	cc.SetHelpTemplate(leafHelpTemplate)
 
 	binder := bindFlags(cc, rc)
 	cc.Args = a.checkArity(rc)
 	cc.RunE = a.runLeaf(rc, binder)
 	return cc
 }
+
+// leafHelpTemplate prints a leaf's detail after its flags rather than before
+// them, which is the whole of what cobra's default does differently.
+//
+// A reader opens `--help` holding a command they already know the name of, to
+// find a flag. The default template puts Long first, and Long is up to 527
+// words here: `jr issue list --help` was 119 lines with `Usage:` on line 55, so
+// the first of its 38 flags arrived on line 60. On an 80x24 terminal that is
+// two screens of prose before the reference begins, which is what a user
+// reported on 2026-09-04 as documentation that is hard to follow.
+//
+// Nothing is shortened, because the prose is not padding: eight of the ten
+// paragraphs on `issue list` are gotchas a caller needs, and moving them costs
+// nothing precisely because the operative half is also in the flag usages
+// printed just above. `--sort` says the ordering is by issue key, `--label`
+// says a comma is part of the label. A reader who stops at the flags has
+// already been told; a reader who wants the argument reads on.
+//
+// Short leads instead of Long, so the command still says what it is in one
+// line before the usage block. Parents and the root keep cobra's default:
+// their Long is orientation, they have no long flag list to bury, and the
+// root's help is a golden file.
+const leafHelpTemplate = `{{with .Short}}{{. | trimTrailingWhitespaces}}
+
+{{end}}{{.UsageString}}{{with .Long}}
+{{. | trimTrailingWhitespaces}}
+{{end}}`
 
 // checkArity holds a call to the argument count the command declared.
 func (a *app) checkArity(rc *registry.Command) func(*cobra.Command, []string) error {
