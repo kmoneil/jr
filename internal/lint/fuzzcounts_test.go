@@ -59,7 +59,10 @@ type countClaim struct {
 
 func countClaims() []countClaim {
 	return []countClaim{{
-		doc:      "../../README.md",
+		// This sentence was in the README until 2026-09-04, when the worked
+		// examples moved to docs/tour.md. The claim travels with the prose
+		// that makes it, not with the file it used to sit in.
+		doc:      "../../docs/tour.md",
 		pkg:      "internal/jql",
 		sentence: regexp.MustCompile(`(?i)\b(\w+) fuzzers back it up`),
 	}, {
