@@ -188,6 +188,7 @@ func (c *Client) ListStream(
 	}
 
 	out := &ListResult{Keyset: c.canKeyset(opt)}
+	var seen counted
 	for {
 		want, satisfied := wantFor(opt.Limit, pageSize, out.Fetched)
 		if satisfied {
@@ -203,11 +204,11 @@ func (c *Client) ListStream(
 			}
 			return nil, err
 		}
+		seen.first(page)
 
 		next, last := c.advance(out.Keyset, token, page, issues, want)
 		if last {
-			out.Complete = true
-			return out, nil
+			return exhaustive(out, seen)
 		}
 		token = next
 
@@ -248,6 +249,80 @@ func reportedTotal(total *int) int {
 		return 0
 	}
 	return *total
+}
+
+// counted is the number of rows the server said the walk's own query holds,
+// kept so the walk can check its answer against it before claiming to be
+// complete.
+//
+// Every other stop condition in ListStream is read off the page just fetched: a
+// page shorter than the one asked for, an offset past the total, a page with no
+// rows at all. Each of those is the server answering about the *bounded* query
+// it was just sent, so a bound that excludes more than the walk has consumed
+// makes all three say "finished" while rows the caller asked for were never
+// requested. That is what `issuekey <` did across projects, and the walk
+// reported 111 of 697 rows at complete="true" and exit 0.
+//
+// The count on the first response is the one number in the exchange that is
+// about the whole query rather than about one page of it, which is what makes
+// it the thing to check against. Data Center sends it on every search. Cloud's
+// cursor API sends none, so the check is inert there, and that is right: those
+// cursors are authoritative about where the set ends.
+type counted struct {
+	rows  int
+	from  int
+	known bool
+}
+
+// first records the count from the walk's first response and ignores every
+// later one.
+//
+// Later ones are counts of narrower queries (a keyset walk's second page is
+// bounded below the first page's last key), so they shrink as the walk goes.
+// Checking against the last of them would compare the walk to a count of the
+// rows it had already decided not to ask for, which is the tautology this whole
+// type exists to avoid.
+//
+// The offset comes with it because the count is not always about the rows this
+// walk will see. Measured on Jira 10.4.0 Data Center, 2026-09-04, over eleven
+// issues at two per page:
+//
+//	startAt=0    echoed startAt=0   total=11   2 rows
+//	startAt=8    echoed startAt=8   total=11   2 rows
+//	startAt=10   echoed startAt=10  total=11   1 row
+//	issuekey < "ENG-3"              total=2    2 rows
+//
+// An offset does not narrow the query, so `total` stays the size of the whole
+// set and a run resuming at row eight is owed three rows, not eleven. A keyset
+// bound narrows the query itself, so its total is already the remainder and the
+// echoed offset is zero. Subtracting the offset is what makes the two the same
+// arithmetic.
+func (c *counted) first(page *searchResponse) {
+	if c.known || page.Total == nil {
+		return
+	}
+	c.rows, c.known = *page.Total, true
+	if page.StartAt != nil {
+		c.from = *page.StartAt
+	}
+}
+
+// verify refuses a claim of completeness the server's own count contradicts.
+//
+// Fetching more than the count is not a disagreement: rows created while the
+// walk ran are counted by the later requests and not by the first, and a walk
+// that picks them up has still seen everything it set out to.
+func (c counted) verify(fetched int) error {
+	owed := c.rows - c.from
+	if !c.known || fetched >= owed {
+		return nil
+	}
+	return errs.Remote("PAGINATION_SHORT",
+		"paging stopped before it had returned every row Jira counted").
+		WithDetail("Jira counted %d rows for this query and paging returned %d",
+			owed, fetched).
+		WithRemedy("re-run the query; if it repeats, narrow it with --project " +
+			"or lower --page-size")
 }
 
 // streamOffsetPaged writes an offset-paged sub-resource to a stream.
@@ -397,14 +472,51 @@ func truncated(out *ListResult, token PageToken) (*ListResult, error) {
 	return out, nil
 }
 
+// exhaustive is the one place a result becomes complete, and the counterpart of
+// truncated for the same reason: the claim is worth making in one place, where
+// it can be checked before it is made.
+//
+// The check is the whole of it. Every caller of this reached it because the
+// server said there was no more: a page shorter than the one asked for, an
+// offset past the total, a page with no rows. Each of those is an answer about
+// the bounded query the server was just sent rather than about the query the
+// caller asked. seen holds what the server said the walk's own query held
+// before any of that narrowing, which makes it the only thing the claim can be
+// measured against.
+func exhaustive(out *ListResult, seen counted) (*ListResult, error) {
+	if err := seen.verify(out.Fetched); err != nil {
+		return nil, err
+	}
+	out.Complete = true
+	return out, nil
+}
+
 // canKeyset reports whether this request can page by key rather than by offset.
 //
-// Three things have to hold. The deployment must be offset-paginated, since
+// Four things have to hold. The deployment must be offset-paginated, since
 // Cloud's cursors are already stable. The query must be built here, so the
-// keyset bound can go through the builder. And the ordering must be the key
+// keyset bound can go through the builder. The ordering must be the key
 // ordering, because a cursor is only meaningful in the order it was taken in.
+//
+// And the query must already be confined to one project, which is the condition
+// that was missing. `ORDER BY issuekey` orders across projects, by project key
+// and then by number, which is what Key.Compare implements. `issuekey <` does
+// not compare across them at all. Measured on Jira 10.4.0 Data Center and
+// on Cloud, 2026-09-04, against two projects ABC and ENG where ORDER BY
+// interleaves neither:
+//
+//	ORDER BY issuekey DESC        ENG-5 … ENG-1 ABC-6 … ABC-1
+//	issuekey < "ENG-1"            no rows, though six sort below it
+//	issuekey > "ENG-1"            ENG-5 … ENG-2, and no ABC row
+//
+// So a bound taken from the last row of a page selects inside that row's own
+// project and silently drops every project the walk has not reached. The walk
+// then sees a short page, reads it as the set running out, and reports
+// complete="true" over the first project alone. Scoped to one project the two
+// agree, which is why every test and every scoped run was right.
 func (c *Client) canKeyset(opt ListOptions) bool {
-	return !c.Site.CursorPaginated() && opt.JQL == "" && opt.Query.SortsByKey()
+	return !c.Site.CursorPaginated() && opt.JQL == "" &&
+		opt.Query.SortsByKey() && opt.Query.Project != ""
 }
 
 // advance computes the token for the next page and reports whether this was the
