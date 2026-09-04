@@ -40,6 +40,7 @@ func exampleDocs(t *testing.T) []string {
 		"docs/getting-started.md",
 		"docs/recipes.md",
 		"docs/troubleshooting.md",
+		"docs/tour.md",
 	}
 	for _, pattern := range []string{
 		"internal/cli/skillassets/*.md",

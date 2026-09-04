@@ -21,10 +21,14 @@ import (
 // and asserted nothing about reads like coverage. recipes.md and
 // troubleshooting.md show commands and error envelopes rather than result ones,
 // so they carry no kind version to check.
+// The README left this list on 2026-09-04, when the worked examples moved to
+// docs/tour.md so the README could get a reader to an install and a first
+// query without scrolling. It prints no envelope now, and a listed document
+// that matches nothing fails rather than reading like coverage.
 var versionedDocs = []string{
 	"../../docs/output-contract.md",
 	"../../docs/getting-started.md",
-	"../../README.md",
+	"../../docs/tour.md",
 }
 
 // docEnvelope matches an XML envelope in prose: `<result kind="issue.list" v="3">`.
