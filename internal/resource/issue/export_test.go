@@ -32,3 +32,13 @@ func SentinelFilterFlagsForTest() []string {
 	slices.Sort(out)
 	return out
 }
+
+// SuggestCurrentUserForTest exposes the near-miss hint.
+//
+// Unexported in production because only this package's three resolve call sites
+// use it, and reaching it through them would need a live metadata lookup. What
+// is worth pinning is the decision, which is a pure function of an error and a
+// string.
+func SuggestCurrentUserForTest(err error, input string) error {
+	return suggestCurrentUser(err, input)
+}

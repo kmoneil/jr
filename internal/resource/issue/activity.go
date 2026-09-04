@@ -533,7 +533,7 @@ func resolveActivityUser(ctx context.Context, inv *registry.Invocation) error {
 	}
 	user, err := meta.ResolveUser(ctx, value)
 	if err != nil {
-		return err
+		return suggestCurrentUser(err, value)
 	}
 	inv.SetValue(activityUserKey, user)
 	return nil

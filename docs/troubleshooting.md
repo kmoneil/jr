@@ -653,6 +653,12 @@ status: `Start Progress` rather than `In Progress`.
 inactive or is an app rather than a person. Pass an id or an email to be
 unambiguous, or `currentUser` for yourself. `jr user me` prints your own id.
 
+**The word for yourself is `currentUser`, and only that.** `me`, `self`,
+`current-user` and their like are not users on any site, so they are refused
+like any other name that does not resolve. Where the value looks like an attempt
+to name yourself, the remedy now leads with `currentUser` rather than offering a
+list of real people, which read as though one of them had been meant.
+
 ### `UNKNOWN_LINK_TYPE` / `AMBIGUOUS_LINK_DIRECTION`
 
 Link wording is customizable per site, so `detail` lists every phrase yours
