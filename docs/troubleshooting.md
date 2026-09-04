@@ -498,6 +498,35 @@ something the site does not have. To see the verdict on its own:
 $ jr jql validate --jql 'your query here'
 ```
 
+**A project key can be a reserved word, and then it has to be quoted.**
+
+```console
+$ jr issue list --jql 'project in (GO)'
+code: JQL_NOT_UNDERSTOOD
+detail: Error in the JQL Query: 'GO' is a reserved JQL word. You must surround
+        it in quotation marks to use it in a query. (line 1, character 13)
+```
+
+`GO` is on Atlassian's reserved word list, and so are `TRANS`, `IN`, `IS`,
+`NOT`, `OR` and 172 others. The detail is Jira's own message: it names the
+offending word, which is the useful half, and leaves out the fix. Quote the key
+and the same question is answered:
+
+```console
+$ jr issue list --jql 'project in ("GO")'
+key     status  assignee        updated              summary
+GO-1    To Do   Ada Lovelace    2026-09-04T19:06:28Z reserved key probe
+```
+
+This only reaches a query you wrote. Every fragment the tool builds goes through
+the JQL builder, which quotes every value unconditionally, so `--project GO`
+works whatever the key is called:
+
+```console
+$ jr jql explain --jql 'status is not EMPTY' --project GO
+query   project = "GO" AND (status is not EMPTY) ORDER BY issuekey DESC
+```
+
 One thing this does not catch, on Cloud only: the operand of a `WAS`,
 `CHANGED TO`, or `CHANGED FROM` predicate. `--jql 'status was "NoSuchStatus"'`
 is checked by neither of Cloud's endpoints and still returns an empty result

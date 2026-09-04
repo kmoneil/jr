@@ -331,19 +331,31 @@ bulk edit gives every issue the same timestamp and ties would otherwise break
 arbitrarily.
 
 **There is no offset flag, and the token is opaque on purpose.** Cloud pages by
-cursor. Data Center pages by **keyset**: the token names the last row seen, and
-the next page resumes with `AND issuekey < "ENG-102"`, not `startAt=50`. That
-matters: an offset cursor shifts when anyone creates an issue mid-run, so a
-long `--limit all` silently skips or repeats rows while reporting itself
-complete. A keyset cursor names a position in the data and cannot shift.
+cursor. Data Center pages by **keyset** where it can: the token names the last
+row seen, and the next page resumes with `AND issuekey < "ENG-102"`, not
+`startAt=50`. That matters: an offset cursor shifts when anyone creates an issue
+mid-run, so a long `--limit all` silently skips or repeats rows while reporting
+itself complete. A keyset cursor names a position in the data and cannot shift.
 
-Keyset needs that exact ordering, so anything else falls back to offsets: a
-`--sort` on another field, or an `--order asc` that reverses the key. The
-result says which was used. And because the whole scheme rests on
-JQL comparing keys by number rather than as text (`ENG-999` sorts _below_
-`ENG-1000`, which a string comparison gets backwards), each page is verified to
-start below its cursor. A server that disagrees is an error, not a quietly
-short result.
+Three things make it unavailable, and then the walk falls back to offsets: a
+`--sort` on another field, an `--order asc` that reverses the key, or a query
+that is not confined to one project. The last one is the newest and the least
+obvious. `ORDER BY issuekey` orders across projects, running the last ENG issue
+straight into the first ABC one, but `issuekey < "ENG-1"` does not compare
+across them at all: it selects inside ENG and returns nothing. So a bound taken
+at the end of a page excluded every project the walk had not reached, the short
+page that came back read as the set running out, and
+`issue list --all-projects --limit all` reported a fraction of the instance at
+`complete="true"`. Both deployments do this, measured; a query scoped to one
+project never could.
+
+Two checks sit under it. Because the scheme rests on JQL comparing keys by
+number rather than as text (`ENG-999` sorts _below_ `ENG-1000`, which a string
+comparison gets backwards), each page is verified to start below its cursor.
+And because every one of a walk's stop conditions is the server answering about
+the narrowed query it was just sent, a walk that ends reconciles what it fetched
+against the count the server gave for the query it started from. A server that
+disagrees with either is an error, not a quietly short result.
 
 A token minted against Cloud is refused against Data Center rather than read as
 offset zero.

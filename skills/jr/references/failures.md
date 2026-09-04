@@ -152,6 +152,14 @@ Two specifics worth knowing:
 already retried per `--retries` (default 3) before reporting either, so back off
 before trying again rather than looping immediately.
 
+`PAGINATION_SHORT` (9) is a walk that stopped holding fewer rows than Jira
+counted for the query it started from, and it exists because every other
+end-of-results signal is the server answering about the narrowed query it was
+just sent. Retry it once: rows deleted while a long `--limit all` was paging
+produce it, and a re-run answers cleanly. The same failure twice is not a race
+but the count and the pages disagreeing, and then the way through is a narrower
+query or a smaller `--page-size`.
+
 A non-idempotent request is **not** replayed after an upstream error. A POST that
 got a 503 may have been processed before the failure, and retrying it is how one
 `issue create` becomes two issues. Only a 429, which is a refusal before

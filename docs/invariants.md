@@ -172,12 +172,30 @@ do not catch, add the test in the same change and cite it here.
   server's undocumented default, which is not guaranteed stable between two
   requests, so a paged result could interleave two orderings unnoticed.
   **Enforced by:** `TestEveryQueryCarriesAnOrderBy`.
-- **Prefer keyset pagination over offsets.** Data Center resumes with
-  `issuekey < <last>`, not `startAt`. An offset shifts when a row is inserted
-  above it, so a long run silently skips or repeats while reporting itself
-  complete. Keyset needs the key ordering; anything else falls back, and the
-  result records which was used.
-  **Enforced by:** `TestSortsByKeyIsTheKeysetPrecondition`.
+- **Prefer keyset pagination over offsets, inside one project.** Data Center
+  resumes with `issuekey < <last>`, not `startAt`. An offset shifts when a row
+  is inserted above it, so a long run silently skips or repeats while reporting
+  itself complete. Keyset needs the key ordering and a query already confined to
+  one project; anything else falls back, and `ListResult.Keyset` records which
+  was used. It records it for the tests and not for the caller: no output
+  attribute reports the paging mode.
+  **Enforced by:** `TestSortsByKeyIsTheKeysetPrecondition`,
+  `TestAWalkAcrossProjectsPagesToExhaustion`.
+- **`ORDER BY issuekey` orders across projects and `issuekey <` does not.**
+  Measured on Jira 10.4.0 Data Center and on Cloud, 2026-09-04: with projects
+  ABC and ENG, `ORDER BY issuekey DESC` runs ENG-1 straight into ABC-6, and
+  `issuekey < "ENG-1"` returns nothing at all. A bound is not the ordering it
+  looks like, which is why the one above is scoped to a project and why nothing
+  may reason from `Key.Compare` to what a `<` selects.
+  **Enforced by:** `TestAWalkAcrossProjectsPagesToExhaustion`.
+- **A walk may not report itself complete on fewer rows than the server
+  counted.** Every other stop condition (a short page, an offset past the
+  total, an empty page) is the server answering about the bounded query it was
+  just sent, so a bound that excludes too much makes all of them true at once.
+  The count on a walk's first response is the only number about the whole query,
+  and reconciling against it is what turns a quietly short result into
+  `PAGINATION_SHORT`. Cloud sends no count, and there the check is inert.
+  **Enforced by:** `TestAWalkShortOfTheServersCountIsRefused`.
 - **Issue keys never sort as text.** `IDO-999` is below `IDO-1000` as an issue
   and above it as a string. Use `issue.ParseKey` and `Key.Compare`, and keep the
   check that verifies the server agrees, because the failure mode otherwise is a

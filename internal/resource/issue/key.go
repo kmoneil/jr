@@ -70,8 +70,18 @@ func (k Key) String() string {
 
 // Compare orders two keys: by project name, then by issue number.
 //
-// This is the order JQL's issuekey comparison uses, and the order this package
+// This is the order `ORDER BY issuekey` returns, and the order this package
 // verifies the server actually returned.
+//
+// It is **not** what `issuekey <` selects. That comparison does not cross a
+// project boundary on either deployment: `issuekey < "ENG-1"` returns nothing
+// where `ORDER BY issuekey DESC` puts six ABC issues below ENG-1, measured
+// 2026-09-04 on Jira 10.4.0 Data Center and on Cloud. The sentence this comment
+// used to carry said the two agreed, and a keyset walk built on that reported
+// the first project of a multi-project result set as the whole of it. Anything
+// reasoning about a bound rather than about an ordering belongs beside
+// canKeyset, which now requires the walk to be inside one project before it
+// takes one.
 func (k Key) Compare(other Key) int {
 	if k.Project != other.Project {
 		return strings.Compare(k.Project, other.Project)

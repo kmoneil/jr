@@ -572,6 +572,15 @@ with the token" has to tolerate there being no token, which it must anyway:
 `complete="false"` is a statement about the answer and never a promise about
 what a further request would do.
 
+**A walk can also fail rather than truncate.** Truncation says the answer stops
+where a bound put it. When a paged walk stops on its own while holding fewer
+rows than Jira counted for the query it started from, that reading is not
+available: nothing bounded it, so there is no bound to raise, and the rows it
+is missing were never requested, so there is no position to resume from.
+That is `PAGINATION_SHORT` at exit 9, naming both counts, and it is an error
+rather than a short result. Under `tsv` the rows fetched before it are already
+on stdout, as they are for every failure a streaming command hits mid-run.
+
 ## Warnings
 
 A warning is a structured document on stderr carrying a `code` and a `message`,
