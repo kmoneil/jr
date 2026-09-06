@@ -28,11 +28,6 @@ on:
 permissions:
   contents: read
 
-env:
-  # The patch, not the minor. See the note in ci.yml: setup-go pins
-  # GOTOOLCHAIN=local, so this has to match go.mod's directive exactly.
-  GO_VERSION: "1.26.6"
-
 jobs:
   packages:
     name: list the packages with fuzz targets
@@ -43,7 +38,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
       - name: list
         id: list
         run: |
@@ -65,7 +60,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
       - name: locate the fuzz cache
         id: gocache
         run: echo "dir=$(go env GOCACHE)/fuzz" >> "$GITHUB_OUTPUT"

@@ -8,12 +8,6 @@ on:
 permissions:
   contents: read
 
-env:
-  # The patch, not the minor. See the note in ci.yml: setup-go pins
-  # GOTOOLCHAIN=local, so this has to match go.mod's directive exactly. A
-  # published archive is built with whatever this names.
-  GO_VERSION: "1.26.6"
-
 jobs:
   # The tag is the release. Everything CI checks on a branch is checked again
   # here rather than trusted from the commit's earlier run: a tag can be placed
@@ -30,8 +24,12 @@ jobs:
           # release would ship binaries that do not know their own version.
           fetch-depth: 0
       - uses: actions/setup-go@v7
+        id: go
         with:
-          go-version: ${{ env.GO_VERSION }}
+          # See the note in ci.yml. The id is for the tools cache below, whose
+          # key names the toolchain this step resolved, so the archive and the
+          # tools that gated it cannot come from different ones.
+          go-version-file: go.mod
       # The versions live in the Makefile so a developer running `make ci` runs
       # what the gate runs. Three of them were `@latest` until 2026-08-13, which
       # made the verdict on an immutable commit depend on what was published
@@ -51,7 +49,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/go/bin
-          key: gate-tools-${{ runner.os }}-go${{ env.GO_VERSION }}-${{ steps.tools.outputs.key }}
+          key: gate-tools-${{ runner.os }}-go${{ steps.go.outputs.go-version }}-${{ steps.tools.outputs.key }}
       - name: install the tools make ci expects
         if: steps.toolcache.outputs.cache-hit != 'true'
         run: make tools
@@ -88,7 +86,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
       - name: build
         env:
           GOOS: ${{ matrix.goos }}
