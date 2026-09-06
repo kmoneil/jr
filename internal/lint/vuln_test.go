@@ -2,6 +2,7 @@ package lint_test
 
 import (
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -14,6 +15,14 @@ const (
 	vulnTarget    = "vuln"
 	vulnInstall   = "golang.org/x/vuln/cmd/govulncheck"
 	goDirectiveRe = `(?m)^go\s+(\S+)\s*$`
+
+	// How a workflow installs a toolchain. `setupGoStep` is the step and
+	// `goVersionFile` is the only way it may choose a version. `goVersionRe`
+	// is the copy that used to sit beside it, still matched so that putting
+	// one back is a failure rather than a preference.
+	workflowGlob  = "../../.github/workflows/*.yml"
+	setupGoStep   = "uses: actions/setup-go@"
+	goVersionFile = "go-version-file: go.mod"
 	goVersionRe   = `(?m)^\s*GO_VERSION:\s*"([^"]+)"`
 
 	// The lint pass that runs with no build tags: its target, the tool it
@@ -94,16 +103,42 @@ func TestTheGoDirectivePinsAPatchVersion(t *testing.T) {
 	}
 }
 
-// goWorkflows are every workflow that installs a toolchain. Each one has to
-// name the same patch version go.mod does.
-var goWorkflows = []string{
-	ciWorkflow,
-	"../../.github/workflows/release.yml",
-	"../../.github/workflows/fuzz-nightly.yml",
+// workflowsThatInstallAToolchain discovers them rather than listing them.
+//
+// The list this replaces held three paths, written by hand, and four workflows
+// install a toolchain. mutation-weekly.yml was the fourth, correct by hand and
+// not by enforcement, and it is the one whose breakage takes longest to see: it
+// runs weekly, on a schedule, and its whole output is a count nobody is waiting
+// on. A fifth workflow arrives covered.
+//
+// Both empty cases are fatal rather than vacuous, because a glob that matches
+// nothing and a repository with no CI produce the same silent pass, and a check
+// that cannot fail is indistinguishable from one that does.
+func workflowsThatInstallAToolchain(t *testing.T) []string {
+	t.Helper()
+
+	paths, err := filepath.Glob(workflowGlob)
+	if err != nil {
+		t.Fatalf("globbing %s: %v", workflowGlob, err)
+	}
+	if len(paths) == 0 {
+		t.Fatalf("%s matched no workflow, so every assertion over it passes",
+			workflowGlob)
+	}
+
+	var found []string
+	for _, path := range paths {
+		if strings.Contains(readFile(t, path), setupGoStep) {
+			found = append(found, path)
+		}
+	}
+	if found == nil {
+		t.Fatalf("no workflow under %s installs a toolchain", workflowGlob)
+	}
+	return found
 }
 
-// TestTheWorkflowsPinTheSameToolchainAsGoMod couples two numbers that have no
-// other reason to agree.
+// TestEveryToolchainInstallReadsGoMod deletes a number instead of checking it.
 //
 // actions/setup-go sets GOTOOLCHAIN=local, which is what makes a build
 // reproducible: the toolchain is the one the workflow installed and never one
@@ -111,28 +146,33 @@ var goWorkflows = []string{
 // the runner can satisfy and becomes a floor it either clears or fails at, with
 // `go.mod requires go >= 1.26.6 (running go 1.26.5; GOTOOLCHAIN=local)`.
 //
-// Bumping go.mod for a standard-library CVE and leaving GO_VERSION at "1.26"
-// therefore does not scan the fixed toolchain; it fails every job in the run,
-// including the scan the bump was for. The comment in ci.yml claimed the
-// opposite for as long as the two happened to agree.
-func TestTheWorkflowsPinTheSameToolchainAsGoMod(t *testing.T) {
-	m := regexp.MustCompile(goDirectiveRe).FindStringSubmatch(readFile(t, goModPath))
-	if m == nil {
-		t.Fatal("go.mod has no go directive")
-	}
-	want := m[1]
+// That used to be a GO_VERSION in every workflow and a test holding each one
+// equal to go.mod, which works for exactly as long as the test's list of
+// workflows is complete. Bumping go.mod for a standard-library advisory is what
+// would have found it incomplete: the three listed workflows fail the suite
+// until they follow, the suite then goes green, and the unlisted one fails on
+// the schedule days later. `go-version-file` leaves nothing to agree.
+//
+// TestTheGoDirectivePinsAPatchVersion carries the other half, and is why this
+// is safe rather than a way of floating the version: go-version-file on a
+// directive of `go 1.26` installs the newest patch the runner can reach.
+func TestEveryToolchainInstallReadsGoMod(t *testing.T) {
+	leftover := regexp.MustCompile(goVersionRe)
 
-	for _, path := range goWorkflows {
-		got := regexp.MustCompile(goVersionRe).FindStringSubmatch(readFile(t, path))
-		if got == nil {
-			t.Errorf("%s sets no GO_VERSION, so what it installs is whatever "+
-				"the runner had cached", path)
-			continue
+	for _, path := range workflowsThatInstallAToolchain(t) {
+		body := readFile(t, path)
+
+		installs := strings.Count(body, setupGoStep)
+		if reads := strings.Count(body, goVersionFile); reads != installs {
+			t.Errorf("%s has %d setup-go steps and %d that read %q; a step "+
+				"naming a version instead takes every job in that workflow "+
+				"down the first time go.mod moves past it",
+				path, installs, reads, goVersionFile)
 		}
-		if got[1] != want {
-			t.Errorf("%s pins GO_VERSION %q and go.mod requires %q; setup-go "+
-				"sets GOTOOLCHAIN=local, so every job in that workflow fails "+
-				"until they match", path, got[1], want)
+
+		if m := leftover.FindStringSubmatch(body); m != nil {
+			t.Errorf("%s sets GO_VERSION %q; that is the second copy of the "+
+				"version, and it only has to be wrong once", path, m[1])
 		}
 	}
 }
@@ -153,7 +193,7 @@ func TestTheWorkflowsPinTheSameToolchainAsGoMod(t *testing.T) {
 // find nothing left to suggest, and pass, every time, for ever.
 //
 // No install assertion, unlike the two tests above: `go fix` is in the
-// distribution, so GO_VERSION is the only version it has.
+// distribution, so the toolchain go.mod names is the only version it has.
 func TestTheModernizerIsWiredIntoBothCIs(t *testing.T) {
 	makefile := readFile(t, makefilePath)
 
