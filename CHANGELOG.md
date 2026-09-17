@@ -20,6 +20,61 @@ accident.
 
 Nothing yet.
 
+## [0.13.4] - 2026-09-17
+
+**A result stopped by `--max-requests` told you to raise `--limit`.** One
+release after `--limit all` became the way to ask `issue activity` for a whole
+window, and that command has no `--page-token` to resume from either, so a
+budget cut answered with a remedy in which every word named something the caller
+could not do:
+
+    jr --max-requests 4 issue activity --since -3650d --all-projects \
+       --page-size 1 --limit all
+    exit 3, complete="false"
+    remedy: raise --limit, or use --limit all
+
+Nothing about the answer was wrong. The rows are the rows, `complete="false"` is
+true, and exit 3 is right. What was wrong was the one line telling you what to do
+about it, which for a command with no token is the entire repair.
+
+Patch: no kind moved a schema version, no exit code changed meaning, and no error
+or warning `code` changed. A `remedy` is free text and this contract names `code`
+as the field to branch on.
+
+### Fixed
+
+- **The truncation warning names the bound that stopped the walk.** A result cut
+  short by `--limit` and one cut short by `--max-requests` arrive at the warning
+  as the same document, rows and a count and maybe a token, so the walk now says
+  which, and `--limit` is offered only where raising it would change the answer:
+
+  | Stopped by | Token | `remedy` |
+  | --- | --- | --- |
+  | `--limit` | yes | resume with --page-token, or raise --limit |
+  | `--limit` | no | raise --limit, or use --limit all |
+  | `--max-requests` | yes | raise --max-requests, or resume with --page-token |
+  | `--max-requests` | no | raise --max-requests, or narrow the query |
+
+  Only the two budget rows are new. A limit cut says exactly what it said
+  before, which is what the second test in this change exists to hold.
+
+### Documentation
+
+- The agent skill's Cost section said exceeding `--max-requests` "exits 3 with a
+  resume token". It does not on every command: `issue list` has one, and
+  `issue activity` and `issue changes` do not, which is precisely when the
+  `remedy` carries the whole answer. It now says so.
+
+### Output contract
+
+- No kind moved a schema version, no exit code changed meaning, and no error or
+  warning `code` changed. `RESULT_TRUNCATED` is emitted for the same conditions
+  it always was.
+- **A `remedy` is not a branch point.** Goldens pin remedy text, and this changes
+  two of the four a truncated collection can carry, both for a condition that
+  previously produced advice nobody could follow. What a consumer reads is
+  `code`, `count` and `next-page-token`, and none of them moves.
+
 ## [0.13.3] - 2026-09-17
 
 **A paged walk could skip a row and still call the answer complete, on Data
@@ -2269,6 +2324,7 @@ recent enough to be worth reading.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
 [unreleased]: https://github.com/kmoneil/jr/compare/v0.13.2...main
+[0.13.4]: https://github.com/kmoneil/jr/releases/tag/v0.13.4
 [0.13.3]: https://github.com/kmoneil/jr/releases/tag/v0.13.3
 [0.13.2]: https://github.com/kmoneil/jr/releases/tag/v0.13.2
 [0.13.1]: https://github.com/kmoneil/jr/releases/tag/v0.13.1
