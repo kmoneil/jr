@@ -14,6 +14,47 @@ const diagnosticVersion = 1
 // It always accompanies exit 3.
 const TruncatedCode = "RESULT_TRUNCATED"
 
+// Stop says which bound ended a collection early.
+//
+// The remedy depends on it and nothing downstream can work it out: a walk that
+// spent its request budget and a walk that reached `--limit` both arrive here
+// as rows plus a token, and only the thing doing the paging knows which. It was
+// inferred from whether a token existed, which told a caller who had already
+// passed `--limit all` to raise `--limit`, on a command with no `--page-token`
+// to resume from either.
+type Stop string
+
+const (
+	// StopUnstated is a caller that did not say. The remedy then describes the
+	// limit, which is what every truncation meant before budgets could report
+	// themselves, and it is right for every bound a command applies to its own
+	// rows.
+	StopUnstated Stop = ""
+	// StopLimit is the caller's --limit.
+	StopLimit Stop = "limit"
+	// StopBudget is --max-requests, which is not a bound on the answer at all
+	// but on what may be spent finding it.
+	StopBudget Stop = "budget"
+)
+
+// truncationRemedy is what to do about a result that stopped early.
+//
+// Two questions, and both have to be asked: what stopped it, and whether this
+// command can resume. `issue activity` has no resume token, so for a budget cut
+// there the only true remedy is the budget and the query.
+func truncationRemedy(stop Stop, token string) string {
+	if stop == StopBudget {
+		if token != "" {
+			return "raise --max-requests, or resume with --page-token"
+		}
+		return "raise --max-requests, or narrow the query"
+	}
+	if token != "" {
+		return "resume with --page-token, or raise --limit"
+	}
+	return "raise --limit, or use --limit all"
+}
+
 // errorNode builds the <error> envelope. Retryable is always present, never
 // omitted when false, so an agent can read it unconditionally instead of
 // inferring a default.
@@ -34,7 +75,7 @@ func errorNode(e *errs.Error) *Node {
 // emitted for every format, not only TSV: the XML and JSON envelopes also carry
 // complete="false", but the exit code and the stderr warning are what a script
 // checks.
-func truncationNode(d *Doc, partialElement string) *Node {
+func truncationNode(d *Doc, partialElement string, stop Stop) *Node {
 	if d.Collection == nil {
 		return recordTruncationNode(d)
 	}
@@ -74,11 +115,7 @@ func truncationNode(d *Doc, partialElement string) *Node {
 		return n
 	}
 
-	if c.NextPageToken != "" {
-		n.Leaf("remedy", "resume with --page-token, or raise --limit")
-	} else {
-		n.Leaf("remedy", "raise --limit, or use --limit all")
-	}
+	n.Leaf("remedy", truncationRemedy(stop, c.NextPageToken))
 	return n
 }
 

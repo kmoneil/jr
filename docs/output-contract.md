@@ -572,6 +572,15 @@ with the token" has to tolerate there being no token, which it must anyway:
 `complete="false"` is a statement about the answer and never a promise about
 what a further request would do.
 
+**The warning names the bound that stopped it.** A result cut short by
+`--limit` and one cut short by `--max-requests` are the same document with the
+same code, and the fixes are opposite, so the `remedy` says which: a budget cut
+names `--max-requests`, and `--limit` is offered only where raising it would
+change the answer. Getting that wrong is not cosmetic. A `--limit all` sweep
+stopped by the budget used to be told to raise `--limit`, on `issue activity`,
+which also has no `--page-token`, so every word of the remedy named something
+the caller could not do.
+
 **A walk can also fail rather than truncate.** Truncation says the answer stops
 where a bound put it. When a paged walk stops on its own while holding fewer
 rows than Jira counted for the query it started from, that reading is not

@@ -331,33 +331,53 @@ func (s *Stream) flush() error {
 	return nil
 }
 
+// Truncation is everything the warning needs about a streamed collection that
+// stopped early.
+//
+// It is a struct rather than a parameter list because four of its five fields
+// would be strings and ints in a row, and the two that decide the remedy sit in
+// the middle of them. Close makes the same argument one type up for two values,
+// and this is five.
+type Truncation struct {
+	// Kind is the collection's kind, for the warning to name.
+	Kind string
+	// Count is how many rows reached stdout before it stopped.
+	Count int
+	// NextPageToken resumes, on the commands that have one. Empty is a real
+	// answer here: `issue activity` merges a feed out of three projections
+	// across a page of issues, and no offset into that describes a place a
+	// request can start from.
+	NextPageToken string
+	// PartialElement names the container inside a row that was clipped, for the
+	// case where the rows are all present and something within one of them is
+	// not. A buffered document is inspected for that; a streamed one cannot be,
+	// because the rows it would inspect are already bytes on stdout. So the
+	// command that knew says so, and empty means the ordinary case: the rows
+	// themselves ran out.
+	PartialElement string
+	// StoppedBy is which bound ended it, from the only layer that knows.
+	StoppedBy Stop
+}
+
 // WriteStreamTruncation emits the warning that accompanies exit 3 for a
 // streamed collection.
 //
 // The rows have already gone to stdout, so this is the only place the caller
 // learns the set was not exhausted — which is exactly the arrangement §3.1
 // describes for TSV, and why streaming is possible at all.
-//
-// partialElement names the container inside a row that was clipped, for the
-// case where the rows are all present and something within one of them is not.
-// A buffered document is inspected for that; a streamed one cannot be, because
-// the rows it would inspect are already bytes on stdout. So the command that
-// knew says so, and empty means the ordinary case: the rows themselves ran out.
-func WriteStreamTruncation(
-	w io.Writer, kind string, count int, token, partialElement string, f Format,
-) error {
-	return writeDiagnostic(w, truncationNodeFor(kind, count, token, partialElement), f)
+func WriteStreamTruncation(w io.Writer, t Truncation, f Format) error {
+	return writeDiagnostic(w, truncationNodeFor(t), f)
 }
 
 // truncationNodeFor builds the warning without needing the document, since a
 // streamed collection no longer has one by the time this is called.
-func truncationNodeFor(kind string, count int, token, partialElement string) *Node {
+func truncationNodeFor(t Truncation) *Node {
 	return truncationNode(&Doc{
-		Kind: kind,
+		Kind: t.Kind,
 		Collection: &Collection{
 			Name:          "items",
-			Items:         make([]*Node, count),
-			NextPageToken: token,
+			Items:         make([]*Node, t.Count),
+			NextPageToken: t.NextPageToken,
 		},
-	}, partialElement)
+	}, t.PartialElement, t.StoppedBy)
 }

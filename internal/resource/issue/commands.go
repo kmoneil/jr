@@ -491,6 +491,7 @@ func runList(
 	return registry.StreamResult{
 		Complete:      result.Complete,
 		NextPageToken: result.NextPageToken,
+		StoppedBy:     result.StoppedBy,
 	}, nil
 }
 

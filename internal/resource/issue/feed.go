@@ -257,7 +257,7 @@ func runChanges(
 		return registry.StreamResult{}, err
 	}
 
-	whole, err := streamFeed(ctx, inv, out, client, opt, window)
+	whole, stop, err := streamFeed(ctx, inv, out, client, opt, window)
 	if err != nil {
 		return registry.StreamResult{}, err
 	}
@@ -273,10 +273,11 @@ func runChanges(
 	case feedClipped:
 		return registry.StreamResult{Complete: false, PartialElement: "change"}, nil
 	default:
-		// Cut short by the caller or by the budget. There is no page token
-		// either: the rows are merged from the changelogs of many issues, so an
-		// offset into them names no place a request can start from.
-		return registry.StreamResult{Complete: false}, nil
+		// Cut short by the caller or by the budget, and which one is the whole
+		// of what to do about it. There is no page token either: the rows are
+		// merged from the changelogs of many issues, so an offset into them
+		// names no place a request can start from.
+		return registry.StreamResult{Complete: false, StoppedBy: stop}, nil
 	}
 }
 
@@ -335,7 +336,7 @@ func feedRequest(
 func streamFeed(
 	ctx context.Context, inv *registry.Invocation, out *render.Stream,
 	client *Client, opt ListOptions, window ChangeWindow,
-) (feedOutcome, error) {
+) (feedOutcome, render.Stop, error) {
 	var clipped, atLimit bool
 	result, err := client.ListStream(ctx, opt, func(page []Issue, total int) error {
 		rows, short := feedRows(page, window)
@@ -357,13 +358,17 @@ func streamFeed(
 	})
 	switch {
 	case err != nil && !errors.Is(err, errStopPaging):
-		return feedShort, err
-	case atLimit, result == nil || !result.Complete:
-		return feedShort, nil
+		return feedShort, "", err
+	case atLimit, result == nil:
+		// errStopPaging is this command's own --limit reaching its end, and it
+		// comes back as an error, so there is no walk result to ask.
+		return feedShort, render.StopLimit, nil
+	case !result.Complete:
+		return feedShort, result.StoppedBy, nil
 	case clipped:
-		return feedClipped, nil
+		return feedClipped, "", nil
 	}
-	return feedWhole, nil
+	return feedWhole, "", nil
 }
 
 // feedWindow resolves --since into the interval this poll reports.
