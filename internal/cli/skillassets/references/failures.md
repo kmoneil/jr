@@ -160,6 +160,16 @@ produce it, and a re-run answers cleanly. The same failure twice is not a race
 but the count and the pages disagreeing, and then the way through is a narrower
 query or a smaller `--page-size`.
 
+`PAGINATION_SHIFTED` (9) is the same family and fires sooner. Where paging is by
+offset, which on Data Center is any query not confined to one project and any
+sort that is not the key, each page is fetched one row early and has to arrive
+holding the row the last page ended on. Something joining or leaving the set
+above the walk moves that row, and then the offsets no longer name the rows the
+walk is owed. Retry it: a long `--limit all` on a busy instance races ordinary
+edits, and the message names the row expected and the row found. If it repeats,
+narrow the query, or scope it to one project with `--project`, where paging is
+by issue key and cannot shift.
+
 A non-idempotent request is **not** replayed after an upstream error. A POST that
 got a 503 may have been processed before the failure, and retrying it is how one
 `issue create` becomes two issues. Only a 429, which is a refusal before

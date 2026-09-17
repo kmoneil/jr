@@ -33,6 +33,18 @@ type PageToken struct {
 	// mid-run cannot shift it. Offset pagination has no such guarantee, which
 	// is why this is preferred wherever it can be used.
 	AfterKey string `json:"k,omitempty"`
+	// Anchor is the last key the walk emitted, when paging by offset.
+	//
+	// An offset is a count of rows to skip, so it names a different row the
+	// moment anything above it joins or leaves the result set. The next page is
+	// therefore fetched one row early and has to come back starting with this
+	// key: that is what turns a shift into `PAGINATION_SHIFTED` instead of into
+	// a row nobody read. See overlapFetch in client.go.
+	//
+	// It travels in the token rather than in a local, so a walk resumed with
+	// --page-token checks its first page too. A token minted before this
+	// existed carries none, and that page goes unchecked rather than refused.
+	Anchor string `json:"a,omitempty"`
 }
 
 // EncodePageToken renders a token for the caller. An empty token encodes to the
@@ -102,12 +114,24 @@ func ParsePageToken(encoded string) (PageToken, error) {
 			"--page-token carries a negative offset").
 			WithDetail("offset %d", t.Offset)
 	}
-	if t.AfterKey != "" {
-		if _, ok := ParseKey(t.AfterKey); !ok {
+	for _, key := range []string{t.AfterKey, t.Anchor} {
+		if key == "" {
+			continue
+		}
+		if _, ok := ParseKey(key); !ok {
 			return PageToken{}, errs.Usage("INVALID_PAGE_TOKEN",
 				"--page-token carries something that is not an issue key").
-				WithDetail("%q", t.AfterKey)
+				WithDetail("%q", key)
 		}
+	}
+	// An anchor is the row sitting just above the offset, so a token carrying
+	// one and no offset describes a position that does not exist. Refusing it
+	// here keeps overlapFetch from computing a negative startAt out of a token
+	// somebody hand-assembled.
+	if t.Anchor != "" && t.Offset == 0 {
+		return PageToken{}, errs.Usage("INVALID_PAGE_TOKEN",
+			"--page-token carries a row to resume after and no offset").
+			WithDetail("anchor %q, offset 0", t.Anchor)
 	}
 	return t, nil
 }

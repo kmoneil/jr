@@ -22,7 +22,7 @@
       "request": {
         "method": "GET",
         "path": "/rest/api/2/search",
-        "query": "fields=summary%2Cstatus%2Cassignee%2Creporter%2Cpriority%2Cissuetype%2Cproject%2Ccreated%2Cupdated%2Clabels&jql=ORDER+BY+issuekey+DESC&maxResults=2&startAt=2"
+        "query": "fields=summary%2Cstatus%2Cassignee%2Creporter%2Cpriority%2Cissuetype%2Cproject%2Ccreated%2Cupdated%2Clabels&jql=ORDER+BY+issuekey+DESC&maxResults=3&startAt=1"
       },
       "response": {
         "status": 200,
@@ -31,7 +31,7 @@
             "application/json;charset=UTF-8"
           ]
         },
-        "body": "{\"startAt\":2,\"maxResults\":2,\"total\":2,\"issues\":[]}"
+        "body": "{\"startAt\": 1, \"maxResults\": 3, \"total\": 2, \"issues\": [{\"id\": \"10000\", \"key\": \"ENG-1\", \"fields\": {\"summary\": \"Record every Data Center conversation\", \"status\": {\"name\": \"To Do\", \"statusCategory\": {\"key\": \"new\", \"name\": \"To Do\"}}, \"assignee\": null, \"reporter\": {\"name\": \"ada\", \"displayName\": \"Ada Lovelace\"}, \"priority\": {\"name\": \"Medium\"}, \"issuetype\": {\"name\": \"Epic\"}, \"project\": {\"key\": \"ENG\"}, \"created\": \"2026-09-04T18:52:30.000+0000\", \"updated\": \"2026-09-04T18:52:30.000+0000\", \"labels\": []}}]}"
       }
     }
   ]

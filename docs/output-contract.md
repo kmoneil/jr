@@ -581,6 +581,22 @@ That is `PAGINATION_SHORT` at exit 9, naming both counts, and it is an error
 rather than a short result. Under `tsv` the rows fetched before it are already
 on stdout, as they are for every failure a streaming command hits mid-run.
 
+**A walk also has to show that each page starts where the last one ended.**
+Where paging is by offset, which on Data Center is every query not confined to
+one project and every sort that is not the key, a page resumes from a count of
+rows to skip, and that count names a different row the moment anything above it
+joins or leaves the result set. So every offset page after the first is fetched
+one row early and has to come back holding the row the page before it ended on.
+When it does not, that is `PAGINATION_SHIFTED` at exit 9, naming the row
+expected and the row that arrived instead.
+
+Measured on Jira 10.4.0 on 2026-09-17, over six rows at two a page, with one row
+removed from above the walk's position and one added below it between the first
+page and the second: six rows came back, the count reconciled because the two
+changes cancelled, and `complete="true"` at exit 0 was wrong about a row nobody
+had read. The check costs one row per page and no extra request. It does not
+fire on a change below the walk, because nothing it has already read moved.
+
 ## Warnings
 
 A warning is a structured document on stderr carrying a `code` and a `message`,

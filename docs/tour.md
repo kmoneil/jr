@@ -357,6 +357,15 @@ the narrowed query it was just sent, a walk that ends reconciles what it fetched
 against the count the server gave for the query it started from. A server that
 disagrees with either is an error, not a quietly short result.
 
+**Where the fallback to offsets happens, a third check covers it.** Each offset
+page after the first is fetched one row early and has to come back holding the
+row the last page ended on; if it does not, the set moved under the walk and
+that is `PAGINATION_SHIFTED` rather than a result. Measured on Jira 10.4.0 in
+September 2026: a row leaving the set above the walk and a row joining below it
+cancel in the count, so the reconciliation above cannot see it, and six rows
+came back at `complete="true"` and exit 0 over a row nobody had read. The
+re-read row is the price, and it is a row rather than a request.
+
 A token minted against Cloud is refused against Data Center rather than read as
 offset zero.
 
