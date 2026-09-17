@@ -244,6 +244,13 @@ type StreamResult struct {
 	// warning names the element rather than offering `--limit all`, which
 	// would not fetch a single further comment.
 	PartialElement string
+	// StoppedBy is which bound ended the result early, for the same reason
+	// PartialElement exists: the warning is written where that is no longer
+	// visible. A walk that spent `--max-requests` and one that reached
+	// `--limit` both arrive as rows plus a token, and the fixes are opposite.
+	// Leaving it unset describes the limit, which is what a command that
+	// bounds its own rows means.
+	StoppedBy render.Stop
 }
 
 // Progress reports how far a long operation has got.

@@ -125,6 +125,10 @@ type ListResult struct {
 	// a limit or a budget cut it short, and then NextPageToken resumes.
 	Complete      bool
 	NextPageToken string
+	// StoppedBy is which of those two it was. The caller's fix depends on it
+	// and cannot be read off anything else here: both arrive as rows plus a
+	// token.
+	StoppedBy render.Stop
 	// Requests is how many HTTP calls this cost, for --debug and for tests
 	// that assert the client did not over-fetch.
 	Requests int
@@ -192,7 +196,7 @@ func (c *Client) ListStream(
 	for {
 		want, satisfied := wantFor(opt.Limit, pageSize, out.Fetched)
 		if satisfied {
-			return truncated(out, token)
+			return truncated(out, token, render.StopLimit)
 		}
 
 		read, err := c.readPage(ctx, opt, token, want, out, onPage)
@@ -200,7 +204,7 @@ func (c *Client) ListStream(
 			// A spent request budget is not a failure: it means there is more,
 			// and the caller gets what was fetched plus a way to resume.
 			if transport.IsBudgetExceeded(err) && out.Fetched > 0 {
-				return truncated(out, token)
+				return truncated(out, token, render.StopBudget)
 			}
 			return nil, err
 		}
@@ -213,7 +217,7 @@ func (c *Client) ListStream(
 		token = next
 
 		if stopEarly(opt.Limit, out.Fetched, len(read.issues)) {
-			return truncated(out, token)
+			return truncated(out, token, render.StopLimit)
 		}
 	}
 }
@@ -361,7 +365,9 @@ func streamOffsetPaged[T any](
 		}
 		if bounded {
 			// Bounded by the caller, so it is not complete and says so.
-			return registry.StreamResult{Complete: false}, nil
+			return registry.StreamResult{
+				Complete: false, StoppedBy: render.StopLimit,
+			}, nil
 		}
 		inv.Progress.Update(out.Count(), reportedTotal(total))
 
@@ -564,9 +570,10 @@ func dropOverlap(issues []Issue, token PageToken) ([]Issue, int, error) {
 // The error return is always nil. It is there so every early exit is one line
 // that reads as a return of the same answer, rather than two assignments a
 // future edit can separate.
-func truncated(out *ListResult, token PageToken) (*ListResult, error) {
+func truncated(out *ListResult, token PageToken, stop render.Stop) (*ListResult, error) {
 	out.Complete = false
 	out.NextPageToken = EncodePageToken(token)
+	out.StoppedBy = stop
 	return out, nil
 }
 

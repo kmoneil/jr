@@ -620,11 +620,19 @@ func runActivity(
 		// merged and sorted from three projections across a page of issues,
 		// and an offset into the result would not describe a place any request
 		// can start from.
-		return registry.StreamResult{Complete: false}, nil
+		return registry.StreamResult{
+			Complete: false, StoppedBy: render.StopLimit,
+		}, nil
 	case clipped:
 		return registry.StreamResult{Complete: false, PartialElement: "event"}, nil
 	}
-	return registry.StreamResult{Complete: result.Complete}, nil
+	// Anything else that cut this short was the candidate walk, and with no
+	// token to resume from, saying which bound did it is the whole remedy: a
+	// spent budget here is `--max-requests` and the query, never `--limit`,
+	// which this command is usually run with set to all.
+	return registry.StreamResult{
+		Complete: result.Complete, StoppedBy: result.StoppedBy,
+	}, nil
 }
 
 // errStopPaging ends the page loop once the caller's limit is reached, so a

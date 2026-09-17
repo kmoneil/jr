@@ -181,6 +181,15 @@ do not catch, add the test in the same change and cite it here.
   attribute reports the paging mode.
   **Enforced by:** `TestSortsByKeyIsTheKeysetPrecondition`,
   `TestAWalkAcrossProjectsPagesToExhaustion`.
+- **A truncation warning names a bound the caller can act on.** `--limit` and
+  `--max-requests` cut a result short in ways that look identical by the time
+  the warning is written, so the command that paged says which, and the remedy
+  offers `--limit` only where raising it would change the answer. A budget cut
+  on a `--limit all` sweep used to be answered with "raise --limit", on a
+  command that also has no `--page-token`, so nothing in the remedy could be
+  followed.
+  **Enforced by:** `TestABudgetCutNamesTheBudgetAndNotTheLimit`,
+  `TestALimitCutStillNamesTheLimit`.
 - **An offset page has to start where the page before it ended.** An offset is a
   count of rows to skip, so it points at a different row as soon as anything
   above it joins or leaves the set, and every stop condition a walk has stays

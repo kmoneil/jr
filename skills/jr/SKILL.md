@@ -170,8 +170,11 @@ Feeding results to a model is the common case and format choice dominates it.
   them into an escape-sequence minefield you pay for twice, once in tokens and
   once in unescaping.
 - `--limit` defaults to 50 and takes `all`. `--max-requests N` bounds an
-  invocation's HTTP calls; exceeding it exits 3 with a resume token rather than
-  running for an hour.
+  invocation's HTTP calls; exceeding it exits 3 rather than running for an hour,
+  and the warning's `remedy` names `--max-requests` so a budget cut is never
+  mistaken for a `--limit` you can raise. Whether there is a token to resume
+  from depends on the command: `issue list` has one, `issue activity` and
+  `issue changes` have none, and the `remedy` is what says which.
 - Ask for the columns you need. Fetching fields you will not read costs tokens on
   the way out and requests on the way in.
 - **`issue history` without `--changed-field` is the most expensive read in the
