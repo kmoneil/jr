@@ -1082,6 +1082,35 @@ $ jr issue list --retries 5
 $ jr issue list --limit all --max-requests 200   # bound a long run
 ```
 
+### `PAGINATION_SHIFTED` (exit 9): the set moved while a walk was paging it
+
+A long `--limit all` on a busy instance shares that instance with everybody
+else. Where paging is by offset, which on Data Center is any query not confined
+to one project and any sort that is not the issue key, an issue joining or
+leaving the result set above the walk shifts every row below it, and the next
+page would start past a row nobody read. Each page is therefore fetched one row
+early and has to arrive holding the row the last page ended on. The message
+names both rows.
+
+```console
+$ jr issue list --all-projects --updated-after -7d --limit all
+PAGINATION_SHIFTED: the result set changed while paging, so a page did not
+start where the one before it ended
+```
+
+Re-run it first: an ordinary edit somewhere on the instance produces this, and
+the next run usually finishes. If it keeps happening, take the query out of
+offset paging or make it shorter:
+
+```console
+$ jr issue list --project ENG --updated-after -7d --limit all   # paged by key
+$ jr issue list --all-projects --updated-after -1d --limit all  # fewer pages
+```
+
+A query scoped to one project, sorted by the default key order, resumes with
+`issuekey < <last>` instead of an offset, which names a place in the data and
+cannot shift.
+
 ### Cached site metadata is stale
 
 The deployment probe and the field catalogue are cached on disk with a TTL. If

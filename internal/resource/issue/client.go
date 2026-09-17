@@ -195,7 +195,7 @@ func (c *Client) ListStream(
 			return truncated(out, token)
 		}
 
-		page, issues, err := c.readPage(ctx, opt, token, want, out, onPage)
+		read, err := c.readPage(ctx, opt, token, want, out, onPage)
 		if err != nil {
 			// A spent request budget is not a failure: it means there is more,
 			// and the caller gets what was fetched plus a way to resume.
@@ -204,15 +204,15 @@ func (c *Client) ListStream(
 			}
 			return nil, err
 		}
-		seen.first(page)
+		seen.first(read.page, read.reread)
 
-		next, last := c.advance(out.Keyset, token, page, issues, want)
+		next, last := c.advance(out.Keyset, token, read, want)
 		if last {
 			return exhaustive(out, seen)
 		}
 		token = next
 
-		if stopEarly(opt.Limit, out.Fetched, len(issues)) {
+		if stopEarly(opt.Limit, out.Fetched, len(read.issues)) {
 			return truncated(out, token)
 		}
 	}
@@ -297,13 +297,19 @@ type counted struct {
 // bound narrows the query itself, so its total is already the remainder and the
 // echoed offset is zero. Subtracting the offset is what makes the two the same
 // arithmetic.
-func (c *counted) first(page *searchResponse) {
+//
+// reread is how many rows of that first response the walk had already emitted,
+// which is one when a resumed walk's first request re-read its anchor row.
+// Counting from where the response started would then owe the walk a row it is
+// deliberately not collecting, and a correct walk would end in
+// PAGINATION_SHORT.
+func (c *counted) first(page *searchResponse, reread int) {
 	if c.known || page.Total == nil {
 		return
 	}
 	c.rows, c.known = *page.Total, true
 	if page.StartAt != nil {
-		c.from = *page.StartAt
+		c.from = *page.StartAt + reread
 	}
 }
 
@@ -408,30 +414,59 @@ func stopEarly(limit registry.Limit, fetched, pageLen int) bool {
 	return (!limit.All && fetched >= limit.N) || pageLen == 0
 }
 
-// readPage fetches one page, decodes it, hands it to the caller, and checks the
-// ordering that the cursor depends on.
+// pageRead is one page of a walk, after the row it was asked to re-read has
+// been accounted for.
+//
+// The two counts are different questions and were one variable until an offset
+// page started carrying a row the walk had already emitted. `issues` is what
+// the caller gets and what `--limit` counts; `sent` is how many rows the server
+// put in the page, which is the only number the offset arithmetic may use,
+// because the server's own `startAt` is about its page and not about ours.
+type pageRead struct {
+	page   *searchResponse
+	issues []Issue
+	sent   int
+	// reread is 1 when the first row of this page was the previous page's last
+	// row, dropped here rather than emitted twice.
+	reread int
+}
+
+// readPage fetches one page, decodes it, checks that it starts where the last
+// one ended, hands it to the caller, and checks the ordering that a keyset
+// cursor depends on.
 func (c *Client) readPage(
 	ctx context.Context, opt ListOptions, token PageToken, want int,
 	out *ListResult, onPage func(page []Issue, total int) error,
-) (*searchResponse, []Issue, error) {
-	page, err := c.fetch(ctx, opt, token, want)
+) (pageRead, error) {
+	fetch, ask := c.overlapFetch(out.Keyset, token, want)
+
+	page, err := c.fetch(ctx, opt, fetch, ask)
 	if err != nil {
-		return nil, nil, err
+		return pageRead{}, err
 	}
 	out.Requests++
 
 	issues, err := decodeIssues(page.Issues, ExtraFieldNames(opt.Fields), c.Body, opt.projections())
 	if err != nil {
-		return nil, nil, err
+		return pageRead{}, err
 	}
-	out.Fetched += len(issues)
+	read := pageRead{page: page, issues: issues, sent: len(issues)}
+
+	if fetch.Offset != token.Offset {
+		read.issues, read.reread, err = dropOverlap(issues, token)
+		if err != nil {
+			return pageRead{}, err
+		}
+	}
+
+	out.Fetched += len(read.issues)
 	if page.Total != nil {
 		out.Total = *page.Total
 	}
 	if onPage == nil {
-		out.Issues = append(out.Issues, issues...)
-	} else if err := onPage(issues, out.Total); err != nil {
-		return nil, nil, err
+		out.Issues = append(out.Issues, read.issues...)
+	} else if err := onPage(read.issues, out.Total); err != nil {
+		return pageRead{}, err
 	}
 
 	if out.Keyset {
@@ -439,11 +474,74 @@ func (c *Client) readPage(
 		// comparison differs from ours, a keyset cursor would silently skip or
 		// repeat rows; failing here turns that into a loud error rather than a
 		// result that is quietly missing issues.
-		if err := verifyDescendingBelow(issues, token.AfterKey); err != nil {
-			return nil, nil, err
+		if err := verifyDescendingBelow(read.issues, token.AfterKey); err != nil {
+			return pageRead{}, err
 		}
 	}
-	return page, issues, nil
+	return read, nil
+}
+
+// overlapRow is the one row an offset page deliberately fetches again.
+const overlapRow = 1
+
+// overlapFetch turns the walk's position into the request that can prove it.
+//
+// An offset names a count of rows to skip, so it points at a different row the
+// moment anything above it joins or leaves the result set, and every stop
+// condition a walk has stays true while that happens. Measured on the rig at
+// Jira 10.4.0, 2026-09-17, over six rows at two per page, with one row removed
+// from above the cursor and one added below it between page one and page two:
+// six rows came back, the count reconciled, and `complete="true"` at exit 0 was
+// wrong about a row nobody had read.
+//
+// So the page after the first is asked for one row early. That row is already
+// on stdout, `dropOverlap` refuses the page when it is not the one that arrives,
+// and the cost is a row per page rather than a request per page.
+//
+// Keyset and cursor walks are left alone: a key bound and a server cursor both
+// name a place in the data rather than a count, which is the whole reason they
+// are preferred where they are available.
+func (c *Client) overlapFetch(keyset bool, token PageToken, want int) (PageToken, int) {
+	if c.Site.CursorPaginated() || keyset || token.Anchor == "" || token.Offset <= 0 {
+		return token, want
+	}
+	fetch := token
+	fetch.Offset = token.Offset - overlapRow
+	// Never ask for more than the search accepts: a server that caps the page
+	// silently returns fewer, and one row of a hundred is a page shorter, not a
+	// walk that breaks.
+	return fetch, min(want+overlapRow, MaxPageSize)
+}
+
+// dropOverlap removes the row this page was asked to re-read, or refuses the
+// page because it is not there.
+//
+// A page that no longer begins with the row the last one ended on is a page
+// whose offsets have moved, and there is no honest way to read it: the rows it
+// holds are some unknown distance from the rows the walk is owed. Both
+// directions are wrong and both were measured. A row leaving above the cursor
+// slides an unread row past the next page's first position, and a row joining
+// there hands the same row back twice, which for `issue activity` is one
+// issue's entire changelog written into the feed a second time.
+//
+// An empty page is not a shift. It means the set shrank past where the walk is
+// standing, which ends the walk, and `counted.verify` is what says whether it
+// ended short.
+func dropOverlap(issues []Issue, token PageToken) ([]Issue, int, error) {
+	if len(issues) == 0 {
+		return nil, 0, nil
+	}
+	if issues[0].Key != token.Anchor {
+		return nil, 0, errs.Remote("PAGINATION_SHIFTED",
+			"the result set changed while paging, so a page did not start "+
+				"where the one before it ended").
+			WithDetail("row %d was %s when the previous page ended and is %s now",
+				token.Offset-overlapRow, token.Anchor, issues[0].Key).
+			WithRemedy("re-run the query; scope it to one project, where paging " +
+				"is by issue key and cannot shift; or narrow it so the walk " +
+				"makes fewer requests")
+	}
+	return issues[1:], overlapRow, nil
 }
 
 // truncated is the one place a result becomes incomplete.
@@ -522,9 +620,13 @@ func (c *Client) canKeyset(opt ListOptions) bool {
 // advance computes the token for the next page and reports whether this was the
 // last one.
 func (c *Client) advance(
-	keyset bool, current PageToken, page *searchResponse, issues []Issue, want int,
+	keyset bool, current PageToken, read pageRead, want int,
 ) (PageToken, bool) {
-	got := len(issues)
+	page, issues := read.page, read.issues
+	// The rows the server sent, not the rows the walk kept. An offset page
+	// carries one row the walk had already emitted, and the arithmetic below is
+	// about positions in the server's result set rather than about this answer.
+	got := read.sent
 
 	if c.Site.CursorPaginated() {
 		// Cloud is authoritative about the end: isLast, or no further token.
@@ -543,14 +645,24 @@ func (c *Client) advance(
 	// Offset paging. The total is the cheapest way to know the end, and also
 	// the reason this mode is unstable: the count it is compared against
 	// changes as issues are created.
-	next := current.Offset + got
+	//
+	// The arithmetic starts from where this page was *fetched*, which is one row
+	// above the walk's position whenever a row was re-read, and never from where
+	// the walk stands.
+	next := current.Offset - read.reread + got
 	if page.StartAt != nil {
 		next = *page.StartAt + got
 	}
 	if page.Total != nil && next >= *page.Total {
 		return PageToken{}, true
 	}
-	return PageToken{Deployment: c.Site.Kind, Offset: next}, false
+	token := PageToken{Deployment: c.Site.Kind, Offset: next}
+	if n := len(issues); n > 0 {
+		// The row the next page has to come back holding. An empty page leaves
+		// it unset, and a walk with nothing to anchor against stops here anyway.
+		token.Anchor = issues[n-1].Key
+	}
+	return token, false
 }
 
 // advanceKeyset computes the next keyset cursor from the last row of a page.

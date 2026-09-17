@@ -181,6 +181,20 @@ do not catch, add the test in the same change and cite it here.
   attribute reports the paging mode.
   **Enforced by:** `TestSortsByKeyIsTheKeysetPrecondition`,
   `TestAWalkAcrossProjectsPagesToExhaustion`.
+- **An offset page has to start where the page before it ended.** An offset is a
+  count of rows to skip, so it points at a different row as soon as anything
+  above it joins or leaves the set, and every stop condition a walk has stays
+  true while that happens. Each offset page after the first is therefore fetched
+  one row early and must arrive holding the previous page's last row; a page
+  that does not is `PAGINATION_SHIFTED`, because the rows it holds are an
+  unknown distance from the rows the walk is owed. Measured on Jira 10.4.0,
+  2026-09-17: a row leaving above the walk and a row joining below it cancel in
+  the count, so the reconciliation above sees nothing, and six rows came back at
+  `complete="true"` and exit 0 over a row that was never fetched. A change below
+  the walk moves nothing it has read and is not refused.
+  **Enforced by:** `TestAPageThatDoesNotStartWhereTheLastOneEndedIsRefused`,
+  `TestAnOffsetWalkEmitsEveryRowExactlyOnce`,
+  `TestAWalkDoesNotRefuseAChangeBelowItsCursor`.
 - **`ORDER BY issuekey` orders across projects and `issuekey <` does not.**
   Measured on Jira 10.4.0 Data Center and on Cloud, 2026-09-04: with projects
   ABC and ENG, `ORDER BY issuekey DESC` runs ENG-1 straight into ABC-6, and
