@@ -20,6 +20,79 @@ accident.
 
 Nothing yet.
 
+## [0.13.3] - 2026-09-17
+
+**A paged walk could skip a row and still call the answer complete, on Data
+Center.** It reaches any query that pages by offset, which since 0.13.2 is every
+`--all-projects` walk and every sort that is not the issue key. An offset is a
+count of rows to skip, so it names a different row the moment anything above it
+joins or leaves the result set, and an ordinary edit by somebody else on the
+instance is enough to move it.
+
+Measured on Jira 10.4.0 on 2026-09-17, six rows at two a page, with page two
+held open while the set changed underneath. One row leaving above the walk and
+one joining below it cancelled in the count, so the reconciliation 0.13.2 added
+saw nothing, and six rows came back at `complete="true"` and exit 0 over a row
+that was never fetched. The other direction, a row joining above the walk,
+returned one row twice; against `issue activity` that wrote one issue's whole
+changelog into the feed a second time, 30 events beside 15 for every other
+issue. Neither case needs anybody to touch the rows being read: `updated >=
+"-7d"` is re-evaluated by the server on every request, so a sweep long enough
+for an issue to cross that boundary moves its own result set while it walks it.
+
+If you have scripted a long `--all-projects --limit all` on `issue list` or
+`issue activity` against Data Center, some of those answers may have been short
+or held a row twice, and nothing in them said so. Cloud pages by cursor and
+never took this path.
+
+Patch: no kind moved a schema version, no exit code changed meaning, and no
+error `code` changed. One is added, under the policy row 0.13.2 wrote for
+exactly this shape.
+
+### Fixed
+
+- **An offset page now has to start where the page before it ended.** Every page
+  after the first is fetched one row early and must come back holding the last
+  row of the previous one. That row is a check rather than a result and is
+  dropped before the answer, so the price is a row per page and no extra
+  request. A page arriving with anything else is refused, because the rows it
+  does hold are an unknown distance from the rows the walk is owed.
+
+  A change *below* the walk moves nothing it has already read and is not
+  refused. A row created under a walk in progress is collected when the walk
+  reaches it, exactly as before.
+
+  The row to expect travels inside `--page-token`, so a walk resumed with one
+  checks its first page too. A token minted by an earlier version carries no
+  such row, and that page goes unchecked rather than refused.
+
+### Added
+
+- **`PAGINATION_SHIFTED` (exit 9): the result set changed while paging, so a
+  page did not start where the one before it ended.** It names the row expected
+  and the row that arrived, and it is `retryable`, because a long `--limit all`
+  on a busy instance races ordinary edits and a re-run usually finishes. If it
+  repeats, the way through is a narrower query, or `--project`, where the walk
+  pages by issue key and cannot shift at all.
+
+### Internal
+
+- The release binaries are built with the toolchain `go.mod` names, read from
+  that file by every workflow rather than pinned separately in four of them.
+
+### Output contract
+
+- No kind moved a schema version, no exit code changed meaning, and no error
+  `code` changed. `PAGINATION_SHIFTED` is new, at the existing exit 9.
+- **Priced a patch under the row 0.13.2 added**: an error `code` for a condition
+  that used to be reported as a successful answer is additive, because the
+  invocation it changes is one whose previous answer was wrong and nothing a
+  caller sends has to change. Every walk this refuses was returning rows it
+  could not vouch for.
+- The extra row a page carries is a change to the requests `jr` sends and not to
+  what it prints. It never reaches stdout, and `--max-requests` is unaffected,
+  because the check costs a row rather than a request.
+
 ## [0.13.2] - 2026-09-04
 
 **`issue list` and `issue activity` dropped every project but one, and said the
@@ -2196,6 +2269,7 @@ recent enough to be worth reading.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
 [unreleased]: https://github.com/kmoneil/jr/compare/v0.13.2...main
+[0.13.3]: https://github.com/kmoneil/jr/releases/tag/v0.13.3
 [0.13.2]: https://github.com/kmoneil/jr/releases/tag/v0.13.2
 [0.13.1]: https://github.com/kmoneil/jr/releases/tag/v0.13.1
 [0.13.0]: https://github.com/kmoneil/jr/releases/tag/v0.13.0
