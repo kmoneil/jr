@@ -269,6 +269,20 @@ not pay for comment bodies:
 $ jr issue activity --since -1d --kind transition --kind field
 ```
 
+`--kind` filters which events come back and not how much of each, so a feed that
+*does* include comments pays for every one of them in full. When the question is
+what was touched and when, drop the text:
+
+```console
+$ jr issue activity --since -1d --no-body
+```
+
+The events all survive and only their text goes, in every format, not just TSV.
+The body is the feed's only unbounded column, so a day with a few long comments
+in it is mostly comment. Note this saves output and not requests: Jira sends
+comments inline with the issues they belong to, so the bytes are already on the
+wire by the time they are dropped.
+
 `--kind` cannot cut a *field*, though: `Rank`, `Sprint`, and `assignee` are all
 `kind=field`, and on a groomed backlog `Rank` is most of the feed by row count
 while carrying nothing you can act on. That is what the field filter is for:
