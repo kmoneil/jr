@@ -20,6 +20,81 @@ accident.
 
 Nothing yet.
 
+## [0.14.0] - 2026-09-22
+
+**If you run Data Center and ask for the Sprint field, take this one.** It was
+answering with Greenhopper's Java `toString`, one object dump per sprint the
+issue had been through. On an issue through a dozen sprints that one field came
+to roughly 3,000 tokens, and the fact anybody wanted from it, which sprint this
+is in and whether that sprint is live, was a substring of a format outside the
+output contract entirely.
+
+    customfield_10109 | com.atlassian.greenhopper.service.sprint.Sprint@1f581600[
+    activatedDate=<null>,autoStartStop=false,completeDate=<null>,endDate=<null>,
+    goal=<null>,id=1,incompleteIssuesDestinationId=<null>,name=ENG Sprint 1,
+    rapidViewId=1,sequence=1,startDate=<null>,state=FUTURE,synced=false]
+
+It now renders as sprints:
+
+```xml
+<customfield_10109 count="2">
+  <sprint id="12345" state="closed">ENG Sprint 1</sprint>
+  <sprint id="12346" state="active">ENG Sprint 2</sprint>
+</customfield_10109>
+```
+
+A TSV column over the field flattens to the names, comma-joined, like any other
+list column. `state` is `future`, `active`, or `closed`, the words
+`sprint list --state` already takes.
+
+Reported as issue 154, by somebody who noted this was the only place in `jr`'s
+output they could not rely on the contract. That was exactly right, and it is
+the reason this is a minor rather than a patch.
+
+**Cloud is unchanged and the two deployments now differ in shape.** Cloud sends
+the same field as an array of objects whose names already rendered, so nothing
+there moves. A caller reading `state` gets it on Data Center and finds nothing
+on Cloud, which is a split worth knowing about before you write the branch.
+Closing it needs an anchor on the Cloud side as specific as the Java class name
+on this one, and nobody has measured a real Cloud payload to find one.
+`docs/output-contract.md` describes both shapes.
+
+**The parse refuses rather than approximates, in three places.** A field holding
+one parseable dump beside one unparseable string falls back entirely, because
+reporting a sprint list with a member silently missing is worse than reporting
+the raw value. A dump naming neither an id nor a name does not parse. And the
+match is anchored on the fully qualified class name, so a text field that merely
+mentions `com.atlassian.greenhopper.service.sprint.Sprint` is prose and is left
+alone.
+
+The shape was measured against a Jira 10.4.0 Data Center rather than inferred
+from the report. That is what established `state` is in the dump: deriving it
+from which dates are set would have been a rule invented here, and wrong the
+first time anybody looked at a sprint that was started and not yet activated.
+
+### Output contract
+
+- `issue.get` is **v10** and `issue.list` is **v9**. A requested field holding
+  Data Center sprints renders as a `<sprint>` list rather than as text: the
+  element carries a `count`, and each child carries an optional `id`, an
+  optional `state` of `future`, `active`, or `closed`, and the sprint name as
+  its text. A TSV column over the field flattens to the names joined with `,`
+  instead of to the raw dumps.
+- `contract` is **v3**. An open shape now publishes the structure it takes when
+  its value is not a scalar, as an `<element>` under `<extra>`.
+- **Priced a minor**, under the row for changing a kind. A consumer parsing the
+  dump with a regular expression gets no value from that element any more, and
+  one reading the element's text gets the names where it used to get the dumps.
+  Both are changes a script can observe, which is what the row is for.
+- The `contract` bump was not foreseen when this was priced and is the reason
+  the release notes say three kinds and not two. `render.Extra` could say an
+  open shape held a string and had no way to say what it looks like when it
+  holds something else, so `jr contract` advertised `<extra type="string">`
+  while the writer emitted a container. The kind whose whole job is to let a
+  consumer verify a response against its shape was the one describing itself
+  wrongly, and the golden gate refused the change until it was versioned.
+- No exit code changed meaning and no error `code` changed.
+
 ## [0.13.4] - 2026-09-17
 
 **A result stopped by `--max-requests` told you to raise `--limit`.** One
@@ -2323,7 +2398,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.13.2...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.14.0...main
+[0.14.0]: https://github.com/kmoneil/jr/releases/tag/v0.14.0
 [0.13.4]: https://github.com/kmoneil/jr/releases/tag/v0.13.4
 [0.13.3]: https://github.com/kmoneil/jr/releases/tag/v0.13.3
 [0.13.2]: https://github.com/kmoneil/jr/releases/tag/v0.13.2
