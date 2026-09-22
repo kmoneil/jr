@@ -5,7 +5,7 @@ board.get	1	board.get
 board.list	1	board.list
 context.get	2	context.create,context.delete,context.edit,context.show,context.use
 context.list	2	context.list
-contract	2	contract
+contract	3	contract
 doctor	2	doctor
 epic.get	1	epic.get
 epic.list	1	epic.list
@@ -15,10 +15,10 @@ issue.attachment.download	1	issue.attachment.download
 issue.attachment.list	1	issue.attachment.list
 issue.changes	1	issue.changes
 issue.comment.list	2	issue.comment.list
-issue.get	9	issue.get
+issue.get	10	issue.get
 issue.history	1	issue.history
 issue.link.list	1	issue.link.list
-issue.list	8	issue.list
+issue.list	9	issue.list
 issue.worklog.list	2	issue.worklog.list
 jql.explain	1	jql.explain
 jql.validate	1	jql.validate

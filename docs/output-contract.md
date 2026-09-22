@@ -327,7 +327,7 @@ Every successful XML response:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<result kind="issue.list" v="8" site="https://acme.atlassian.net">
+<result kind="issue.list" v="9" site="https://acme.atlassian.net">
   <issues count="3" complete="true">
     <issue key="ENG-101">
       <summary>Retry logic drops the last error</summary>
@@ -400,7 +400,7 @@ the XML tree:
 ```json
 {
   "kind": "issue.list",
-  "v": 8,
+  "v": 9,
   "site": "https://acme.atlassian.net",
   "count": 3,
   "complete": true,
@@ -681,7 +681,7 @@ flags that ever carry it are `--project` and `--board`.
 *did*:
 
 ```xml
-<result kind="issue.list" v="8" site="https://jira.example/jira" project="ENG">
+<result kind="issue.list" v="9" site="https://jira.example/jira" project="ENG">
 ```
 
 **It reports the scope the command read, not the scope the context holds**, and
@@ -983,7 +983,7 @@ container's `count` is derived from its children and cannot disagree with them.
 
 ### The reporter is reported
 
-`issue.list` v8 and `issue.get` v9 carry a `reporter` element, on the same terms
+`issue.list` v9 and `issue.get` v10 carry a `reporter` element, on the same terms
 as `assignee`: always present, and empty when the server discloses nobody.
 
 It was asked for on every request from the first version of this tool — it is in
@@ -1499,7 +1499,7 @@ refuses the write if the issue has changed since the caller read it. Without it
 two callers editing one issue both exit 0 and the earlier write is lost, with
 nothing truncated, nothing in error, and nothing to say it happened.
 
-`issue.get` v9 carries a `precondition` attribute, which is what the flag takes.
+`issue.get` v10 carries a `precondition` attribute, which is what the flag takes.
 It is opaque: what it holds is the millisecond timestamp Jira served, and the
 `updated` element is RFC 3339 to the second, so conditioning on the published
 value would leave a whole second in which another edit is invisible. It also
@@ -1523,7 +1523,7 @@ alternative was what shipped in 0.11.0 and 0.12.0, where a listing's baseline
 was compared at a precision it never had and refused **every** write on Data
 Center.
 
-`issue.list` v8 carries the same attribute per row, but only with
+`issue.list` v9 carries the same attribute per row, but only with
 `--precondition`, and it is absent otherwise. The flag exists because the
 arithmetic without it is bad: "list the blocked issues, edit the three that
 matter" otherwise costs one request for the listing and one `issue get` per row
@@ -2013,10 +2013,11 @@ governs is worth less than one that says where it was not followed.
 
 ## Verifying against `jr contract`
 
-`jr contract` v2 carries each kind's element schema alongside its name, version,
+`jr contract` v3 carries each kind's element schema alongside its name, version,
 and emitters. v1 let a consumer pin a version; v2 lets it check a response
 against the shape, which is the half §3.5 promised and the first version could
-not deliver.
+not deliver. v3 adds the structure an *open* shape takes when its value is not
+a scalar, which v2 could describe only as text.
 
 Each kind reports one element: its attributes with types, optionality, and any
 closed set of values; its child elements with the same, plus whether each may be
@@ -2039,6 +2040,41 @@ Some shapes are open, and say so. `issue list --field "Story Points"` adds a
 an `<extra>` element saying where the names come from. Every other kind is
 closed, and an element outside the schema is a contract violation rather than a
 curiosity.
+
+**An open shape can still be structured, and then it says that too.** Most
+requested fields are a scalar and render as text. A Data Center sprint field is
+not: Jira sends it as an array of Greenhopper's Java `toString`, so
+`issue.get` v10 and `issue.list` v9 render it as a list of sprints instead.
+
+```xml
+<customfield_10109 count="2">
+  <sprint id="12345" state="closed">ENG Sprint 1</sprint>
+  <sprint id="12346" state="active">ENG Sprint 2</sprint>
+</customfield_10109>
+```
+
+`state` is `future`, `active`, or `closed`, lower-cased from Jira's own
+spelling so it matches `sprint list --state`. Both attributes are optional,
+because the dump omits what a sprint has not got. A TSV column over the field
+flattens to the names, joined with `,` like any other list.
+
+The shape is published: `<extra>` carries it as a child element, which is what
+`contract` v3 is for. Before v10 this field reached the caller as the raw dump,
+roughly 3,000 tokens on an issue that had been through a dozen sprints, and the
+schema described it as a string.
+
+**The fallback is the whole value, unchanged.** A sprint whose name contains a
+`,` cannot be recovered from a format with no escaping, and a field holding one
+parseable dump beside one unparseable string is not a sprint field this tool
+understands. Either case renders as text exactly as it arrived: an unreadable
+value is still better than a value quietly reported as something it is not.
+**Cloud renders the same field as text, and the shapes differ.** Cloud sends an
+array of objects rather than an array of dumps, and `scalarize` has always
+reduced each one to its name, so a Cloud sprint field is
+`ENG Sprint 3, ENG Sprint 4` in the element's text with no `<sprint>` children
+and no `state`. Nothing there moved in v10. A consumer reading `state` to find
+the live sprint has to know which deployment answered, which is the one thing
+§5.3 exists to spare it; the split is recorded rather than defended.
 
 **An optional element is still declared.** `issue.list` and `issue.get` carry a
 `<url>` that appears only under `--url`. It is declared in the schema and so is

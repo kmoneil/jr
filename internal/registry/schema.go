@@ -25,11 +25,19 @@ const (
 	// results must be able to tell "nothing does" from "this build does not
 	// say".
 	VersionCommand = 2
-	// VersionContract is 2 because each kind now carries its element schema.
-	// A consumer that pinned v1 read a name, a version, and a list of
-	// emitters; v2 adds the shape, which is the half §3.5 promised and the
-	// first version could not deliver.
-	VersionContract = 2
+	// v2 was where each kind began carrying its element schema. A consumer
+	// that pinned v1 read a name, a version, and a list of emitters; v2 added
+	// the shape, which is the half §3.5 promised and the first version could
+	// not deliver.
+	//
+	// VersionContract is 3 because an open shape can now publish the structure
+	// it takes when its value is not a scalar. A consumer that pinned v2 read
+	// `<extra type="string">` and had no way to learn that a Data Center sprint
+	// field arrives as a list of sprints rather than as text; v3 carries that
+	// shape as an <element> under <extra>. The trigger was issue 154, where the
+	// writer emitted a container the schema described as a string, which is the
+	// one disagreement this kind exists to make impossible.
+	VersionContract = 3
 )
 
 func init() {
@@ -184,10 +192,19 @@ func elementSchema() *render.Schema {
 				Named: "element, recursively — this schema does not repeat itself",
 				Type:  render.TypeString,
 			}}},
+			// An open shape that also has a structured form carries the shape
+			// as an <element> child, so `jr contract` publishes it. The open
+			// shape here stops the recursion exactly as its sibling above
+			// does, and for the same reason: this schema does not repeat
+			// itself.
 			{Schema: &render.Schema{
 				Element: "extra",
 				Attrs:   []render.Field{{Name: "type", Type: render.TypeString}},
 				Text:    &render.Field{Type: render.TypeString},
+				Extra: &render.Extra{
+					Named: "element, when the open shape has a structured form",
+					Type:  render.TypeString,
+				},
 			}, Optional: true},
 		},
 	}
