@@ -177,6 +177,10 @@ Feeding results to a model is the common case and format choice dominates it.
   `issue changes` have none, and the `remedy` is what says which.
 - Ask for the columns you need. Fetching fields you will not read costs tokens on
   the way out and requests on the way in.
+- **`issue activity --no-body`** when the question is what was touched and when.
+  The body is the feed's only unbounded column, and a day with a few long
+  comments in it is mostly comment. The events all survive; only their text
+  goes, in every format.
 - **`issue history` without `--changed-field` is the most expensive read in the
   tool.** A changelog carries every description edit as a full before-and-after
   body on one row. `--changed-field status` is "who moved this, and when", and

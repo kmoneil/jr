@@ -156,6 +156,31 @@ func ActivityColumns() []render.Column {
 	}
 }
 
+// noBodyFlag drops the text of a comment or a worklog note.
+const noBodyFlag = "no-body"
+
+// activityColumnsFor drops the body column when --no-body is given.
+//
+// The column has to go as well as the element, or TSV would carry a header for
+// something no row can fill: the writer builds a row per column, so a column
+// whose path resolves to nothing is an empty cell on every line rather than no
+// column at all. That is the shape of the defect --field had before
+// nativeColumns existed, arrived at from the other direction.
+func activityColumnsFor(inv *registry.Invocation) []render.Column {
+	cols := ActivityColumns()
+	if !inv.Flags.Bool(noBodyFlag) {
+		return cols
+	}
+	out := make([]render.Column, 0, len(cols))
+	for _, c := range cols {
+		if c.Header == "body" {
+			continue
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
 // eventsFrom turns one issue's projections into events.
 //
 // Transitions and field changes are the same source and differ only in which
@@ -327,6 +352,11 @@ feed that exits 3 is not the same answer as an empty feed that exits 0.`),
 				"backlog; a comment and a worklog move no field and so are " +
 				"never dropped; wins over --" + changedFieldFlag,
 		}, rawBodyFlag(), {
+			Name: noBodyFlag, Type: registry.TypeBool,
+			Usage: "drop comment and worklog text from the feed, keeping the " +
+				"events themselves; the body is the only unbounded column and " +
+				"is pure cost when the question is what was touched and when",
+		}, {
 			Name: allProjectsFlag, Type: registry.TypeBool,
 			Usage: "search every project the credential can see, ignoring " +
 				"the context's; --since still bounds the sweep in time",
@@ -338,6 +368,7 @@ feed that exits 3 is not the same answer as an empty feed that exits 0.`),
 		NeedsJira:      true,
 		CollectionName: "events",
 		Columns:        ActivityColumns(),
+		ColumnsFor:     activityColumnsFor,
 		Outputs: []registry.Output{
 			{Kind: KindActivity, Version: VersionActivity},
 		},
@@ -672,13 +703,34 @@ func eventsForPage(
 			(i.HasChanges && !i.ChangesComplete()) {
 			short = true
 		}
-		for _, e := range eventsFrom(i) {
-			if want.accepts(e) {
-				events = append(events, e)
-			}
-		}
+		events = append(events, want.selected(i)...)
 	}
 	return events, short, nil
+}
+
+// selected returns the events of one issue that pass the filters, carrying only
+// the parts the caller asked for.
+//
+// Its own function because eventsForPage is already at the complexity gate's
+// limit and the two halves are genuinely separate: that one decides which
+// issues were read and whether anything was clipped, this one decides which of
+// their events are the answer.
+func (w activityWant) selected(i Issue) []Event {
+	var out []Event
+	for _, e := range eventsFrom(i) {
+		if !w.accepts(e) {
+			continue
+		}
+		// Cleared after accepts and not before: a filter that read the body
+		// would otherwise see one already emptied. None does today, and the
+		// ordering is what stops that becoming a silent change the first time
+		// one does.
+		if w.noBody {
+			e.Body, e.BodyFormat = "", ""
+		}
+		out = append(out, e)
+	}
+	return out
 }
 
 // topUpWorklogs refetches an issue's worklogs when the projection cut them off,
@@ -709,6 +761,14 @@ type activityWant struct {
 	kinds map[string]bool
 	user  site.User
 	since string
+	// noBody drops the text of a comment or a worklog note, keeping the event.
+	//
+	// The event is the answer to "what did I touch"; the body is the answer to
+	// a question the caller did not ask and pays for by the character. It is
+	// dropped at the point the events are built rather than at the point they
+	// are rendered, so no format carries it and `--format json` cannot
+	// reintroduce what TSV was asked to leave out.
+	noBody bool
 	// fields is the shared --changed-field / --not-changed-field filter, the
 	// same one issue history uses, so the two commands cannot disagree about
 	// what a field name matches. Nil when neither flag was given.
@@ -754,6 +814,7 @@ func activityFilter(inv *registry.Invocation) activityWant {
 	since, _ := inv.Value(activitySinceKey).(string)
 	return activityWant{
 		kinds: kinds, user: user, since: since,
+		noBody: inv.Flags.Bool(noBodyFlag),
 		fields: newHistoryFilter(inv),
 	}
 }
