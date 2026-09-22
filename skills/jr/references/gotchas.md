@@ -12,6 +12,7 @@ is available, which makes them the ones worth knowing before you need them.
 - [Issue keys do not sort as text](#issue-keys-do-not-sort-as-text)
 - [`sprint = <id>` is not current membership](#sprint--id-is-not-current-membership)
 - [Questions JQL cannot answer](#questions-jql-cannot-answer)
+- [`text ~` is stemmed, unranked, and silent about stop words](#text--is-stemmed-unranked-and-silent-about-stop-words)
 - [Nothing splits on commas](#nothing-splits-on-commas)
 - [`--field` reads a column and writes a value](#--field-reads-a-column-and-writes-a-value)
 - [A record in TSV is not a row](#a-record-in-tsv-is-not-a-row)
@@ -101,6 +102,26 @@ carried out at close.
 
 If you want what is in a sprint now, that is a different question than
 `--jql 'sprint = 1002'` answers.
+
+## `text ~` is stemmed, unranked, and silent about stop words
+
+Measured against Jira 10.4.0 Data Center.
+
+| You write | What happens |
+| --- | --- |
+| `text ~ "truncate"` | matches a stored "truncated"; the index stems |
+| `text ~ "a" AND text ~ "b"` | the intersection, including across fields |
+| `text ~ "the"` | **nothing, exit 0**, because the index discards common words |
+
+**There is no relevance ranking.** Every query carries `ORDER BY issuekey DESC`,
+so the "top" of a text search is the highest issue key that matched and nothing
+more. Reading the first five rows as the five best matches is wrong. Ordering by
+relevance is not available: `--jql` carrying its own `ORDER BY` is refused,
+because the fragment is parenthesised and JQL does not allow one there.
+
+When a text search disappoints, check in this order: try each word alone, in
+case one is a stop word; consider what the word stems to; and do not read a
+key-ordered list as a ranked one.
 
 ## Questions JQL cannot answer
 
