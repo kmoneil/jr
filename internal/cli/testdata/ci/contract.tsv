@@ -15,10 +15,10 @@ issue.attachment.download	1	issue.attachment.download
 issue.attachment.list	1	issue.attachment.list
 issue.changes	1	issue.changes
 issue.comment.list	2	issue.comment.list
-issue.get	10	issue.get
+issue.get	11	issue.get
 issue.history	1	issue.history
 issue.link.list	1	issue.link.list
-issue.list	9	issue.list
+issue.list	10	issue.list
 issue.worklog.list	2	issue.worklog.list
 jql.explain	1	jql.explain
 jql.validate	1	jql.validate

@@ -70,6 +70,14 @@ type Client struct {
 	// empty for the default. Here for the same reason Body is — every write
 	// that takes a body answers the same question.
 	BodyFormat string
+	// FieldNames maps a resolved field id to its name in the site's
+	// catalogue, so a requested field can report what it is called.
+	//
+	// Here rather than on each options struct for the reason Body gives: every
+	// read that can carry a requested field answers the same question. It is
+	// nil on a command that resolved no fields, which is the common one, and
+	// an absent name renders as no attribute rather than as an empty one.
+	FieldNames map[string]string
 }
 
 // ListOptions is one `issue list` request.
@@ -452,7 +460,8 @@ func (c *Client) readPage(
 	}
 	out.Requests++
 
-	issues, err := decodeIssues(page.Issues, ExtraFieldNames(opt.Fields), c.Body, opt.projections())
+	issues, err := decodeIssues(page.Issues, ExtraFieldNames(opt.Fields), c.FieldNames,
+		c.Body, opt.projections())
 	if err != nil {
 		return pageRead{}, err
 	}
@@ -880,7 +889,8 @@ func (c *Client) Get(ctx context.Context, key string, fields []string) (Issue, e
 		return Issue{}, err
 	}
 
-	issues, err := decodeIssues([]json.RawMessage{resp.Body}, ExtraFieldNames(fields), c.Body, Projections{})
+	issues, err := decodeIssues([]json.RawMessage{resp.Body}, ExtraFieldNames(fields),
+		c.FieldNames, c.Body, Projections{})
 	if err != nil {
 		return Issue{}, err
 	}

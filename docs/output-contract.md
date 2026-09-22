@@ -327,7 +327,7 @@ Every successful XML response:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<result kind="issue.list" v="9" site="https://acme.atlassian.net">
+<result kind="issue.list" v="10" site="https://acme.atlassian.net">
   <issues count="3" complete="true">
     <issue key="ENG-101">
       <summary>Retry logic drops the last error</summary>
@@ -400,7 +400,7 @@ the XML tree:
 ```json
 {
   "kind": "issue.list",
-  "v": 9,
+  "v": 10,
   "site": "https://acme.atlassian.net",
   "count": 3,
   "complete": true,
@@ -681,7 +681,7 @@ flags that ever carry it are `--project` and `--board`.
 *did*:
 
 ```xml
-<result kind="issue.list" v="9" site="https://jira.example/jira" project="ENG">
+<result kind="issue.list" v="10" site="https://jira.example/jira" project="ENG">
 ```
 
 **It reports the scope the command read, not the scope the context holds**, and
@@ -983,7 +983,7 @@ container's `count` is derived from its children and cannot disagree with them.
 
 ### The reporter is reported
 
-`issue.list` v9 and `issue.get` v10 carry a `reporter` element, on the same terms
+`issue.list` v10 and `issue.get` v11 carry a `reporter` element, on the same terms
 as `assignee`: always present, and empty when the server discloses nobody.
 
 It was asked for on every request from the first version of this tool — it is in
@@ -1499,7 +1499,7 @@ refuses the write if the issue has changed since the caller read it. Without it
 two callers editing one issue both exit 0 and the earlier write is lost, with
 nothing truncated, nothing in error, and nothing to say it happened.
 
-`issue.get` v10 carries a `precondition` attribute, which is what the flag takes.
+`issue.get` v11 carries a `precondition` attribute, which is what the flag takes.
 It is opaque: what it holds is the millisecond timestamp Jira served, and the
 `updated` element is RFC 3339 to the second, so conditioning on the published
 value would leave a whole second in which another edit is invisible. It also
@@ -1523,7 +1523,7 @@ alternative was what shipped in 0.11.0 and 0.12.0, where a listing's baseline
 was compared at a precision it never had and refused **every** write on Data
 Center.
 
-`issue.list` v9 carries the same attribute per row, but only with
+`issue.list` v10 carries the same attribute per row, but only with
 `--precondition`, and it is absent otherwise. The flag exists because the
 arithmetic without it is bad: "list the blocked issues, edit the three that
 matter" otherwise costs one request for the listing and one `issue get` per row
@@ -2041,10 +2041,36 @@ an `<extra>` element saying where the names come from. Every other kind is
 closed, and an element outside the schema is a contract violation rather than a
 curiosity.
 
+**An open shape still says what its attributes are.** A requested field carries
+two, both declared and both published by `jr contract`:
+
+```xml
+<customfield_10042 name="Story Points" set="false"/>
+<customfield_10050 name="Team">Platform</customfield_10050>
+```
+
+`name` is the field's name in the site's catalogue. It is the catalogue's name
+and not the one the caller typed, so `--field 'Story Points'` and
+`--field customfield_10042` produce identical bytes. The TSV column header stays
+the id for the same reason: how a request was spelled is not part of the
+contract, and two spellings of one field collapse to one column.
+
+**`set="false"` means the issue has no value for the field**, and it is written
+only when false. Four different payloads reduce to an empty element and none of
+them could be told apart from the value alone: the key absent from `fields`
+entirely, an explicit `null`, an empty string, and an empty array. A field that
+*has* a value writes no `set` at all, because the common row should not pay an
+attribute to repeat what its own text already shows.
+
+So the check is: no `set` attribute means the text is the value; `set="false"`
+means there is no value. Note this does not distinguish a field the server
+omitted from one it returned as null. That is a question about whether the field
+applies to this issue, which `jr meta createmeta` answers properly.
+
 **An open shape can still be structured, and then it says that too.** Most
 requested fields are a scalar and render as text. A Data Center sprint field is
 not: Jira sends it as an array of Greenhopper's Java `toString`, so
-`issue.get` v10 and `issue.list` v9 render it as a list of sprints instead.
+`issue.get` v11 and `issue.list` v10 render it as a list of sprints instead.
 
 ```xml
 <customfield_10109 count="2">

@@ -661,9 +661,23 @@ $ jr issue get ENG-101 --field 'Story Points'
 ```
 
 A name that matches nothing is refused locally, with the near misses and their
-ids — rather than sent for Jira to reject opaquely. A field the server did not
-return comes back present and empty, so "no value" stays distinguishable from
-"you asked for something that does not exist".
+ids, rather than sent for Jira to reject opaquely.
+
+**A field you asked for always comes back, and says whether it has a value:**
+
+```console
+$ jr issue get ENG-101 --field 'Story Points' --field Team
+# → <customfield_10042 name="Story Points" set="false"/>
+# → <customfield_10050 name="Team">Platform</customfield_10050>
+```
+
+`set="false"` is written only when the issue has no value for the field, so its
+absence means the element's text is the value. Without it an empty element read
+the same as a broken response.
+
+The `name` is the one from your site's catalogue, not the one you typed, so
+asking by name and asking by id produce identical bytes. The TSV column header
+is still the id, for the same reason.
 
 **Sprint is structured, not text.** Data Center sends that field as Greenhopper's
 Java `toString`, one per sprint an issue has been through, which on a long-lived
