@@ -24,6 +24,7 @@ import (
 	"github.com/kmoneil/jr/internal/registry"
 	"github.com/kmoneil/jr/internal/render"
 	"github.com/kmoneil/jr/internal/resource/issue"
+	"github.com/kmoneil/jr/internal/resource/sprint"
 	"github.com/kmoneil/jr/internal/site"
 	"github.com/kmoneil/jr/internal/transport"
 )
@@ -224,11 +225,46 @@ func runSprintAdd(ctx context.Context, inv *registry.Invocation) (*render.Doc, e
 		return registry.DryRunDoc(KindSprintAdd, req), nil
 	}
 	if err := client.send(ctx, req); err != nil {
-		return nil, err
+		return nil, client.explainSprintAdd(ctx, inv.Args[0], err)
 	}
 
 	return render.Record(KindSprintAdd, VersionSprintAdd,
 		movedNode("sprint", inv.Args[0], "added", keys)), nil
+}
+
+// explainSprintAdd turns a refused move into a refusal that names the reason,
+// when the reason is one this tool can confirm.
+//
+// Diagnosed after the fact rather than checked before. `sprint close` reads the
+// sprint first and says so, because it needs the name for its acknowledgement
+// anyway; this command needs nothing from the sprint on the happy path, and a
+// pre-check would put a request on every successful move to describe a failure
+// that usually does not happen. Here the extra read costs nothing until
+// something has already gone wrong.
+//
+// The state is read from the sprint, never from the error text. Jira's sentence
+// is a sentence: it is localised, it changes between versions, and matching on
+// it would be a guess dressed as a diagnosis. Asking what state the sprint is
+// in is a fact.
+func (c *client) explainSprintAdd(ctx context.Context, id string, cause error) error {
+	// Only a refusal is worth explaining. A network failure, an expired
+	// credential, or a permission error would make the read below fail too,
+	// and the caller is better served by the error they already have.
+	if errs.ExitOf(cause) != exitcode.Usage {
+		return cause
+	}
+	current, err := (&sprint.Client{Transport: c.conn, Site: c.site}).Get(ctx, id)
+	if err != nil || current.State != sprint.StateClosed {
+		// Could not confirm it, so do not claim it. Jira's own words are still
+		// in the original error's detail, which is the whole value of the
+		// generic path and is why this returns rather than wrapping.
+		return cause
+	}
+	return errs.New(exitcode.Conflict, "SPRINT_CLOSED",
+		"sprint %s is closed, and a closed sprint takes no more issues", current.ID).
+		WithDetail("%q", current.Name).
+		WithRemedy("move them into an open sprint; `%s sprint list --state active "+
+			"--state future` names the ones that will take them", buildinfo.App)
 }
 
 func epicAddCommand() *registry.Command {
