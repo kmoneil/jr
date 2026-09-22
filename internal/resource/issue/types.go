@@ -22,9 +22,9 @@ import (
 // commit that changes the corresponding golden file.
 const (
 	KindList    = "issue.list"
-	VersionList = 8
+	VersionList = 9
 	KindGet     = "issue.get"
-	VersionGet  = 9
+	VersionGet  = 10
 )
 
 // Body formats a description can arrive in.
@@ -194,6 +194,11 @@ type Issue struct {
 type ExtraField struct {
 	ID    string
 	Value string
+	// sprints is set when the value was Data Center's sprint field: an array
+	// of Greenhopper toString dumps. It is unexported because it exists to
+	// give Node something to render structurally, and Value carries the same
+	// sprints flattened for anything that wants one cell.
+	sprints []sprintRef
 }
 
 // Status is an issue's workflow state, plus the category the state belongs to.
@@ -683,9 +688,48 @@ func extraFields(data json.RawMessage, names []string) []ExtraField {
 
 	out := make([]ExtraField, 0, len(names))
 	for _, name := range names {
-		out = append(out, ExtraField{ID: name, Value: scalarize(fields[name])})
+		raw := fields[name]
+		f := ExtraField{ID: name, Value: scalarize(raw)}
+		if refs, ok := sprintValue(raw); ok {
+			f.sprints = refs
+			f.Value = joinSprintNames(refs)
+		}
+		out = append(out, f)
 	}
 	return out
+}
+
+// sprintValue reads a field value as Data Center's sprint field, which is an
+// array of Java toString dumps and nothing else.
+//
+// Cloud sends an array of objects for the same field, which does not decode
+// into []string and so falls through to `scalarize`, whose map branch already
+// reduces each one to its name. Neither deployment is special-cased; the shape
+// of the value decides.
+func sprintValue(raw json.RawMessage) ([]sprintRef, bool) {
+	if len(raw) == 0 {
+		return nil, false
+	}
+	var values []string
+	if err := json.Unmarshal(raw, &values); err != nil {
+		return nil, false
+	}
+	return sprintRefs(values)
+}
+
+// joinSprintNames flattens sprints to one cell, the way every other list-valued
+// field flattens. A sprint with no name falls back to its id rather than
+// contributing an empty entry to a comma-separated list.
+func joinSprintNames(refs []sprintRef) string {
+	names := make([]string, 0, len(refs))
+	for _, r := range refs {
+		if r.Name == "" {
+			names = append(names, r.ID)
+			continue
+		}
+		names = append(names, r.Name)
+	}
+	return strings.Join(names, ", ")
 }
 
 // scalarize reduces a field value to one cell.
@@ -809,6 +853,10 @@ func (i Issue) Node() *render.Node {
 	// like any other: `--format json` gives "customfield_10042": "3", and a
 	// TSV column path is just the id.
 	for _, f := range i.Extra {
+		if len(f.sprints) > 0 {
+			n.Child(sprintNode(f.ID, f.sprints))
+			continue
+		}
 		n.Leaf(f.ID, f.Value)
 	}
 

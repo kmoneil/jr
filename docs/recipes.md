@@ -665,6 +665,24 @@ ids — rather than sent for Jira to reject opaquely. A field the server did not
 return comes back present and empty, so "no value" stays distinguishable from
 "you asked for something that does not exist".
 
+**Sprint is structured, not text.** Data Center sends that field as Greenhopper's
+Java `toString`, one per sprint an issue has been through, which on a long-lived
+issue is thousands of characters of object dump. `jr` renders it as sprints
+instead, so the live one is a value you can read rather than a substring you
+have to find:
+
+```console
+$ jr issue get ENG-101 --field Sprint
+# → <sprint id="12346" state="active">ENG Sprint 4</sprint>
+
+$ jr issue list --field Sprint --format tsv
+# → the names, comma-joined, like any other list column
+```
+
+`state` is `future`, `active`, or `closed`, the same words `sprint list --state`
+takes. Anything that does not parse as a sprint is passed through exactly as it
+arrived.
+
 **It is not only for custom fields.** The default columns are five, and an issue
 carries more than that, so `--field` is also how you widen a listing with the
 ones already being fetched:

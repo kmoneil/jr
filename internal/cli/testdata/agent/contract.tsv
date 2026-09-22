@@ -5,7 +5,7 @@ board.get	1	board.get
 board.list	1	board.list
 context.get	2	context.create,context.delete,context.edit,context.show,context.use
 context.list	2	context.list
-contract	2	contract
+contract	3	contract
 doctor	2	doctor
 dry-run	2	epic.add,epic.remove,issue.assign,issue.attachment.upload,issue.clone,issue.comment.add,issue.comment.delete,issue.comment.edit,issue.create,issue.delete,issue.edit,issue.link.add,issue.link.remove,issue.move,issue.watch,issue.worklog.add,issue.worklog.delete,sprint.add,sprint.create,sprint.start
 epic.add	2	epic.add
@@ -28,12 +28,12 @@ issue.comment.list	2	issue.comment.list
 issue.create	1	issue.create
 issue.delete	1	issue.delete
 issue.edit	2	issue.edit
-issue.get	9	issue.get
+issue.get	10	issue.get
 issue.history	1	issue.history
 issue.link.add	1	issue.link.add
 issue.link.list	1	issue.link.list
 issue.link.remove	1	issue.link.remove
-issue.list	8	issue.list
+issue.list	9	issue.list
 issue.move	3	issue.move
 issue.plan	1	issue.edit
 issue.watch	1	issue.watch

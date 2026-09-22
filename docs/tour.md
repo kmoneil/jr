@@ -17,7 +17,7 @@ your first query in about five minutes.
 
 ```console
 $ jr issue get ENG-101
-<result kind="issue.get" v="9" site="https://your-company.atlassian.net">
+<result kind="issue.get" v="10" site="https://your-company.atlassian.net">
   <issue key="ENG-101" type="Story" priority="High" project="ENG" parent="ENG-1"
          precondition="eyJkIjoiY2xvdWQiLCJrIjoiRU5HLTEwMSIsInUiOiIyMDI2LTA4LTA0VDExOjMyOjA3LjQxMloifQ">
     <summary>...</summary>

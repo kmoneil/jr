@@ -103,6 +103,19 @@ type Extra struct {
 	// "the id of a field requested with --field".
 	Named string
 	Type  Type
+	// Structured is the shape an extra element takes when its value is not a
+	// scalar. It is optional, and an open shape without one is text only.
+	//
+	// It exists because a Data Center sprint field is a list of sprints rather
+	// than a string, and `<extra type="string">` said otherwise while the
+	// writer emitted a container. A consumer pins the contract with
+	// `jr contract`, so a shape the schema cannot describe is a shape the
+	// contract does not have, whatever the writer does.
+	//
+	// Its Element is ignored: the container's name is the field's own id and
+	// is not knowable here, which is what makes this an open shape in the
+	// first place. Conform substitutes the name it actually found.
+	Structured *Schema
 }
 
 // Leaf is the shape of an element that carries nothing but text, which is most
@@ -257,6 +270,19 @@ func (s *Schema) conformChild(c *Node, at string, counts map[string]int) error {
 		if s.Extra == nil {
 			return violation(at, "undeclared element <%s>", c.Name)
 		}
+		// A container is held to the declared structure when there is one.
+		//
+		// When there is not, the text check stands and a container passes it
+		// trivially, which is the pre-existing behaviour and is deliberately
+		// left alone: the schema document's own meta-schema uses an open shape
+		// to say "an element, recursively" rather than to say "a string", and
+		// rejecting children there would refuse every schema jr publishes.
+		// What is enforced is what is declared.
+		if len(c.Children) > 0 && s.Extra.Structured != nil {
+			alt := *s.Extra.Structured
+			alt.Element = c.Name
+			return alt.Conform(c, at)
+		}
 		return checkValue(at, "<"+c.Name+">", c.Text, Field{Type: s.Extra.Type})
 	}
 	counts[c.Name]++
@@ -365,9 +391,13 @@ func (s *Schema) Node() *Node {
 	n.Child(ListEl("elements", "element", children...))
 
 	if s.Extra != nil {
-		n.Child(El("extra").
+		extra := El("extra").
 			Attr("type", string(s.Extra.Type)).
-			SetText(s.Extra.Named))
+			SetText(s.Extra.Named)
+		if s.Extra.Structured != nil {
+			extra.Child(s.Extra.Structured.Node())
+		}
+		n.Child(extra)
 	}
 	return n
 }

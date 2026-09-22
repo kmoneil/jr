@@ -138,8 +138,9 @@ func Schema() *render.Schema {
 			{Schema: commentsSchema(), Optional: true},
 		},
 		Extra: &render.Extra{
-			Named: "the id of a field requested with --field, e.g. customfield_10042",
-			Type:  render.TypeString,
+			Named:      "the id of a field requested with --field, e.g. customfield_10042",
+			Type:       render.TypeString,
+			Structured: sprintFieldSchema(),
 		},
 	}
 }

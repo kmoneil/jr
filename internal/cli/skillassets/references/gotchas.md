@@ -186,6 +186,20 @@ jr issue edit ENG-101 --field-json customfield_11350='"ENG-42"'
 `jr field list --format json` carries both the schema type and Jira's own type
 key, which is the only thing that tells two `any` fields apart.
 
+**`--field Sprint` is structured on both deployments.** Data Center sends that
+field as Greenhopper's Java `toString`, one dump per sprint the issue has been
+through, so on a long-lived issue the raw value runs to thousands of characters.
+`jr` reads it into sprints, which is what makes the live one cheap to find:
+
+```console
+jr issue get ENG-101 --field Sprint
+# → <sprint id="12346" state="active">ENG Sprint 4</sprint>
+```
+
+`state` is `future`, `active`, or `closed`. In TSV the column holds the names,
+comma-joined. A value that does not parse as a sprint is passed through
+unchanged, so check for the element rather than assuming it.
+
 ## A record in TSV is not a row
 
 A collection in TSV is a header row plus data rows. A **single record** in TSV is
