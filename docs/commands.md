@@ -674,7 +674,7 @@ jr contract --format json
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `contract` | v3 | always |
+| `contract` | v4 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE
 

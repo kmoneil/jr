@@ -2013,11 +2013,35 @@ governs is worth less than one that says where it was not followed.
 
 ## Verifying against `jr contract`
 
-`jr contract` v3 carries each kind's element schema alongside its name, version,
+`jr contract` v4 carries each kind's element schema alongside its name, version,
 and emitters. v1 let a consumer pin a version; v2 lets it check a response
 against the shape, which is the half §3.5 promised and the first version could
 not deliver. v3 adds the structure an *open* shape takes when its value is not
-a scalar, which v2 could describe only as text.
+a scalar, which v2 could describe only as text. v4 adds an open shape's
+attributes, and separates two statements that used to share one spelling.
+
+**`<extra>` and `<recursive>` mean different things.** An `<extra>` says the
+element names here are open, and publishes everything else about them: the type
+of their text, the attributes they may carry, and the structure they take when
+their value is not a scalar. All of it is checked before the document reaches
+stdout.
+
+A `<recursive>` says the children here are instances of the shape you are
+already reading, so this schema declines to describe them rather than contain
+itself. Nothing below one is checked, because there is nothing there to check
+against.
+
+```xml
+<element name="elements" list-of="element">
+  <recursive>element, because this schema contains itself</recursive>
+</element>
+```
+
+Both were spelled `<extra>` before v4, and the cost of that was not
+theoretical: an open shape could not enforce anything it declared, because
+enforcing it refused every schema `jr` publishes. A consumer walking a schema
+can now tell "these names are open and here is what they hold" from "these are
+instances of what you are reading".
 
 Each kind reports one element: its attributes with types, optionality, and any
 closed set of values; its child elements with the same, plus whether each may be
@@ -2085,7 +2109,7 @@ because the dump omits what a sprint has not got. A TSV column over the field
 flattens to the names, joined with `,` like any other list.
 
 The shape is published: `<extra>` carries it as a child element, which is what
-`contract` v3 is for. Before v10 this field reached the caller as the raw dump,
+`jr contract` publishes. Before v10 this field reached the caller as the raw dump,
 roughly 3,000 tokens on an issue that had been through a dozen sprints, and the
 schema described it as a string.
 

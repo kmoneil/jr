@@ -95,6 +95,10 @@ type Schema struct {
 	// unexpected element would otherwise have to guess whether it was a
 	// contract change or a flag somebody passed.
 	Extra *Extra
+	// Recursive marks children this schema declines to describe, which is a
+	// different statement from Extra's and is checked differently. See the
+	// type's own comment.
+	Recursive *Recursive
 }
 
 // Extra describes the elements a caller's own flags can add to a shape.
@@ -123,6 +127,26 @@ type Extra struct {
 	// requested field could say was its value, and stopped being enough when
 	// one had to say what it is called and whether it is set at all.
 	Attrs []Field
+}
+
+// Recursive marks children a schema deliberately does not describe, because
+// describing them would mean containing itself.
+//
+// It is not an Extra and the difference is the point. An Extra says "the
+// element names here are open, and here is everything else about them", and
+// every part of that is checked. A Recursive says "these are instances of the
+// shape you are already reading", and nothing about them is checked, because
+// there is nothing here to check them against.
+//
+// Both were spelled Extra until 2026-09-22, and the collision cost three
+// separate debugging sessions ending in the same workaround: every attempt to
+// enforce what an Extra declared refused `jr contract` in all four formats,
+// because the schema document's own meta-schema was using an Extra to mean
+// this instead. The rule that kept being rediscovered, "enforce only what is
+// declared", was a way of saying that one of these two declares nothing.
+type Recursive struct {
+	// Named says what the children are, in a few words.
+	Named string
 }
 
 // Leaf is the shape of an element that carries nothing but text, which is most
@@ -274,6 +298,13 @@ func (s *Schema) conformChildren(n *Node, at string) error {
 func (s *Schema) conformChild(c *Node, at string, counts map[string]int) error {
 	child, ok := s.child(c.Name)
 	if !ok {
+		// A schema that declines to describe its children cannot check them,
+		// and saying so is the declaration. Checked before Extra because a
+		// schema with both would be claiming to describe what it just said it
+		// would not, and the first branch is the honest one.
+		if s.Recursive != nil {
+			return nil
+		}
 		if s.Extra == nil {
 			return violation(at, "undeclared element <%s>", c.Name)
 		}
@@ -296,23 +327,17 @@ func (s *Schema) conformChild(c *Node, at string, counts map[string]int) error {
 		// the two used to disagree: this branch checked the text and nothing
 		// else, which is how an undeclared attribute reached stdout.
 		//
-		// Only when attributes were declared, for the third time and the same
-		// reason: the schema document's own meta-schema uses an open shape to
-		// mean "an element, recursively", and every one of those carries a
-		// `name`. Enforcing an empty declaration against them refuses every
-		// schema jr publishes. What is enforced is what is declared, and an
-		// open shape that declares nothing about attributes still says nothing
-		// about them. See the backlog card on the two meanings of an open
-		// shape, which this is now the third instance of.
-		if len(s.Extra.Attrs) > 0 {
-			leaf := Schema{
-				Element: c.Name,
-				Attrs:   s.Extra.Attrs,
-				Text:    &Field{Type: s.Extra.Type},
-			}
-			return leaf.Conform(c, at)
+		// Unconditional, which it could not be while one declaration meant two
+		// things. Three earlier attempts at this had to be hedged with "only
+		// when something was declared", because the meta-schema was spelling
+		// its recursion as an Extra and every hedge was really a way of saying
+		// so. Recursive says it directly and the hedge is gone.
+		leaf := Schema{
+			Element: c.Name,
+			Attrs:   s.Extra.Attrs,
+			Text:    &Field{Type: s.Extra.Type},
 		}
-		return checkValue(at, "<"+c.Name+">", c.Text, Field{Type: s.Extra.Type})
+		return leaf.Conform(c, at)
 	}
 	counts[c.Name]++
 	if counts[c.Name] > 1 && !child.Repeated {
@@ -419,6 +444,9 @@ func (s *Schema) Node() *Node {
 	}
 	n.Child(ListEl("elements", "element", children...))
 
+	if s.Recursive != nil {
+		n.Child(El("recursive").SetText(s.Recursive.Named))
+	}
 	if s.Extra != nil {
 		extra := El("extra").
 			Attr("type", string(s.Extra.Type)).
