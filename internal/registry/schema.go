@@ -30,14 +30,22 @@ const (
 	// the shape, which is the half §3.5 promised and the first version could
 	// not deliver.
 	//
-	// VersionContract is 3 because an open shape can now publish the structure
-	// it takes when its value is not a scalar. A consumer that pinned v2 read
+	// v3 was where an open shape began publishing the structure it takes when
+	// its value is not a scalar. A consumer that pinned v2 read
 	// `<extra type="string">` and had no way to learn that a Data Center sprint
-	// field arrives as a list of sprints rather than as text; v3 carries that
+	// field arrives as a list of sprints rather than as text; v3 carried that
 	// shape as an <element> under <extra>. The trigger was issue 154, where the
 	// writer emitted a container the schema described as a string, which is the
 	// one disagreement this kind exists to make impossible.
-	VersionContract = 3
+	//
+	// VersionContract is 4 because an open shape now also publishes its
+	// attributes, and because the two things `<extra>` used to mean have been
+	// split. An element whose children a schema declines to describe now says
+	// so with `<recursive>` rather than by borrowing the open-shape spelling
+	// and claiming its children were strings. A consumer walking a schema can
+	// now tell "these names are open and here is what they hold" from "these
+	// are instances of the shape you are already reading".
+	VersionContract = 4
 )
 
 func init() {
@@ -186,26 +194,30 @@ func elementSchema() *render.Schema {
 		Children: []render.Child{
 			{Schema: render.ListSchema("attributes", "attribute", fieldShape("attribute"))},
 			{Schema: fieldShape("text"), Optional: true},
+			// A child element is an <element> like the one being described, so
+			// writing it out here would mean writing this schema inside
+			// itself. Recursive says that rather than implying it.
 			{Schema: &render.Schema{Element: "elements", ListOf: "element", Attrs: []render.Field{
 				{Name: "count", Type: render.TypeInt},
-			}, Extra: &render.Extra{
-				Named: "element, recursively — this schema does not repeat itself",
-				Type:  render.TypeString,
+			}, Recursive: &render.Recursive{
+				Named: "element, because this schema contains itself",
 			}}},
-			// An open shape that also has a structured form carries the shape
-			// as an <element> child, so `jr contract` publishes it. The open
-			// shape here stops the recursion exactly as its sibling above
-			// does, and for the same reason: this schema does not repeat
-			// itself.
+			// An open shape publishes its attributes and, where it has one,
+			// the structure it takes when its value is not a scalar. Both are
+			// written with the same shapes this schema already describes, so
+			// this declines to describe them for the same reason its sibling
+			// above does.
 			{Schema: &render.Schema{
 				Element: "extra",
 				Attrs:   []render.Field{{Name: "type", Type: render.TypeString}},
 				Text:    &render.Field{Type: render.TypeString},
-				Extra: &render.Extra{
-					Named: "element, when the open shape has a structured form",
-					Type:  render.TypeString,
+				Recursive: &render.Recursive{
+					Named: "attributes and element, because this schema contains itself",
 				},
 			}, Optional: true},
+			// What a Recursive prints. A leaf, because the whole point of one
+			// is that there is nothing below it to describe.
+			{Schema: render.Leaf("recursive", render.TypeString), Optional: true},
 		},
 	}
 }
