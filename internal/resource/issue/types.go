@@ -22,9 +22,9 @@ import (
 // commit that changes the corresponding golden file.
 const (
 	KindList    = "issue.list"
-	VersionList = 9
+	VersionList = 10
 	KindGet     = "issue.get"
-	VersionGet  = 10
+	VersionGet  = 11
 )
 
 // Body formats a description can arrive in.
@@ -192,7 +192,24 @@ type Issue struct {
 
 // ExtraField is one field requested by id and reduced to a scalar.
 type ExtraField struct {
-	ID    string
+	ID string
+	// Name is the field's name in the site's catalogue, empty when the
+	// catalogue was not consulted.
+	//
+	// It is the *catalogue's* name and not the one the caller typed, which is
+	// what makes it safe to emit: `--field 'Story Points'` and
+	// `--field customfield_10042` resolve to one id and render identical
+	// bytes. Echoing the typed spelling would make the output depend on which
+	// synonym was used, which is the thing ExtraColumns refuses to do.
+	Name string
+	// Set says the issue has a value for this field.
+	//
+	// Four different payloads reduce to an empty cell and a caller cannot tell
+	// them apart from the value alone: the key absent from `fields` entirely,
+	// an explicit null, an empty string, and an empty array. Reporting an
+	// empty element and leaving the caller to guess whether that is a value, a
+	// blank, or a broken response is the defect this exists for.
+	Set   bool
 	Value string
 	// sprints is set when the value was Data Center's sprint field: an array
 	// of Greenhopper toString dumps. It is unexported because it exists to
@@ -452,7 +469,8 @@ func decodeDescription(raw json.RawMessage, mode BodyMode) (text, format string,
 // caller asked for beyond the default set, and thread says whether the caller
 // asked for the comment projection.
 func decodeIssues(
-	raw []json.RawMessage, extras []string, mode BodyMode, want Projections,
+	raw []json.RawMessage, extras []string, labels map[string]string,
+	mode BodyMode, want Projections,
 ) ([]Issue, error) {
 	out := make([]Issue, 0, len(raw))
 	for i, data := range raw {
@@ -467,7 +485,7 @@ func decodeIssues(
 		if err != nil {
 			return nil, err
 		}
-		issue.Extra = extraFields(data, extras)
+		issue.Extra = extraFields(data, extras, labels)
 		if err := attachProjections(&issue, data, mode, want); err != nil {
 			return nil, err
 		}
@@ -674,7 +692,7 @@ func (i Issue) ThreadComplete() bool {
 // than omitted, so a caller can tell "this issue has no value for it" from "I
 // asked for something that does not exist" — the latter shows up as empty on
 // every row.
-func extraFields(data json.RawMessage, names []string) []ExtraField {
+func extraFields(data json.RawMessage, names []string, labels map[string]string) []ExtraField {
 	if len(names) == 0 {
 		return nil
 	}
@@ -689,11 +707,14 @@ func extraFields(data json.RawMessage, names []string) []ExtraField {
 	out := make([]ExtraField, 0, len(names))
 	for _, name := range names {
 		raw := fields[name]
-		f := ExtraField{ID: name, Value: scalarize(raw)}
+		f := ExtraField{ID: name, Name: labels[name], Value: scalarize(raw)}
 		if refs, ok := sprintValue(raw); ok {
 			f.sprints = refs
 			f.Value = joinSprintNames(refs)
 		}
+		// A sprint list is a value even though it contributes no text of its
+		// own, so it is asked about separately rather than through Value.
+		f.Set = f.Value != "" || len(f.sprints) > 0
 		out = append(out, f)
 	}
 	return out
@@ -854,10 +875,17 @@ func (i Issue) Node() *render.Node {
 	// TSV column path is just the id.
 	for _, f := range i.Extra {
 		if len(f.sprints) > 0 {
-			n.Child(sprintNode(f.ID, f.sprints))
+			n.Child(sprintNode(f.ID, f.sprints).AttrIf("name", f.Name))
 			continue
 		}
-		n.Leaf(f.ID, f.Value)
+		// `set` is written only when false, because the common field has a
+		// value and would otherwise pay for an attribute on every row saying
+		// so. Its absence means the element's text is the value.
+		el := render.El(f.ID).AttrIf("name", f.Name).SetText(f.Value)
+		if !f.Set {
+			el.Attr("set", "false")
+		}
+		n.Child(el)
 	}
 
 	if i.HasThread {

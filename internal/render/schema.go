@@ -116,6 +116,13 @@ type Extra struct {
 	// is not knowable here, which is what makes this an open shape in the
 	// first place. Conform substitutes the name it actually found.
 	Structured *Schema
+	// Attrs are the attributes an extra element may carry.
+	//
+	// An open shape used to mean the element name was open and everything else
+	// was fixed at "text of this type". That was enough while the only thing a
+	// requested field could say was its value, and stopped being enough when
+	// one had to say what it is called and whether it is set at all.
+	Attrs []Field
 }
 
 // Leaf is the shape of an element that carries nothing but text, which is most
@@ -283,6 +290,28 @@ func (s *Schema) conformChild(c *Node, at string, counts map[string]int) error {
 			alt.Element = c.Name
 			return alt.Conform(c, at)
 		}
+		// Built from the open shape and checked like any other element, so an
+		// attribute nobody declared is refused here exactly as it would be on
+		// a closed one. Conform is reused rather than reimplemented because
+		// the two used to disagree: this branch checked the text and nothing
+		// else, which is how an undeclared attribute reached stdout.
+		//
+		// Only when attributes were declared, for the third time and the same
+		// reason: the schema document's own meta-schema uses an open shape to
+		// mean "an element, recursively", and every one of those carries a
+		// `name`. Enforcing an empty declaration against them refuses every
+		// schema jr publishes. What is enforced is what is declared, and an
+		// open shape that declares nothing about attributes still says nothing
+		// about them. See the backlog card on the two meanings of an open
+		// shape, which this is now the third instance of.
+		if len(s.Extra.Attrs) > 0 {
+			leaf := Schema{
+				Element: c.Name,
+				Attrs:   s.Extra.Attrs,
+				Text:    &Field{Type: s.Extra.Type},
+			}
+			return leaf.Conform(c, at)
+		}
 		return checkValue(at, "<"+c.Name+">", c.Text, Field{Type: s.Extra.Type})
 	}
 	counts[c.Name]++
@@ -394,6 +423,13 @@ func (s *Schema) Node() *Node {
 		extra := El("extra").
 			Attr("type", string(s.Extra.Type)).
 			SetText(s.Extra.Named)
+		if len(s.Extra.Attrs) > 0 {
+			attrs := make([]*Node, 0, len(s.Extra.Attrs))
+			for _, f := range s.Extra.Attrs {
+				attrs = append(attrs, fieldNode("attribute", f))
+			}
+			extra.Child(ListEl("attributes", "attribute", attrs...))
+		}
 		if s.Extra.Structured != nil {
 			extra.Child(s.Extra.Structured.Node())
 		}

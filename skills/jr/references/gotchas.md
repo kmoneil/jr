@@ -186,6 +186,19 @@ jr issue edit ENG-101 --field-json customfield_11350='"ENG-42"'
 `jr field list --format json` carries both the schema type and Jira's own type
 key, which is the only thing that tells two `any` fields apart.
 
+**A requested field says whether it has a value.** An empty element used to be
+unreadable: a field with no value, a field holding an empty string, and a field
+the server never sent all looked the same.
+
+```console
+jr issue get ENG-101 --field 'Story Points'
+# → <customfield_10042 name="Story Points" set="false"/>
+```
+
+`set="false"` appears only when the issue has no value, so its absence means the
+text is the value. The `name` is your site's catalogue name, not what you typed,
+so asking by name and by id give identical bytes. The TSV header stays the id.
+
 **`--field Sprint` is structured on both deployments.** Data Center sends that
 field as Greenhopper's Java `toString`, one dump per sprint the issue has been
 through, so on a long-lived issue the raw value runs to thousands of characters.

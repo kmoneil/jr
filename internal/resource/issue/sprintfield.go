@@ -163,7 +163,7 @@ func sprintNode(id string, refs []sprintRef) *render.Node {
 // it onto every issue row would be the same field twice with two chances to
 // disagree.
 func sprintFieldSchema() *render.Schema {
-	return render.ListSchema("field", "sprint", &render.Schema{
+	s := render.ListSchema("field", "sprint", &render.Schema{
 		Element: "sprint",
 		Attrs: []render.Field{
 			{Name: "id", Type: render.TypeString, Optional: true},
@@ -174,4 +174,28 @@ func sprintFieldSchema() *render.Schema {
 		},
 		Text: &render.Field{Type: render.TypeString},
 	})
+	// A sprint container carries the field's name for the same reason a scalar
+	// one does. It carries no `set`: this shape is only built when sprints
+	// parsed, and a field with none never reaches it.
+	s.Attrs = append(s.Attrs, render.Field{
+		Name: "name", Type: render.TypeString, Optional: true,
+	})
+	return s
+}
+
+// extraFieldAttrs are the attributes any requested field may carry.
+//
+// `name` is optional because a command that resolved no catalogue has none to
+// report, and an absent name is a different fact from an empty one.
+//
+// `set` is optional in the strict sense that it is written only when false. A
+// field with a value says nothing, because the common row should not pay for an
+// attribute repeating what its own text already shows. Its absence means the
+// text is the value; its presence means the issue has no value for the field,
+// which is the one thing an empty element could not previously say.
+func extraFieldAttrs() []render.Field {
+	return []render.Field{
+		{Name: "name", Type: render.TypeString, Optional: true},
+		{Name: "set", Type: render.TypeBool, Optional: true},
+	}
 }
