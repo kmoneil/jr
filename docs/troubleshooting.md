@@ -770,6 +770,22 @@ message.
 one. Jira will not run a sprint that has no dates; this says so without spending
 the round trip.
 
+### `SPRINT_CLOSED`
+
+`jr sprint add` into a sprint that has finished. Nothing moved.
+
+This is worth knowing about if you keep a sprint id around: a sprint rolls over
+and an id you looked up earlier now names a closed one. The move is refused
+rather than quietly landing somewhere wrong, but the id you have is stale and
+the next one will be too.
+
+```console
+$ jr sprint list --state active --state future
+```
+
+names the sprints that will take issues. If you are scripting this, resolve the
+sprint each time rather than carrying one between runs.
+
 ### `UNBOUNDABLE_DATE`
 
 `jr issue activity --since startOfWeek()`, or any other date function. Every

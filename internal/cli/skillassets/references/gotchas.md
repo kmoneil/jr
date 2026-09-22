@@ -103,6 +103,18 @@ carried out at close.
 If you want what is in a sprint now, that is a different question than
 `--jql 'sprint = 1002'` answers.
 
+**And a sprint id you looked up earlier goes stale.** Sprints roll over. An id
+resolved at the start of a long session can name a closed sprint by the end of
+it, and `sprint add` into a closed one is refused with `SPRINT_CLOSED` and moves
+nothing. Resolve it again rather than carrying it:
+
+```console
+jr sprint list --state active --state future
+```
+
+The same applies to any id with a lifecycle, such as a version or a board that
+gets archived. Re-derive; do not remember.
+
 ## `text ~` is stemmed, unranked, and silent about stop words
 
 Measured against Jira 10.4.0 Data Center.
