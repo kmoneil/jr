@@ -120,6 +120,38 @@ $ jr issue list --jql 'text ~ "connection reset"'
 $ jr issue list --type Bug --jql 'summary ~ "timeout" OR summary ~ "deadline"'
 ```
 
+### What `text ~` actually does
+
+Measured against Jira 10.4.0 Data Center. Worth reading before you conclude a
+search is broken, because three of these surprise people:
+
+| You write | What happens |
+| --- | --- |
+| `text ~ "truncate"` | matches a stored "truncated". The index stems. |
+| `text ~ "a" AND text ~ "b"` | the intersection, as you would hope, and it works across fields: one word in the summary and the other in the description still matches |
+| `text ~ "the"` | **nothing, with exit 0.** A search index discards common words, and the empty answer is identical to the one for a word that appears nowhere |
+
+**There is no relevance ranking.** `jr` puts `ORDER BY issuekey DESC` on every
+query, so the "top" of a text search is the highest issue key among the matches
+and nothing more. The order is deliberate, because a result with no `ORDER BY`
+is in whatever order the server felt like and two pages of one walk can
+interleave two different orderings. But it does mean a text search is not
+sorted by how well anything matched, and never was:
+
+```console
+# Not "the five best matches". The five highest keys that matched.
+$ jr issue list --jql 'text ~ "connection reset"' --limit 5
+```
+
+Use `--sort` to order by a field you care about. A relevance order is not
+available: `--jql` carrying its own `ORDER BY` is refused, because the fragment
+is wrapped in parentheses and JQL does not allow one there.
+
+So when a text search disappoints, the order to check things in is: is one of
+your words a stop word (try each alone), is the word stemmed to something you
+did not expect, and are you reading the top of a key-ordered list as though it
+were ranked.
+
 Check a query without running it:
 
 ```console
