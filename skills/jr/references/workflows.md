@@ -204,6 +204,12 @@ and `issue edit --description-file <path>` sends a file's exact bytes back,
 trailing newline. The precondition still comes from a plain `issue get`: a
 raw read emits no document to carry one.
 
+The same pair seeds a ticket from a template issue: `--raw-field` the
+template's description to a file, then `issue create --description
+"$(cat template.wiki)"`. A scaffold does not miss the trailing newline the
+substitution eats; where bytes must survive exactly, create and then
+`issue edit --description-file`.
+
 ## Working from a script or CI
 
 Everything comes from the environment. No login step, no config file:
