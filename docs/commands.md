@@ -68,7 +68,7 @@ The flags themselves:
 - **[project](#project)** — [`project components`](#jr-project-components), [`project get`](#jr-project-get), [`project list`](#jr-project-list), [`project statuses`](#jr-project-statuses), [`project versions`](#jr-project-versions)
 - **[schema](#schema)** — [`schema`](#jr-schema)
 - **[skill](#skill)** — [`skill`](#jr-skill)
-- **[sprint](#sprint)** — [`sprint add`](#jr-sprint-add), [`sprint close`](#jr-sprint-close), [`sprint create`](#jr-sprint-create), [`sprint get`](#jr-sprint-get), [`sprint list`](#jr-sprint-list), [`sprint start`](#jr-sprint-start)
+- **[sprint](#sprint)** — [`sprint add`](#jr-sprint-add), [`sprint close`](#jr-sprint-close), [`sprint create`](#jr-sprint-create), [`sprint current`](#jr-sprint-current), [`sprint get`](#jr-sprint-get), [`sprint list`](#jr-sprint-list), [`sprint start`](#jr-sprint-start)
 - **[user](#user)** — [`user get`](#jr-user-get), [`user list`](#jr-user-list), [`user me`](#jr-user-me)
 - **[version](#version)** — [`version`](#jr-version)
 
@@ -3134,6 +3134,41 @@ given them when it is started, which is what the Jira UI does; passing them now
 records the intended window up front.
 
 --dry-run prints the exact request, body included, and sends nothing.
+
+### `jr sprint current`
+
+Resolve the board's one active sprint
+
+```
+jr sprint current
+```
+
+Examples:
+
+```console
+jr sprint current
+jr --board 3 sprint current --format json
+```
+
+| Emits | Schema | When |
+| --- | --- | --- |
+| `sprint.get` | v1 | always |
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
+
+Answers with the board's single active sprint, exactly as `jr sprint get` reports one.
+
+"The current sprint" is a question about a board, so this reads the board the
+way `jr sprint list` does: --board, JIRA_BOARD, or
+the context. A board with no active sprint is NO_ACTIVE_SPRINT at exit 5, and
+a board running more than one is AMBIGUOUS_SPRINT at exit 2 naming every
+candidate, because handing a script one of several sprints without saying so
+would be a guess dressed as an answer.
+
+The id this reports goes stale the moment the sprint closes. Re-derive it near
+the write that uses it rather than remembering it across a session; a reused
+stale id is refused by `jr sprint add` as
+SPRINT_CLOSED either way.
 
 ### `jr sprint get`
 

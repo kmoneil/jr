@@ -257,7 +257,7 @@ Generated from the registry of the binary that printed this, so it is the truth
 about that binary and not about the project. A reader build lists no mutating
 commands because it contains none.
 
-67 commands, profile `full`, tags `prompt, render, mcp, write, admin`.
+68 commands, profile `full`, tags `prompt, render, mcp, write, admin`.
 
 | Command | | Does |
 | --- | --- | --- |
@@ -321,6 +321,7 @@ commands because it contains none.
 | `sprint add` | `M` | Move issues into a sprint |
 | `sprint close` | `M D` | Close an active sprint |
 | `sprint create` | `M` | Create a future sprint on a board |
+| `sprint current` |  | Resolve the board's one active sprint |
 | `sprint get` |  | Fetch one sprint |
 | `sprint list` |  | List a board's sprints |
 | `sprint start` | `M` | Start a future sprint |

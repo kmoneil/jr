@@ -43,7 +43,7 @@ as it was. No script downstream will ever mistake that page for the whole result
 set, and the same is true of every command, in every format, on every path.
 
 > **Status: released, and pinnable.** The command surface is complete and
-> tested: 67 commands in the full build, 45 in the reader. Every output kind
+> tested: 68 commands in the full build, 46 in the reader. Every output kind
 > also carries its own schema version, and those move independently of the
 > release, so a consumer pins `kind` and `v` from the document it parses rather
 > than the version it installed. See
@@ -227,8 +227,8 @@ product, which is the same idea from the other end.
 
 ## What works today
 
-Everything below is built, tested, and asserted by the suite: 67 commands in
-the full build, 45 in the reader.
+Everything below is built, tested, and asserted by the suite: 68 commands in
+the full build, 46 in the reader.
 
 ```
 jr auth      login logout status token
@@ -241,7 +241,7 @@ jr issue     attachment list download upload
 jr project   list get components versions statuses
 jr user      list get me
 jr board     list get
-jr sprint    list get create add start close
+jr sprint    list get current create add start close
 jr epic      list get add remove
 jr jql       validate explain
 jr field     list
@@ -289,7 +289,7 @@ carried a feature behind them. A tag that names a capability no build can
 perform is the one thing this tool promises not to do, and each of them is a
 two-line file on the day somebody needs it.
 
-Everything else described in this README is built. 67 commands in the full
+Everything else described in this README is built. 68 commands in the full
 build, and `internal/lint` asserts that number against the binaries rather than
 against this sentence. Every tag the build declares now gates real code, and
 `internal/lint/tags_test.go` fails the day one stops.
@@ -353,7 +353,7 @@ because a reader build holds none:
 
 ```console
 $ bin/jr-reader skill | grep 'commands, profile'
-45 commands, profile `reader`, tags `mcp`.
+46 commands, profile `reader`, tags `mcp`.
 ```
 
 Install it by symlinking the copy in this repository, which `make skill`
