@@ -1324,6 +1324,30 @@ is `HEADER_AND_FORMAT` and exit 2: they name two different outputs, and
 accepting both would mean ignoring one. `JIRA_FORMAT` is not grounds for that
 refusal, because it is set once for a whole shell.
 
+Two is not a cap, and the third will not be argued from silence. The rule
+these two follow, stated once so the next one is designed rather than
+excused:
+
+- **Opt-in by flag, never by default, and never a `--format`.** The flag
+  names one value ("the file", "the header line", "this field's stored
+  bytes"), so nothing generic ever learns to emit a bare value.
+- **An explicit `--format` beside it refuses**, the way `--header` does: the
+  two name different outputs, and honoring both would mean ignoring one.
+  `JIRA_FORMAT` is not grounds for the refusal, because it is set once for a
+  whole shell.
+- **`mcp serve` refuses it with `NO_STDOUT`**, exit 2, before a byte lands
+  on the JSON-RPC stream.
+- **The bytes are exact.** What was stored, nothing prepended, nothing
+  appended, no trailing newline the value did not carry: byte-exactness is
+  the only reason to leave the envelope off.
+- **A value that does not exist refuses.** Zero bytes on stdout cannot say
+  whether the value was empty or absent, which is the same collapse the
+  `set` attribute exists to prevent inside a document, and out here there is
+  no attribute to prevent it with.
+
+Errors are unchanged by all of this: they go to stderr as documents, with
+their codes and exits, whatever stdout was asked to carry.
+
 A caller with no stdout to spare, `mcp serve`, where bytes would land on the
 JSON-RPC stream as a frame the peer cannot parse, gets `NO_STDOUT` and exit 2
 rather than a corrupted session. Both invocations refuse there.
