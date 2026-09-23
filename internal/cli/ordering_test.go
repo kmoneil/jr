@@ -272,10 +272,11 @@ func invocationWith(c *registry.Command, bad string) *registry.Invocation {
 	var args []string
 	if len(c.Args) > 0 {
 		args = append(args, bad)
-		for _, a := range c.Args[1:] {
-			if !a.Required {
-				break
-			}
+		// Every declared argument after the first gets a filler, required or
+		// not: move and assign stopped requiring theirs when --apply arrived,
+		// and a one-argument invocation is refused for its shape before the
+		// malformed identifier is ever read.
+		for range c.Args[1:] {
 			args = append(args, "1")
 		}
 	}

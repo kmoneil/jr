@@ -53,16 +53,26 @@ long run then skips or repeats while reporting itself complete.
 
 ## Bulk changes across a set
 
-`issue edit` takes several keys only through a plan, and that is the only path
-to a bulk write. `--plan-out <file>` sends nothing and writes a document: one
-row per issue, each carrying its own baseline and an idempotency key, with the
-change written once because a plan applies one change to many issues. Read it,
-then `--apply <file>`.
+`issue edit`, `issue move` and `issue assign` take several keys only through
+a plan, and that is the only path to a bulk write. `--plan-out <file>` sends
+nothing and writes a document: one row per issue, each carrying its own
+baseline and an idempotency key, with the change written once because a plan
+applies one change to many issues. On move and assign, every argument before
+the last is a key and the last is the transition or the assignee. Read the
+document, then `--apply <file>` with the same verb.
 
 ```console
 jr issue edit ENG-101 ENG-102 ENG-103 --add-label triaged --plan-out plan.xml
+jr issue move ENG-104 ENG-105 ENG-106 Done --plan-out close.xml
+jr issue assign ENG-104 ENG-105 'Ada Lovelace' --plan-out hand-off.xml
 jr issue edit --apply plan.xml
 ```
+
+A move plan resolves the transition against each row's own workflow and
+records the id, or the reason there is none: a blocked row is reported
+`TRANSITION_UNAVAILABLE` at apply with nothing sent for it. The assignee is
+resolved once, when the plan is built, so the plan means the same person
+whenever it runs.
 
 Every row is attempted. Each is reported `applied`, `skipped` or `failed` with
 its own error code, and a row somebody changed since the plan was built is

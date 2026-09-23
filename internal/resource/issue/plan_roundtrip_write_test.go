@@ -54,7 +54,7 @@ func renderPlan(t *testing.T, p *issue.Plan) string {
 // either way. TestEveryChangeFieldSurvivesThePlan holds that gap.
 func TestAPlanSurvivesBeingWrittenAndReadBack(t *testing.T) {
 	want := planFixture()
-	got, err := issue.ParsePlan(strings.NewReader(renderPlan(t, want)))
+	got, err := issue.ParsePlan(strings.NewReader(renderPlan(t, want)), "issue.edit")
 	if err != nil {
 		t.Fatalf("a plan this tool wrote was refused by its own reader: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestClearingLabelsSurvivesSeparatelyFromLeavingThemAlone(t *testing.T) {
 		Change: issue.EditOptions{Labels: []string{}},
 		Rows:   []issue.PlanRow{{Key: "ENG-1", IdempotencyKey: "auto-a"}},
 	}
-	got, err := issue.ParsePlan(strings.NewReader(renderPlan(t, clearing)))
+	got, err := issue.ParsePlan(strings.NewReader(renderPlan(t, clearing)), "issue.edit")
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestClearingLabelsSurvivesSeparatelyFromLeavingThemAlone(t *testing.T) {
 		Change: issue.EditOptions{Summary: "x"},
 		Rows:   []issue.PlanRow{{Key: "ENG-1", IdempotencyKey: "auto-a"}},
 	}
-	got, err = issue.ParsePlan(strings.NewReader(renderPlan(t, leaving)))
+	got, err = issue.ParsePlan(strings.NewReader(renderPlan(t, leaving)), "issue.edit")
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

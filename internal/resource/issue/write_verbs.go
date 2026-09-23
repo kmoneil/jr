@@ -85,18 +85,33 @@ the case it is for.`),
 			buildinfo.App + " issue assign ENG-101 'Ada Lovelace' --if-unchanged eyJkIjo",
 		}, "\n"),
 		Args: []registry.Arg{
-			{Name: "key", Usage: "issue key, e.g. ENG-101", Required: true},
 			{
-				Name: "assignee", Required: true,
-				Usage: "the user, or the word unassigned or default",
+				Name: "key",
+				Usage: "issue key, e.g. ENG-101; several keys before the " +
+					"assignee plan a bulk assignment, and --apply takes none",
+			},
+			{
+				Name: "assignee", Variadic: true,
+				Usage: "the user, or the word unassigned or default, always " +
+					"the last argument",
 			},
 		},
-		Flags:        []registry.Flag{ifUnchangedFlagDecl(), dryRunFlag()},
+		Flags: []registry.Flag{
+			ifUnchangedFlagDecl(), dryRunFlag(), planOutFlag(), applyFlag(),
+		},
 		Mutating:     true,
 		NeedsJira:    true,
 		RequiresTags: []string{"write"},
 		Outputs: []registry.Output{
-			{Kind: KindAssign, Version: VersionAssign},
+			{Kind: KindAssign, Version: VersionAssign, When: "one issue is assigned"},
+			{
+				Kind: KindPlan, Version: VersionPlan,
+				When: "--" + planOutFlagName + " is given",
+			},
+			{
+				Kind: KindApply, Version: VersionApply,
+				When: "--" + applyFlagName + " is given",
+			},
 			registry.DryRunOutput(),
 		},
 		ExitCodes: writeExits(),
@@ -146,23 +161,39 @@ func (c *Client) AssignRequest(key, assignee string) (transport.Request, error) 
 // names nobody — or two people — is refused here rather than by a 400 that
 // says which field was wrong and nothing else.
 func validateAssign(ctx context.Context, inv *registry.Invocation) error {
-	if err := requireKey(inv); err != nil {
+	if err := validateVerbShape(inv, "assignee", nil); err != nil {
 		return err
 	}
-	if len(inv.Args) < 2 {
-		return errs.Usage("INVALID_USER", "a user is required").
-			WithRemedy("pass a name, an id, or the word unassigned")
+	if inv.Flags.String(applyFlagName) != "" {
+		// The plan validates itself when it is read.
+		return nil
+	}
+	keys, assignee := lastArgSplit(inv)
+	for _, arg := range keys {
+		if _, ok := ParseKey(arg); !ok {
+			return errs.Usage("INVALID_KEY", "%q is not an issue key", arg).
+				WithDetail("an issue key looks like ENG-123").
+				WithRemedy("every argument before the last is a key; the " +
+					"last is the assignee")
+		}
 	}
 	if err := validatePrecondition(inv); err != nil {
 		return err
 	}
-	return validateAssignee(ctx, inv, inv.Args[1])
+	return validateAssignee(ctx, inv, assignee)
 }
 
 func runAssign(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) {
 	client, err := writeClientFor(ctx, inv, "issue assign")
 	if err != nil {
 		return nil, err
+	}
+
+	if path := inv.Flags.String(applyFlagName); path != "" {
+		return runApply(ctx, inv, client, path, planVerbAssign)
+	}
+	if path := inv.Flags.String(planOutFlagName); path != "" {
+		return runAssignPlanOut(ctx, inv, client, client.Site, path)
 	}
 
 	assignee := resolvedAssignee(inv, inv.Args[1])

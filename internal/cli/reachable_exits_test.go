@@ -220,6 +220,12 @@ var extraArgs = map[string][]string{
 	// plan, so probeArgs, which supplies only required positionals, now
 	// supplies none and the run is refused with NO_ISSUES.
 	"issue.edit": {"--summary", "probe", "eng-1"},
+	// Move and assign are the same story: their positionals stopped being
+	// Required when --apply arrived, so probeArgs supplies none. The
+	// transition "1" and the sentinel assignee pass Validate without a
+	// request, so the probe reaches the layer it breaks.
+	"issue.move":   {"eng-1", "1"},
+	"issue.assign": {"eng-1", "unassigned"},
 }
 
 // probeArgs builds a command line that gets past cobra and past the command's
