@@ -629,6 +629,44 @@ do not catch, add the test in the same change and cite it here.
   because a build made on the host is executable by mode and cannot exec in
   the container.
   **Enforced by:** `TestTheRigRefusesAProfileThatNamesAnotherAddress`.
+- **Every preflight step can fail, and each runs against what changed.**
+  `scripts/preflight` exists because the gates that bite were found late: the
+  complexity limit by a three-minute `make test`, gofumpt by a twenty-minute
+  `make ci`. A preflight step that cannot fail reads exactly like a clean tree,
+  and so does one handed an empty package list, so both halves are driven: a
+  red staged for each of the six steps is reported by that step alone, and the
+  packages it selects are the ones a fixture, an untracked file or `go.mod`
+  says changed. A tool that is not installed fails its step rather than
+  skipping it.
+  **Enforced by:** `TestEveryPreflightStepCanFail`,
+  `TestPreflightChecksThePackagesThatChanged`.
+- **A commit on the default branch is refused before it exists.** `main` is
+  protected, so the push is refused anyway, but by then the commit has to be
+  moved; it happened twice before the guard. The pre-commit hook runs
+  `scripts/guard branch` first, the default is read from `origin/HEAD` rather
+  than assumed, and a detached HEAD passes, because that is a rebase replaying
+  commits.
+  **Enforced by:** `TestACommitOnTheDefaultBranchIsRefused`,
+  `TestTheDefaultBranchIsTheRemotesNotAName`,
+  `TestTheHooksAndTheBuildTargetsCallTheGuards`.
+- **No em dash is added to prose, and none already there blocks an edit.**
+  CLAUDE.md forbids them in docs, code comments and commit messages, and says
+  the hundreds already present stay until their line is edited for another
+  reason. So the guard reads added lines only, and only prose: every line of
+  a hand-written markdown file and the comment lines of code, never a string
+  literal, a generated file or testdata. The commit-msg hook reads the
+  message the same way.
+  **Enforced by:** `TestAnEmDashIsRefusedOnlyInAddedProse`,
+  `TestAnExistingEmDashDoesNotBlockAnEdit`,
+  `TestAnEmDashInACommitMessageIsRefused`.
+- **A build never replaces a binary made for another machine unless told
+  where to build.** In the Linux dev container `bin/` holds the macOS host's
+  build, and `make ci` ends in build-all, which replaced all four binaries on
+  2026-09-23. Every build target depends on `bin-guard`, which asks the
+  existing `bin/jr` to run and refuses on 126, "found but cannot execute"; a
+  `BIN` given on the command line is a decision and goes through.
+  **Enforced by:** `TestABinaryBuiltElsewhereIsNotReplaced`,
+  `TestTheBuildGuardRunsFromMake`.
 
 ## Credentials and safety
 
@@ -645,6 +683,18 @@ do not catch, add the test in the same change and cite it here.
   `TestAListingBaselineStillRefusesAWriteToAMovedIssue`,
   `TestAnIssueThatMovedAcrossTheSecondIsStillRefused`.
 
+- **A probe's credential reaches the server it belongs to and nothing else.**
+  `scripts/probe` replaced a curl wrapper rebuilt by hand in every measuring
+  session, one of which put the sandbox token on curl's command line, where
+  `ps` shows it to anyone on the machine. The header now reaches curl on
+  stdin and never appears in its arguments, the output or `PROBE_LOG`. A path
+  with a scheme or a leading `//` names a host and is refused before curl is
+  called. The sandbox is a jr context whose host must be an Atlassian Cloud
+  one, checked on the host rather than the URL, so no context naming another
+  site, production included, gets a request.
+  **Enforced by:** `TestAProbeOfTheRigSendsItsTokenOnlyToTheRig`,
+  `TestAProbeRefusesAPathThatLeavesTheSite`,
+  `TestTheSandboxIsOnlyEverACloudSite`.
 - **A write never reports success for something the server discarded.** Jira
   takes a transition that has no screen, carrying a comment, answers 204, and
   drops the comment. Measured on Data Center 10.4.0, where the comment count

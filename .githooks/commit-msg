@@ -127,4 +127,9 @@ printf '%s\n' "$whole" | grep -Eiq 'Generated with \[?Claude Code' &&
 	attrib "a generator credit" 'Generated with \[?Claude Code' \
 		"Remove the line."
 
+# No em dashes. CLAUDE.md forbids them in commit messages among everything
+# else written here, and a message is the one piece of prose the pre-commit
+# guard cannot see, because it does not exist yet when that hook runs.
+scripts/guard prose --message "$1"
+
 exit 0

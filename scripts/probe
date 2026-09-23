@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+# probe: one raw request to one of the two Jiras this project may write to,
+# with the credential kept off the command line.
+#
+#   scripts/probe rig METHOD PATH [BODY]       the local Data Center rig
+#   scripts/probe sandbox METHOD PATH [BODY]   the Cloud sandbox
+#   scripts/probe issue rig|sandbox KEY        one JSON line: status,
+#                                              resolution, comments, updated
+#
+#   scripts/probe rig GET /rest/api/2/issue/ENG-1/transitions?expand=transitions.fields
+#   scripts/probe sandbox POST /rest/api/3/issue/ET-6/transitions '{"transition":{"id":"11"}}'
+#
+# Prints the status as `HTTP 204`, then the body. Exits 0 when the server
+# answered, whatever it answered, because a refusal is usually what is being
+# measured; 1 when it could not be reached; 2 on a usage mistake or a
+# refusal of the probe's own.
+#
+# Why it exists: the recon rule says to run a card's claim against a real
+# server, and every session that did rebuilt the same curl wrapper by hand,
+# one of which put the sandbox token on curl's command line, where `ps` shows
+# it to anyone on the machine. Here the credential reaches curl on stdin.
+#
+# Two servers and no others. The rig is found the way every rig script finds
+# it, with its throwaway profile's token. The sandbox is the jr context named
+# by PROBE_SANDBOX, and its site has to be an Atlassian Cloud host, so a
+# context naming anything else, production included, is refused before a
+# request is built. PROBE_SANDBOX_SUFFIX changes the host suffix, for the
+# tests, which may not name a real one.
+#
+# PROBE_LOG, when set, gets one JSON line per exchange: the method, the path,
+# both bodies and the status. Never a header.
+set -euo pipefail
+
+# shellcheck disable=SC1091
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/dc/common.sh"
+
+usage() {
+	say "usage: scripts/probe rig|sandbox METHOD PATH [BODY]"
+	say "       scripts/probe issue rig|sandbox KEY"
+	exit 2
+}
+
+refuse() {
+	say "probe: $*"
+	exit 2
+}
+
+# check_path refuses a path that could send the credential somewhere else. A
+# scheme or a leading // names a host, and curl would go there with the
+# Authorization header this script just handed it.
+check_path() {
+	case $1 in
+	//*) refuse "a path starting // names a host; give a path on the site, /rest/..." ;;
+	/*) ;;
+	*) refuse "a path starts with /, e.g. /rest/api/2/myself" ;;
+	esac
+	if [[ $1 =~ [[:space:][:cntrl:]] ]]; then
+		refuse "the path holds whitespace or a control character; encode it"
+	fi
+}
+
+# target sets base, api and header for rig or sandbox.
+target() {
+	case $1 in
+	rig)
+		base=$(jira_base) || exit 1
+		api=/rest/api/2
+		[ -s "$profile/token" ] || refuse "no rig token at $profile/token. Run: make dc-up"
+		header="Authorization: Bearer $(cat "$profile/token")"
+		;;
+	sandbox)
+		local ctx=${PROBE_SANDBOX:-} site host
+		[ -n "$ctx" ] || refuse "set PROBE_SANDBOX to the jr context that names the Cloud sandbox."
+		require_jr || exit 2
+		site=$("$jr" --context "$ctx" context show --format tsv 2>/dev/null |
+			awk -F'\t' '$1 == "@site" { print $2 }')
+		[ -n "$site" ] || refuse "jr has no context named $ctx."
+		# The host is what is checked, not the URL: a suffix matched
+		# against the whole string lets a path that happens to contain it
+		# carry the credential to another host.
+		case $site in
+		https://*) ;;
+		*) refuse "context $ctx does not name an https site, and the sandbox is one." ;;
+		esac
+		host=${site#https://}
+		host=${host%%/*}
+		case $host in
+		*@* | *:*) refuse "context $ctx names a site with userinfo or a port; the sandbox has neither." ;;
+		*"${PROBE_SANDBOX_SUFFIX:-.atlassian.net}") ;;
+		*) refuse "context $ctx does not name an Atlassian Cloud site, and the sandbox is one." ;;
+		esac
+		base=https://$host
+		api=/rest/api/3
+		header=$("$jr" --context "$ctx" auth token --header) ||
+			refuse "jr has no credential for context $ctx."
+		case $header in
+		"Authorization: "*) ;;
+		*) refuse "jr auth token --header did not print an Authorization header." ;;
+		esac
+		;;
+	*)
+		usage
+		;;
+	esac
+}
+
+# request sends one exchange, leaving the status in $status and the body in
+# the file $response. The header goes on stdin and the body through a file,
+# so neither is on the command line; a body given as an argument would also
+# be read by curl as a file name if it began with @.
+request() {
+	local method=$1 path=$2 body=${3-} bodyfile=""
+	response=$(mktemp)
+	local args=(-sS -o "$response" -w '%{http_code}' -X "$method"
+		-H @- -H 'Accept: application/json')
+	if [ -n "$body" ]; then
+		bodyfile=$(mktemp)
+		printf '%s' "$body" >"$bodyfile"
+		args+=(-H 'Content-Type: application/json' --data-binary "@$bodyfile")
+	fi
+	if ! status=$(printf '%s\n' "$header" | curl "${args[@]}" "$base$path"); then
+		rm -f "$response" "$bodyfile"
+		say "probe: $base did not answer."
+		exit 1
+	fi
+	rm -f "$bodyfile"
+	log_exchange "$method" "$path" "$body"
+}
+
+log_exchange() {
+	[ -n "${PROBE_LOG:-}" ] || return 0
+	command -v jq >/dev/null || refuse "PROBE_LOG needs jq."
+	jq -nc --arg target "$which" --arg method "$1" --arg path "$2" \
+		--arg request "$3" --arg status "$status" --rawfile response "$response" \
+		'{time: (now | todate), target: $target, method: $method, path: $path,
+		  status: ($status | tonumber), request: $request, response: $response}' \
+		>>"$PROBE_LOG"
+}
+
+case ${1:-} in
+rig | sandbox)
+	[ $# -ge 3 ] && [ $# -le 4 ] || usage
+	which=$1
+	method=$(printf '%s' "$2" | tr '[:lower:]' '[:upper:]')
+	check_path "$3"
+	target "$which"
+	request "$method" "$3" "${4-}"
+	printf 'HTTP %s\n' "$status"
+	cat "$response"
+	[ -s "$response" ] && printf '\n'
+	rm -f "$response"
+	;;
+issue)
+	[ $# -eq 3 ] || usage
+	which=$2
+	[[ $3 =~ ^[A-Za-z][A-Za-z0-9_]*-[0-9]+$ ]] || refuse "$3 is not an issue key."
+	command -v jq >/dev/null || refuse "issue needs jq."
+	target "$which"
+	request GET "$api/issue/$3?fields=status,resolution,comment,updated"
+	if [ "$status" != 200 ]; then
+		printf 'HTTP %s\n' "$status"
+		cat "$response"
+		printf '\n'
+		rm -f "$response"
+		exit 1
+	fi
+	jq -c '{key, status: .fields.status.name, resolution: .fields.resolution.name,
+		comments: .fields.comment.total, updated: .fields.updated}' "$response"
+	rm -f "$response"
+	;;
+*)
+	usage
+	;;
+esac

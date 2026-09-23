@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# jr, pointed at the rig's throwaway profile.
+#
+#   scripts/dc/jr issue move CLS-1 'Resolve Issue' --resolution Done
+#   JR=/tmp/jr scripts/dc/jr meta transitions ENG-1 --format xml
+#
+# The binary every rig script uses, JR or bin/jr, with XDG pointed at
+# scripts/dc/profile, so nothing from the contexts and credentials in your
+# home directory reaches the rig, and nothing about the rig lands there.
+#
+# It runs require_rig first and says nothing when it passes, so a profile
+# naming yesterday's container address is refused with both addresses rather
+# than answered with a TIMEOUT that reads as a network fault.
+set -euo pipefail
+
+# shellcheck disable=SC1091
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
+guard=$(mktemp)
+if ! require_rig >/dev/null 2>"$guard"; then
+	cat "$guard" >&2
+	rm -f "$guard"
+	exit 2
+fi
+rm -f "$guard"
+exec "$jr" "$@"

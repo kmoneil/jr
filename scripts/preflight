@@ -1,0 +1,225 @@
+#!/usr/bin/env bash
+# preflight: the checks a pull request fails on, run against what changed, in
+# well under a minute.
+#
+#   scripts/preflight           the packages changed since the merge base
+#   scripts/preflight --all     every package
+#   scripts/preflight --list    print what it would check, and stop
+#
+# Every step runs and reports, so one red does not hide the next, and the exit
+# is 1 when any failed. A missing tool fails its step, because a check that did
+# not run is not a check that passed.
+#
+# It exists because the gates that bite were found late, twice in one
+# session: the cognitive-complexity limit by `make test` after three minutes,
+# and gofumpt by `make ci`, whose first run of a branch died at fmt-check and
+# cost twenty minutes to repeat. Each is under a second against the packages
+# that changed.
+#
+# What it runs: gofumpt; go vet and go fix under all four shipped tag sets;
+# staticcheck's U1000 with no tags; golangci-lint; and the changed packages'
+# tests at the full tag set, plus all of internal/lint, whose drift checks
+# (the command reference, the skill, the complexity gate, the error-code
+# tables) read the whole tree whatever changed. What it leaves to `make ci`:
+# the race detector, the vulnerability scan, the other tag sets' tests, and
+# the builds.
+#
+# PREFLIGHT_BASE overrides the revision changes are measured from; the
+# default is the merge base with origin/main, or with main.
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+mode=changed
+case ${1:-} in
+'') ;;
+--all) mode=all ;;
+--list) mode=list ;;
+*)
+	printf '%s\n' "usage: scripts/preflight [--all | --list]" >&2
+	exit 2
+	;;
+esac
+
+base=${PREFLIGHT_BASE:-}
+if [ -z "$base" ]; then
+	base=$(git merge-base HEAD origin/main 2>/dev/null ||
+		git merge-base HEAD main 2>/dev/null || true)
+fi
+if [ -z "$base" ] && [ "$mode" != all ]; then
+	printf '%s\n' "preflight: no merge base with origin/main or main." \
+		"  Pass --all, or set PREFLIGHT_BASE to the revision to measure from." >&2
+	exit 2
+fi
+
+# The tag sets come from the Makefile's own print-% rule, never from reading
+# the file: a hand-rolled extraction of TAGS_FULL once missed the := and built
+# a binary with no tags at all, silently.
+tagset() {
+	make -s --no-print-directory "print-$1" VERSION=0.0.0
+}
+tags_full=$(tagset TAGS_FULL)
+tag_sets=("$(tagset TAGS_CI)" "$(tagset TAGS_READER)" "$(tagset TAGS_AGENT)" "$tags_full")
+if [ -z "$tags_full" ]; then
+	printf '%s\n' "preflight: the Makefile reports no TAGS_FULL; refusing to test with none." >&2
+	exit 2
+fi
+
+# changed_files is every path that differs from the base in the working tree,
+# staged or not, and every untracked file that is not ignored.
+changed_files() {
+	{
+		git diff --name-only --no-renames "$base" --
+		git ls-files --others --exclude-standard
+	} | sort -u
+}
+
+# packages maps changed files onto the packages that own them. A fixture under
+# testdata belongs to the package above it; go.mod or go.sum changing is every
+# package; a package that was deleted has nothing left to check.
+packages() {
+	local f dir
+	changed_files | while IFS= read -r f; do
+		case $f in
+		go.mod | go.sum)
+			echo "./..."
+			continue
+			;;
+		*.go | */testdata/* | testdata/*) ;;
+		*) continue ;;
+		esac
+		dir=$(dirname "$f")
+		case $dir in
+		testdata | testdata/*) dir=. ;;
+		*/testdata | */testdata/*) dir=${dir%%/testdata*} ;;
+		esac
+		ls "$dir"/*.go >/dev/null 2>&1 || continue
+		if [ "$dir" = . ]; then echo "."; else echo "./$dir"; fi
+	done | sort -u
+}
+
+if [ "$mode" = all ]; then
+	pkgs=(./...)
+	gofiles=()
+else
+	pkgs=()
+	while IFS= read -r p; do
+		[ -n "$p" ] && pkgs+=("$p")
+	done < <(packages)
+	# ./... among them means everything, and listing the rest beside it only
+	# checks them twice.
+	for p in "${pkgs[@]+"${pkgs[@]}"}"; do
+		[ "$p" = "./..." ] && pkgs=(./...) && break
+	done
+	gofiles=()
+	while IFS= read -r f; do
+		case $f in *.go) [ -f "$f" ] && gofiles+=("$f") ;; esac
+	done < <(changed_files)
+fi
+
+tests=("${pkgs[@]+"${pkgs[@]}"}")
+if [ -d internal/lint ] && [ "${pkgs[*]-}" != "./..." ]; then
+	case " ${pkgs[*]-} " in
+	*" ./internal/lint "*) ;;
+	*) tests+=(./internal/lint) ;;
+	esac
+fi
+
+if [ "$mode" = list ]; then
+	printf 'base     %s\n' "${base:-(none: --all)}"
+	printf 'package  %s\n' "${pkgs[@]+"${pkgs[@]}"}"
+	printf 'test     %s\n' "${tests[@]+"${tests[@]}"}"
+	exit 0
+fi
+
+need() {
+	command -v "$1" >/dev/null && return 0
+	printf '%s\n' "missing: $1. Run 'make tools' to install the pinned versions."
+	return 1
+}
+
+step_gofumpt() {
+	need gofumpt || return 1
+	[ ${#gofiles[@]} -gt 0 ] || [ "$mode" = all ] || return 0
+	local out
+	if [ "$mode" = all ]; then out=$(gofumpt -l .); else out=$(gofumpt -l "${gofiles[@]}"); fi
+	[ -z "$out" ] && return 0
+	printf '%s\n' "$out" "run: make fmt"
+	return 1
+}
+
+step_vet() {
+	local tags
+	for tags in "${tag_sets[@]}"; do
+		go vet -tags "$tags" "${pkgs[@]}" || {
+			printf '%s\n' "(under tags=${tags:-none})"
+			return 1
+		}
+	done
+}
+
+step_fix() {
+	local tags out status
+	for tags in "${tag_sets[@]}"; do
+		status=0
+		out=$(go fix -diff -tags "$tags" "${pkgs[@]}" 2>&1) || status=$?
+		if [ $status -ne 0 ] || [ -n "$out" ]; then
+			printf '%s\n' "$out" "(under tags=${tags:-none}; see the fix-check note in the Makefile)"
+			return 1
+		fi
+	done
+}
+
+step_unused() {
+	need staticcheck || return 1
+	staticcheck -checks=U1000 "${pkgs[@]}"
+}
+
+step_lint() {
+	need golangci-lint || return 1
+	golangci-lint run "${pkgs[@]}"
+}
+
+step_test() {
+	local log status=0
+	log=$(mktemp)
+	go test -count=1 -tags "$tags_full" "${tests[@]}" >"$log" 2>&1 || status=$?
+	# The failures, not the forty packages that passed around them.
+	[ $status -eq 0 ] || grep -v -E '^(ok|\?) ' "$log"
+	rm -f "$log"
+	return $status
+}
+
+failed=()
+step() {
+	local name=$1 start=$SECONDS out status=0
+	shift
+	out=$("$@" 2>&1) || status=$?
+	if [ $status -eq 0 ]; then
+		printf '  ok    %-10s %3ds\n' "$name" $((SECONDS - start))
+	else
+		printf '  FAIL  %-10s %3ds\n' "$name" $((SECONDS - start))
+		printf '%s\n' "$out" | head -40 | sed 's/^/        /'
+		failed+=("$name")
+	fi
+}
+
+started=$SECONDS
+if [ ${#pkgs[@]} -eq 0 ]; then
+	printf 'preflight: no Go package changed since %s; running internal/lint only\n' "${base:0:7}"
+	[ ${#tests[@]} -gt 0 ] && step test step_test
+else
+	printf 'preflight: %s against %s\n' "${pkgs[*]}" "${base:0:7}"
+	step gofumpt step_gofumpt
+	step vet step_vet
+	step fix step_fix
+	step unused step_unused
+	step lint step_lint
+	step test step_test
+fi
+
+if [ ${#failed[@]} -gt 0 ]; then
+	printf 'preflight: FAIL (%s) in %ds\n' "${failed[*]}" $((SECONDS - started))
+	exit 1
+fi
+printf 'preflight: ok in %ds\n' $((SECONDS - started))

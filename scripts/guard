@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+# guard: the refusals the git hooks and the Makefile run, one subcommand each.
+#
+#   scripts/guard branch                  refuse a commit on the default branch
+#   scripts/guard prose --staged          refuse an em dash in added prose
+#   scripts/guard prose --message <file>  refuse an em dash in a commit message
+#   scripts/guard bin <dir> <origin>      refuse to replace a binary that was
+#                                         built for another machine
+#
+# Exits 0 when there is nothing to refuse, 1 when there is, 2 on a usage
+# mistake. Each rule was kept by memory alone before this, and each one had
+# already been broken at least once by the time it got a line here: two
+# commits on local main, and a `make ci` in the Linux dev container that
+# replaced every macOS binary in bin/ without a word.
+set -euo pipefail
+
+say() { printf '%s\n' "$*" >&2; }
+
+usage() {
+	say "usage: scripts/guard branch"
+	say "       scripts/guard prose --staged | --message <file>"
+	say "       scripts/guard bin <dir> <origin>"
+	exit 2
+}
+
+# The em dash as UTF-8 bytes, so neither this file nor a C locale has to hold
+# the character itself.
+dash=$'\xe2\x80\x94'
+
+# branch refuses a commit on the branch every pull request targets.
+#
+# The server refuses the push anyway, since main is protected, which is
+# exactly why this belongs before the commit: by the time the push is refused
+# the commit exists, and moving it off main is a reset and a new branch.
+guard_branch() {
+	local name default
+	# A detached HEAD, mid-rebase or mid-bisect, is not a branch anybody
+	# pushes, and refusing there would stop a rebase replaying its commits.
+	name=$(git symbolic-ref --quiet --short HEAD) || return 0
+	default=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
+	default=${default#origin/}
+	[ "$name" = "${default:-main}" ] || return 0
+
+	say "guard: refusing to commit on $name."
+	say
+	say "  $name is protected, and work reaches it through a pull request."
+	say "  Nothing is lost: a new branch takes the staged changes with it."
+	say
+	say "    git switch -c <type>/<subject>"
+	return 1
+}
+
+# prose refuses an em dash where this project writes prose.
+#
+# Only added lines are read. The rule arrived after more than a hundred of
+# them were already in the hand-written documents and more than a thousand in
+# code comments, and those stay until somebody edits the line for another
+# reason; a check that failed on them would demand the sweep the rule says
+# not to do.
+#
+# What counts as prose: every line of a hand-written markdown file, and the
+# comment lines of Go, shell, Makefile, YAML and TOML. Not a Go string literal,
+# which is data and may be a test of how a dash is handled. Not generated
+# files, whose bytes belong to their generator: docs/commands.md prints a dash
+# for a flag with no default. Not testdata, which holds what servers said.
+guard_prose_staged() {
+	local found
+	# The prefixes are pinned because diff.noprefix and diff.mnemonicPrefix
+	# both change what precedes the path, and the path is what gets matched.
+	found=$(git diff --cached --no-color --no-ext-diff -U0 --diff-filter=AMR \
+		--src-prefix=a/ --dst-prefix=b/ |
+		awk -v dash="$dash" '
+		function kind(p) {
+			if (p == "docs/commands.md" || p ~ /^skills\// || p ~ /(^|\/)testdata\//) return ""
+			if (p ~ /\.md$/) return "all"
+			if (p ~ /\.go$/) return "slash"
+			if (p ~ /(^|\/)Makefile$/ || p ~ /\.(sh|mk|ya?ml|toml|tsv)$/) return "hash"
+			if (p ~ /^(scripts|\.githooks)\// && p !~ /\.[^\/]*$/) return "hash"
+			return ""
+		}
+		/^\+\+\+ / { path = substr($0, 5); sub(/^b\//, "", path); k = kind(path); next }
+		/^@@ / { split($3, n, ","); line = substr(n[1], 2) + 0; next }
+		/^\+/ {
+			text = substr($0, 2)
+			if (k != "" && index(text, dash) > 0) {
+				if (k == "all" || (k == "slash" && text ~ /^[ \t]*\/\//) ||
+					(k == "hash" && text ~ /^[ \t]*#/))
+					print path ":" line ": " text
+			}
+			line++
+		}')
+	[ -z "$found" ] && return 0
+
+	say "guard: an em dash in added prose, which this project does not write."
+	say
+	printf '%s\n' "$found" | head -10 | sed 's/^/  /' >&2
+	say
+	say "  Rewrite the sentence rather than swapping the dash for a comma. A"
+	say "  colon, a semicolon, a full stop and a pair of parentheses each say"
+	say "  something different, and one of them is what the sentence meant."
+	say "  Only added lines are read; existing dashes stay where they are."
+	return 1
+}
+
+# The same rule for a commit message, whose every line is prose. Git's own
+# comment lines are skipped: an editor-written message still holds them here.
+guard_prose_message() {
+	local file=$1 found
+	[ -r "$file" ] || usage
+	found=$(grep -n "$dash" "$file" | grep -v '^[0-9]*:#' || true)
+	[ -z "$found" ] && return 0
+
+	say "guard: an em dash in the commit message."
+	say
+	printf '%s\n' "$found" | head -5 | sed 's/^/  /' >&2
+	say
+	say "  Rewrite the sentence rather than swapping the dash for a comma: a"
+	say "  colon, a semicolon, a full stop or parentheses each say something"
+	say "  different, and one of them is what the sentence meant."
+	return 1
+}
+
+# bin refuses to overwrite a binary that cannot execute on this machine.
+#
+# In the dev container, bin/ holds what `make build` last wrote on the macOS
+# host, and every build target writes there. `make ci` ends in build-all, so
+# running the full gate in the container replaced all four of the host's
+# binaries, and the first sign was the host's `bin/jr` refusing to run.
+#
+# A binary that does not execute here was built for somewhere else, for
+# somebody else, which is the whole test: asked to run, it answers 126, the
+# status for "found but cannot execute". It is asked rather than inspected,
+# the way require_jr in scripts/dc/common.sh asks, because a header check
+# needs a table of formats and still misses the wrong architecture.
+#
+# A directory chosen on the command line is a decision, and is not
+# second-guessed. The default is what this protects.
+guard_bin() {
+	local dir=$1 origin=$2 jr status=0
+	case $origin in
+	"command line" | environment* | override) return 0 ;;
+	esac
+	jr=$dir/jr
+	[ -f "$jr" ] && [ -x "$jr" ] || return 0
+	"$jr" version --format tsv >/dev/null 2>&1 || status=$?
+	[ "$status" -eq 126 ] || return 0
+
+	say "guard: $jr was built for another machine, and this build would replace it."
+	say
+	say "  It does not execute here, so it is somebody else's, most likely the"
+	say "  host's build seen from inside a dev container."
+	say
+	say "  Build to a path of your own instead:"
+	say "    make build-here OUT=/tmp/jr"
+	say "    make ci BIN=/tmp/jr-bin"
+	return 1
+}
+
+case ${1:-} in
+branch)
+	guard_branch
+	;;
+prose)
+	case ${2:-} in
+	--staged) guard_prose_staged ;;
+	--message) guard_prose_message "${3:-}" ;;
+	*) usage ;;
+	esac
+	;;
+bin)
+	[ $# -eq 3 ] || usage
+	guard_bin "$2" "$3"
+	;;
+*)
+	usage
+	;;
+esac

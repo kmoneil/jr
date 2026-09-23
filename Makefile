@@ -84,15 +84,26 @@ TOOLS := \
 help:
 	@grep -hE '^## ' $(MAKEFILE_LIST) | sed 's/^## /  /' | sort
 
+# bin-guard refuses to replace a binary that was built for another machine.
+#
+# In the Linux dev container, bin/ holds what `make build` last wrote on the
+# macOS host, and every target below writes there. `make ci` ends in
+# build-all, so the full gate run in the container replaced all four of the
+# host's binaries on 2026-09-23 without a word. A BIN given on the command line
+# is a decision and goes through; only the default is guarded.
+.PHONY: bin-guard
+bin-guard:
+	@scripts/guard bin "$(BIN)" "$(origin BIN)"
+
 ## build: full human build, every capability
 .PHONY: build
-build:
+build: bin-guard
 	@mkdir -p $(BIN)
 	go build -tags "$(TAGS_FULL)" -ldflags "$(LDFLAGS)" -o $(BIN)/$(BINARY) $(PKG)
 
 ## build: full human build, every capability for macOS
 .PHONY: build-mac
-build-mac:
+build-mac: bin-guard
 	@mkdir -p $(BIN)
 	GOOS=darwin GOARCH=amd64 go build -tags "$(TAGS_FULL)" -ldflags "$(LDFLAGS)" -o $(BIN)/$(BINARY)-mac $(PKG)
 
@@ -105,19 +116,19 @@ build-here:
 
 ## build-agent: no TTY assumptions, no interactivity, cannot block on input
 .PHONY: build-agent
-build-agent:
+build-agent: bin-guard
 	@mkdir -p $(BIN)
 	go build -tags "$(TAGS_AGENT)" -ldflags "$(LDFLAGS)" -o $(BIN)/$(BINARY)-agent $(PKG)
 
 ## build-reader: physically cannot mutate Jira
 .PHONY: build-reader
-build-reader:
+build-reader: bin-guard
 	@mkdir -p $(BIN)
 	go build -tags "$(TAGS_READER)" -ldflags "$(LDFLAGS)" -o $(BIN)/$(BINARY)-reader $(PKG)
 
 ## build-ci: query only, smallest possible
 .PHONY: build-ci
-build-ci:
+build-ci: bin-guard
 	@mkdir -p $(BIN)
 	go build -tags "$(TAGS_CI)" -ldflags "$(LDFLAGS)" -o $(BIN)/$(BINARY)-ci $(PKG)
 
@@ -470,6 +481,15 @@ vet:
 	@set -e; for tags in "$(TAGS_CI)" "$(TAGS_READER)" "$(TAGS_AGENT)" "$(TAGS_FULL)"; do \
 		go vet -tags "$$tags" ./...; \
 	done
+
+## preflight: the pull request's checks against what changed, in under a minute
+#
+# Not a substitute for `ci`: no race detector, no vulnerability scan, one tag
+# set's tests rather than four, no builds. It is the part that fails most, run
+# early. scripts/preflight says what it runs and why.
+.PHONY: preflight
+preflight:
+	@scripts/preflight
 
 ## ci: everything CI enforces, runnable locally
 .PHONY: ci
