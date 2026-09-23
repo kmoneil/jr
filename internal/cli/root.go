@@ -469,7 +469,10 @@ func (a *app) newInvocation(
 		Limit:    registry.Limit{N: registry.DefaultLimit},
 		Stderr:   a.stderr,
 		Stdout:   a.stdout,
+		Stdin:    a.stdin,
 		Progress: registry.NoProgress,
+
+		FormatFromFlag: a.formatFromFlag,
 	}
 
 	if rc.NeedsJira {

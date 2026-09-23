@@ -503,6 +503,30 @@ $ jr issue edit ENG-101 --add-label flaky --remove-label wontfix
 Combining `--label` with `--add-label` is refused, because one replaces the set
 and the other adjusts it, and doing both has no single right answer.
 
+### Editing a description in place
+
+Ticking one checkbox in a long description means reading the stored text,
+changing one line, and writing the rest back untouched. Both halves have an
+exact form:
+
+```console
+$ jr issue get ENG-101 --raw-field description > description.wiki
+$ $EDITOR description.wiki
+$ jr issue edit ENG-101 --description-file description.wiki
+```
+
+`--raw-field` writes the stored bytes and nothing else: no envelope, no added
+newline, CRLF line endings intact. `--description-file` sends a file's exact
+bytes back, or stdin's when the path is `-`, so the round trip never passes
+through a shell substitution, which would eat the trailing newline. For a
+guarded write, take `precondition` from a plain `jr issue get` first and add
+`--if-unchanged`.
+
+A field with no value is a refusal (`UNSET_FIELD`), not zero bytes, and a
+field whose value is not text refuses as `FIELD_NOT_TEXT` naming the form
+that can carry it: a Cloud description is a document, which `--raw-body`
+emits.
+
 ### Making a retry safe
 
 A `create` that gets a 503 may or may not have created the issue. `jr` never

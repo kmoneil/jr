@@ -591,6 +591,9 @@ letting the word precondition imply an atomic one.
 --dry-run prints the exact request, body included, and sends nothing.
 
 --description and --body-format work exactly as on issue create.
+--description-file replaces it with a file's exact bytes, or stdin's when the
+path is -, so a round trip preserves what --description "$(cat f)" would eat,
+the trailing newline above all.
 
 --field sets anything the flags above do not name, by field id or by field
 name: --field customfield_10140=5 or --field 'Story Points=5'. The value is
@@ -629,6 +632,11 @@ write is a silent last-one-wins.`),
 			{
 				Name: "description", Type: registry.TypeString,
 				Usage: "replace the description, as plain text",
+			},
+			{
+				Name: descriptionFileFlag, Type: registry.TypeString,
+				Usage: "replace the description with a file's exact bytes, " +
+					"or stdin's when the path is -; refuses beside --description",
 			},
 			{Name: "priority", Type: registry.TypeString, Usage: "set the priority by name"},
 			{
@@ -694,6 +702,9 @@ func validateEdit(ctx context.Context, inv *registry.Invocation) error {
 		return nil
 	}
 
+	if err := validateDescriptionFile(inv); err != nil {
+		return err
+	}
 	if err := validateAssignee(ctx, inv, inv.Flags.String("assignee")); err != nil {
 		return err
 	}
@@ -738,7 +749,9 @@ func editTouchesAnything(inv *registry.Invocation) bool {
 	// most easily left out: `issue edit ENG-1 --parent ENG-42` names exactly one
 	// field, and omitting it from this list would refuse the only spelling of
 	// "move this into that epic" with "nothing to change".
-	for _, name := range []string{"summary", "description", "priority", "assignee", "parent"} {
+	for _, name := range []string{
+		"summary", "description", descriptionFileFlag, "priority", "assignee", "parent",
+	} {
 		if inv.Flags.String(name) != "" {
 			return true
 		}
@@ -931,7 +944,7 @@ func editOptionsFor(inv *registry.Invocation, key string) EditOptions {
 	opt := EditOptions{
 		Key:          key,
 		Summary:      inv.Flags.String("summary"),
-		Description:  inv.Flags.String("description"),
+		Description:  editDescription(inv),
 		Priority:     inv.Flags.String("priority"),
 		AddLabels:    inv.Flags.StringSlice("add-label"),
 		RemoveLabels: inv.Flags.StringSlice("remove-label"),

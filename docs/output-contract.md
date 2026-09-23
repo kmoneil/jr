@@ -1297,10 +1297,10 @@ back to XML rather than failing twice.
 
 ### A command that writes bytes instead of a document
 
-Two invocations write raw bytes to stdout and emit no result document. Both are
-opt-in by flag, neither is a default, and the exception is narrow on purpose: a
-document and something that is not one on the same channel means one corrupts
-the other.
+Three invocations write raw bytes to stdout and emit no result document. Each
+is opt-in by flag, none is a default, and the exception is narrow on purpose:
+a document and something that is not one on the same channel means one
+corrupts the other.
 
 `jr issue attachment download --output -` writes the file. Writing to a path is
 the ordinary case and emits `issue.attachment.download` saying what was written,
@@ -1324,8 +1324,19 @@ is `HEADER_AND_FORMAT` and exit 2: they name two different outputs, and
 accepting both would mean ignoring one. `JIRA_FORMAT` is not grounds for that
 refusal, because it is set once for a whole shell.
 
-Two is not a cap, and the third will not be argued from silence. The rule
-these two follow, stated once so the next one is designed rather than
+`jr issue get ENG-101 --raw-field description` writes one field's stored
+bytes: what Jira holds, through one JSON string decode and nothing else, so a
+read-modify-write round trip edits the artifact rather than a rendering of
+it. It follows every line of the rule below, and two of its refusals are its
+own. A field whose value is not text is `FIELD_NOT_TEXT`, because inventing a
+byte form for an object would be an approximation, and a field with no value
+is `UNSET_FIELD` at exit 5, because zero bytes cannot say unset from empty,
+which is the collapse the `set` attribute prevents where there is a document
+to carry it. An explicit `--format` beside it is `RAW_AND_FORMAT`, and the
+flags that shape the document it does not emit are `RAW_FIELD_ALONE`.
+
+Three is not a cap, and the fourth will not be argued from silence. The rule
+all three follow, stated once so the next one is designed rather than
 excused:
 
 - **Opt-in by flag, never by default, and never a `--format`.** The flag
@@ -1350,7 +1361,8 @@ their codes and exits, whatever stdout was asked to carry.
 
 A caller with no stdout to spare, `mcp serve`, where bytes would land on the
 JSON-RPC stream as a frame the peer cannot parse, gets `NO_STDOUT` and exit 2
-rather than a corrupted session. Both invocations refuse there.
+rather than a corrupted session. All three invocations refuse there, and
+`--description-file -` refuses its mirror image as `NO_STDIN`.
 
 ### `--explain` answers with the query instead of the result
 

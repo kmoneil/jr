@@ -1492,6 +1492,11 @@ losslessly, or not at all: a description holding something markdown cannot
 represent is an error naming it rather than an approximation. --raw-body emits
 the document itself. The format attribute says which you have.
 
+--raw-field <field> writes one field's stored bytes to stdout with no document
+around them, for a byte-exact read-modify-write. The output contract's
+raw-bytes rule governs it: an explicit --format beside it is refused, and a
+field with no value is a refusal rather than zero bytes.
+
 The issue shape here is the same one issue list emits for a row, so a caller
 parses both identically. It simply has more of it filled in.`),
 		Example: strings.Join([]string{
@@ -1499,6 +1504,7 @@ parses both identically. It simply has more of it filled in.`),
 			buildinfo.App + " issue get ENG-101 --format json",
 			buildinfo.App + " issue get ENG-101 --field customfield_10042",
 			buildinfo.App + " issue get ENG-101 --raw-body",
+			buildinfo.App + " issue get ENG-101 --raw-field description",
 			buildinfo.App + " issue get ENG-101 --url",
 		}, "\n"),
 		Args: []registry.Arg{{
@@ -1506,7 +1512,7 @@ parses both identically. It simply has more of it filled in.`),
 		}},
 		Flags: []registry.Flag{
 			fieldFlag(),
-			contextFieldsFlag(), rawBodyFlag(), urlFlag(), ageFlag(),
+			contextFieldsFlag(), rawBodyFlag(), rawFieldFlag(), urlFlag(), ageFlag(),
 			{
 				Name: withCommentsFlag, Type: registry.TypeBool,
 				Usage: "include the comment thread, oldest first; costs a second " +
@@ -1515,7 +1521,13 @@ parses both identically. It simply has more of it filled in.`),
 			},
 		},
 		NeedsJira: true,
-		Outputs:   []registry.Output{{Kind: KindGet, Version: VersionGet}},
+		// Only when --raw-field is writing bytes. Every other invocation
+		// emits its document like anything else.
+		OwnsStdoutWhen: rawFieldOwnsStdout,
+		Outputs: []registry.Output{{
+			Kind: KindGet, Version: VersionGet,
+			When: "--raw-field is not given",
+		}},
 		ExitCodes: []exitcode.Code{
 			exitcode.Partial, exitcode.Usage, exitcode.Auth, exitcode.NotFound,
 			exitcode.Permission, exitcode.RateLimit, exitcode.Remote,
@@ -1539,6 +1551,11 @@ func validateGet(ctx context.Context, inv *registry.Invocation) error {
 	if err := requireIssueKey(inv); err != nil {
 		return err
 	}
+	// A raw read emits no document, so the checks below, which resolve what
+	// the document will carry, are replaced by its own.
+	if rawFieldOwnsStdout(inv) {
+		return validateRawField(ctx, inv)
+	}
 	if err := validateBrowseURL(ctx, inv); err != nil {
 		return err
 	}
@@ -1556,6 +1573,10 @@ func runGet(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) 
 	}
 	client := &Client{
 		Transport: conn, Site: info, Body: bodyMode(inv), FieldNames: fieldNames(inv),
+	}
+
+	if rawFieldOwnsStdout(inv) {
+		return nil, writeRawField(ctx, client, inv)
 	}
 
 	fields := append(DetailFields(), ExtraFieldNames(resolvedFields(inv))...)
