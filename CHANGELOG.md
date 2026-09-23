@@ -20,6 +20,75 @@ accident.
 
 Nothing yet.
 
+## [0.17.0] - 2026-09-23
+
+**Take this one if you move issues with `--resolution` or `--comment`,
+especially on Data Center, or if a script branches on the refusal a bad
+resolution gets.** Two fixes to `issue move`, both found by measuring it
+against a real Jira rather than by reading it. One changes the code a
+refusal carries, which is why the version is a minor; the pricing section
+below names the exact invocation.
+
+**`--resolution` is resolved against the transition's own screen.** It
+went out as typed, so `--dry-run` printed a clean request for a resolution
+the site does not have (issue 180), while the transition named in the same
+command was resolved and refused with the candidates. Jira always refused
+the bad name, so nothing was lost, but the preview promised a request Jira
+would reject, and two more things were wrong underneath: Jira matches the
+name case-sensitively, so `won't do` failed where the resolution is
+`Won't Do`, and an id could not be passed at all. The value now resolves by
+id, or by name in any case, against the values the transition's screen
+offers. Those arrive with the transitions read the command already makes,
+so it costs no request. What is sent is the site's own spelling. A value
+the screen does not offer is refused before anything is sent, dry run
+included, with every value it does offer and its id, and a transition whose
+screen has no resolution field is refused as Jira would refuse it. A bulk
+plan checks each row against its own transition and carries the site's
+spelling.
+
+**`--comment` works through a Data Center transition that has a screen.**
+Since 0.13.0 it was refused on every Data Center transition with
+`TRANSITION_TAKES_NO_COMMENT`, including ones whose screen keeps the
+comment, because Data Center never lists a comment among a screen's fields
+and never says whether there is a screen at all. There, a transition that
+lists any field has a screen, and takes the comment. What drops a comment
+is a transition with no screen, and that refusal stands, now measured on
+Cloud as well as Data Center. On Cloud, a screen that lists no comment
+field is still refused, because no such screen has been measured.
+
+### Documentation
+
+- docs/troubleshooting.md gains `UNKNOWN_RESOLUTION`,
+  `AMBIGUOUS_RESOLUTION` and `TRANSITION_TAKES_NO_RESOLUTION`, and the
+  skill's failure references gain the same.
+- Two docs/recipes.md examples that never worked are fixed. One used a
+  resolution neither deployment ships; the other, offered as the reliable
+  spelling, passed `--resolution` to a default workflow's Done, which has
+  no screen.
+- The skill said `--field` refuses a bad value before sending. It checks
+  the value's type; a named value (an option, a priority, a version) goes
+  as typed, and Jira refuses one it does not have. The output contract now
+  says which named values are resolved before sending and which are not
+  yet.
+
+### Output contract
+
+- No kind moved.
+- New error codes, all exit 2, all on `issue move` and a move plan's rows:
+  `UNKNOWN_RESOLUTION`, `AMBIGUOUS_RESOLUTION`,
+  `TRANSITION_TAKES_NO_RESOLUTION`.
+- **Priced a minor, on one row.** `jr issue move <key> <transition>
+  --resolution <value>` with a value the transition's screen does not
+  offer, or on a transition whose screen has no resolution field, answered
+  Jira's `BAD_REQUEST` at exit 2, and now answers `UNKNOWN_RESOLUTION` or
+  `TRANSITION_TAKES_NO_RESOLUTION` at exit 2 having sent nothing. The same
+  invocations under `--dry-run` exited 0 and now refuse. The exit is
+  unchanged, but `code` is the field this contract tells a consumer to
+  branch on, and the same input carrying a different code is the stability
+  policy's row for a minor. The `--comment` change is additive: it accepts
+  an input that used to be refused.
+- No exit code changed meaning.
+
 ## [0.16.0] - 2026-09-23
 
 **Take this one for the byte-exact description round trip and the bulk
@@ -2603,7 +2672,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.16.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.17.0...main
+[0.17.0]: https://github.com/kmoneil/jr/releases/tag/v0.17.0
 [0.16.0]: https://github.com/kmoneil/jr/releases/tag/v0.16.0
 [0.15.0]: https://github.com/kmoneil/jr/releases/tag/v0.15.0
 [0.14.0]: https://github.com/kmoneil/jr/releases/tag/v0.14.0
