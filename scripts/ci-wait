@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# ci-wait — block until every check on a commit settles, and say how it went.
+#
+#   scripts/ci-wait              the checks on HEAD
+#   scripts/ci-wait <sha>        the checks on a commit
+#   scripts/ci-wait --pr <n>     the checks on a pull request's head
+#
+# Exits 0 when every check passed (skipped and neutral count as passed),
+# 1 when any failed, printing each failing job, 2 on timeout. A commit with
+# no checks yet is waited for rather than read as green: the gap between a
+# push and the first check appearing is exactly when an eager reading says
+# GREEN over nothing.
+#
+# POLL (default 30) seconds between reads; TIMEOUT (default 1800) seconds
+# overall. Every read is one API call.
+set -euo pipefail
+
+poll=${POLL:-30}
+timeout=${TIMEOUT:-1800}
+
+repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+case ${1:-} in
+--pr)
+	sha=$(gh pr view "${2:?--pr needs a pull request number}" \
+		--json headRefOid --jq .headRefOid)
+	;;
+'')
+	sha=$(git rev-parse HEAD)
+	;;
+*)
+	sha=$(git rev-parse "$1")
+	;;
+esac
+
+settled='(.conclusion == "success" or .conclusion == "skipped"
+          or .conclusion == "neutral")'
+
+deadline=$((SECONDS + timeout))
+while [ "$SECONDS" -lt "$deadline" ]; do
+	line=$(gh api "repos/$repo/commits/$sha/check-runs?per_page=100" --jq "
+		[ .total_count,
+		  ([.check_runs[] | select(.status != \"completed\")] | length),
+		  ([.check_runs[] | select(.status == \"completed\"
+		    and ($settled | not))] | length)
+		] | @tsv")
+	IFS=$'\t' read -r total running failed <<<"$line"
+
+	if [ "${failed:-0}" -gt 0 ]; then
+		gh api "repos/$repo/commits/$sha/check-runs?per_page=100" --jq "
+			.check_runs[]
+			| select(.status == \"completed\" and ($settled | not))
+			| \"\(.name): \(.conclusion)\""
+		echo "RED $sha"
+		exit 1
+	fi
+	if [ "${total:-0}" -gt 0 ] && [ "${running:-1}" -eq 0 ]; then
+		echo "GREEN $sha"
+		exit 0
+	fi
+	sleep "$poll"
+done
+
+echo "TIMEOUT after ${timeout}s: $sha"
+exit 2

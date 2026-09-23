@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# land — take one green pull request to main, the way this repo merges.
+#
+#   scripts/land <pr-number>
+#
+# Steps, refusing loudly at each: a clean tree; the PR's branch checked
+# out; a rebase onto the base when the ruleset would refuse the merge as
+# behind, with the generated files re-verified afterwards, because a
+# textually clean rebase can still disagree with its generators when the
+# other side moved a kind, a command, or a doc; a green ci-wait; a squash
+# merge that deletes the branch; the base pulled.
+#
+# It never resolves a conflict and never force-pushes anything but the
+# PR's own head branch. A stopped rebase is left in place for a human.
+set -euo pipefail
+
+pr=${1:?usage: scripts/land <pr-number>}
+here=$(cd "$(dirname "$0")" && pwd)
+
+if [ -n "$(git status --porcelain)" ]; then
+	git status --short
+	echo "land: the tree is not clean" >&2
+	exit 1
+fi
+
+state=$(gh pr view "$pr" --json state --jq .state)
+if [ "$state" != OPEN ]; then
+	echo "land: PR $pr is $state" >&2
+	exit 1
+fi
+branch=$(gh pr view "$pr" --json headRefName --jq .headRefName)
+base=$(gh pr view "$pr" --json baseRefName --jq .baseRefName)
+
+git fetch origin -q
+git switch -q "$branch" 2>/dev/null ||
+	git switch -q -c "$branch" --track "origin/$branch"
+git pull -q --ff-only origin "$branch"
+
+if ! git merge-base --is-ancestor "origin/$base" HEAD; then
+	echo "land: $branch is behind origin/$base; rebasing"
+	if ! git rebase "origin/$base"; then
+		echo "land: the rebase stopped; resolve it, run" \
+			"'git rebase --continue', then re-run land" >&2
+		exit 1
+	fi
+	make docs >/dev/null
+	make skill >/dev/null
+	make golden >/dev/null
+	if [ -n "$(git status --porcelain)" ]; then
+		git status --short
+		echo "land: the rebased tree disagrees with its generators;" \
+			"review and commit the regeneration before landing" >&2
+		exit 1
+	fi
+	git push -q --force-with-lease
+fi
+
+"$here/ci-wait" --pr "$pr"
+
+gh pr merge "$pr" --squash --delete-branch
+git switch -q "$base" 2>/dev/null || true
+git pull -q --ff-only origin "$base"
+echo "landed: PR $pr onto $base"

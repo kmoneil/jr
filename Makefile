@@ -96,6 +96,13 @@ build-mac:
 	@mkdir -p $(BIN)
 	GOOS=darwin GOARCH=amd64 go build -tags "$(TAGS_FULL)" -ldflags "$(LDFLAGS)" -o $(BIN)/$(BINARY)-mac $(PKG)
 
+## build-here: full build at OUT (default /tmp/jr), for a machine bin/jr was not built for
+.PHONY: build-here
+OUT ?= /tmp/jr
+build-here:
+	go build -tags "$(TAGS_FULL)" -ldflags "$(LDFLAGS)" -o $(OUT) $(PKG)
+	@$(OUT) version >/dev/null && echo "built $(OUT)"
+
 ## build-agent: no TTY assumptions, no interactivity, cannot block on input
 .PHONY: build-agent
 build-agent:
