@@ -680,6 +680,37 @@ $ jr meta transitions ENG-101
 Note the name is the _transition's_ name, which is often not the destination
 status: `Start Progress` rather than `In Progress`.
 
+### `UNKNOWN_RESOLUTION` / `AMBIGUOUS_RESOLUTION`
+
+`issue move --resolution` named a resolution the transition's screen does not
+offer. `detail` lists every one it does, each with its id, and either works:
+
+```console
+$ jr issue move ENG-101 'Close Issue' --resolution "Won't Do"
+$ jr issue move ENG-101 'Close Issue' --resolution 10001
+```
+
+Case does not matter. What is sent is the site's own spelling, because Jira
+matches the name exactly and would refuse `won't do`. The list belongs to the
+transition rather than to the site, so one name can be refused on one transition
+and accepted on another; `jr meta transitions ENG-101 --format xml` shows each
+transition's resolutions ahead of time.
+
+### `TRANSITION_TAKES_NO_RESOLUTION`
+
+The transition has no resolution field on its screen, and Jira refuses a
+resolution sent with one of those. None of the default workflows measured on
+Cloud or Data Center puts a screen on any transition, so on a default workflow
+this is the answer for every transition. Move it without `--resolution`:
+
+```console
+$ jr issue move ENG-101 Done
+$ jr issue get ENG-101
+```
+
+The second command shows the resolution the issue ended up with, since some
+workflows set one themselves when an issue reaches done.
+
 ### `UNKNOWN_USER` / `AMBIGUOUS_USER`
 
 `detail` lists the near misses with their ids, and flags whether an account is

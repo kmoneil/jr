@@ -996,6 +996,28 @@ func commentIsAccepted(transition site.Transition, comment string) error {
 			"`" + buildinfo.App + " issue comment add <key> <body>`")
 }
 
+// resolveMove reads what one issue's transitions make of a move: the
+// transition the name picks, refused if its screen cannot take the comment,
+// and the resolution as that screen spells it, refused if the screen cannot
+// take that either. The single move and every row of a move plan come through
+// here, so the two cannot disagree about what a screen accepts.
+func resolveMove(
+	transitions *site.Transitions, change MoveChange,
+) (site.Transition, site.Resolution, error) {
+	transition, err := transitions.Resolve(change.Transition)
+	if err != nil {
+		return site.Transition{}, site.Resolution{}, err
+	}
+	if err := commentIsAccepted(transition, change.Comment); err != nil {
+		return site.Transition{}, site.Resolution{}, err
+	}
+	resolution, err := transition.Resolution(change.Resolution)
+	if err != nil {
+		return site.Transition{}, site.Resolution{}, err
+	}
+	return transition, resolution, nil
+}
+
 // send performs a request whose success carries no body worth parsing. Jira
 // answers an edit and a transition with 204.
 func (c *Client) send(ctx context.Context, req transport.Request) error {
@@ -1034,6 +1056,13 @@ That list is fetched fresh every time and never cached: it depends on where the
 issue is now, and acting on a stale copy sends an id the workflow no longer
 offers.
 
+--resolution is resolved against the transition's own screen the same way, by
+id or by a name in any case, and what is sent is the site's spelling, because
+Jira matches the name exactly. A value the screen does not offer is refused with
+the ones it does, and a transition whose screen has no resolution field is
+refused outright, as Jira would refuse it. Neither costs a request: the screen
+arrives with the transitions.
+
 --if-unchanged refuses the transition if the issue changed since you read it,
 exactly as on issue edit. Resolving the transition already guards against a
 status that moved underneath you; this guards against everything else, which
@@ -1051,7 +1080,7 @@ than answered with another request's result.
 --dry-run prints the exact request, body included, and sends nothing.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue move ENG-101 'Start Progress'",
-			buildinfo.App + " issue move ENG-101 'Close Issue' --resolution Fixed",
+			buildinfo.App + " issue move ENG-101 'Close Issue' --resolution Done",
 			buildinfo.App + " issue move ENG-101 11 --dry-run",
 			buildinfo.App + " issue move ENG-101 Done --if-unchanged eyJkIjo",
 			buildinfo.App + " issue move ENG-101 Done --idempotency-key deploy-42",
@@ -1071,7 +1100,7 @@ than answered with another request's result.
 		Flags: []registry.Flag{
 			{
 				Name: "resolution", Type: registry.TypeString,
-				Usage: "resolution to set, for a transition that asks for one",
+				Usage: "resolution to set, by name or id; the transition's screen must offer it",
 			},
 			{
 				Name: "comment", Type: registry.TypeString,
@@ -1255,17 +1284,19 @@ func sendMove(
 		return nil, claim.releaseUnsent(err)
 	}
 	// Resolved before anything is sent, so a name that is not available costs
-	// one read and no write.
-	transition, err := transitions.Resolve(inv.Args[1])
+	// one read and no write, and a dry run refuses what Jira would refuse
+	// instead of printing it.
+	transition, resolution, err := resolveMove(transitions, MoveChange{
+		Transition: inv.Args[1],
+		Resolution: inv.Flags.String("resolution"),
+		Comment:    inv.Flags.String("comment"),
+	})
 	if err != nil {
-		return nil, claim.releaseUnsent(err)
-	}
-	if err := commentIsAccepted(transition, inv.Flags.String("comment")); err != nil {
 		return nil, claim.releaseUnsent(err)
 	}
 
 	req, err := client.MoveRequest(inv.Args[0], transition.ID,
-		inv.Flags.String("resolution"), inv.Flags.String("comment"))
+		resolution.Name, inv.Flags.String("comment"))
 	if err != nil {
 		return nil, claim.releaseUnsent(err)
 	}

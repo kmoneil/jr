@@ -106,10 +106,12 @@ refused. Scope it, or pass `--all-projects` to mean it.
 
 ## Resolution refusals
 
-Anything naming something on the server is resolved against the site before the
-request is built, never sent for Jira to reject. Every refusal carries the
-candidates in `detail`, because an error that only says "unknown" leaves you
-reading a catalogue to find your typo.
+A field, a user, a transition, an issue type, or a transition's resolution is
+resolved against the site before the request is built, never sent for Jira to
+reject. Every refusal carries the candidates in `detail`, because an error that
+only says "unknown" leaves you reading a catalogue to find your typo. A priority
+and a named `--field` value are not resolved yet: a bad one comes back from Jira
+as `BAD_REQUEST`.
 
 | Code | Exit | What `detail` gives you |
 | --- | --- | --- |
@@ -117,6 +119,8 @@ reading a catalogue to find your typo.
 | `AMBIGUOUS_FIELD` | 2 | Every candidate with its id. Pass the id |
 | `UNKNOWN_TRANSITION` | 2 | Every transition the issue offers **right now**, with id and destination |
 | `AMBIGUOUS_TRANSITION` | 2 | Both transitions, where two names lead to different statuses |
+| `UNKNOWN_RESOLUTION` | 2 | Every resolution the transition's screen offers, each with its id. Pass either |
+| `AMBIGUOUS_RESOLUTION` | 2 | Both resolutions, where two names differ only in case. Pass the id |
 | `UNKNOWN_ISSUE_TYPE` | 2 | The types the project does offer |
 | `UNKNOWN_USER` | 2 | Near misses with ids, or absent when nothing shares a word with what you typed |
 | `AMBIGUOUS_USER` | 2 | Every candidate with its id, whether the account is inactive, and whether it is an app rather than a person |
@@ -142,6 +146,7 @@ Two specifics worth knowing:
 | `READ_ONLY` | 10 | `--readonly`, `JIRA_READONLY`, or a context created read-only. A one-way latch within an invocation; `JIRA_READONLY=0` does not clear it. Stop and tell the user. Making a context writable again is a deliberate `jr context edit <name> --unset readonly` |
 | `CONFIRMATION_REQUIRED` | 10 | A destructive command with no `--yes`. Ask the user for authorization for that specific action. Do not supply it yourself |
 | `STALE_WRITE` | 7 | The issue changed since the read your precondition came from. Nothing was sent. Re-read for a fresh precondition, decide again, retry |
+| `TRANSITION_TAKES_NO_RESOLUTION` | 2 | `--resolution` on a transition whose screen has no resolution field, which Jira refuses as well. Default workflows have none. Move it without `--resolution`; `jr meta transitions <key> --format xml` shows which transitions carry one |
 | `INVALID_PRECONDITION` | 2 | The `--if-unchanged` value is not one this tool issued, or describes another issue or another site. It comes from the `precondition` attribute of `jr issue get` and nowhere else |
 | `IDEMPOTENCY_KEY_REUSED` | 7 | The key was already used for a *different* operation. Answering one with the other's result would be worse than refusing. Use a new key |
 | `SPRINT_HAS_NO_DATES` | - | Jira will not run a sprint with no window. The refusal names only the missing half, so being asked for `--end` alone means the start is already set |

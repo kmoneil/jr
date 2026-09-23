@@ -2236,7 +2236,7 @@ Examples:
 
 ```console
 jr issue move ENG-101 'Start Progress'
-jr issue move ENG-101 'Close Issue' --resolution Fixed
+jr issue move ENG-101 'Close Issue' --resolution Done
 jr issue move ENG-101 11 --dry-run
 jr issue move ENG-101 Done --if-unchanged eyJkIjo
 jr issue move ENG-101 Done --idempotency-key deploy-42
@@ -2249,7 +2249,7 @@ jr issue move ENG-101 Done --idempotency-key deploy-42
 
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
-| `--resolution` | `string` | — | resolution to set, for a transition that asks for one |
+| `--resolution` | `string` | — | resolution to set, by name or id; the transition's screen must offer it |
 | `--comment` | `string` | — | comment to add with the transition |
 | `--idempotency-key` | `string` | — | make a retry safe: the same key returns the recorded move |
 | `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
@@ -2277,6 +2277,13 @@ transitions is refused with both, since they lead to different statuses.
 That list is fetched fresh every time and never cached: it depends on where the
 issue is now, and acting on a stale copy sends an id the workflow no longer
 offers.
+
+--resolution is resolved against the transition's own screen the same way, by
+id or by a name in any case, and what is sent is the site's spelling, because
+Jira matches the name exactly. A value the screen does not offer is refused with
+the ones it does, and a transition whose screen has no resolution field is
+refused outright, as Jira would refuse it. Neither costs a request: the screen
+arrives with the transitions.
 
 --if-unchanged refuses the transition if the issue changed since you read it,
 exactly as on issue edit. Resolving the transition already guards against a

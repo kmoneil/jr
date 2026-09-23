@@ -25,7 +25,7 @@ have. Report it or act on what it tells you. Do not reach for a way past it.
 | --- | --- | --- |
 | `UNCONSTRAINED_QUERY` | Add `--jql 'project is not empty'` to satisfy the filter check | Scope it (`--project`, `--status`, a date bound) or pass `--all-projects` if a whole-instance sweep is genuinely intended |
 | Exit 3, `RESULT_TRUNCATED` | Report the rows you got as the answer | Resume with `--page-token`, or say the result is partial and how much you saw |
-| `UNKNOWN_USER`, `UNKNOWN_FIELD`, `UNKNOWN_TRANSITION` | Guess another spelling and retry | Read `detail`. It lists the real candidates with their ids. Pass an id |
+| `UNKNOWN_USER`, `UNKNOWN_FIELD`, `UNKNOWN_TRANSITION`, `UNKNOWN_RESOLUTION` | Guess another spelling and retry | Read `detail`. It lists the real candidates with their ids. Pass an id |
 | `INVALID_USAGE`, `UNKNOWN_COMMAND` | Re-read the help output and guess again | Read `detail`. A mistyped flag, verb, or command name carries the near misses; an empty `detail` means nothing is close, so check `jr schema` rather than trying another spelling |
 | `READ_ONLY` (exit 10) | Look for another command that writes | Stop. The caller chose a read-only context. Tell them |
 | `CONFIRMATION_REQUIRED` (exit 10) | Append `--yes` and rerun | `--yes` is the user's decision. Ask for it, once, for the specific action |
@@ -216,8 +216,10 @@ Mutations are gated on purpose, and the gates are cheap to satisfy honestly.
 5. **`--field id=value` for anything without a flag of its own.** Story points,
    acceptance criteria, and every other custom field are reachable:
    `jr issue edit ENG-1 --field 'Story Points=5'`. The id or the name both work
-   and the value is typed from the site's catalogue, so a bad value is refused
-   before anything is sent. Where the type is one `jr` will not guess at, and
+   and the value is typed from the site's catalogue, so a value of the wrong
+   type is refused before anything is sent. A named value (an option, a
+   priority, a version) goes as typed, and Jira refuses one it does not have
+   with `BAD_REQUEST`. Where the type is one `jr` will not guess at, and
    Jira reports Epic Link and most plugin fields as `any`, the refusal names
    `--field-json`, which sends the value verbatim:
    `--field-json customfield_11350='"ENG-42"'`. Do not leave `jr` for `curl` to

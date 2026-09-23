@@ -34,6 +34,12 @@ type MetaField struct {
 	// They are the difference between "this field is required" and a caller
 	// being able to fill it in without a second lookup.
 	AllowedValues []string `json:"allowedValues,omitempty"`
+	// AllowedIDs are the ids Jira sent with those values, index for index,
+	// with an empty string for a value that came with none, and nil when none
+	// did. A value is what a person types and an id is what they can pass
+	// instead, so a refusal listing the candidates carries both. A field read
+	// from a cache written before this existed has none.
+	AllowedIDs []string `json:"allowedIds,omitempty"`
 	// HasDefault reports whether Jira supplies a value when none is given, so
 	// a required field with a default is not reported as something the caller
 	// must provide.
@@ -76,6 +82,7 @@ func (r rawMetaField) convert(id string) MetaField {
 	} else if r.Key != "" && id == "" {
 		id = r.Key
 	}
+	names, ids := allowedValues(r.AllowedValues)
 	return MetaField{
 		ID:            id,
 		Name:          r.Name,
@@ -84,43 +91,58 @@ func (r rawMetaField) convert(id string) MetaField {
 		Items:         r.Schema.Items,
 		CustomType:    r.Schema.Custom,
 		HasDefault:    r.HasDefaultValue,
-		AllowedValues: allowedValueNames(r.AllowedValues),
+		AllowedValues: names,
+		AllowedIDs:    ids,
 	}
 }
 
-// allowedValueNames reduces Jira's allowed values to something printable.
+// allowedValues reduces Jira's allowed values to something printable, and
+// keeps the id each one came with.
 //
 // They arrive as objects with a name, a value, or just an id depending on the
 // field type. A value that reduces to nothing is dropped rather than rendered
 // as an empty string, because an empty cell in a list of choices reads as a
-// choice.
-func allowedValueNames(raw []json.RawMessage) []string {
-	out := make([]string, 0, len(raw))
+// choice. The ids stay index for index with the names, so a dropped value
+// drops its id too.
+func allowedValues(raw []json.RawMessage) (names, ids []string) {
+	names = make([]string, 0, len(raw))
+	ids = make([]string, 0, len(raw))
+	anyID := false
 	for _, item := range raw {
-		var obj struct {
-			Name  string `json:"name"`
-			Value string `json:"value"`
-			ID    string `json:"id"`
+		name, id, ok := allowedValue(item)
+		if !ok {
+			continue
 		}
-		if err := json.Unmarshal(item, &obj); err == nil {
-			switch {
-			case obj.Name != "":
-				out = append(out, obj.Name)
-				continue
-			case obj.Value != "":
-				out = append(out, obj.Value)
-				continue
-			case obj.ID != "":
-				out = append(out, obj.ID)
-				continue
+		names = append(names, name)
+		ids = append(ids, id)
+		anyID = anyID || id != ""
+	}
+	if !anyID {
+		ids = nil
+	}
+	return names, ids
+}
+
+// allowedValue reduces one allowed value to the name it is printed as and the
+// id it came with, and reports false for one that reduces to nothing.
+func allowedValue(item json.RawMessage) (name, id string, ok bool) {
+	var obj struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+		ID    string `json:"id"`
+	}
+	if err := json.Unmarshal(item, &obj); err == nil {
+		for _, printed := range []string{obj.Name, obj.Value, obj.ID} {
+			if printed != "" {
+				return printed, obj.ID, true
 			}
 		}
-		var text string
-		if err := json.Unmarshal(item, &text); err == nil && text != "" {
-			out = append(out, text)
-		}
 	}
-	return out
+	var text string
+	if err := json.Unmarshal(item, &text); err == nil && text != "" {
+		return text, "", true
+	}
+	return "", "", false
 }
 
 // decodeMetaFields converts a map of field id to description, sorted so two
