@@ -600,12 +600,13 @@ is refused with `TRANSITION_TAKES_NO_RESOLUTION`. Both are refused before
 anything is sent, `--dry-run` included, so a preview no longer prints a request
 Jira would refuse for its resolution.
 
-**`--comment` only works where the transition's screen has a comment field**,
-and on a default workflow it does not. Where it does not, the transition is
-refused with `TRANSITION_TAKES_NO_COMMENT` and nothing is sent, rather than the
-transition being applied and the comment quietly dropped, which is what Jira
-does with it. Check with `jr meta transitions <key>`: a transition showing
-`has-screen="false"` and no fields will not take one.
+**`--comment` only works on a transition that has a screen**, and on a default
+workflow none does. Where it does not, the transition is refused with
+`TRANSITION_TAKES_NO_COMMENT` and nothing is sent, rather than the transition
+being applied and the comment quietly dropped, which is what Jira does with it.
+Check with `jr meta transitions <key> --format xml`: a transition with no
+fields has no screen and will not take one. On Cloud, which says
+`has-screen`, the screen also has to list a comment field.
 
 Two commands is the reliable spelling, and the second is what the first would
 have done anyway:
