@@ -107,11 +107,16 @@ If you want what is in a sprint now, that is a different question than
 **And a sprint id you looked up earlier goes stale.** Sprints roll over. An id
 resolved at the start of a long session can name a closed sprint by the end of
 it, and `sprint add` into a closed one is refused with `SPRINT_CLOSED` and moves
-nothing. Resolve it again rather than carrying it:
+nothing. Re-derive it near the write that uses it rather than carrying it:
 
 ```console
-jr sprint list --state active --state future
+jr sprint current                             # the board's one active sprint
+jr sprint list --state active --state future  # everything that will take issues
 ```
+
+`sprint current` refuses when the answer is not singular: `NO_ACTIVE_SPRINT`
+(exit 5) when nothing is running, `AMBIGUOUS_SPRINT` (exit 2, naming every
+candidate) when the board runs several at once.
 
 The same applies to any id with a lifecycle, such as a version or a board that
 gets archived. Re-derive; do not remember.

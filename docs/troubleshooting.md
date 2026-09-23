@@ -812,11 +812,30 @@ rather than quietly landing somewhere wrong, but the id you have is stale and
 the next one will be too.
 
 ```console
-$ jr sprint list --state active --state future
+$ jr sprint current                                # the board's one active sprint
+$ jr sprint list --state active --state future     # everything that will take issues
 ```
 
-names the sprints that will take issues. If you are scripting this, resolve the
-sprint each time rather than carrying one between runs.
+If you are scripting this, resolve the sprint each time rather than carrying
+one between runs; `sprint current` is that resolution as one request.
+
+### `NO_ACTIVE_SPRINT`
+
+`jr sprint current` on a board with no sprint running. Exit 5: the question
+"which sprint is current" has no answer here, which is different from an
+empty list a script would have to notice.
+
+```console
+$ jr sprint list --state future    # what could be started
+$ jr sprint start <id>             # start it
+```
+
+### `AMBIGUOUS_SPRINT`
+
+`jr sprint current` on a board running more than one active sprint, which
+some boards allow. Exit 2, and the refusal names every candidate with its
+id, because handing a script one of several without saying so would be a
+guess. Address the sprint by id instead.
 
 ### `UNBOUNDABLE_DATE`
 

@@ -54,7 +54,7 @@ schema.commands	1	schema
 sprint.add	1	sprint.add
 sprint.close	1	sprint.close
 sprint.create	1	sprint.create
-sprint.get	1	sprint.get
+sprint.get	1	sprint.current,sprint.get
 sprint.list	1	sprint.list
 sprint.start	1	sprint.start
 user.get	2	user.get,user.me
