@@ -1,0 +1,38 @@
+{
+  "deployment": "datacenter",
+  "source": "constructed",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/issue/ENG-101/transitions",
+        "query": "expand=transitions.fields"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"expand\":\"transitions\",\"transitions\":[{\"id\":\"4\",\"name\":\"Start Progress\",\"opsbarSequence\":20,\"to\":{\"self\":\"https://recorded.invalid/rest/api/2/status/3\",\"description\":\"This issue is being actively worked on at the moment by the assignee.\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/inprogress.png\",\"name\":\"In Progress\",\"id\":\"3\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/2/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"inprogress\",\"name\":\"In Progress\"}},\"fields\":{}},{\"id\":\"5\",\"name\":\"Resolve Issue\",\"opsbarSequence\":40,\"to\":{\"self\":\"https://recorded.invalid/rest/api/2/status/5\",\"description\":\"A resolution has been taken, and it is awaiting verification by reporter. From here issues are either reopened, or are closed.\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/resolved.png\",\"name\":\"Resolved\",\"id\":\"5\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/2/statuscategory/3\",\"id\":3,\"key\":\"done\",\"colorName\":\"success\",\"name\":\"Done\"}},\"fields\":{\"resolution\":{\"required\":true,\"schema\":{\"type\":\"resolution\",\"system\":\"resolution\"},\"name\":\"Resolution\",\"fieldId\":\"resolution\",\"operations\":[\"set\"],\"allowedValues\":[{\"self\":\"https://recorded.invalid/rest/api/2/resolution/10000\",\"name\":\"Done\",\"id\":\"10000\"},{\"self\":\"https://recorded.invalid/rest/api/2/resolution/10001\",\"name\":\"Won't Do\",\"id\":\"10001\"},{\"self\":\"https://recorded.invalid/rest/api/2/resolution/10002\",\"name\":\"Duplicate\",\"id\":\"10002\"},{\"self\":\"https://recorded.invalid/rest/api/2/resolution/10003\",\"name\":\"Cannot Reproduce\",\"id\":\"10003\"}]},\"fixVersions\":{\"required\":false,\"schema\":{\"type\":\"array\",\"items\":\"version\",\"system\":\"fixVersions\"},\"name\":\"Fix Version/s\",\"fieldId\":\"fixVersions\",\"operations\":[\"set\",\"add\",\"remove\"],\"allowedValues\":[]},\"worklog\":{\"required\":false,\"schema\":{\"type\":\"array\",\"items\":\"worklog\",\"system\":\"worklog\"},\"name\":\"Log Work\",\"fieldId\":\"worklog\",\"operations\":[\"add\"]},\"assignee\":{\"required\":false,\"schema\":{\"type\":\"user\",\"system\":\"assignee\"},\"name\":\"Assignee\",\"fieldId\":\"assignee\",\"autoCompleteUrl\":\"https://recorded.invalid/rest/api/latest/user/assignable/search?issueKey=CLS-1&username=\",\"operations\":[\"set\"]}}},{\"id\":\"2\",\"name\":\"Close Issue\",\"opsbarSequence\":60,\"to\":{\"self\":\"https://recorded.invalid/rest/api/2/status/6\",\"description\":\"The issue is considered finished, the resolution is correct. Issues which are closed can be reopened.\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/closed.png\",\"name\":\"Closed\",\"id\":\"6\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/2/statuscategory/3\",\"id\":3,\"key\":\"done\",\"colorName\":\"success\",\"name\":\"Done\"}},\"fields\":{\"resolution\":{\"required\":true,\"schema\":{\"type\":\"resolution\",\"system\":\"resolution\"},\"name\":\"Resolution\",\"fieldId\":\"resolution\",\"operations\":[\"set\"],\"allowedValues\":[{\"self\":\"https://recorded.invalid/rest/api/2/resolution/10000\",\"name\":\"Done\",\"id\":\"10000\"},{\"self\":\"https://recorded.invalid/rest/api/2/resolution/10001\",\"name\":\"Won't Do\",\"id\":\"10001\"},{\"self\":\"https://recorded.invalid/rest/api/2/resolution/10002\",\"name\":\"Duplicate\",\"id\":\"10002\"},{\"self\":\"https://recorded.invalid/rest/api/2/resolution/10003\",\"name\":\"Cannot Reproduce\",\"id\":\"10003\"}]},\"fixVersions\":{\"required\":false,\"schema\":{\"type\":\"array\",\"items\":\"version\",\"system\":\"fixVersions\"},\"name\":\"Fix Version/s\",\"fieldId\":\"fixVersions\",\"operations\":[\"set\",\"add\",\"remove\"],\"allowedValues\":[]},\"worklog\":{\"required\":false,\"schema\":{\"type\":\"array\",\"items\":\"worklog\",\"system\":\"worklog\"},\"name\":\"Log Work\",\"fieldId\":\"worklog\",\"operations\":[\"add\"]},\"assignee\":{\"required\":false,\"schema\":{\"type\":\"user\",\"system\":\"assignee\"},\"name\":\"Assignee\",\"fieldId\":\"assignee\",\"autoCompleteUrl\":\"https://recorded.invalid/rest/api/latest/user/assignable/search?issueKey=CLS-1&username=\",\"operations\":[\"set\"]}}}]}"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/2/issue/ENG-101/transitions",
+        "body": "{\"fields\":{\"resolution\":{\"name\":\"Done\"}},\"transition\":{\"id\":\"5\"},\"update\":{\"comment\":[{\"add\":{\"body\":\"probe comment on a screened transition\"}}]}}"
+      },
+      "response": {
+        "status": 204,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": ""
+      }
+    }
+  ]
+}

@@ -964,17 +964,27 @@ func editOptionsFor(inv *registry.Invocation, key string) EditOptions {
 
 // commentIsAccepted refuses a comment the transition will not take.
 //
-// Data Center answers a transition carrying a comment its screen has no field
-// for with 204 and no comment. The transition applies, the comment is discarded,
-// and every layer above reports success: measured on Jira 10.4.0, where the
-// comment count went 0 to 0 across two accepted POSTs while a control comment
-// through `issue comment add` landed on the same issue. A caller who asked for a
-// comment, got exit 0, and has no comment is §0 exactly inverted.
+// A transition with no screen takes a comment and drops it. Jira answers 204,
+// the transition applies, and every layer above reports success: measured on
+// Data Center 10.4.0, where the comment count went 0 to 0 across two accepted
+// POSTs while a control comment through `issue comment add` landed on the same
+// issue, and on Cloud, 0 to 0 for a well-formed document. A caller who asked
+// for a comment, got exit 0, and has no comment is §0 exactly inverted.
+//
+// A transition with a screen keeps one, and Data Center does not say so the way
+// the first version of this check expected. It never sends hasScreen and never
+// lists `comment` among a screen's fields, so the check refused `--comment` on
+// every transition there: measured on 10.4.0, Resolve Issue, whose screen
+// lists four fields and no comment, took one with 204 and the comment count
+// went 0 to 1. A transition without a screen lists no fields at all, so where
+// the server does not say, a field list is a screen. Cloud does say, and
+// whether a Cloud screen keeps a comment it does not list has not been
+// measured, because the sandbox has no screened transition; there the screen
+// still has to list one.
 //
 // The check costs nothing, because `expand=transitions.fields` is already on the
 // request that resolved the transition and `Transition.Fields` already holds the
-// answer. `meta transitions` has been publishing `has-screen="false"` and
-// `fields count="0"` for these transitions the whole time.
+// answer.
 //
 // A refusal rather than a warning. A warning on a write that did not do what was
 // asked still exits 0, and the exit is what a script reads.
@@ -987,13 +997,27 @@ func commentIsAccepted(transition site.Transition, comment string) error {
 			return nil
 		}
 	}
-	return errs.Usage("TRANSITION_TAKES_NO_COMMENT",
-		"the %s transition has no comment field, so --comment cannot be applied",
-		transition.Name).
-		WithDetail("this transition's screen accepts %d field(s); Jira would "+
-			"take the transition and discard the comment", len(transition.Fields)).
-		WithRemedy("make the transition without --comment, then add one with " +
-			"`" + buildinfo.App + " issue comment add <key> <body>`")
+	remedy := "make the transition without --comment, then add one with " +
+		"`" + buildinfo.App + " issue comment add <key> <body>`"
+	switch {
+	case transition.HasScreen == nil && len(transition.Fields) > 0:
+		// A server that does not say, with a field list: a screen.
+		return nil
+	case transition.HasScreen == nil || !*transition.HasScreen:
+		return errs.Usage("TRANSITION_TAKES_NO_COMMENT",
+			"the %s transition has no screen, so --comment cannot be applied",
+			transition.Name).
+			WithDetail("Jira takes a transition with no screen and discards a "+
+				"comment sent with it").
+			WithRemedy("%s", remedy)
+	default:
+		return errs.Usage("TRANSITION_TAKES_NO_COMMENT",
+			"the %s transition's screen has no comment field, so --comment "+
+				"cannot be applied", transition.Name).
+			WithDetail("the screen lists %d field(s), and none of them is a comment",
+				len(transition.Fields)).
+			WithRemedy("%s", remedy)
+	}
 }
 
 // resolveMove reads what one issue's transitions make of a move: the

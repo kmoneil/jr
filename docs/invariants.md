@@ -646,15 +646,20 @@ do not catch, add the test in the same change and cite it here.
   `TestAnIssueThatMovedAcrossTheSecondIsStillRefused`.
 
 - **A write never reports success for something the server discarded.** Jira
-  takes a transition carrying a comment its screen has no field for, answers
-  204, and drops the comment. Measured on Data Center 10.4.0: the comment count
+  takes a transition that has no screen, carrying a comment, answers 204, and
+  drops the comment. Measured on Data Center 10.4.0, where the comment count
   went 0 to 0 across two accepted POSTs while a control comment through
-  `issue comment add` landed on the same issue. The transition is refused before
-  it is sent, from the field list `expand=transitions.fields` already returns,
-  because a caller who asked for a comment and got exit 0 has no way to learn
-  there is no comment. A warning would not do: it still exits 0.
+  `issue comment add` landed on the same issue, and on Cloud, 0 to 0 for a
+  well-formed document. The transition is refused before it is sent, from the
+  field list `expand=transitions.fields` already returns, because a caller who
+  asked for a comment and got exit 0 has no way to learn there is no comment. A
+  warning would not do: it still exits 0. The refusal is held to what was
+  measured in the other direction too: a Data Center transition with a screen
+  keeps a comment its field list does not name, and refusing it there was a
+  limit the server does not have.
   **Enforced by:** `TestACommentIsRefusedWhereTheTransitionCannotTakeOne`,
-  `TestACommentIsAcceptedWhereTheScreenTakesOne`.
+  `TestACommentIsAcceptedWhereTheScreenTakesOne`,
+  `TestADataCenterScreenKeepsACommentItDoesNotList`.
 - **Every body this tool sends is encoded for the deployment it is going to.**
   Cloud stores documents and refuses a string where a comment body belongs;
   Data Center stores wiki markup and refuses a document. `bodyValue` is the one
