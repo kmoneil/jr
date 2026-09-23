@@ -20,6 +20,109 @@ accident.
 
 Nothing yet.
 
+## [0.15.0] - 2026-09-23
+
+**Take this one if a consumer parses `jr contract`, or branches on the
+refusal `sprint add` answers a closed sprint with.** Both change spelling
+here, and both are listed with their new shapes under Output contract below.
+Everything else is additive: an attribute that says a requested field is
+unset rather than empty, a flag that drops comment bodies from the activity
+feed, and a warning for wiki markup with more than one reading.
+
+**A requested field the issue has no value for now says so.** A custom field
+with no value rendered as a bare empty element, which the reporter of issue
+159 read as looking "as much like a malformed response as an empty value".
+They were right: absent from the response, null, the empty string, and the
+empty list all collapsed to the same bytes, and nothing in the document said
+which had happened. The element now carries `set="false"` in exactly that
+case, so the absence of the attribute says the element's text is the value.
+A numeric 0 and the string "0" were never part of the collapse and are
+unchanged, which a test now asserts rather than assumes.
+
+Beside it, the same element carries `name`, the field's name in the site's
+catalogue. `--field 'Story Points'` and `--field customfield_10042` still
+render identical bytes, because `name` is the catalogue's spelling and not
+the caller's, and the TSV column header remains the field id.
+
+**Moving an issue into a closed sprint is now a typed refusal.** Jira
+refuses the move and the issue does not change, measured against a 10.4.0
+Data Center, so issue 155's report of a silent failure was a report of an
+unreadable one. The refusal arrived as a generic `BAD_REQUEST` at exit 2,
+with a remedy pointing at the offending field when no field was wrong.
+`sprint add` now reads the sprint's state after such a refusal and answers
+`SPRINT_CLOSED` at exit 7, a state conflict, which is what it is. The
+diagnosis comes from the sprint and never from matching Jira's message, and
+a 400 the state cannot confirm keeps Jira's own words as `BAD_REQUEST`.
+
+**`issue activity --no-body` drops comment and worklog text.** The feed
+answers "what did I touch yesterday" and charged for the full text of every
+comment in the window; the body is its only unbounded column, and issue 156
+noted there was no way to decline it. The flag drops the column and the
+element together in every format, so JSON does not keep what TSV was asked
+to leave out, and the skill's advice to ask for only the columns you need
+now names it. It saves output and not requests: Jira sends the bodies
+inline either way. No kind moves, because `body` was declared optional on
+`issue.activity` from the start.
+
+**Wiki markup that has more than one reading gets a warning.** The reporter
+of issue 161 nearly sent `{{/subjects/{subject\}}}` as a description and
+rewrote it instead, because there was no way to tell how it would render. A
+person posts, looks at the result, and edits it; an agent has no such loop,
+and a mangled span is cosmetic enough that nobody ever mentions it. On a
+write whose body the deployment stores as wiki markup, `jr` now scans for
+the constructs that cannot be resolved by reading: a run of three or more
+braces, an unclosed `{code}`, `{noformat}`, `{quote}`, `{panel}` or
+`{color}`, and an unequal number of `{{` and `}}` outside a fence. Each
+earns an `AMBIGUOUS_WIKI_MARKUP` warning on stderr. The write still happens
+and exit stays 0, because nothing reported is known to be wrong, and a brace
+run inside a `{code}` fence is left alone, because pasting a shell snippet
+is the common case. This is a scanner and not a parser: it decides nothing
+about what a construct means, and reports only where one has no single
+meaning. Cloud stores ADF and never warns.
+
+### Documentation
+
+- `docs/recipes.md` now says what `text ~` does, measured rather than
+  reasoned: it stems (`report` matches a stored "reports"), a stop word
+  matches nothing and says nothing about it, and a two-clause conjunction
+  is the intersection it looks like. It also says what nothing before it
+  said: every query `jr` sends carries `ORDER BY issuekey`, so a text
+  search is not ranked and never was. The five results issue 162 read as
+  poor relevance were the five highest keys that matched. Whether a ranked
+  search is worth offering at the cost of stable pagination is carded, not
+  decided.
+
+### Output contract
+
+- `issue.get` is **v11** and `issue.list` is **v10**. A field requested
+  with `--field` carries two new optional attributes: `name`, the field's
+  catalogue name, present whenever a catalogue was consulted, and `set`,
+  written only when the issue has no value for the field. Absence of `set`
+  means the element's text is the value. The TSV column header is
+  unchanged. This is additive under the new-optional-attribute row; the
+  versions move because a changed shape at an unchanged version is what
+  the golden gate exists to refuse, and a kind's version moving decides
+  nothing about the release.
+- `contract` is **v4**, and this one is breaking. A schema that declines
+  to describe its own children, the meta-schema's recursion, said
+  `<extra type="string">` and described those children as strings, which
+  they were not. It now says so honestly with a `<recursive>` element
+  carrying a short explanation. `<extra>` keeps its one meaning, an open
+  shape, and gains an `<attributes>` child publishing the attributes an
+  open element may carry, which are now enforced rather than hedged
+  around.
+- `SPRINT_CLOSED` is a new error `code`, at exit 7 (`CONFLICT`). The same
+  invocation answered `BAD_REQUEST` at exit 2 before, and `code` is the
+  field this contract tells a consumer to branch on, so this is breaking
+  under the row for a refusal that changes its spelling.
+- `AMBIGUOUS_WIKI_MARKUP` is a new warning `code`. Additive: a warning is
+  a separate document on stderr, the result beside it is unchanged, and no
+  kind moves.
+- **Priced a minor** on the two breaking rows above. The field attributes,
+  the flag, and the warning would have been a patch on their own.
+- No exit code changed meaning: 7 already meant `CONFLICT` and 2 still
+  means what it did. What changed is which of them one refusal earns.
+
 ## [0.14.0] - 2026-09-22
 
 **If you run Data Center and ask for the Sprint field, take this one.** It was
@@ -2398,7 +2501,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.14.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.15.0...main
+[0.15.0]: https://github.com/kmoneil/jr/releases/tag/v0.15.0
 [0.14.0]: https://github.com/kmoneil/jr/releases/tag/v0.14.0
 [0.13.4]: https://github.com/kmoneil/jr/releases/tag/v0.13.4
 [0.13.3]: https://github.com/kmoneil/jr/releases/tag/v0.13.3
