@@ -127,6 +127,12 @@ func planKeys(args []string) []string {
 // an issue that moves after planning is refused as stale before the id is
 // ever sent, which is the same freshness the interactive command buys by
 // never caching the list.
+//
+// The resolution is checked against each row's own transition screen, since
+// one workflow's screen can take a resolution and another's cannot. The
+// change then carries the site's spelling, because apply sends exactly what
+// the plan says and Jira matches the name case-sensitively. A resolution is
+// one site-wide object, so the rows agree on how it is spelled.
 func BuildMovePlan(
 	ctx context.Context, inv *registry.Invocation, client *Client, info site.Info,
 	keys []string, change MoveChange,
@@ -146,6 +152,7 @@ func BuildMovePlan(
 		"comment=" + change.Comment,
 	})
 	rows := make([]PlanRow, 0, len(keys))
+	spelled := ""
 	for _, key := range keys {
 		row, err := baselineRow(info, updated, planVerbMove, key, fp)
 		if err != nil {
@@ -155,18 +162,23 @@ func BuildMovePlan(
 		if err != nil {
 			return nil, err
 		}
-		transition, err := transitions.Resolve(change.Transition)
-		switch {
-		case err != nil:
+		transition, resolution, err := resolveMove(transitions, change)
+		if err != nil {
 			row.Blocked = errs.Coerce(err).Message
-		default:
-			if err := commentIsAccepted(transition, change.Comment); err != nil {
-				row.Blocked = errs.Coerce(err).Message
-			} else {
-				row.Transition = transition.ID
+		} else {
+			row.Transition = transition.ID
+			// Only a spelling some screen listed, which is one with an id:
+			// every resolution Jira lists carries one. A screen that listed
+			// nothing passes the input through, and that is not the site's
+			// spelling.
+			if spelled == "" && resolution.ID != "" {
+				spelled = resolution.Name
 			}
 		}
 		rows = append(rows, row)
+	}
+	if spelled != "" {
+		change.Resolution = spelled
 	}
 	return &Plan{Verb: planVerbMove, Move: change, Rows: rows}, nil
 }

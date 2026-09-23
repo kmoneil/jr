@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/kmoneil/jr/internal/buildinfo"
 	"github.com/kmoneil/jr/internal/errs"
 	"github.com/kmoneil/jr/internal/transport"
 )
@@ -199,6 +200,132 @@ func describeTransitions(items []Transition) string {
 	parts := make([]string, 0, len(items))
 	for _, item := range items {
 		parts = append(parts, item.Name+" ("+item.ID+" → "+item.To.Name+")")
+	}
+	return strings.Join(parts, ", ")
+}
+
+// Resolution is one resolution a transition's screen offers.
+type Resolution struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// Resolution turns a resolution name or id into the one this transition's
+// screen offers, spelled the way Jira has to be sent it.
+//
+// It is resolved the way the transition itself is: an id first and exactly,
+// then a name in any case, and a name matching two is refused with both. The
+// answer goes out as the name, which Jira takes as readily as the id and which
+// is what a person reading a dry run or a plan recognises. It has to be the
+// site's own spelling, because Jira matches the name case-sensitively: Data
+// Center 10.4.0 refused `won't do` where the resolution is `Won't Do`, and
+// refused `10001` sent as a name.
+//
+// The set is the screen's, not the site's, because a resolution the site has
+// is not necessarily one the transition offers. It arrives with the
+// transitions read that resolved the transition, so this costs no request.
+//
+// A transition whose screen has no resolution field is refused, as Jira
+// refuses it on both deployments: "Field 'resolution' cannot be set. It is not
+// on the appropriate screen, or unknown." None of the default workflows
+// measured on either puts a screen on any transition, so that is the common
+// case and not the edge. A
+// screen that has the field and lists no values constrains nothing, which is
+// what an empty AllowedValues means everywhere else; the input goes as typed
+// and Jira decides. Nothing has shown that shape, and refusing it would invent
+// a limit nobody measured.
+//
+// An empty input asks for no resolution and gets none, whatever the screen.
+func (t Transition) Resolution(input string) (Resolution, error) {
+	want := strings.TrimSpace(input)
+	if want == "" {
+		return Resolution{}, nil
+	}
+	field, ok := t.field("resolution")
+	if !ok {
+		return Resolution{}, errs.Usage("TRANSITION_TAKES_NO_RESOLUTION",
+			"the %s transition has no resolution field, so a resolution cannot "+
+				"be set with it", t.Name).
+			WithDetail("Jira refuses a resolution sent with a transition whose "+
+				"screen does not show one; this one's screen has %d field(s)",
+				len(t.Fields)).
+			WithRemedy("take the transition without a resolution, or one whose "+
+				"screen has the field: `%s meta transitions <key> --format xml` "+
+				"lists each transition's fields", buildinfo.App)
+	}
+
+	offered := resolutionsOffered(field)
+	if len(offered) == 0 {
+		return Resolution{Name: want}, nil
+	}
+	// An id is checked first and on its own, because ids are unique and an
+	// exact id match is therefore never ambiguous.
+	for _, r := range offered {
+		if r.ID != "" && r.ID == want {
+			return r, nil
+		}
+	}
+	var matches []Resolution
+	for _, r := range offered {
+		if strings.EqualFold(r.Name, want) {
+			matches = append(matches, r)
+		}
+	}
+	switch len(matches) {
+	case 1:
+		return matches[0], nil
+	case 0:
+		// Every candidate rather than near misses: a screen offers a handful,
+		// and the one the caller meant may be spelled nothing like it.
+		return Resolution{}, errs.Usage("UNKNOWN_RESOLUTION",
+			"the %s transition offers no resolution %q", t.Name, input).
+			WithDetail("available: %s", describeResolutions(offered)).
+			WithRemedy("pass one of these, by name or id; they are the ones " +
+				"this transition's screen offers")
+	default:
+		return Resolution{}, errs.Usage("AMBIGUOUS_RESOLUTION",
+			"%q names %d resolutions on the %s transition",
+			input, len(matches), t.Name).
+			WithDetail("%s", describeResolutions(matches)).
+			WithRemedy("pass the id of the one you mean")
+	}
+}
+
+// field finds a field on the transition's screen by id. The id and not the
+// name, because a custom field can be called Resolution and is not the field
+// `fields.resolution` sets.
+func (t Transition) field(id string) (MetaField, bool) {
+	for _, f := range t.Fields {
+		if f.ID == id {
+			return f, true
+		}
+	}
+	return MetaField{}, false
+}
+
+// resolutionsOffered pairs each value the resolution field allows with its id.
+func resolutionsOffered(f MetaField) []Resolution {
+	out := make([]Resolution, 0, len(f.AllowedValues))
+	for i, name := range f.AllowedValues {
+		r := Resolution{Name: name}
+		if i < len(f.AllowedIDs) {
+			r.ID = f.AllowedIDs[i]
+		}
+		out = append(out, r)
+	}
+	return out
+}
+
+// describeResolutions renders candidates for an error detail: the name the
+// caller recognises, and the id they can pass instead where Jira sent one.
+func describeResolutions(items []Resolution) string {
+	parts := make([]string, 0, len(items))
+	for _, r := range items {
+		if r.ID == "" {
+			parts = append(parts, r.Name)
+			continue
+		}
+		parts = append(parts, r.Name+" ("+r.ID+")")
 	}
 	return strings.Join(parts, ", ")
 }

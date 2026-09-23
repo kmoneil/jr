@@ -16,9 +16,17 @@ import (
 
 // planVerbsRecorder counts what reached the server, keyed by issue.
 type planVerbsRecorder struct {
-	mu      sync.Mutex
-	moves   map[string]string // key -> transition id sent
-	assigns map[string]string // key -> assignee value sent
+	mu          sync.Mutex
+	moves       map[string]string // key -> transition id sent
+	resolutions map[string]string // key -> resolution name sent with it
+	assigns     map[string]string // key -> assignee value sent
+}
+
+func newPlanVerbsRecorder() *planVerbsRecorder {
+	return &planVerbsRecorder{
+		moves: map[string]string{}, resolutions: map[string]string{},
+		assigns: map[string]string{},
+	}
 }
 
 // planVerbsJira serves three issues whose workflows differ: ENG-1 and ENG-3
@@ -26,12 +34,19 @@ type planVerbsRecorder struct {
 // whole reason a move plan resolves per row.
 func planVerbsJira(t *testing.T, rec *planVerbsRecorder) string {
 	t.Helper()
-	const updated = `"2026-09-23T10:00:00.000+0000"`
-	transitions := map[string]string{
+	return planVerbsJiraWith(t, rec, map[string]string{
 		"ENG-1": `{"transitions":[{"id":"31","name":"Done","to":{"id":"6","name":"Done","statusCategory":{"key":"done","name":"Done"}}}]}`,
 		"ENG-2": `{"transitions":[{"id":"21","name":"Start Progress","to":{"id":"3","name":"In Progress","statusCategory":{"key":"indeterminate","name":"In Progress"}}}]}`,
 		"ENG-3": `{"transitions":[{"id":"33","name":"Done","to":{"id":"6","name":"Done","statusCategory":{"key":"done","name":"Done"}}}]}`,
-	}
+	})
+}
+
+// planVerbsJiraWith is planVerbsJira serving the given transitions per key.
+func planVerbsJiraWith(
+	t *testing.T, rec *planVerbsRecorder, transitions map[string]string,
+) string {
+	t.Helper()
+	const updated = `"2026-09-23T10:00:00.000+0000"`
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -61,10 +76,18 @@ func planVerbsJira(t *testing.T, rec *planVerbsRecorder) string {
 				Transition struct {
 					ID string `json:"id"`
 				} `json:"transition"`
+				Fields struct {
+					Resolution struct {
+						Name string `json:"name"`
+					} `json:"resolution"`
+				} `json:"fields"`
 			}
 			_ = json.NewDecoder(r.Body).Decode(&body)
 			rec.mu.Lock()
 			rec.moves[key] = body.Transition.ID
+			if name := body.Fields.Resolution.Name; name != "" {
+				rec.resolutions[key] = name
+			}
 			rec.mu.Unlock()
 			w.WriteHeader(http.StatusNoContent)
 		case strings.HasSuffix(r.URL.Path, "/assignee") && r.Method == http.MethodPut:
@@ -90,7 +113,7 @@ func planVerbsJira(t *testing.T, rec *planVerbsRecorder) string {
 // plan built from issue move records the id each row's workflow resolved, or
 // the reason it could not, and sends nothing mutating while doing it.
 func TestMovePlanResolvesEachWorkflowsOwnTransition(t *testing.T) {
-	rec := &planVerbsRecorder{moves: map[string]string{}, assigns: map[string]string{}}
+	rec := newPlanVerbsRecorder()
 	url := planVerbsJira(t, rec)
 	env := credentialed(t)
 	mustRun(t, env, "context", "create", "work", "--site", url, "--project", "ENG")
@@ -121,7 +144,7 @@ func TestMovePlanResolvesEachWorkflowsOwnTransition(t *testing.T) {
 // TestMoveApplyMovesWhatItCanAndOnlyOnce: the movable rows move, the blocked
 // row fails without a request, and a second run replays nothing.
 func TestMoveApplyMovesWhatItCanAndOnlyOnce(t *testing.T) {
-	rec := &planVerbsRecorder{moves: map[string]string{}, assigns: map[string]string{}}
+	rec := newPlanVerbsRecorder()
 	url := planVerbsJira(t, rec)
 	env := credentialed(t)
 	mustRun(t, env, "context", "create", "work", "--site", url, "--project", "ENG")
@@ -160,11 +183,76 @@ func TestMoveApplyMovesWhatItCanAndOnlyOnce(t *testing.T) {
 	}
 }
 
+// resolutionScreen is a Done transition whose screen takes a resolution, as
+// the system workflow's Resolve Issue does on Data Center 10.4.0.
+func resolutionScreen(id string) string {
+	return `{"transitions":[{"id":"` + id + `","name":"Done",` +
+		`"to":{"id":"6","name":"Done","statusCategory":{"key":"done","name":"Done"}},` +
+		`"fields":{"resolution":{"required":true,"name":"Resolution","fieldId":"resolution",` +
+		`"schema":{"type":"resolution","system":"resolution"},"operations":["set"],` +
+		`"allowedValues":[{"name":"Done","id":"10000"},{"name":"Duplicate","id":"10002"}]}}}]}`
+}
+
+// TestAMovePlanCarriesTheResolutionEachScreenOffers is issue 180 in a plan.
+//
+// Each row's transition is resolved against its own workflow, and whether that
+// transition takes a resolution is a fact about the same screen, so it is
+// checked in the same place: ENG-2's Done has no screen, and Jira refuses a
+// resolution there on both deployments. The plan says so rather than letting
+// the apply find out. The change carries the site's spelling, because Jira
+// matches the name case-sensitively and the apply sends what the plan says.
+func TestAMovePlanCarriesTheResolutionEachScreenOffers(t *testing.T) {
+	rec := newPlanVerbsRecorder()
+	url := planVerbsJiraWith(t, rec, map[string]string{
+		"ENG-1": resolutionScreen("31"),
+		"ENG-2": `{"transitions":[{"id":"32","name":"Done","to":{"id":"6","name":"Done","statusCategory":{"key":"done","name":"Done"}},"fields":{}}]}`,
+		"ENG-3": resolutionScreen("33"),
+	})
+	env := credentialed(t)
+	mustRun(t, env, "context", "create", "work", "--site", url, "--project", "ENG")
+	path := filepath.Join(t.TempDir(), "move.plan.xml")
+
+	got := run(t, env, "issue", "move", "ENG-1", "ENG-2", "ENG-3", "Done",
+		"--resolution", "duplicate", "--plan-out", path)
+	if got.exit != exitcode.OK {
+		t.Fatalf("exit = %v, stderr = %s", got.exit, got.stderr)
+	}
+	for _, want := range []string{
+		"<resolution>Duplicate</resolution>", `transition="31"`, `transition="33"`,
+	} {
+		if !strings.Contains(got.stdout, want) {
+			t.Errorf("the plan does not carry %s:\n%s", want, got.stdout)
+		}
+	}
+	for line := range strings.SplitSeq(got.stdout, "\n") {
+		if strings.Contains(line, `key="ENG-2"`) && !strings.Contains(line, `blocked="`) {
+			t.Errorf("ENG-2's Done has no resolution field and was planned "+
+				"anyway:\n%s", got.stdout)
+		}
+	}
+	if n := strings.Count(got.stdout, `blocked="`); n != 1 {
+		t.Errorf("blocked rows = %d, want exactly ENG-2:\n%s", n, got.stdout)
+	}
+
+	applied := run(t, env, "issue", "move", "--apply", path)
+	if applied.exit != exitcode.Usage {
+		t.Fatalf("exit = %v, want 2: the blocked row is the cause; stderr = %s",
+			applied.exit, applied.stderr)
+	}
+	if rec.resolutions["ENG-1"] != "Duplicate" || rec.resolutions["ENG-3"] != "Duplicate" {
+		t.Errorf("resolutions sent = %v, want the site's spelling on ENG-1 and ENG-3",
+			rec.resolutions)
+	}
+	if _, sent := rec.moves["ENG-2"]; sent {
+		t.Error("the blocked row reached the server")
+	}
+}
+
 // TestAssignPlanRecordsTheResolvedPerson: the plan carries the id the
 // directory resolved, not the name typed, so the same plan means the same
 // person on every day it is applied.
 func TestAssignPlanRecordsTheResolvedPerson(t *testing.T) {
-	rec := &planVerbsRecorder{moves: map[string]string{}, assigns: map[string]string{}}
+	rec := newPlanVerbsRecorder()
 	url := planVerbsJira(t, rec)
 	env := credentialed(t)
 	mustRun(t, env, "context", "create", "work", "--site", url, "--project", "ENG")
@@ -193,7 +281,7 @@ func TestAssignPlanRecordsTheResolvedPerson(t *testing.T) {
 // TestApplyRefusesAPlanForAnotherVerb: a move plan is not an edit, and
 // reinterpreting its change set would be the incumbent's habit.
 func TestApplyRefusesAPlanForAnotherVerb(t *testing.T) {
-	rec := &planVerbsRecorder{moves: map[string]string{}, assigns: map[string]string{}}
+	rec := newPlanVerbsRecorder()
 	url := planVerbsJira(t, rec)
 	env := credentialed(t)
 	mustRun(t, env, "context", "create", "work", "--site", url, "--project", "ENG")

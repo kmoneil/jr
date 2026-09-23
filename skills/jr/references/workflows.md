@@ -130,6 +130,12 @@ jr issue move ENG-101 'Close Issue' --resolution 'Done'
 and destinations. A move missing from that list is far more often blocked from
 the current status than misspelled, so read the list before assuming a typo.
 
+`--resolution` is resolved against that transition's own screen, by name in any
+case or by id, and the site's spelling is what is sent. `UNKNOWN_RESOLUTION`
+lists what the screen offers. `TRANSITION_TAKES_NO_RESOLUTION` means the
+transition has no resolution field, which on a default workflow is true of
+every transition: move it without one.
+
 ## Running a sprint
 
 The id you need at every step is the one `sprint create` reports.

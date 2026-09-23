@@ -585,11 +585,20 @@ name, not the destination status:
 
 ```console
 $ jr issue move ENG-101 'Start Progress'
-$ jr issue move ENG-101 'Close Issue' --resolution Fixed
+$ jr issue move ENG-101 'Close Issue' --resolution Done
 
 # Preview it
 $ jr issue move ENG-101 Done --dry-run
 ```
+
+**`--resolution` only works where the transition's screen has a resolution
+field**, and on a default workflow no transition has one. The value is resolved
+against what that screen offers, by name in any case or by id, and the site's
+spelling is what gets sent. A value the screen does not offer is refused with
+`UNKNOWN_RESOLUTION`, listing the ones it does; a transition with no such field
+is refused with `TRANSITION_TAKES_NO_RESOLUTION`. Both are refused before
+anything is sent, `--dry-run` included, so a preview no longer prints a request
+Jira would refuse for its resolution.
 
 **`--comment` only works where the transition's screen has a comment field**,
 and on a default workflow it does not. Where it does not, the transition is
@@ -602,7 +611,7 @@ Two commands is the reliable spelling, and the second is what the first would
 have done anyway:
 
 ```console
-$ jr issue move ENG-101 'Done' --resolution Fixed
+$ jr issue move ENG-101 'Done'
 $ jr issue comment add ENG-101 'Fixed by the retry rework'
 ```
 
