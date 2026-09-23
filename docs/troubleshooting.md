@@ -770,6 +770,34 @@ message.
 one. Jira will not run a sprint that has no dates; this says so without spending
 the round trip.
 
+### `AMBIGUOUS_WIKI_MARKUP`
+
+A warning, not an error. The write went through and the exit is 0.
+
+Data Center stores wiki markup, and some constructs have more than one reading.
+`jr` reports the ones it can be certain are ambiguous rather than guessing which
+reading your Jira takes:
+
+```console
+$ jr issue create --type Task --summary x \
+    --description '{{/subjects/{subject\}}}'
+# → AMBIGUOUS_WIKI_MARKUP: "}}}" is three or more braces in a row, which is a
+#   monospace delimiter beside a literal brace under one reading and the
+#   reverse under another
+```
+
+Three cases are reported: a run of three or more braces, an unclosed `{code}`,
+`{noformat}`, `{quote}`, `{panel}` or `{color}`, and an unequal number of `{{`
+and `}}` outside a code block. Text inside a fence is literal, so a brace run in
+a pasted snippet is left alone.
+
+If you meant the braces literally, a `{code}` block or `{noformat}` renders them
+without interpretation and removes the ambiguity. If the text came out wrong
+after posting, this is the first thing to check.
+
+You will not see this on Cloud. A Cloud body becomes an Atlassian Document
+Format document where a brace is just a brace.
+
 ### `SPRINT_CLOSED`
 
 `jr sprint add` into a sprint that has finished. Nothing moved.

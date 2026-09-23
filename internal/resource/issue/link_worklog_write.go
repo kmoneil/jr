@@ -349,10 +349,11 @@ func (c *Client) WorklogAddRequest(
 		"started":   at.Format(jiraTimeLayout),
 	}
 	if comment != "" {
-		value, err := bodyValue(c.Site.Kind, comment, c.BodyFormat)
+		value, findings, err := bodyValue(c.Site.Kind, comment, c.BodyFormat)
 		if err != nil {
 			return transport.Request{}, err
 		}
+		c.warnWiki(findings)
 		payload["comment"] = value
 	}
 

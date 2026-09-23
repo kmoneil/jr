@@ -11,6 +11,7 @@ is available, which makes them the ones worth knowing before you need them.
 - [A filter never orders anything](#a-filter-never-orders-anything)
 - [Issue keys do not sort as text](#issue-keys-do-not-sort-as-text)
 - [`sprint = <id>` is not current membership](#sprint--id-is-not-current-membership)
+- [Wiki markup is checked, not parsed](#wiki-markup-is-checked-not-parsed)
 - [Questions JQL cannot answer](#questions-jql-cannot-answer)
 - [`text ~` is stemmed, unranked, and silent about stop words](#text--is-stemmed-unranked-and-silent-about-stop-words)
 - [Nothing splits on commas](#nothing-splits-on-commas)
@@ -114,6 +115,29 @@ jr sprint list --state active --state future
 
 The same applies to any id with a lifecycle, such as a version or a board that
 gets archived. Re-derive; do not remember.
+
+## Wiki markup is checked, not parsed
+
+Data Center stores wiki markup and `jr` sends it through untouched. Some
+constructs have more than one reading, and you have no way to see the result,
+so `jr` warns on the ones it can be certain about. Exit stays 0 and the write
+happens: nothing here is known to be wrong.
+
+```console
+jr issue create --type Task --summary x --description '{{/subjects/{subject\}}}'
+# → AMBIGUOUS_WIKI_MARKUP: "}}}" is three or more braces in a row ...
+```
+
+Three cases: a run of three or more braces, an unclosed `{code}`, `{noformat}`,
+`{quote}`, `{panel}` or `{color}`, and an unequal number of `{{` and `}}`
+outside a code block. Text inside a fence is literal and is left alone.
+
+**If you want braces rendered literally, put them in `{code}` or `{noformat}`.**
+That is unambiguous and is the fix for the warning as well as for the text.
+
+Nothing else about your markup is checked. A silent run does not mean the markup
+is right, only that it holds none of these three. Cloud never warns, because a
+body there becomes an ADF document where a brace is a brace.
 
 ## `text ~` is stemmed, unranked, and silent about stop words
 
