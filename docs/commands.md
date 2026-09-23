@@ -1751,6 +1751,7 @@ jr issue edit ENG-101 --field-json customfield_11350='"ENG-42"'
 | --- | --- | --- | --- |
 | `--summary` | `string` | — | replace the summary |
 | `--description` | `string` | — | replace the description, as plain text |
+| `--description-file` | `string` | — | replace the description with a file's exact bytes, or stdin's when the path is -; refuses beside --description |
 | `--priority` | `string` | — | set the priority by name |
 | `--label` | `string` | — | replace the whole label set; repeat for several (repeatable) |
 | `--add-label` | `string` | — | add a label, leaving the others; repeat for several (repeatable) |
@@ -1804,6 +1805,9 @@ letting the word precondition imply an atomic one.
 --dry-run prints the exact request, body included, and sends nothing.
 
 --description and --body-format work exactly as on issue create.
+--description-file replaces it with a file's exact bytes, or stdin's when the
+path is -, so a round trip preserves what --description "$(cat f)" would eat,
+the trailing newline above all.
 
 --field sets anything the flags above do not name, by field id or by field
 name: --field customfield_10140=5 or --field 'Story Points=5'. The value is
@@ -1833,6 +1837,7 @@ jr issue get ENG-101
 jr issue get ENG-101 --format json
 jr issue get ENG-101 --field customfield_10042
 jr issue get ENG-101 --raw-body
+jr issue get ENG-101 --raw-field description
 jr issue get ENG-101 --url
 ```
 
@@ -1845,13 +1850,14 @@ jr issue get ENG-101 --url
 | `--field` | `string` | — | extra field to include, by id or name, e.g. customfield_10042 or 'Story Points'; added to the default set and to the context's, repeat for several; a subresource such as comment or worklog is refused, naming the command that reads it (repeatable) |
 | `--no-context-fields` | `bool` | — | ignore the field set stored in the context, and ask only for the fields named by --field |
 | `--raw-body` | `bool` | — | emit a Cloud body as the Atlassian Document Format document Jira sent it as, rather than converting it to markdown |
+| `--raw-field` | `string` | — | write one field's stored bytes to stdout with no document around them; by id or name, and only a field whose value is text |
 | `--url` | `bool` | — | include the browse URL, built from the site's own base URL; a bare URL, which most terminals make clickable |
 | `--age` | `bool` | — | include an age column: how long since the issue was last updated, coarsely, e.g. 3 hours or 14 days |
 | `--with-comments` | `bool` | — | include the comment thread, oldest first; costs a second request, and a thread longer than 50 is reported incomplete with exit 3 |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.get` | v11 | always |
+| `issue.get` | v11 | --raw-field is not given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
@@ -1863,6 +1869,11 @@ serves an Atlassian Document Format object, which is converted to markdown —
 losslessly, or not at all: a description holding something markdown cannot
 represent is an error naming it rather than an approximation. --raw-body emits
 the document itself. The format attribute says which you have.
+
+--raw-field &lt;field> writes one field's stored bytes to stdout with no document
+around them, for a byte-exact read-modify-write. The output contract's
+raw-bytes rule governs it: an explicit --format beside it is refused, and a
+field with no value is a refusal rather than zero bytes.
 
 The issue shape here is the same one issue list emits for a row, so a caller
 parses both identically. It simply has more of it filled in.

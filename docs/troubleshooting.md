@@ -837,6 +837,36 @@ some boards allow. Exit 2, and the refusal names every candidate with its
 id, because handing a script one of several without saying so would be a
 guess. Address the sprint by id instead.
 
+### `UNSET_FIELD`
+
+`jr issue get --raw-field` on a field the issue holds no value for. Exit 5,
+and deliberately not zero bytes on stdout, which could not say unset from
+empty. The document form marks the same case with `set="false"`.
+
+### `FIELD_NOT_TEXT`
+
+`--raw-field` on a field whose stored value is not text: an object, an
+array, a number. Inventing a byte form for those would be an approximation,
+so read them from the document with `--format json`. A Cloud description is
+a document, which `--raw-body` emits.
+
+### `RAW_AND_FORMAT`
+
+`--raw-field` beside an explicit `--format`: they name two different
+outputs, and honoring both would mean ignoring one. `JIRA_FORMAT` alone
+never causes this, because it is set once for a whole shell. The sibling
+`RAW_FIELD_ALONE` refuses the document-shaping flags (`--field`, `--url`,
+`--age`, `--with-comments`, `--raw-body`, `--no-context-fields`) for the
+same reason: there is no document for them to shape.
+
+### `DESCRIPTION_AND_FILE`
+
+`--description` and `--description-file` both name the new description;
+pass one. Its siblings: `EMPTY_DESCRIPTION_FILE` refuses a zero-byte file
+rather than quietly sending an empty description, and
+`DESCRIPTION_FILE_UNREADABLE` names a path that could not be read. The path
+`-` means stdin.
+
 ### `UNBOUNDABLE_DATE`
 
 `jr issue activity --since startOfWeek()`, or any other date function. Every

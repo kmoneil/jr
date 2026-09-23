@@ -384,6 +384,19 @@ type Invocation struct {
 	// Everything else writes a *render.Doc and lets the CLI encode it. If a
 	// second command ever reaches for this, that is the moment to ask why.
 	Stdout io.Writer
+	// Stdin is the raw byte channel in, and exists for the same one shape of
+	// command Stdout does, pointed the other way: an input that is a file
+	// rather than a flag, such as `issue edit --description-file -`. It is
+	// nil wherever stdin is not free to be read, inside `mcp serve` above
+	// all, where the stream carries JSON-RPC frames. A command that needs it
+	// and finds it nil refuses rather than reading somewhere else.
+	Stdin io.Reader
+	// FormatFromFlag records that --format was typed on this invocation, as
+	// opposed to arriving from JIRA_FORMAT. A command that writes raw bytes
+	// to Stdout refuses an explicit --format beside it, and only an explicit
+	// one: the environment variable is set once for a whole shell and is not
+	// grounds for that refusal.
+	FormatFromFlag bool
 	// Progress reports the scale of a long operation. It is never nil.
 	Progress Progress
 

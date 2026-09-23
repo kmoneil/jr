@@ -197,6 +197,13 @@ silently.
 
 Do not drop the flag to force the write through.
 
+**A description edit has an exact round trip.** `issue get --raw-field
+description` writes the stored bytes alone (no envelope, no added newline),
+and `issue edit --description-file <path>` sends a file's exact bytes back,
+`-` meaning stdin, so nothing passes through `"$(cat f)"`, which eats the
+trailing newline. The precondition still comes from a plain `issue get`: a
+raw read emits no document to carry one.
+
 ## Working from a script or CI
 
 Everything comes from the environment. No login step, no config file:
