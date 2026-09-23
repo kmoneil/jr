@@ -527,6 +527,25 @@ field whose value is not text refuses as `FIELD_NOT_TEXT` naming the form
 that can carry it: a Cloud description is a document, which `--raw-body`
 emits.
 
+### Seeding a ticket from a template issue
+
+A team that keeps a template issue ("make it like ENG-1") can copy its
+scaffold without retyping it, and retyping is where the drift comes from: a
+dropped macro, an h3. that became an h4., and nothing to diff against.
+
+```console
+$ jr issue get ENG-1 --raw-field description > template.wiki
+$ jr issue create --type Story --summary 'Renewal flow: retries' \
+    --description "$(cat template.wiki)"
+```
+
+The scaffold arrives exactly as the template stores it, wiki markup
+untouched, with no XML or JSON to unwrap in between. The command
+substitution eats the file's trailing newline, which a scaffold does not
+miss; where the bytes must survive exactly, create first and then
+`jr issue edit <key> --description-file template.wiki`, the byte-exact
+write.
+
 ### Making a retry safe
 
 A `create` that gets a 503 may or may not have created the issue. `jr` never
