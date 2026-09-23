@@ -105,6 +105,15 @@ sends the query, and `jql explain`, which says what would be sent. A second copy
 would make the explanation a second implementation, and the two would disagree
 on the first change to either.
 
+**The explanation itself lives there too.** `jql.Explanation`, its node, and
+the `jql.explain` kind moved down from the jql resource when the global
+`--explain` arrived, because `issue list`, `issue activity` and
+`issue changes` all emit one and resources may not import each other. A kind
+owned outside `resource/*` has precedent: `internal/registry` owns
+`schema.commands` and `contract`. The command surface stays in
+`internal/resource/jql`; what moved is the document every explaining command
+shares.
+
 **Reading a value back is the same package's job.** `jql.Unquote` is the
 inverse of the quoting nothing else is allowed to do, and it exists because
 Jira answers in JQL's own spelling: the label suggestion endpoint returns

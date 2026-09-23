@@ -388,11 +388,15 @@ project cannot match:
 ```console
 $ jr context show                  # what project am I scoped to?
 $ jr jql explain --jql 'your query here'
+$ jr issue list --status Done --explain    # the query those flags compose
 ```
 
 `jql explain` prints the query that would actually be sent, including the
 project scope it would be combined with, which is the fact the result document
-used to leave out. Three things now say it without being asked:
+used to leave out. A query built from filter flags rather than typed is
+explained the same way: `--explain` on the exact invocation you are debugging
+prints what it would have sent, without sending anything. Three things now say
+it without being asked:
 
 - **An empty collection names its own frame.** `EMPTY_RESULT` on stderr at
   exit 0, in every format, carrying the row count, the scope, and any bound the

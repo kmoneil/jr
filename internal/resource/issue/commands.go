@@ -412,7 +412,14 @@ to status and everything else has to be asked for.`),
 		Columns:        ListColumns(),
 		ColumnsFor:     listColumnsFor,
 		Validate:       validateList,
-		Outputs:        []registry.Output{{Kind: KindList, Version: VersionList}},
+		Explain:        explainList,
+		Outputs: []registry.Output{
+			{Kind: KindList, Version: VersionList},
+			{
+				Kind: jql.KindExplain, Version: jql.VersionExplain,
+				When: "--explain is given",
+			},
+		},
 		ExitCodes: []exitcode.Code{
 			// Usage covers an unresolvable --assignee as well as a bad flag.
 			exitcode.Partial, exitcode.Usage, exitcode.Auth, exitcode.NotFound,

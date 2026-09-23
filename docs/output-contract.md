@@ -1328,6 +1328,30 @@ A caller with no stdout to spare, `mcp serve`, where bytes would land on the
 JSON-RPC stream as a frame the peer cannot parse, gets `NO_STDOUT` and exit 2
 rather than a corrupted session. Both invocations refuse there.
 
+### `--explain` answers with the query instead of the result
+
+Any command that composes JQL from its flags takes the global `--explain` and
+answers with a `jql.explain` document instead of running: the composed query,
+the scope it was combined with, and the raw `--jql` fragment it wrapped,
+exactly as `jql explain` reports them. It makes no request, deliberately:
+`Validate` is allowed to ask the server, so the explanation runs before it,
+and it keeps working when the query is the thing that is broken.
+
+Values the command resolves only at send time are the one honest gap. A
+`--assignee` naming a person becomes an account id in the sent query, and
+`issue changes --since` becomes a floor computed in the account's timezone;
+resolving either here would cost the request this flag exists not to make.
+The explained query carries what was typed, and an `unresolved` list names
+each such filter with its flag, so a consumer can tell a literal query from
+one with substitutions pending. `jql.explain` is v2 for that element, which
+is optional and absent when everything is literal.
+
+A command that composes no query refuses the flag with `INVALID_USAGE`
+rather than running as if it had not been given. `--describe` beside
+`--explain` is `DESCRIBE_AND_EXPLAIN` and exit 2, for the reason
+`HEADER_AND_FORMAT` is: they name two different outputs, and honoring both
+would mean ignoring one.
+
 ### Verdicts
 
 A command whose whole product is a judgement reports it and exits 0, even when
