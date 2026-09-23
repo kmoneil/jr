@@ -4,6 +4,13 @@
 # Never bypass this with --no-verify. If a check is wrong, fix the check.
 set -e
 
+# The refusals first, because they are instant and each one saves the three
+# minutes the rest of this costs: a commit on main, and an em dash added to
+# prose. scripts/guard says why each exists.
+echo "pre-commit: guards"
+scripts/guard branch
+scripts/guard prose --staged
+
 echo "pre-commit: gofumpt"
 unformatted=$(gofumpt -l .)
 if [ -n "$unformatted" ]; then

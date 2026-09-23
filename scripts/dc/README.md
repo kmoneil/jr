@@ -143,6 +143,31 @@ real; only the assembly is ours.
 `serverInfo` carries Jira's own build SHA in `scmInfo`, which trips the
 identifier check and is Atlassian's, not yours.
 
+## Measuring by hand
+
+Recon means asking the server, and two tools do the asking without anybody
+rebuilding a curl wrapper:
+
+```sh
+scripts/dc/jr issue move ENG-1 Done --dry-run        # jr against this rig's profile
+scripts/probe rig GET /rest/api/2/issue/ENG-1/transitions?expand=transitions.fields
+scripts/probe rig POST /rest/api/2/issue/ENG-1/transitions '{"transition":{"id":"31"}}'
+scripts/probe issue rig ENG-1                        # status, resolution, comments, updated
+```
+
+`scripts/dc/jr` is the binary every script here uses (`JR`, or `bin/jr`)
+with XDG pointed at `profile/`, and it runs `require_rig` first, silently when
+it passes. `scripts/probe` sends one raw request with the profile's token and
+prints `HTTP <status>` and the body; `PROBE_LOG=<file>` keeps every exchange as
+a JSON line, which is what a constructed cassette gets built from when a
+recording cannot be made.
+
+The same probe reaches the Cloud sandbox as `scripts/probe sandbox ...`, with
+`PROBE_SANDBOX` naming its jr context. It talks to those two servers and no
+others: the sandbox context has to name an Atlassian Cloud host, so a context
+naming anything else is refused before a request is built, and the credential
+reaches curl on stdin rather than on its command line.
+
 ## After recording: what the fixtures still claim
 
 ```sh
