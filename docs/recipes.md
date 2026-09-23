@@ -941,12 +941,20 @@ $ jr issue list --limit 50 --format json | jq '{count, complete}'
 
 ### Editing a set through a plan
 
-`issue edit` takes more than one key only through a plan, and a plan is a
-document you read before anything is sent:
+`issue edit`, `issue move` and `issue assign` take more than one key only
+through a plan, and a plan is a document you read before anything is sent.
+On move and assign, every argument before the last is a key and the last is
+the transition or the assignee:
 
 ```console
 $ jr issue edit ENG-101 ENG-102 ENG-103 --add-label triaged --plan-out plan.xml
+$ jr issue move ENG-104 ENG-105 ENG-106 Done --plan-out close.xml
+$ jr issue assign ENG-104 ENG-105 'Ada Lovelace' --plan-out hand-off.xml
 ```
+
+A move plan checks each row's own workflow when it is built: a row whose
+workflow has no such transition is written `blocked` in the plan and
+reported `TRANSITION_UNAVAILABLE` at apply, with nothing sent for it.
 
 That makes no mutating request. It writes the plan to the file and prints the
 same document, so you can read it, diff it, or hand it to somebody for approval.

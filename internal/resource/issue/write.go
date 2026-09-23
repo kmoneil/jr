@@ -899,7 +899,7 @@ func runEdit(ctx context.Context, inv *registry.Invocation) (*render.Doc, error)
 	// An apply's change set comes out of the plan, so it is answered before the
 	// flags are read at all: there are none to read.
 	if path := inv.Flags.String(applyFlagName); path != "" {
-		return runApply(ctx, inv, client, path)
+		return runApply(ctx, inv, client, path, planVerbEdit)
 	}
 
 	opt := editOptionsFor(inv, inv.Args[0])
@@ -1057,10 +1057,15 @@ than answered with another request's result.
 			buildinfo.App + " issue move ENG-101 Done --idempotency-key deploy-42",
 		}, "\n"),
 		Args: []registry.Arg{
-			{Name: "key", Usage: "issue key, e.g. ENG-101", Required: true},
 			{
-				Name: "transition", Required: true,
-				Usage: "transition name or id; see `jr meta transitions <key>`",
+				Name: "key",
+				Usage: "issue key, e.g. ENG-101; several keys before the " +
+					"transition plan a bulk move, and --apply takes none",
+			},
+			{
+				Name: "transition", Variadic: true,
+				Usage: "transition name or id, always the last argument; " +
+					"see `jr meta transitions <key>`",
 			},
 		},
 		Flags: []registry.Flag{
@@ -1078,12 +1083,22 @@ than answered with another request's result.
 			},
 			ifUnchangedFlagDecl(),
 			dryRunFlag(),
+			planOutFlag(),
+			applyFlag(),
 		},
 		Mutating:     true,
 		NeedsJira:    true,
 		RequiresTags: []string{"write"},
 		Outputs: []registry.Output{
-			{Kind: KindMove, Version: VersionMove},
+			{Kind: KindMove, Version: VersionMove, When: "one issue is moved"},
+			{
+				Kind: KindPlan, Version: VersionPlan,
+				When: "--" + planOutFlagName + " is given",
+			},
+			{
+				Kind: KindApply, Version: VersionApply,
+				When: "--" + applyFlagName + " is given",
+			},
 			registry.DryRunOutput(),
 		},
 		ExitCodes: writeExits(),
@@ -1093,10 +1108,29 @@ than answered with another request's result.
 }
 
 func validateMove(_ context.Context, inv *registry.Invocation) error {
-	if _, ok := ParseKey(inv.Args[0]); !ok {
-		return errs.Usage("INVALID_KEY", "%q is not an issue key", inv.Args[0]).
-			WithDetail("an issue key looks like ENG-123").
-			WithRemedy("pass a key, not an id or a summary")
+	if err := validateVerbShape(inv, "transition",
+		[]string{"resolution", "comment", "idempotency-key"}); err != nil {
+		return err
+	}
+	if inv.Flags.String(applyFlagName) != "" {
+		// The plan validates itself when it is read.
+		return nil
+	}
+	keys, _ := lastArgSplit(inv)
+	for _, arg := range keys {
+		if _, ok := ParseKey(arg); !ok {
+			return errs.Usage("INVALID_KEY", "%q is not an issue key", arg).
+				WithDetail("an issue key looks like ENG-123").
+				WithRemedy("every argument before the last is a key; the " +
+					"last is the transition")
+		}
+	}
+	if inv.Flags.String(planOutFlagName) != "" &&
+		inv.Flags.String("idempotency-key") != "" {
+		return errs.Usage("CONFLICTING_PLAN_FLAGS",
+			"--"+planOutFlagName+" derives one idempotency key per row, so "+
+				"--idempotency-key cannot be given as well").
+			WithRemedy("drop the flag; the plan's rows each carry their own")
 	}
 	if err := validatePrecondition(inv); err != nil {
 		return err
@@ -1174,6 +1208,13 @@ func runMove(ctx context.Context, inv *registry.Invocation) (*render.Doc, error)
 		return nil, err
 	}
 	client := &Client{Transport: conn, Site: info}
+
+	if path := inv.Flags.String(applyFlagName); path != "" {
+		return runApply(ctx, inv, client, path, planVerbMove)
+	}
+	if path := inv.Flags.String(planOutFlagName); path != "" {
+		return runMovePlanOut(ctx, inv, client, info, path)
+	}
 
 	// The claim comes before the transitions are read, which is the whole
 	// difference between this and create. A retry after an ambiguous failure

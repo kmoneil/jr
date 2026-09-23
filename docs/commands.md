@@ -1084,7 +1084,7 @@ Set or clear an issue's assignee
 - **build tags** — needs `write`
 
 ```
-jr issue assign <key> <assignee> [flags]
+jr issue assign [key] [assignee...] [flags]
 ```
 
 Examples:
@@ -1098,17 +1098,21 @@ jr issue assign ENG-101 'Ada Lovelace' --if-unchanged eyJkIjo
 
 | Argument | Required | Description |
 | --- | --- | --- |
-| `key` | yes | issue key, e.g. ENG-101 |
-| `assignee` | yes | the user, or the word unassigned or default |
+| `key` | no | issue key, e.g. ENG-101; several keys before the assignee plan a bulk assignment, and --apply takes none |
+| `assignee...` | no | the user, or the word unassigned or default, always the last argument |
 
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
+| `--plan-out` | `string` | — | write a plan for these issues to this file and send nothing; apply it later with --apply |
+| `--apply` | `string` | — | run a plan written by --plan-out; takes no issue keys and no field flags, because the plan carries both |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.assign` | v2 | always |
+| `issue.assign` | v2 | one issue is assigned |
+| `issue.plan` | v2 | --plan-out is given |
+| `issue.apply` | v2 | --apply is given |
 | `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
@@ -1769,8 +1773,8 @@ jr issue edit ENG-101 --field-json customfield_11350='"ENG-42"'
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.edit` | v2 | one issue is edited |
-| `issue.plan` | v1 | --plan-out is given |
-| `issue.apply` | v1 | --apply is given |
+| `issue.plan` | v2 | --plan-out is given |
+| `issue.apply` | v2 | --apply is given |
 | `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
@@ -2225,7 +2229,7 @@ Transition an issue to another status
 - **build tags** — needs `write`
 
 ```
-jr issue move <key> <transition> [flags]
+jr issue move [key] [transition...] [flags]
 ```
 
 Examples:
@@ -2240,8 +2244,8 @@ jr issue move ENG-101 Done --idempotency-key deploy-42
 
 | Argument | Required | Description |
 | --- | --- | --- |
-| `key` | yes | issue key, e.g. ENG-101 |
-| `transition` | yes | transition name or id; see `jr meta transitions &lt;key>` |
+| `key` | no | issue key, e.g. ENG-101; several keys before the transition plan a bulk move, and --apply takes none |
+| `transition...` | no | transition name or id, always the last argument; see `jr meta transitions &lt;key>` |
 
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -2250,10 +2254,14 @@ jr issue move ENG-101 Done --idempotency-key deploy-42
 | `--idempotency-key` | `string` | — | make a retry safe: the same key returns the recorded move |
 | `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
+| `--plan-out` | `string` | — | write a plan for these issues to this file and send nothing; apply it later with --apply |
+| `--apply` | `string` | — | run a plan written by --plan-out; takes no issue keys and no field flags, because the plan carries both |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.move` | v3 | always |
+| `issue.move` | v3 | one issue is moved |
+| `issue.plan` | v2 | --plan-out is given |
+| `issue.apply` | v2 | --apply is given |
 | `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED

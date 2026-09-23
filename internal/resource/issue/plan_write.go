@@ -68,8 +68,10 @@ import (
 
 // The plan kind and the kind an apply reports.
 const (
-	KindPlan    = "issue.plan"
-	VersionPlan = 1
+	KindPlan = "issue.plan"
+	// VersionPlan is 2: v2 added the move and assign verbs, the change
+	// children they carry, and the per-row transition and blocked attributes.
+	VersionPlan = 2
 )
 
 // MaxPlanRows is how many issues one plan may carry.
@@ -102,7 +104,10 @@ func PlanSchema() *render.Schema {
 			// different verb rather than reinterpreting its change set, which
 			// is the same reasoning the idempotency ledger uses when it stores
 			// the operation beside the key.
-			{Name: "verb", Type: render.TypeString, Enum: []string{"issue.edit"}},
+			{
+				Name: "verb", Type: render.TypeString,
+				Enum: []string{planVerbEdit, planVerbMove, planVerbAssign},
+			},
 			{Name: "count", Type: render.TypeInt},
 		},
 		Children: []render.Child{
@@ -125,6 +130,9 @@ func PlanSchema() *render.Schema {
 						Attrs:   []render.Field{{Name: "id", Type: render.TypeString}},
 						Text:    &render.Field{Type: render.TypeString},
 					}), Optional: true},
+					{Schema: render.Leaf("transition", render.TypeString), Optional: true},
+					{Schema: render.Leaf("resolution", render.TypeString), Optional: true},
+					{Schema: render.Leaf("comment", render.TypeString), Optional: true},
 				},
 			}},
 			{Schema: render.ListSchema("rows", "row", &render.Schema{
@@ -137,6 +145,15 @@ func PlanSchema() *render.Schema {
 					// such a row rather than writing it unchecked.
 					{Name: "precondition", Type: render.TypeString, Optional: true},
 					{Name: "idempotency-key", Type: render.TypeString},
+					// The transition id this row resolved to at plan time,
+					// move plans only. It stays valid for as long as the
+					// row's precondition holds, which apply checks before
+					// sending.
+					{Name: "transition", Type: render.TypeString, Optional: true},
+					// Why this row cannot be sent, recorded at plan time so
+					// the plan is the thing read instead of finding out.
+					// Apply reports such a row failed without sending.
+					{Name: "blocked", Type: render.TypeString, Optional: true},
 				},
 			})},
 		},
@@ -148,18 +165,41 @@ type PlanRow struct {
 	Key            string
 	Precondition   string
 	IdempotencyKey string
+	// Transition is the id this row's workflow resolved the plan's
+	// transition name to, move plans only.
+	Transition string
+	// Blocked is why this row cannot be sent, found at plan time. Apply
+	// reports it failed without sending anything.
+	Blocked string
 }
 
-// Plan is a bulk edit before any of it has happened.
+// MoveChange is what a move plan does to every row.
+type MoveChange struct {
+	// Transition is the name as typed; each row records the id its own
+	// workflow resolved it to, because workflows differ by project and type.
+	Transition string
+	Resolution string
+	Comment    string
+}
+
+// Plan is a bulk change before any of it has happened. Change is read for
+// the edit verb, Move for the move verb, and Assignee, already resolved to
+// the id the deployment uses, for the assign verb.
 type Plan struct {
-	Verb   string
-	Change EditOptions
-	Rows   []PlanRow
+	Verb     string
+	Change   EditOptions
+	Move     MoveChange
+	Assignee string
+	Rows     []PlanRow
 }
 
-// planVerbEdit is the only verb v1 plans. It is the registry path with a dot,
-// which is what the ledger records an operation as.
-const planVerbEdit = "issue.edit"
+// The verbs a plan can carry. Each is the registry path with a dot, which is
+// what the ledger records an operation as.
+const (
+	planVerbEdit   = "issue.edit"
+	planVerbMove   = "issue.move"
+	planVerbAssign = "issue.assign"
+)
 
 // BuildPlan resolves a set of keys into a plan, spending one request rather
 // than one per row.
@@ -177,30 +217,14 @@ func BuildPlan(
 		return nil, err
 	}
 
+	fp := changeFingerprint(change)
 	rows := make([]PlanRow, 0, len(keys))
 	for _, key := range keys {
-		raw, found := updated[key]
-		if !found {
-			// A key the search did not return is one the credential cannot see
-			// or one that does not exist. Planning it would put a row in the
-			// document that apply is certain to fail, and a plan is supposed to
-			// be the thing you read *instead* of finding out.
-			return nil, errs.NotFound("UNKNOWN_ISSUE",
-				"%s is not an issue this credential can read", key).
-				WithRemedy("check the key, or drop it from the set")
-		}
-		// Second, because these came from a search: on Data Center the index
-		// keeps only the second, and a plan whose baselines claimed the
-		// millisecond failed every row it had.
-		token, err := EncodePrecondition(info, key, raw, PrecisionSecond)
+		row, err := baselineRow(info, updated, planVerbEdit, key, fp)
 		if err != nil {
 			return nil, err
 		}
-		rows = append(rows, PlanRow{
-			Key:            key,
-			Precondition:   token,
-			IdempotencyKey: idem.DeriveKey(planVerbEdit, key, changeFingerprint(change)),
-		})
+		rows = append(rows, row)
 	}
 	return &Plan{Verb: planVerbEdit, Change: change, Rows: rows}, nil
 }
@@ -250,6 +274,13 @@ func changeFingerprint(c EditOptions) string {
 		parts = append(parts, fmt.Sprintf("field:%s=%v", id, c.Fields[id]))
 	}
 
+	return fingerprint(parts)
+}
+
+// fingerprint reduces labelled parts to one stable string, length-prefixed
+// for the reason idem.DeriveKey length-prefixes its parts: two different
+// sets must not reduce to one string.
+func fingerprint(parts []string) string {
 	var b strings.Builder
 	for _, p := range parts {
 		fmt.Fprintf(&b, "%d:%s;", len(p), p)
@@ -274,16 +305,38 @@ func PlanDoc(p *Plan) *render.Doc {
 		n := render.El("row").Attr("key", r.Key)
 		n.AttrIf("precondition", r.Precondition)
 		n.Attr("idempotency-key", r.IdempotencyKey)
+		n.AttrIf("transition", r.Transition)
+		n.AttrIf("blocked", r.Blocked)
 		rows = append(rows, n)
 	}
 
 	plan := render.El("plan").
 		Attr("verb", p.Verb).
 		Attr("count", fmt.Sprint(len(p.Rows))).
-		Child(changeNode(p.Change)).
+		Child(changeNodeFor(p)).
 		Child(render.ListEl("rows", "row", rows...))
 
 	return render.Record(KindPlan, VersionPlan, plan)
+}
+
+// changeNodeFor writes the verb's own change set. A move carries the
+// transition as typed beside its resolution and comment; an assign carries
+// the one resolved assignee; an edit carries the field set changeNode has
+// always written.
+func changeNodeFor(p *Plan) *render.Node {
+	switch p.Verb {
+	case planVerbMove:
+		n := render.El("change")
+		n.LeafIf("transition", p.Move.Transition)
+		n.LeafIf("resolution", p.Move.Resolution)
+		n.LeafIf("comment", p.Move.Comment)
+		return n
+	case planVerbAssign:
+		return render.El("change").
+			Child(render.El("assignee").SetText(p.Assignee))
+	default:
+		return changeNode(p.Change)
+	}
 }
 
 // changeNode writes the change set once, in the same names the flags carry, so
@@ -366,12 +419,17 @@ type planDoc struct {
 					Value string `xml:",chardata"`
 				} `xml:"field"`
 			} `xml:"fields"`
+			Transition *string `xml:"transition"`
+			Resolution *string `xml:"resolution"`
+			Comment    *string `xml:"comment"`
 		} `xml:"change"`
 		Rows struct {
 			Row []struct {
 				Key            string `xml:"key,attr"`
 				Precondition   string `xml:"precondition,attr"`
 				IdempotencyKey string `xml:"idempotency-key,attr"`
+				Transition     string `xml:"transition,attr"`
+				Blocked        string `xml:"blocked,attr"`
 			} `xml:"row"`
 		} `xml:"rows"`
 	} `xml:"plan"`
@@ -383,7 +441,7 @@ type planDoc struct {
 // checks are ordered from the cheapest and most likely mistake to the most
 // specific, so somebody who pointed at the wrong file is told that rather than
 // being told a row is malformed.
-func ParsePlan(r io.Reader) (*Plan, error) {
+func ParsePlan(r io.Reader, wantVerb string) (*Plan, error) {
 	var doc planDoc
 	if err := xml.NewDecoder(r).Decode(&doc); err != nil {
 		return nil, planError("this is not a document this tool wrote").
@@ -405,9 +463,9 @@ func ParsePlan(r io.Reader) (*Plan, error) {
 			doc.Version, VersionPlan).
 			WithRemedy("rebuild the plan with this version of " + buildinfo.App)
 	}
-	if doc.Plan.Verb != planVerbEdit {
-		return nil, planError("this plan is for %s, not for issue edit",
-			displayKind(doc.Plan.Verb)).
+	if doc.Plan.Verb != wantVerb {
+		return nil, planError("this plan is for %s, not for %s",
+			displayKind(doc.Plan.Verb), displayKind(wantVerb)).
 			WithRemedy("apply it with the command it was planned for")
 	}
 
@@ -435,6 +493,8 @@ func ParsePlan(r io.Reader) (*Plan, error) {
 			Key:            key.String(),
 			Precondition:   r.Precondition,
 			IdempotencyKey: r.IdempotencyKey,
+			Transition:     r.Transition,
+			Blocked:        r.Blocked,
 		})
 	}
 	if len(rows) == 0 {
@@ -446,7 +506,59 @@ func ParsePlan(r io.Reader) (*Plan, error) {
 			len(rows), MaxPlanRows)
 	}
 
-	return &Plan{Verb: doc.Plan.Verb, Change: changeFrom(doc), Rows: rows}, nil
+	plan := &Plan{Verb: doc.Plan.Verb, Rows: rows}
+	if err := verbChangeFrom(plan, doc); err != nil {
+		return nil, err
+	}
+	return plan, nil
+}
+
+// verbChangeFrom rebuilds the verb's own change set from the document.
+func verbChangeFrom(plan *Plan, doc planDoc) error {
+	switch plan.Verb {
+	case planVerbMove:
+		move, err := moveChangeFrom(doc, plan.Rows)
+		if err != nil {
+			return err
+		}
+		plan.Move = move
+	case planVerbAssign:
+		if doc.Plan.Change.Assignee == nil || *doc.Plan.Change.Assignee == "" {
+			return planError("an assign plan carries no assignee").
+				WithRemedy("rebuild the plan with `" + buildinfo.App +
+					" issue assign ... --plan-out`")
+		}
+		plan.Assignee = *doc.Plan.Change.Assignee
+	default:
+		plan.Change = changeFrom(doc)
+	}
+	return nil
+}
+
+// moveChangeFrom rebuilds a move plan's change set and holds every row to
+// the rule the writer follows: the id its own workflow resolved, or the
+// reason it could not. A row with neither is a document this tool did not
+// write.
+func moveChangeFrom(doc planDoc, rows []PlanRow) (MoveChange, error) {
+	if doc.Plan.Change.Transition == nil || *doc.Plan.Change.Transition == "" {
+		return MoveChange{}, planError("a move plan carries no transition").
+			WithRemedy("rebuild the plan with `" + buildinfo.App +
+				" issue move ... --plan-out`")
+	}
+	move := MoveChange{Transition: *doc.Plan.Change.Transition}
+	if doc.Plan.Change.Resolution != nil {
+		move.Resolution = *doc.Plan.Change.Resolution
+	}
+	if doc.Plan.Change.Comment != nil {
+		move.Comment = *doc.Plan.Change.Comment
+	}
+	for _, row := range rows {
+		if row.Transition == "" && row.Blocked == "" {
+			return MoveChange{}, planError(
+				"%s carries neither a transition nor a blocked reason", row.Key)
+		}
+	}
+	return move, nil
 }
 
 // changeFrom rebuilds the change set. Nothing here is validated against the
@@ -641,25 +753,31 @@ func runPlanOut(
 		return nil, err
 	}
 	doc := PlanDoc(plan)
+	if err := writePlan(doc, path); err != nil {
+		return nil, err
+	}
+	return doc, nil
+}
 
+// writePlan writes the file --apply reads back. XML, whatever --format says,
+// because this file is written for this tool to read and one format is one
+// parser. --format still decides what reaches stdout, so a caller who wants
+// JSON gets JSON where they read it.
+func writePlan(doc *render.Doc, path string) error {
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
-		return nil, errs.Runtime("PLAN_NOT_WRITTEN",
+		return errs.Runtime("PLAN_NOT_WRITTEN",
 			"cannot write the plan to %s", path).Wrap(err)
 	}
 	defer func() { _ = f.Close() }()
-
-	// XML, whatever --format says, because this file is written for this tool
-	// to read back and one format is one parser. --format still decides what
-	// reaches stdout, so a caller who wants JSON gets JSON where they read it.
 	if err := render.Write(f, doc, render.XML); err != nil {
-		return nil, err
+		return err
 	}
 	if err := f.Close(); err != nil {
-		return nil, errs.Runtime("PLAN_NOT_WRITTEN",
+		return errs.Runtime("PLAN_NOT_WRITTEN",
 			"cannot finish writing the plan to %s", path).Wrap(err)
 	}
-	return doc, nil
+	return nil
 }
 
 // ---------------------------------------------------------------------------
@@ -668,8 +786,10 @@ func runPlanOut(
 
 // The kind an apply reports.
 const (
-	KindApply    = "issue.apply"
-	VersionApply = 1
+	KindApply = "issue.apply"
+	// VersionApply is 2: v2 added the move and assign verbs to the verb
+	// enum.
+	VersionApply = 2
 )
 
 // What one row of a plan came to.
@@ -696,7 +816,10 @@ func ApplySchema() *render.Schema {
 	return &render.Schema{
 		Element: "apply",
 		Attrs: []render.Field{
-			{Name: "verb", Type: render.TypeString, Enum: []string{planVerbEdit}},
+			{
+				Name: "verb", Type: render.TypeString,
+				Enum: []string{planVerbEdit, planVerbMove, planVerbAssign},
+			},
 			{Name: "requested", Type: render.TypeInt},
 			{Name: "applied", Type: render.TypeInt},
 			{Name: "skipped", Type: render.TypeInt},
@@ -731,7 +854,8 @@ type rowOutcome struct {
 
 // runApply reads a plan and executes it, one row at a time.
 func runApply(
-	ctx context.Context, inv *registry.Invocation, client *Client, path string,
+	ctx context.Context, inv *registry.Invocation, client *Client,
+	path, wantVerb string,
 ) (*render.Doc, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -742,14 +866,14 @@ func runApply(
 	}
 	defer func() { _ = f.Close() }()
 
-	plan, err := ParsePlan(f)
+	plan, err := ParsePlan(f, wantVerb)
 	if err != nil {
 		return nil, err
 	}
 
 	outcomes := make([]rowOutcome, 0, len(plan.Rows))
 	for _, row := range plan.Rows {
-		outcomes = append(outcomes, applyRow(ctx, inv, client, plan.Change, row))
+		outcomes = append(outcomes, applyRow(ctx, inv, client, plan, row))
 	}
 
 	doc := ApplyDoc(plan.Verb, outcomes)
@@ -766,13 +890,23 @@ func runApply(
 // result rather than the end of the run.
 func applyRow(
 	ctx context.Context, inv *registry.Invocation, client *Client,
-	change EditOptions, row PlanRow,
+	plan *Plan, row PlanRow,
 ) rowOutcome {
 	failed := func(err error) rowOutcome {
 		return rowOutcome{
 			key: row.Key, outcome: OutcomeFailed,
 			code: errs.Coerce(err).Code, cause: err,
 		}
+	}
+
+	if row.Blocked != "" {
+		// The plan found this at build time, which is the point of a plan:
+		// nothing is sent, and the row's outcome names what the workflow
+		// would not do.
+		return failed(errs.Usage("TRANSITION_UNAVAILABLE",
+			"%s was planned blocked: %s", row.Key, row.Blocked).
+			WithRemedy("move it by hand, or re-plan once its workflow offers " +
+				"the transition"))
 	}
 
 	if row.Precondition == "" {
@@ -786,15 +920,14 @@ func applyRow(
 				"plan was built"))
 	}
 
-	change.Key = row.Key
-	req, err := client.EditRequest(change)
+	req, err := rowRequest(client, plan, row)
 	if err != nil {
 		return failed(err)
 	}
 
 	ledger := inv.Jira.Idempotency()
 	siteURL := client.Site.BaseURL
-	out, err := ledger.Claim(siteURL, row.IdempotencyKey, planVerbEdit)
+	out, err := ledger.Claim(siteURL, row.IdempotencyKey, plan.Verb)
 	if err != nil {
 		return failed(err)
 	}
@@ -826,7 +959,9 @@ func applyRow(
 	}
 
 	// The caller holds an idempotency key, which is what makes this safe to
-	// replay after an upstream error.
+	// replay after an upstream error. The single-issue move applies the same
+	// rule when --idempotency-key is held, comment and all, so the three
+	// verbs replay under one discipline.
 	req.Replayable = true
 	if err := client.send(ctx, req); err != nil {
 		// Released only when the failure proves the request never arrived.
@@ -841,6 +976,22 @@ func applyRow(
 		return failed(err)
 	}
 	return rowOutcome{key: row.Key, outcome: OutcomeApplied}
+}
+
+// rowRequest builds one row's request the way the row's verb builds it
+// interactively, so a planned change and a typed one are one request shape.
+func rowRequest(client *Client, plan *Plan, row PlanRow) (transport.Request, error) {
+	switch plan.Verb {
+	case planVerbMove:
+		return client.MoveRequest(row.Key, row.Transition,
+			plan.Move.Resolution, plan.Move.Comment)
+	case planVerbAssign:
+		return client.AssignRequest(row.Key, plan.Assignee)
+	default:
+		change := plan.Change
+		change.Key = row.Key
+		return client.EditRequest(change)
+	}
 }
 
 // reportableCause picks the failure that decides the exit.

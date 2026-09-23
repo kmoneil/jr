@@ -232,7 +232,7 @@ func TestAPlanThisToolDidNotWriteIsRefused(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := issue.ParsePlan(strings.NewReader(tc.doc)); err == nil {
+			if _, err := issue.ParsePlan(strings.NewReader(tc.doc), "issue.edit"); err == nil {
 				t.Fatal("accepted")
 			} else if got := errs.Coerce(err).Exit; got != exitcode.Usage {
 				t.Errorf("exit = %d, want %d: the caller named this file",
@@ -261,7 +261,7 @@ func TestAPlanCannotNameSomethingThatIsNotAnIssue(t *testing.T) {
 			`<change><summary>x</summary></change><rows count="1">` +
 			`<row key="` + key + `" idempotency-key="auto-a"/></rows></plan></result>`
 
-		plan, err := issue.ParsePlan(strings.NewReader(doc))
+		plan, err := issue.ParsePlan(strings.NewReader(doc), "issue.edit")
 		if err == nil {
 			t.Errorf("accepted %q as an issue key, and it reached a request as %q",
 				key, plan.Rows[0].Key)
@@ -303,7 +303,7 @@ func FuzzParsePlanAcceptsOnlyWhatIsSafeToApply(f *testing.F) {
 		`<row key="ENG-1" idempotency-key="auto-b"/></rows></plan></result>`)
 
 	f.Fuzz(func(t *testing.T, doc string) {
-		plan, err := issue.ParsePlan(strings.NewReader(doc))
+		plan, err := issue.ParsePlan(strings.NewReader(doc), "issue.edit")
 		if err != nil {
 			// A refusal is the caller's mistake, always. One that reached a
 			// conflict or a remote exit would be blaming the server for a file.

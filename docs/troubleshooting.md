@@ -859,6 +859,13 @@ never causes this, because it is set once for a whole shell. The sibling
 `--age`, `--with-comments`, `--raw-body`, `--no-context-fields`) for the
 same reason: there is no document for them to shape.
 
+### `TRANSITION_UNAVAILABLE`
+
+A row in a move plan whose workflow had no such transition when the plan was
+built. The plan wrote the reason on the row as `blocked`, and apply sends
+nothing for it while the other rows still go through. Move it by hand, or
+re-plan once its workflow offers the transition.
+
 ### `DESCRIPTION_AND_FILE`
 
 `--description` and `--description-file` both name the new description;

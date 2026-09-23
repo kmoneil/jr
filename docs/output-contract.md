@@ -1661,22 +1661,41 @@ did not happen.
 
 ### Plans and applies
 
-`issue edit` takes more than one key only through a plan, and there is no other
-path to a bulk write. `--plan-out <file>` writes `issue.plan` v1 and sends
-nothing; `--apply <file>` runs one and emits `issue.apply` v1. Both documents
-also go to stdout, so a caller with no shell to redirect with, which is every
-caller over MCP, still gets the document every other command produces.
+`issue edit`, `issue move` and `issue assign` take more than one key only
+through a plan, and there is no other path to a bulk write. `--plan-out
+<file>` writes `issue.plan` v2 and sends nothing; `--apply <file>` runs one
+and emits `issue.apply` v2. A plan records the verb it was built by, and an
+apply refuses one built for another verb rather than reinterpreting its
+change set. Both documents also go to stdout, so a caller with no shell to
+redirect with, which is every caller over MCP, still gets the document every
+other command produces.
+
+On move and assign the arguments follow one rule: every argument before the
+last is a key, and the last is the transition or the assignee.
 
 ```console
 $ jr issue edit ENG-101 ENG-102 ENG-103 --add-label triaged --plan-out plan.xml
+$ jr issue move ENG-101 ENG-102 ENG-103 Done --plan-out close.xml
+$ jr issue assign ENG-101 ENG-102 'Ada Lovelace' --plan-out hand-off.xml
 $ jr issue edit --apply plan.xml
 ```
 
-**A plan costs one request, whatever its row count.** Each row carries the
-baseline `--if-unchanged` would take, and all of them come from a single
-`key IN (...)` search rather than an `issue get` each. Fifty rows is the cap,
-and it is about how much a person reads rather than about what the API can
-carry: a plan nobody read is the failure this surface exists to prevent.
+**An edit or assign plan costs one request, whatever its row count**: the
+single `key IN (...)` search every row's baseline comes from, rather than an
+`issue get` each. A move plan adds one transitions read per row, because the
+id it records is a fact about that row's own workflow; nothing it sends
+mutates. Fifty rows is the cap, and it is about how much a person reads
+rather than about what the API can carry: a plan nobody read is the failure
+this surface exists to prevent.
+
+**A move plan resolves per row, and an assign plan resolves once.** Planning
+a move reads each row's transitions and records the resolved id, or a
+`blocked` reason the apply reports as `TRANSITION_UNAVAILABLE` with nothing
+sent for that row. The row's baseline is what keeps a plan-time id honest:
+an issue that moved since planning is refused as stale before the id is
+ever sent. An assignee is one directory answer for the whole plan, resolved
+when the plan is built, so the same file means the same person on every day
+it is applied.
 
 **A plan carries intent, never requests.** A row names an issue, its baseline
 and its idempotency key; the change is written once because a plan applies one
