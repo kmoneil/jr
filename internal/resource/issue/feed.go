@@ -160,12 +160,17 @@ changelog and a comment is not a field transition.`),
 		Columns:        ChangeFeedColumns(),
 		Outputs: []registry.Output{
 			{Kind: KindChanges, Version: VersionChanges},
+			{
+				Kind: jql.KindExplain, Version: jql.VersionExplain,
+				When: "--explain is given",
+			},
 		},
 		ExitCodes: []exitcode.Code{
 			exitcode.Partial, exitcode.Usage, exitcode.Auth, exitcode.NotFound,
 			exitcode.Permission, exitcode.RateLimit, exitcode.Remote,
 		},
 		Validate: validateChanges,
+		Explain:  explainChanges,
 		Stream:   runChanges,
 	}
 }

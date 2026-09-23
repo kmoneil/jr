@@ -48,6 +48,7 @@ const (
 const (
 	GlobalFormat      = "format"
 	GlobalDescribe    = "describe"
+	GlobalExplain     = "explain"
 	GlobalContext     = "context"
 	GlobalSite        = "site"
 	GlobalProject     = "project"
@@ -81,6 +82,10 @@ func GlobalFlags() []Flag {
 		{
 			Name: GlobalDescribe, Type: TypeBool,
 			Usage: "print this command's schema instead of running it",
+		},
+		{
+			Name: GlobalExplain, Type: TypeBool,
+			Usage: "print the query this command would send instead of running it",
 		},
 		{
 			Name: GlobalContext, Type: TypeString,

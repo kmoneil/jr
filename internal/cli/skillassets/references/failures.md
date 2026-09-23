@@ -85,9 +85,11 @@ refused with `UNKNOWN_USER` at exit 2 rather than sent, precisely because
 successfully, which is indistinguishable from a real answer.
 
 So an unexpectedly empty result means the query is wrong, not the lookup. Check
-what was actually sent:
+what was actually sent: re-run the exact invocation with `--explain`, which
+prints the query it would have sent and sends nothing.
 
 ```console
+jr issue list --project ENG --status Done --explain
 jr jql explain --jql 'your query here'
 ```
 

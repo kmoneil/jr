@@ -31,8 +31,6 @@ import (
 const (
 	KindValidate    = "jql.validate"
 	VersionValidate = 1
-	KindExplain     = "jql.explain"
-	VersionExplain  = 1
 )
 
 func init() {
@@ -40,7 +38,6 @@ func init() {
 	registry.Register(explainCommand())
 
 	render.RegisterSchema(KindValidate, ValidateSchema())
-	render.RegisterSchema(KindExplain, ExplainSchema())
 }
 
 // ValidateSchema is the shape of a verdict.
@@ -60,23 +57,6 @@ func ValidateSchema() *render.Schema {
 			// A consumer that read only the first would fix one error at a time.
 			{Schema: render.Leaf("error", render.TypeString), Optional: true, Repeated: true},
 			{Schema: render.Leaf("warning", render.TypeString), Optional: true, Repeated: true},
-		},
-	}
-}
-
-// ExplainSchema is the shape of an explanation.
-func ExplainSchema() *render.Schema {
-	return &render.Schema{
-		Element: "explanation",
-		Attrs: []render.Field{
-			{Name: "parenthesized", Type: render.TypeBool},
-		},
-		Children: []render.Child{
-			{Schema: render.Leaf("fragment", render.TypeString)},
-			{Schema: render.Leaf("query", render.TypeString)},
-			{Schema: render.Leaf("project", render.TypeString), Optional: true},
-			{Schema: render.ListSchema("fields", "field",
-				render.Leaf("field", render.TypeString))},
 		},
 	}
 }
@@ -311,7 +291,7 @@ not a project scope, and a regular expression cannot tell the difference.`),
 		// resolved settings. It never connects: nothing here asks Jira
 		// anything.
 		NeedsJira: true,
-		Outputs:   []registry.Output{{Kind: KindExplain, Version: VersionExplain}},
+		Outputs:   []registry.Output{{Kind: jql.KindExplain, Version: jql.VersionExplain}},
 		// Asking Jira nothing is not the same as being unable to fail. The
 		// settled context has to be resolved to answer at all, and `--context`
 		// naming one that does not exist is UNKNOWN_CONTEXT at exit 5 before a
@@ -322,72 +302,12 @@ not a project scope, and a regular expression cannot tell the difference.`),
 			return jql.ValidateFragment(inv.Flags.String("jql"))
 		},
 		Run: runExplain,
+		// --explain on the command whose whole job is explaining answers the
+		// document the command itself would.
+		Explain: func(inv *registry.Invocation) (*render.Doc, error) {
+			return runExplain(context.Background(), inv)
+		},
 	}
-}
-
-// Explanation is what `jql explain` reports.
-type Explanation struct {
-	// Fragment is the caller's raw --jql, as they wrote it.
-	Fragment string
-	// Query is what would be sent.
-	Query string
-	// Project is the scope the fragment was combined with, or empty.
-	Project string
-	// Fields are the fields the fragment references, tokenized.
-	Fields []string
-	// Parenthesized reports whether the fragment was wrapped. It always is —
-	// this is stated rather than assumed, because the whole reason the command
-	// exists is that the consequence of not wrapping is invisible.
-	Parenthesized bool
-}
-
-// Node renders an explanation.
-func (e Explanation) Node() *render.Node {
-	n := render.El("explanation").
-		Attr("parenthesized", strconv.FormatBool(e.Parenthesized)).
-		Leaf("fragment", e.Fragment).
-		Leaf("query", e.Query).
-		LeafIf("project", e.Project)
-
-	fields := make([]*render.Node, 0, len(e.Fields))
-	for _, f := range e.Fields {
-		fields = append(fields, render.El("field").SetText(f))
-	}
-	return n.Child(render.ListEl("fields", "field", fields...))
-}
-
-// Explain builds the query without sending it.
-//
-// It goes through the same builder and the same ordering policy the issue
-// commands use, so what it reports is what would be sent rather than a second
-// account of it.
-func Explain(fragment, project, sort, order string) (Explanation, error) {
-	if err := jql.ValidateFragment(fragment); err != nil {
-		return Explanation{}, err
-	}
-
-	b := jql.New()
-	if project != "" {
-		b.Project(project)
-	}
-	b.Raw(fragment)
-	if err := jql.AppendOrder(b, sort, order); err != nil {
-		return Explanation{}, err
-	}
-
-	query, err := b.Render()
-	if err != nil {
-		return Explanation{}, err
-	}
-	fields, err := jql.Fields(fragment)
-	if err != nil {
-		return Explanation{}, err
-	}
-
-	return Explanation{
-		Fragment: fragment, Query: query, Project: project,
-		Fields: fields, Parenthesized: true,
-	}, nil
 }
 
 func runExplain(_ context.Context, inv *registry.Invocation) (*render.Doc, error) {
@@ -398,12 +318,12 @@ func runExplain(_ context.Context, inv *registry.Invocation) (*render.Doc, error
 		project = inv.Jira.Project()
 	}
 
-	explained, err := Explain(inv.Flags.String("jql"), project,
+	explained, err := jql.Explain(inv.Flags.String("jql"), project,
 		inv.Flags.String("sort"), inv.Flags.String("order"))
 	if err != nil {
 		return nil, err
 	}
-	return render.Record(KindExplain, VersionExplain, explained.Node()), nil
+	return render.Record(jql.KindExplain, jql.VersionExplain, explained.Node()), nil
 }
 
 // clientFor is the opening the validating command needs.

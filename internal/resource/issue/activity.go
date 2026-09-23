@@ -371,12 +371,17 @@ feed that exits 3 is not the same answer as an empty feed that exits 0.`),
 		ColumnsFor:     activityColumnsFor,
 		Outputs: []registry.Output{
 			{Kind: KindActivity, Version: VersionActivity},
+			{
+				Kind: jql.KindExplain, Version: jql.VersionExplain,
+				When: "--explain is given",
+			},
 		},
 		ExitCodes: []exitcode.Code{
 			exitcode.Partial, exitcode.Usage, exitcode.Auth, exitcode.NotFound,
 			exitcode.Permission, exitcode.RateLimit, exitcode.Remote,
 		},
 		Validate:   validateActivity,
+		Explain:    explainActivity,
 		Stream:     runActivity,
 		EmptyFrame: activityEmptyFrame,
 	}

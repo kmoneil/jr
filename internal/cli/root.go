@@ -85,6 +85,7 @@ and go to stderr.`),
 	bind := globalBinder{flags: root.PersistentFlags()}
 	bind.str(&a.requestedFormat, registry.GlobalFormat)
 	bind.boolean(&a.describe, registry.GlobalDescribe)
+	bind.boolean(&a.explain, registry.GlobalExplain)
 	bind.str(&a.contextName, registry.GlobalContext)
 	bind.str(&a.site, registry.GlobalSite)
 	bind.str(&a.project, registry.GlobalProject)
@@ -282,10 +283,8 @@ func (a *app) runLeaf(
 	binder func(*cobra.Command) registry.Flags,
 ) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		// --describe answers "what would this do" without doing it, so it runs
-		// before any validation the real invocation would have to satisfy.
-		if a.describe {
-			return a.emit(registry.CommandDoc(rc))
+		if answered, err := a.answerAboutTheCommand(rc); answered {
+			return err
 		}
 		if err := validateFlags(cmd, rc); err != nil {
 			return err
@@ -296,20 +295,12 @@ func (a *app) runLeaf(
 			return err
 		}
 
-		// A command's own validation runs before anything is written, which
-		// matters for a streaming command: its header goes out before its body
-		// runs, so a flag rejected later would arrive after output had started.
-		// Read-only and confirmation are enforced here, from the declaration,
-		// so a resource author cannot ship a verb that forgets them. Both come
-		// before Validate and before any network call.
-		if err := a.gate(rc, inv); err != nil {
-			return err
+		if a.explain {
+			return a.explainInvocation(rc, inv)
 		}
 
-		if rc.Validate != nil {
-			if err := rc.Validate(cmd.Context(), inv); err != nil {
-				return err
-			}
+		if err := a.admit(cmd.Context(), rc, inv); err != nil {
+			return err
 		}
 
 		if rc.Streams() {
@@ -317,6 +308,68 @@ func (a *app) runLeaf(
 		}
 		return a.runDocument(cmd.Context(), rc, inv)
 	}
+}
+
+// admit runs the declaration's gates and then the command's own validation,
+// before anything is written, which matters for a streaming command: its
+// header goes out before its body runs, so a flag rejected later would
+// arrive after output had started. Read-only and confirmation are enforced
+// from the declaration, so a resource author cannot ship a verb that forgets
+// them, and both come before Validate and before any network call.
+func (a *app) admit(
+	ctx context.Context, rc *registry.Command, inv *registry.Invocation,
+) error {
+	if err := a.gate(rc, inv); err != nil {
+		return err
+	}
+	if rc.Validate == nil {
+		return nil
+	}
+	return rc.Validate(ctx, inv)
+}
+
+// answerAboutTheCommand handles the flags whose answer needs no invocation:
+// --describe, and the --explain misuse that is knowable from the declaration
+// alone. Both run before flag validation and before any context resolves, so
+// a caller can ask about a command they cannot yet run. It reports whether it
+// answered.
+func (a *app) answerAboutTheCommand(rc *registry.Command) (bool, error) {
+	if a.describe {
+		// Beside --explain, --describe names a second output, and honoring
+		// both would mean ignoring one.
+		if a.explain {
+			return true, errs.Usage("DESCRIBE_AND_EXPLAIN",
+				"--describe and --explain each name a different output").
+				WithRemedy("ask for one of them")
+		}
+		// --describe answers "what would this do" without doing it, so it
+		// runs before any validation the real invocation would have to
+		// satisfy.
+		return true, a.emit(registry.CommandDoc(rc))
+	}
+	// A command that composes no query refuses --explain rather than running
+	// as if the flag had not been given.
+	if a.explain && rc.Explain == nil {
+		return true, errs.Usage("INVALID_USAGE",
+			"%s composes no query, so --explain has nothing to show",
+			rc.Name()).
+			WithRemedy("use it on a command that builds a query from " +
+				"its flags, or run jql explain for a raw fragment")
+	}
+	return false, nil
+}
+
+// explainInvocation answers "what would this send" without sending it. It
+// needs the invocation for the resolved scope, and it runs before Validate
+// because Validate is allowed to ask the server: a diagnostic has to work
+// when the thing it diagnoses is broken, and it must not make the request it
+// exists to show.
+func (a *app) explainInvocation(rc *registry.Command, inv *registry.Invocation) error {
+	doc, err := rc.Explain(inv)
+	if err != nil {
+		return err
+	}
+	return a.emitResult(rc, inv, doc)
 }
 
 // runDocument runs a command that returns a result document, and writes it.
@@ -341,6 +394,14 @@ func (a *app) runDocument(
 	if !rc.EmitsDocumentFor(inv) {
 		return nil
 	}
+	return a.emitResult(rc, inv, doc)
+}
+
+// emitResult stamps the envelope's provenance onto a result document and
+// writes it, refusing a kind the command does not declare.
+func (a *app) emitResult(
+	rc *registry.Command, inv *registry.Invocation, doc *render.Doc,
+) error {
 	if !rc.Emits(doc.Kind, doc.Version) {
 		// A command that emits a kind it did not declare would break every
 		// consumer that dispatches on the declared kind, and would be invisible

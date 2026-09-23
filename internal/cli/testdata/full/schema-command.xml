@@ -22,7 +22,7 @@ it lists only what this build contains.]]></description>
         <usage>maximum results, or "all" to exhaust the result set</usage>
       </flag>
     </flags>
-    <global-flags count="13">
+    <global-flags count="14">
       <global-flag name="format" type="enum" required="false" repeatable="false" affects="invocation">
         <usage>output format: tsv|xml|json|yaml|markdown (default: tsv for lists, xml for records; markdown is for reading and is not a versioned contract). JIRA_FORMAT sets it for every command</usage>
         <values count="5">
@@ -35,6 +35,9 @@ it lists only what this build contains.]]></description>
       </global-flag>
       <global-flag name="describe" type="bool" required="false" repeatable="false" affects="invocation">
         <usage>print this command's schema instead of running it</usage>
+      </global-flag>
+      <global-flag name="explain" type="bool" required="false" repeatable="false" affects="invocation">
+        <usage>print the query this command would send instead of running it</usage>
       </global-flag>
       <global-flag name="context" type="string" required="false" repeatable="false" affects="invocation">
         <usage>use this context for one invocation, without selecting it</usage>

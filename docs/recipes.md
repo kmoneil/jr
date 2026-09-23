@@ -157,7 +157,12 @@ Check a query without running it:
 ```console
 $ jr jql validate --jql 'project = ENG AND status = Open'
 $ jr jql explain --jql 'assignee = currentUser() AND sprint IN openSprints()'
+$ jr issue list --changed-by currentUser --changed-after -30d --explain
 ```
+
+`--explain` works on any command that composes a query from its flags: it
+prints the JQL those flags become, makes no request, and exits without
+running the command.
 
 A date that does not parse is refused with the reason, rather than silently
 matching nothing:

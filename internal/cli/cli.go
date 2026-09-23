@@ -66,6 +66,7 @@ type app struct {
 	// JIRA_FORMAT being set. Only `auth token --header` reads it.
 	formatFromFlag bool
 	describe       bool
+	explain        bool
 	contract       bool
 
 	// exit is the status the run resolved to.

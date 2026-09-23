@@ -203,6 +203,13 @@ type Command struct {
 	// are computed after this and cannot fail.
 	Validate func(ctx context.Context, inv *Invocation) error
 
+	// Explain answers the global --explain: the query this invocation would
+	// send, as a jql.explain document, composed without a request. Declared
+	// by the commands that compose JQL from their flags and by `jql explain`
+	// itself. On a command that composes no query the flag is a refusal, not
+	// a silent no-op.
+	Explain func(inv *Invocation) (*render.Doc, error)
+
 	// Exactly one of Run and Stream is set. Stream is for a command that emits
 	// a collection; Run is for one that emits a record.
 	Run    RunFunc

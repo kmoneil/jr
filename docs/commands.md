@@ -37,6 +37,7 @@ The flags themselves:
 | --- | --- | --- | --- |
 | `--format` | `enum` | — | output format: tsv\|xml\|json\|yaml\|markdown (default: tsv for lists, xml for records; markdown is for reading and is not a versioned contract). JIRA_FORMAT sets it for every command |
 | `--describe` | `bool` | — | print this command's schema instead of running it |
+| `--explain` | `bool` | — | print the query this command would send instead of running it |
 | `--context` | `string` | — | use this context for one invocation, without selecting it |
 | `--site` | `string` | — | Jira site, overriding the context's |
 | `--project` | `string` | — | project key, overriding the context's |
@@ -1012,6 +1013,7 @@ jr issue activity --since -1d --kind transition --format json
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.activity` | v1 | always |
+| `jql.explain` | v2 | --explain is given |
 
 Default TSV columns: `at`, `issue`, `kind`, `author`, `field`, `time-spent`, `from`, `to`, `body`
 
@@ -1308,6 +1310,7 @@ jr issue changes --since -1d --jql "project = ENG" --format json
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.changes` | v1 | always |
+| `jql.explain` | v2 | --explain is given |
 
 Default TSV columns: `created`, `issue`, `author`, `field`, `from`, `to`
 
@@ -2143,6 +2146,7 @@ jr issue list --changed-by currentUser --changed-after -1w
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.list` | v10 | always |
+| `jql.explain` | v2 | --explain is given |
 
 Default TSV columns: `key`, `status`, `assignee`, `updated`, `summary`
 
@@ -2477,7 +2481,7 @@ jr jql explain --jql 'labels = retry' --sort updated --order desc
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `jql.explain` | v1 | always |
+| `jql.explain` | v2 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND
 

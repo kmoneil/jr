@@ -40,7 +40,7 @@ issue.watch	1	issue.watch
 issue.worklog.add	2	issue.worklog.add
 issue.worklog.delete	1	issue.worklog.delete
 issue.worklog.list	2	issue.worklog.list
-jql.explain	1	jql.explain
+jql.explain	2	issue.activity,issue.changes,issue.list,jql.explain
 jql.validate	1	jql.validate
 meta.createmeta	2	meta.createmeta
 meta.transitions	3	meta.transitions
