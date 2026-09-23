@@ -262,7 +262,23 @@ fi
 token_file=$here/profile/token
 mkdir -p "$(dirname "$token_file")"
 if [ -s "$token_file" ]; then
-	say "token exists: $token_file"
+	# A token file outlives the database that issued it: dc-down destroys
+	# the volumes and keeps this host file, so a fresh instance used to be
+	# seeded green for eight minutes and then refuse `jr auth login` with a
+	# credential the old database minted. Ask the instance before trusting
+	# the file, and discard what it refuses.
+	code=$(curl -sS -o /dev/null -w '%{http_code}' \
+		-H "Authorization: Bearer $(cat "$token_file")" \
+		"$base/rest/api/2/myself" || true)
+	if [ "$code" = "200" ]; then
+		say "token exists and the instance takes it: $token_file"
+	else
+		say "stale token: /rest/api/2/myself answered ${code:-nothing}; minting a fresh one"
+		rm -f "$token_file"
+	fi
+fi
+if [ -s "$token_file" ]; then
+	: # validated above
 elif [ -n "$bearer" ]; then
 	# Already minted one to do the seeding with, on an instance that refuses
 	# Basic. Making a second would leave the first behind with nothing holding

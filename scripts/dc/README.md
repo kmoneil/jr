@@ -82,15 +82,15 @@ is. Nobody at Atlassian has said either way.
    from step 3. Data Center takes it as a bearer token, which is what `jr`
    sends.
 
-**`dc-down` does not remove `profile/token`, and step 3 reuses it.** The
-compose volumes go, the database goes, and the token file stays: it is on the
-host filesystem, not in the volume. `seed.sh` finds it non-empty, prints
-`token exists`, and skips minting one, so step 4 authenticates the new instance
-with a credential the old database issued. The failure is `UNAUTHORIZED` from
-`jr auth login` at the very end of a run that otherwise reported every step
-succeeding, which reads as a login bug rather than as a stale file. `rm -f
-scripts/dc/profile/token` and re-run `scripts/dc/seed.sh`, which is idempotent
-and takes seconds. Only `dc-up` after a `dc-down` hits this; a first clone has
+**`dc-down` does not remove `profile/token`, and a stale one is caught at the
+top of the seed rather than at the end of the run.** The compose volumes go,
+the database goes, and the token file stays: it is on the host filesystem,
+not in the volume. `seed.sh` used to trust any non-empty file, so a fresh
+instance was seeded green for eight minutes and then refused `jr auth login`
+with a credential the old database issued, which read as a login bug rather
+than as a stale file. It now asks the instance (`/rest/api/2/myself`) before
+trusting the file, discards one the instance refuses, and mints a fresh token
+in its place. Only `dc-up` after a `dc-down` ever had this; a first clone has
 no token to go stale.
 
 **`dc-up` recreates the profile's context on every run, because the address
