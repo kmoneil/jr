@@ -20,6 +20,108 @@ accident.
 
 Nothing yet.
 
+## [0.16.0] - 2026-09-23
+
+**Take this one for the byte-exact description round trip and the bulk
+move.** Four features, every one of them raised by somebody using the tool
+from an agent: a global --explain, `sprint current`, a raw read paired with
+a file write, and `issue move` and `issue assign` through the plan
+machinery. The version is a minor for one narrow reason the pricing section
+below spells out; everything a working script does today still works.
+
+**Any command that composes JQL now answers `--explain`.** `jql explain`
+showed the query you already wrote and took none of the 36 filter flags
+that compose JQL on your behalf, which were exactly the JQL nobody could
+see. `--explain` on `issue list`, `issue activity`, or `issue changes`
+prints the query that invocation would send, as a `jql.explain` document,
+and makes no request at all. Values the command resolves only at send time
+(a typed `--assignee`, the changes feed's `--since` floor) go out as typed
+and are named in an `unresolved` list, so a consumer can tell a literal
+query from one with substitutions pending. A drift test holds the explained
+bytes equal to the JQL a real run sends.
+
+**`jr sprint current` resolves the board's one active sprint**, as a
+`sprint.get` document, so the id an agent should re-derive rather than
+remember is one request. The refusals are the feature: `NO_ACTIVE_SPRINT`
+at exit 5 when nothing is running, and `AMBIGUOUS_SPRINT` at exit 2 naming
+every candidate when the board runs several at once, because handing a
+script one of several without saying so would be a guess dressed as an
+answer.
+
+**A description round trip is now byte-exact, both directions.**
+`issue get --raw-field description` writes the stored bytes to stdout with
+no envelope and no added newline, the third member of the output contract's
+raw-bytes family and the first that reads. String-valued fields only: a
+field with no value refuses (`UNSET_FIELD`, exit 5) rather than writing
+zero bytes that cannot say unset from empty, and a structured value refuses
+(`FIELD_NOT_TEXT`) rather than inventing a serialization. The write half is
+`issue edit --description-file <path>`, a file's exact bytes or stdin's
+when the path is -, so nothing passes through a shell substitution that
+eats the trailing newline. The wiki-markup scanner still sees a body that
+arrives by file. Seeding a ticket from a template issue is now a recipe
+built on this pair, in docs/recipes.md.
+
+**`issue move` and `issue assign` take a plan.** Several keys before the
+final argument, then `--plan-out <file>`, then `--apply <file>`: the same
+reviewable document, per-row baselines, and idempotent resume that
+`issue edit` shipped. A move plan resolves the transition against each
+row's own workflow when the plan is built and records the id, or a
+`blocked` reason the apply reports as `TRANSITION_UNAVAILABLE` with nothing
+sent for that row; the row's baseline is what keeps a plan-time id honest.
+An assignee resolves once, at plan time, so the same file means the same
+person on every day it is applied. An apply refuses a plan built for
+another verb rather than reinterpreting its change set.
+
+### Documentation
+
+- The output contract now states the rule raw-bytes output follows, so the
+  next such flag is designed rather than excused: opt-in by flag, never a
+  format, an explicit --format refused beside it, NO_STDOUT under
+  mcp serve, the stored bytes exactly, and a missing value refused rather
+  than written as zero bytes.
+- docs/recipes.md gains the read-modify-write description recipe and the
+  template-issue recipe; docs/troubleshooting.md gains every code this
+  release adds; the skill teaches the raw round trip and the bulk verbs.
+
+### Internal
+
+- scripts/ci-wait and scripts/land wrap the wait-for-checks and
+  rebase-merge chains; `make build-here` builds the full binary at a named
+  path; the Data Center rig now validates a reused token before seeding
+  over it, so a stale one is caught at the top of the run rather than at
+  the final login.
+
+### Output contract
+
+- `jql.explain` is **v2**: an optional `unresolved` list, each `filter`
+  child carrying the flag's name and the typed value. Additive; everything
+  a v1 consumer parses is unchanged. `issue.list`, `issue.activity` and
+  `issue.changes` declare it as an alternative output, selected by
+  --explain.
+- `issue.plan` is **v2** and `issue.apply` is **v2**: the verb enum gains
+  `issue.move` and `issue.assign`, a plan's change element gains optional
+  `transition`, `resolution` and `comment` children, and its rows gain
+  optional `transition` and `blocked` attributes. Additive; an edit plan is
+  byte-compatible with v1 except the version it declares.
+- New error codes, every one on an invocation that did not exist before
+  this release and therefore additive: `DESCRIBE_AND_EXPLAIN`,
+  `NO_ACTIVE_SPRINT` (exit 5), `AMBIGUOUS_SPRINT`, `RAW_AND_FORMAT`,
+  `RAW_FIELD_ALONE`, `UNSET_FIELD` (exit 5), `FIELD_NOT_TEXT`,
+  `DESCRIPTION_AND_FILE`, `EMPTY_DESCRIPTION_FILE`,
+  `DESCRIPTION_FILE_UNREADABLE`, `NO_STDIN`, `TRANSITION_UNAVAILABLE`.
+- **Priced a minor, on one row.** `issue move` and `issue assign` stopped
+  requiring their positional arguments so --apply can take none, which
+  moved their argument-count mistakes out of the generic arity check:
+  `jr issue move ENG-1` answered `INVALID_USAGE` and now answers
+  `NO_ISSUES`; three keys with no plan flag answered `INVALID_USAGE` and
+  now answers `BULK_NEEDS_A_PLAN`. The invocations never worked, the exit
+  is 2 either way, and the refusals are better; but `code` is the field
+  this contract tells a consumer to branch on, and the same input carrying
+  a different code is the stability policy's own row for a minor,
+  the same one the date refusals paid in 0.3.0. Everything else in this
+  release is patch-priced.
+- No exit code changed meaning.
+
 ## [0.15.0] - 2026-09-23
 
 **Take this one if a consumer parses `jr contract`, or branches on the
@@ -2501,7 +2603,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.15.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.16.0...main
+[0.16.0]: https://github.com/kmoneil/jr/releases/tag/v0.16.0
 [0.15.0]: https://github.com/kmoneil/jr/releases/tag/v0.15.0
 [0.14.0]: https://github.com/kmoneil/jr/releases/tag/v0.14.0
 [0.13.4]: https://github.com/kmoneil/jr/releases/tag/v0.13.4
