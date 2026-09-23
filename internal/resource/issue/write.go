@@ -237,10 +237,11 @@ func (c *Client) CreateRequest(opt CreateOptions) (transport.Request, error) {
 		// How the text is read is --body-format's answer, and every format
 		// ends in a document on Cloud and a string on Data Center. See
 		// bodyValue.
-		value, err := bodyValue(c.Site.Kind, opt.Description, c.BodyFormat)
+		value, findings, err := bodyValue(c.Site.Kind, opt.Description, c.BodyFormat)
 		if err != nil {
 			return transport.Request{}, err
 		}
+		c.warnWiki(findings)
 		fields["description"] = value
 	}
 	if opt.Priority != "" {
@@ -412,6 +413,7 @@ func runCreate(ctx context.Context, inv *registry.Invocation) (*render.Doc, erro
 	client := &Client{
 		Transport: conn, Site: info,
 		BodyFormat: inv.Flags.String("body-format"),
+		Warn:       warnFor(inv),
 	}
 
 	req, err := client.CreateRequest(CreateOptions{
@@ -822,10 +824,11 @@ func (c *Client) editFields(opt EditOptions) (map[string]any, error) {
 		fields["summary"] = opt.Summary
 	}
 	if opt.Description != "" {
-		value, err := bodyValue(c.Site.Kind, opt.Description, c.BodyFormat)
+		value, findings, err := bodyValue(c.Site.Kind, opt.Description, c.BodyFormat)
 		if err != nil {
 			return nil, err
 		}
+		c.warnWiki(findings)
 		fields["description"] = value
 	}
 	if opt.Priority != "" {
@@ -877,6 +880,7 @@ func runEdit(ctx context.Context, inv *registry.Invocation) (*render.Doc, error)
 	client := &Client{
 		Transport: conn, Site: info,
 		BodyFormat: inv.Flags.String("body-format"),
+		Warn:       warnFor(inv),
 	}
 
 	// An apply's change set comes out of the plan, so it is answered before the
@@ -1120,10 +1124,11 @@ func (c *Client) MoveRequest(key, transitionID, resolution, comment string) (tra
 		// FormatText rather than a --body-format flag on this command. A
 		// transition comment is a line, the flag's other two values exist for
 		// documents, and adding a flag is a wider change than the fix.
-		body, err := bodyValue(c.Site.Kind, comment, FormatText)
+		body, findings, err := bodyValue(c.Site.Kind, comment, FormatText)
 		if err != nil {
 			return transport.Request{}, err
 		}
+		c.warnWiki(findings)
 		payload["update"] = map[string]any{
 			"comment": []any{map[string]any{"add": map[string]any{"body": body}}},
 		}

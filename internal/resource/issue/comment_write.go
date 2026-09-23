@@ -70,45 +70,63 @@ func bodyFormatFlag() registry.Flag {
 // produces one. `text` contains the text, which is exact. `markdown` converts
 // it, or fails naming the construct that stopped it. `adf` is the caller's own
 // document, passed through.
-func bodyValue(kind site.Kind, text, format string) (any, error) {
+func bodyValue(kind site.Kind, text, format string) (any, []string, error) {
 	if format == "" {
 		format = FormatText
 	}
 	if kind != site.Cloud {
 		if format != FormatText {
-			return nil, errs.Usage("BODY_FORMAT_UNSUPPORTED",
+			return nil, nil, errs.Usage("BODY_FORMAT_UNSUPPORTED",
 				"this site stores wiki markup, which --body-format %s cannot produce",
 				format).
 				WithDetail("the site is Data Center or Server, not Cloud").
 				WithRemedy("send the body with --body-format text and write it " +
 					"in the markup the site uses")
 		}
-		return text, nil
+		// The one branch that stores wiki markup, which is the only markup
+		// these findings are about. A Cloud body becomes an ADF document where
+		// a brace is a brace.
+		return text, wikiFindings(text), nil
 	}
 
 	switch format {
 	case FormatMarkdown:
 		doc, err := adf.FromMarkdown(text)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return doc, nil
+		return doc, nil, nil
 	case FormatADF:
 		doc, err := adf.Parse([]byte(text))
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		// Re-encoded from the parsed tree rather than forwarded as the bytes
 		// that arrived: a document that parsed is one this tool understands,
 		// and forwarding the original would let a field it refuses on the way
 		// out reach Jira on the way in.
-		return doc, nil
+		return doc, nil, nil
 	}
 	doc, err := adf.FromText(text)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return doc, nil
+	return doc, nil, nil
+}
+
+// warnWiki reports ambiguous wiki markup, once per finding.
+//
+// Exit stays 0. Nothing here is known to be wrong: the text may render exactly
+// as intended, and refusing it would make jr the arbiter of a renderer it does
+// not model. What the caller gets is the thing they could not get by reading,
+// which is that the construct has more than one reading.
+func (c *Client) warnWiki(findings []string) {
+	if c.Warn == nil {
+		return
+	}
+	for _, f := range findings {
+		c.Warn("AMBIGUOUS_WIKI_MARKUP", f)
+	}
 }
 
 func commentAddCommand() *registry.Command {
@@ -181,10 +199,11 @@ func validateCommentBody(_ context.Context, inv *registry.Invocation) error {
 
 // commentBody builds the request body shared by add and edit.
 func (c *Client) commentBody(text, visibility string) ([]byte, error) {
-	value, err := bodyValue(c.Site.Kind, text, c.BodyFormat)
+	value, findings, err := bodyValue(c.Site.Kind, text, c.BodyFormat)
 	if err != nil {
 		return nil, err
 	}
+	c.warnWiki(findings)
 
 	payload := map[string]any{"body": value}
 	if visibility != "" {

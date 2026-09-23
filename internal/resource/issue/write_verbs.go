@@ -538,5 +538,12 @@ func writeClientFor(
 		Transport: conn, Site: info,
 		Body:       bodyMode(inv),
 		BodyFormat: inv.Flags.String("body-format"),
+		Warn:       warnFor(inv),
 	}, nil
+}
+
+// warnFor binds this invocation's stderr and format into a sink the request
+// builders can call without being handed the invocation itself.
+func warnFor(inv *registry.Invocation) func(code, message string) {
+	return func(code, message string) { warn(inv, code, message) }
 }

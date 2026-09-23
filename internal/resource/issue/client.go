@@ -70,6 +70,14 @@ type Client struct {
 	// empty for the default. Here for the same reason Body is — every write
 	// that takes a body answers the same question.
 	BodyFormat string
+	// Warn reports something worth saying that is not an error, and is nil on
+	// a path with nothing to say.
+	//
+	// A sink rather than an invocation, because this package's request
+	// builders are pure functions of their options and a client. Handing them
+	// an invocation would let any of them read a flag, and what a request
+	// contains would stop being a function of what was passed in.
+	Warn func(code, message string)
 	// FieldNames maps a resolved field id to its name in the site's
 	// catalogue, so a requested field can report what it is called.
 	//

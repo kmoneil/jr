@@ -621,6 +621,7 @@ about the answer cannot be read off the answer itself.
 | `SCOPE_MISMATCH`   | `issue list`, `issue activity`, `issue changes` | A raw `--jql` selects a project the effective scope excludes, so those rows cannot come back. The query still runs and still exits 0.                                                                                                 |
 | `UNKNOWN_CHANGED_FIELD` | `issue history`, from `--changed-field`    | No recorded change on that issue touched any of the named fields. It names the fields the issue does hold, and still exits 0.                                                                                                         |
 | `EMPTY_RESULT`     | any collection, when it is complete and holds no rows | The bounds the zero-row answer was computed over: the row count, the context scope or `scope=none`, and any bound the command resolved rather than the caller typed. Still exits 0.                                                    |
+| `AMBIGUOUS_WIKI_MARKUP` | any write carrying a body, on Data Center only | A construct in the body has more than one reading, so how it renders cannot be predicted here. The write still happens and the exit stays 0: nothing is known to be wrong. Never emitted on Cloud, where a body becomes an ADF document and a brace is a brace. |
 
 `UNKNOWN_LABEL` exists because an empty answer to a mistyped label and an empty
 answer to a correct one are the same bytes: `--label retyr` returns a header, no
