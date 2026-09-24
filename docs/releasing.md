@@ -85,8 +85,9 @@ because what gets verified has to be a commit rather than a working tree, and
 
 **It needs one secret, and it says so when it does not have it.**
 `TAP_DISPATCH_TOKEN` is a fine-grained PAT scoped to `kmoneil/homebrew-tap`
-alone, with Contents: read and write, because `github.token` is scoped to this
-repository and cannot dispatch to another. Without it the job fails, which is
+and `kmoneil/scoop-bucket` and nothing else, with Contents: read and write,
+because `github.token` is scoped to this repository and cannot dispatch to
+another. Without it the job fails, which is
 the honest signal: the release is out and `brew install` still fetches the
 previous one. Its failure message carries the one command that fixes that
 release by hand:
@@ -103,6 +104,30 @@ nothing when the formula already names the tag.
 `publish`, so by then the tag, the archives and the notes are all out and none
 of them can be withdrawn. It means exactly one thing: Homebrew has not caught
 up yet.
+
+## The bucket bumps itself
+
+`bucket/jr.json` in `kmoneil/scoop-bucket` names the full profile's Windows zip
+for each of two architectures, its digest, and the directory Scoop extracts
+from it, and all three carry the version. The `bump-the-bucket` job dispatches
+`jr-released` there once the archives are published, and its `bump-jr`
+workflow does what the tap's does: rewrite the manifest, re-derive both digests
+from the zips it downloaded, verify their build provenance, commit that to a
+branch, install the branch with Scoop on a Windows runner, and only then move
+`main`.
+
+It uses the same `TAP_DISPATCH_TOKEN`, and its failure message carries the
+command that bumps the bucket by hand, for a release the dispatch missed or a
+bump that failed:
+
+```console
+$ gh workflow run bump-jr.yml --repo kmoneil/scoop-bucket -f tag=v1.2.0
+```
+
+**A red `bump-the-bucket` does not mean the release is bad** either. It means
+`scoop install kmoneil/jr` still installs the previous release. It is its own
+job rather than a step of `bump-the-tap`, so a red says which of the two was
+not told.
 
 ## Which number to bump
 
