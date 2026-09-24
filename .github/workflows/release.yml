@@ -208,6 +208,43 @@ jobs:
             --notes-file notes.md \
             dist/*.tar.gz dist/*.zip dist/checksums.txt
 
+  # The Scoop manifest names two zips, and kmoneil/scoop-bucket moves them the
+  # way the tap moves the formula: rewrite, re-derive both digests, verify
+  # their provenance, install the rewrite with Scoop on Windows, then land. Its
+  # own job, so that a red says which of the two was not told.
+  bump-the-bucket:
+    name: tell the bucket
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: dispatch to kmoneil/scoop-bucket
+        env:
+          # The tap's token, whose access includes the bucket: a fine-grained
+          # PAT limited to the two repositories, with Contents: read and write.
+          GH_TOKEN: ${{ secrets.TAP_DISPATCH_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          fix="  gh workflow run bump-jr.yml --repo kmoneil/scoop-bucket -f tag=${TAG}"
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "TAP_DISPATCH_TOKEN is not set, so the Scoop manifest was not bumped." >&2
+            echo "scoop install kmoneil/jr still fetches the previous release." >&2
+            echo >&2
+            echo "To fix it for ${TAG} now:" >&2
+            echo "$fix" >&2
+            exit 1
+          fi
+          if ! gh api repos/kmoneil/scoop-bucket/dispatches \
+            -f event_type=jr-released \
+            -F client_payload[tag]="${TAG}"; then
+            echo "The dispatch was refused. TAP_DISPATCH_TOKEN has to reach" >&2
+            echo "kmoneil/scoop-bucket as well as the tap, with Contents: read and write." >&2
+            echo >&2
+            echo "To fix it for ${TAG} now:" >&2
+            echo "$fix" >&2
+            exit 1
+          fi
+          echo "asked the bucket to bump to ${TAG}"
+
   # The Homebrew formula pins four URLs and four digests, and moving them was
   # the one step of a release still done by hand. kmoneil/homebrew-tap does the
   # move now; this tells it there is one to do.
