@@ -79,7 +79,9 @@ platform, and moving them was the last hand-typed step of a release. The
 are published, and its `bump-jr` workflow does the rest: rewrite the eight
 lines, re-derive every digest from the archive it just downloaded, verify build
 provenance on all four, then audit, install and test the rewritten formula on a
-macOS runner before the commit exists.
+macOS runner before `main` moves. The rewrite is committed to a branch first,
+because what gets verified has to be a commit rather than a working tree, and
+`main` is fast-forwarded to that commit only once it has passed.
 
 **It needs one secret, and it says so when it does not have it.**
 `TAP_DISPATCH_TOKEN` is a fine-grained PAT scoped to `kmoneil/homebrew-tap`
@@ -157,9 +159,17 @@ one thing this project's whole contract exists to prevent.
 
 ## What ships
 
-Four profiles × two operating systems × two architectures, as
-`jr-<profile>_<version>_<os>_<arch>.tar.gz`, each containing the binary named
-`jr` plus `LICENSE`, `NOTICE`, and `README.md`.
+Four profiles × three operating systems × two architectures, twenty-four
+archives:
+
+- `jr-<profile>_<version>_<os>_<arch>.tar.gz` for `linux` and `darwin`, each
+  containing the binary named `jr` plus `LICENSE`, `NOTICE`, and `README.md`;
+- `jr-<profile>_<version>_windows_<arch>.zip` for `windows`, the same four files
+  with the binary named `jr.exe`. A zip because it is what Windows opens with
+  nothing installed, and what Scoop extracts without installing 7-Zip first.
+
+Every archive holds one directory named for itself, so extracting one never
+scatters files into the directory it was extracted in.
 
 The profiles ship separately because they are the product rather than a build
 convenience — see [build-profiles.md](build-profiles.md). Somebody choosing
@@ -190,9 +200,10 @@ $ gh run rerun <id> --failed
 ```
 
 The tag is already correct, which is why moving it is the wrong instinct even
-though the release is missing. The gate is the first of three jobs and `build`
-and `publish` both hang off it, so a red gate means nothing was compiled and
-nothing was published. There is no half-published state to clean up.
+though the release is missing. The two gates come first, `make ci` on Linux and
+the suite on Windows, and `build` and `publish` both hang off them, so a red
+gate means nothing was compiled and nothing was published. There is no
+half-published state to clean up.
 
 This has happened once, on the first attempt at `v0.1.1`: `sum.golang.org`
 returned an `INTERNAL_ERROR` while the gate was installing the tools `make ci`

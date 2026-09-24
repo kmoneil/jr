@@ -66,11 +66,11 @@ never meets Gatekeeper: Homebrew fetches with `curl`, which does not attach
 `com.apple.quarantine`, and an unsigned binary without that attribute is not
 refused. It installs the full profile and the shell completions.
 
-Every release also carries four profiles for linux and darwin, on amd64 and
-arm64. `jr-full` is everything; the others are in
+Every release also carries four profiles for linux, darwin and windows, on amd64
+and arm64. `jr-full` is everything; the others are in
 [build profiles](#build-profiles), and the one you want for an agent is probably
 `jr-reader`, which cannot change anything in Jira because it does not contain the
-code that could. Those are tarballs rather than formulae, because the machine
+code that could. Those are archives rather than formulae, because the machine
 running an agent is usually a container:
 
 ```console
