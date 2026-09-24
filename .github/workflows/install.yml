@@ -1,0 +1,128 @@
+name: install
+
+# The README's Windows install, both ways, run exactly as it is written. Nobody
+# who works on jr runs PowerShell or Scoop, so without this those steps would be
+# a guess that reads well. They are read out of README.md rather than copied in
+# here, so the two cannot drift: a change to the README is tested by the
+# README. The shape is kmoneil/hunk's install.yml.
+#
+# The steps install from the latest release, so this also answers whether a
+# user following them today gets a working jr. It runs when the README or this
+# file changes, and after every run of the release workflow, which is the only
+# other thing that changes what "latest" serves.
+
+on:
+  pull_request:
+    paths: [README.md, .github/workflows/install.yml]
+  push:
+    branches: [main]
+    paths: [README.md, .github/workflows/install.yml]
+  # Not `release: published`: release.yml publishes with the workflow's own
+  # token, and an event that token causes starts no workflow.
+  workflow_run:
+    workflows: [release]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: windows (${{ matrix.shell }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows PowerShell 5.1 is what every Windows machine has, and
+        # PowerShell 7 is what most people who installed one have.
+        shell: [powershell, pwsh]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Exactly one powershell block under "Without Scoop", run as written. A
+      # second block would be a step this does not run, so it is refused.
+      - name: the README's steps, as written
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $readme = Get-Content README.md -Raw
+          $section = [regex]::Match($readme, '(?ms)^#### Without Scoop\r?\n(.*?)(?=^#{2,4} |^<details>|\z)').Groups[1].Value
+          $blocks = [regex]::Matches($section, '(?s)```powershell\r?\n(.*?)```')
+          if ($blocks.Count -ne 1) {
+            throw "'Without Scoop' has $($blocks.Count) powershell blocks, and this runs exactly one"
+          }
+          Invoke-Expression $blocks[0].Groups[1].Value
+
+      - name: what it installed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # A new terminal's PATH, read back from where the steps saved it: a
+          # step inherits the runner's environment and never rereads it.
+          $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
+            [Environment]::GetEnvironmentVariable('Path', 'User')
+          $jr = (Get-Command jr).Source
+          $latest = gh release view --repo kmoneil/jr --json tagName --jq .tagName
+          $row = & $jr version --format tsv | Where-Object { $_ -like "@release`t*" }
+          $got = ($row -split "`t")[1]
+          if ("v$got" -ne $latest) {
+            throw "jr version reports $got, and the latest release is $latest"
+          }
+          foreach ($file in 'SKILL.md', 'references\failures.md') {
+            $skill = Join-Path $env:USERPROFILE ".claude\skills\jr\$file"
+            if (-not (Test-Path $skill)) { throw "the skill has no $skill" }
+          }
+          "installed jr $got from $jr, with the skill"
+
+  # The README's Scoop lines, with real Scoop. The version is checked against
+  # the bucket's own manifest rather than the latest release: the bucket moves
+  # a few minutes after a release, by its own verified bump, and a check run in
+  # between would be reporting that gap rather than a broken install.
+  scoop:
+    name: windows (scoop)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: install Scoop
+        run: |
+          # The runners are administrators, and Scoop's installer refuses one
+          # unless told it may.
+          Invoke-Expression "& {$(Invoke-RestMethod https://get.scoop.sh)} -RunAsAdmin"
+          Join-Path $env:USERPROFILE 'scoop\shims' | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+
+      - name: the README's Scoop steps, as written
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $readme = Get-Content README.md -Raw
+          $section = [regex]::Match($readme, '(?ms)^#### With Scoop\r?\n(.*?)(?=^#{2,4} |^<details>|\z)').Groups[1].Value
+          $blocks = [regex]::Matches($section, '(?s)```powershell\r?\n(.*?)```')
+          if ($blocks.Count -ne 1) {
+            throw "'With Scoop' has $($blocks.Count) powershell blocks, and this runs exactly one"
+          }
+          Invoke-Expression $blocks[0].Groups[1].Value
+
+      - name: what it installed
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $manifest = Get-Content (Join-Path $env:USERPROFILE 'scoop\buckets\kmoneil\bucket\jr.json') -Raw | ConvertFrom-Json
+          $row = jr version --format tsv | Where-Object { $_ -like "@release`t*" }
+          $got = ($row -split "`t")[1]
+          if ($got -ne $manifest.version) {
+            throw "jr version reports $got, and the bucket's manifest is at $($manifest.version)"
+          }
+          foreach ($file in 'SKILL.md', 'references\failures.md') {
+            $skill = Join-Path $env:USERPROFILE ".claude\skills\jr\$file"
+            if (-not (Test-Path $skill)) { throw "the skill has no $skill" }
+          }
+          if (Test-Path (Join-Path $env:USERPROFILE 'scoop\apps\7zip')) {
+            throw 'Scoop installed 7-Zip to install jr'
+          }
+          "installed jr $got with Scoop, with the skill, and no 7-Zip"

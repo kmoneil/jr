@@ -51,20 +51,73 @@ set, and the same is true of every command, in every format, on every path.
 
 ## Install
 
+### macOS and Linux, with Homebrew
+
 ```console
 $ brew install kmoneil/tap/jr
 ```
 
-macOS and Linux, both architectures. That is the whole step, and it brings the
-shell completions and [the agent skill](#the-agent-skill) with it.
+Both architectures. That is the whole step, and it brings the shell completions
+and [the agent skill](#the-agent-skill) with it. On macOS it is also the path
+that never meets Gatekeeper: Homebrew fetches with `curl`, which does not attach
+`com.apple.quarantine`, and an unsigned binary without that attribute is not
+refused.
+
+### Windows
+
+#### With Scoop
+
+```powershell
+scoop bucket add kmoneil https://github.com/kmoneil/scoop-bucket
+scoop install kmoneil/jr
+```
+
+amd64 and arm64. That installs the full profile and has it write the agent skill
+into `~\.claude\skills\jr`, and `scoop update jr` keeps both at the same version.
+
+#### Without Scoop
+
+In PowerShell. The zip is named for its release, so this reads the latest
+release's `checksums.txt` for the one that fits your machine, downloads it,
+installs nothing unless it matches, then puts `jr.exe` on your `PATH` and has it
+write its skill:
+
+```powershell
+# Windows PowerShell 5.1 does not always offer TLS 1.2, which GitHub requires.
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+$ProgressPreference = 'SilentlyContinue'
+$arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }
+$from = 'https://github.com/kmoneil/jr/releases/latest/download'
+$get = Join-Path $env:TEMP 'jr-install'
+New-Item -ItemType Directory -Force -Path $get | Out-Null
+Invoke-WebRequest "$from/checksums.txt" -OutFile (Join-Path $get 'checksums.txt') -UseBasicParsing
+
+$line = Get-Content (Join-Path $get 'checksums.txt') |
+    Where-Object { $_ -match ('\sjr-full_[^_]+_windows_' + $arch + '\.zip$') }
+if (@($line).Count -ne 1) { throw "checksums.txt names no single jr-full zip for windows_$arch" }
+$digest, $zip = $line -split '\s+', 2
+Invoke-WebRequest "$from/$zip" -OutFile (Join-Path $get $zip) -UseBasicParsing
+if ((Get-FileHash (Join-Path $get $zip)).Hash -ne $digest) {
+    throw "$zip does not match checksums.txt; nothing was installed"
+}
+
+Expand-Archive (Join-Path $get $zip) -DestinationPath $get -Force
+$dir = Join-Path $env:LOCALAPPDATA 'Programs\jr'
+New-Item -ItemType Directory -Force -Path $dir | Out-Null
+Copy-Item (Join-Path $get "$($zip -replace '\.zip$')\jr.exe") (Join-Path $dir 'jr.exe') -Force
+& (Join-Path $dir 'jr.exe') skill --dir (Join-Path $env:USERPROFILE '.claude\skills\jr') --force
+if ($LASTEXITCODE -ne 0) { throw 'jr could not write its skill; the refusal above says why' }
+$path = [Environment]::GetEnvironmentVariable('Path', 'User')
+if (($path -split ';') -notcontains $dir) {
+    [Environment]::SetEnvironmentVariable('Path', "$path;$dir", 'User')
+}
+```
+
+Open a new terminal, and `jr version` says which release you have. Running the
+same steps again upgrades it.
 
 <details>
-<summary>Other ways: release archives, verifying a download, building from source</summary>
-
-Shortest path on both macOS and Linux, and on macOS it is also the one that
-never meets Gatekeeper: Homebrew fetches with `curl`, which does not attach
-`com.apple.quarantine`, and an unsigned binary without that attribute is not
-refused. It installs the full profile and the shell completions.
+<summary>Other ways: another profile, verifying a download, building from source</summary>
 
 Every release also carries four profiles for linux, darwin and windows, on amd64
 and arm64. `jr-full` is everything; the others are in
@@ -79,6 +132,9 @@ $ tar xzf jr-full_*_darwin_arm64.tar.gz
 $ install jr-full_*/jr ~/.local/bin/jr
 ```
 
+On Linux the pattern ends `_linux_amd64.tar.gz` or `_linux_arm64.tar.gz`, and on
+Windows it is `_windows_amd64.zip` or `_windows_arm64.zip`, holding `jr.exe`.
+
 Each release also has a `checksums.txt` over every archive, and a build
 provenance attestation, so an archive can be traced to the workflow run and the
 commit that produced it:
@@ -92,8 +148,11 @@ $ gh attestation verify jr-full_*_darwin_arm64.tar.gz --repo kmoneil/jr
 quarantined executable that is not signed with an Apple Developer ID and
 notarized by Apple, which these are not: they are cross-compiled on Linux
 runners that hold no signing identity. Fetched with `gh` or `curl` the attribute
-is never set and nothing refuses. If you already have a browser copy that will
-not run, see [it will not start](docs/troubleshooting.md#it-will-not-start).
+is never set and nothing refuses. Windows marks a browser download the same way,
+with the Mark of the Web, and SmartScreen stops an unsigned program carrying it;
+Scoop and the PowerShell steps above do not set it. If you already have a
+browser copy that will not run, see
+[it will not start](docs/troubleshooting.md#it-will-not-start).
 
 Or build from source, which needs Go 1.26:
 
@@ -103,7 +162,7 @@ make build          # → bin/jr
 make hooks          # install the pre-commit gate; contributors only, once per clone
 ```
 
-Then see the [quickstart](#quickstart) above, or
+Then see [your first query](#your-first-query) below, or
 [docs/getting-started.md](docs/getting-started.md) for the walkthrough.
 
 </details>

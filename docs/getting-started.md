@@ -22,7 +22,23 @@ $ brew install kmoneil/tap/jr
 ```
 
 That is the whole step on macOS and Linux, and it brings the shell completions
-with it. If you would rather not use Homebrew, download a release archive:
+and the agent skill with it. On Windows, install it with
+[Scoop](https://scoop.sh):
+
+```powershell
+scoop bucket add kmoneil https://github.com/kmoneil/scoop-bucket
+scoop install kmoneil/jr
+```
+
+Without Scoop, [the README](../README.md#without-scoop) has PowerShell steps
+that do the same. The commands in this guide are written for a Unix shell, and
+`jr` takes the same arguments in PowerShell. Two things are spelled
+differently there: an environment variable is set as
+`$env:JIRA_API_TOKEN = '...'`, and a path is written out in full
+(`$HOME\.secrets\jira`), because Windows PowerShell hands `~` to a program as
+the character rather than your home directory.
+
+If you would rather not use a package manager, download a release archive:
 
 ```console
 $ gh release download --repo kmoneil/jr --pattern 'jr-full_*_darwin_arm64.tar.gz'
