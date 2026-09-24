@@ -281,8 +281,10 @@ So: different audience, different bargain. Want a rich interactive Jira
 experience? Use those. Writing a script, or pointing an agent at Jira, and need
 to know the output means what it says? That is this.
 
-The TUI, when it arrives, will be a consumer of this tool rather than the
-product, which is the same idea from the other end.
+There is no TUI here, and none is coming. The design left room for one as a
+consumer of this tool rather than the product; the consumer that actually
+arrived is the agent, and an agent reads the contract. A TUI, if anybody wants
+one, can be its own project, consuming jr's output like any other caller.
 
 ## What works today
 
@@ -334,19 +336,19 @@ parseable.
 Nothing below is stubbed or partially wired. A flag that would silently no-op is
 not shipped at all.
 
-- `jr ui`. The TUI is a consumer of this tool, not the product, so it is the
-  lowest priority there is.
 - OAuth, mTLS, and a system-keyring credential provider. The provider interface
   is in place; a keyring implementation shells out, so it will arrive behind its
   own build tag rather than in the reader profile.
 - `--no-color`. Nothing emits ANSI, so it would be a flag that does nothing.
 
-The `tui`, `browser`, and `clipboard` tags used to be declared for the first
-three, and were dropped on 2026-08-13 having never gated anything: they came
-from the spec's tag table, written before any code was, and no build ever
-carried a feature behind them. A tag that names a capability no build can
-perform is the one thing this tool promises not to do, and each of them is a
-two-line file on the day somebody needs it.
+`jr ui` used to head this list, marked lowest priority. It came off on
+2026-09-24 as a decision, not a delivery: no TUI is planned, for the reasons
+above. The `tui`, `browser`, and `clipboard` tags had already gone on
+2026-08-13, having never gated anything: they came from the spec's tag table,
+written before any code was, and no build ever carried a feature behind them. A
+tag that names a capability no build can perform is the one thing this tool
+promises not to do, and each of them is a two-line file on the day somebody
+needs it.
 
 Everything else described in this README is built. 68 commands in the full
 build, and `internal/lint` asserts that number against the binaries rather than
