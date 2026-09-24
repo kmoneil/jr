@@ -20,6 +20,75 @@ accident.
 
 Nothing yet.
 
+## [0.17.1] - 2026-09-24
+
+**Take this one if you install the agent skill from the binary rather than
+from a clone of this repository.** `jr skill` printed `SKILL.md` and
+`jr skill <ref>` printed one reference, so an install had to name every
+reference itself: the recipe did it in a shell loop over three names, which
+goes stale the day a fourth reference ships.
+
+### Added
+
+- **`jr skill --dir DIR` writes the whole skill into a directory**, laid out
+  the way a skill loader reads one: `SKILL.md`, and each reference under
+  `references/`, the bytes `jr skill` prints for each. It prints nothing, and
+  exit 0 means every file was written.
+
+      jr skill --dir ~/.claude/skills/jr
+
+  Every check runs before the first write, so a refusal leaves the directory
+  as it was:
+
+  | Code | Exit | When |
+  | --- | --- | --- |
+  | `DESTINATION_EXISTS` | 7 | the directory already holds one of the skill's files and `--force` was not given |
+  | `STRAY_FILES` | 7 | the directory holds anything the skill does not write, even with `--force`; `detail` names ten and counts the rest |
+  | `NOT_A_DIRECTORY` | 7 | the path is a file |
+  | `EMPTY_DIR` | 2 | `--dir ""`, most likely a variable that was never set |
+  | `FORCE_WITHOUT_DIR` | 2 | `--force` alone |
+  | `DIR_AND_REFERENCE` | 2 | `--dir` beside a reference; `--dir` writes the whole skill |
+
+  `STRAY_FILES` holds even with `--force` because both ways past it are
+  wrong: deleting the entry removes something this command did not create,
+  and keeping it leaves a reference an older release carried beside a skill
+  that no longer mentions it.
+
+### Documentation
+
+- The README and docs/recipes.md install the skill with `--dir`, and the
+  recipe's shell loop is gone. Its transcript of the reader build's skill
+  said 41 commands against a real 46, and 21 commands the reader cannot call
+  against a real 22.
+- docs/troubleshooting.md gains `STRAY_FILES` and `DESTINATION_EXISTS` as
+  `jr skill --dir` raises them.
+
+### Internal
+
+- `make preflight` runs the checks a pull request fails on against the
+  packages that changed. The commit hooks refuse a commit on `main` and an
+  em dash in added prose or in the message, and every build target refuses
+  to replace a `bin/jr` that cannot run on the machine building it.
+  `scripts/probe` sends one raw request to the Data Center rig or the Cloud
+  sandbox, with the credential on stdin.
+
+### Output contract
+
+- No kind moved a schema version, no exit code changed meaning, and no
+  existing error `code` changed.
+- `skill` gains `--dir`, `--force`, and exit 7. `STRAY_FILES` and
+  `NOT_A_DIRECTORY` are new at exit 7, and `EMPTY_DIR`, `FORCE_WITHOUT_DIR`
+  and `DIR_AND_REFERENCE` at exit 2. `DESTINATION_EXISTS` keeps its exit 7
+  and is now raised by `skill --dir` as well as by a download.
+- `skill` still owns stdout and emits no document, with `--dir` or without,
+  so it is still not a tool `mcp serve` offers.
+- `jr schema` and `--help` summarize `skill` as "Print the agent skill for
+  this build, or write it to a directory". A summary is text, not a branch
+  point.
+- **Priced a patch.** Every invocation that worked before works the same, and
+  `--dir` is an input that used to be refused as an unknown flag: the
+  stability policy's row for accepting an input that used to be refused.
+
 ## [0.17.0] - 2026-09-23
 
 **Take this one if you move issues with `--resolution` or `--comment`,
@@ -2672,7 +2741,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.17.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.17.1...main
+[0.17.1]: https://github.com/kmoneil/jr/releases/tag/v0.17.1
 [0.17.0]: https://github.com/kmoneil/jr/releases/tag/v0.17.0
 [0.16.0]: https://github.com/kmoneil/jr/releases/tag/v0.16.0
 [0.15.0]: https://github.com/kmoneil/jr/releases/tag/v0.15.0
