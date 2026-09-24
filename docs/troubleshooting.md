@@ -950,7 +950,7 @@ skill already is answers `DESTINATION_EXISTS`, exit 7. `--force` replaces the
 skill's own files:
 
 ```console
-$ jr skill --dir ~/.claude/skills/jr --force
+$ jr skill --dir ~/.agents/skills/jr --force
 ```
 
 `STRAY_FILES`, also exit 7, is refused even with `--force`: the directory holds

@@ -2980,7 +2980,7 @@ Examples:
 ```console
 jr skill
 jr skill workflows
-jr skill --dir ~/.claude/skills/jr
+jr skill --dir ~/.agents/skills/jr
 ```
 
 | Argument | Required | Description |
@@ -3014,7 +3014,7 @@ was written. It refuses before writing anything when the directory holds a
 file the skill does not write, even with --force, and when it holds one the
 skill does write and --force was not given:
 
-    jr skill --dir ~/.claude/skills/jr
+    jr skill --dir ~/.agents/skills/jr
 
 The Markdown is the output, so nothing else is written to stdout: there is no
 result envelope, and --format does not apply. It is deliberately in every

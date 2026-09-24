@@ -73,7 +73,8 @@ scoop install kmoneil/jr
 ```
 
 amd64 and arm64. That installs the full profile and has it write the agent skill
-into `~\.claude\skills\jr`, and `scoop update jr` keeps both at the same version.
+into `~\.agents\skills\jr` and `~\.claude\skills\jr`, and `scoop update jr`
+keeps them all at the same version.
 
 #### Without Scoop
 
@@ -105,8 +106,10 @@ Expand-Archive (Join-Path $get $zip) -DestinationPath $get -Force
 $dir = Join-Path $env:LOCALAPPDATA 'Programs\jr'
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 Copy-Item (Join-Path $get "$($zip -replace '\.zip$')\jr.exe") (Join-Path $dir 'jr.exe') -Force
-& (Join-Path $dir 'jr.exe') skill --dir (Join-Path $env:USERPROFILE '.claude\skills\jr') --force
-if ($LASTEXITCODE -ne 0) { throw 'jr could not write its skill; the refusal above says why' }
+foreach ($skills in '.agents\skills\jr', '.claude\skills\jr') {
+    & (Join-Path $dir 'jr.exe') skill --dir (Join-Path $env:USERPROFILE $skills) --force
+    if ($LASTEXITCODE -ne 0) { throw 'jr could not write its skill; the refusal above says why' }
+}
 $path = [Environment]::GetEnvironmentVariable('Path', 'User')
 if (($path -split ';') -notcontains $dir) {
     [Environment]::SetEnvironmentVariable('Path', "$path;$dir", 'User')
@@ -413,27 +416,35 @@ $ bin/jr-reader skill | grep 'commands, profile'
 46 commands, profile `reader`, tags `mcp`.
 ```
 
+Two folders matter: `~/.agents/skills` is the cross-agent convention, read by
+Codex, Cursor, Gemini CLI and most other skill loaders, and `~/.claude/skills`
+is where Claude Code looks. Everything below installs into both.
+
 Installed with Homebrew, the formula has already written it, from the binary
 it installed. Homebrew does not write into your home directory, so link it
 once, and every `brew upgrade` moves the skill with the binary:
 
 ```console
-$ mkdir -p ~/.claude/skills
+$ mkdir -p ~/.agents/skills ~/.claude/skills
+$ ln -s "$(brew --prefix)/opt/jr/share/jr/skill" ~/.agents/skills/jr
 $ ln -s "$(brew --prefix)/opt/jr/share/jr/skill" ~/.claude/skills/jr
 ```
 
 Otherwise, install it into a directory a skill loader reads. The binary writes
 the whole skill, `SKILL.md` and its references, the same bytes `jr skill`
-prints:
+prints; the second line hands Claude Code the same copy:
 
 ```console
-$ jr skill --dir ~/.claude/skills/jr
+$ jr skill --dir ~/.agents/skills/jr
+$ mkdir -p ~/.claude/skills && ln -s ~/.agents/skills/jr ~/.claude/skills/jr
 ```
 
 Or symlink the copy in this repository, which `make skill` regenerates and a
 test refuses to let go stale:
 
 ```console
+$ mkdir -p ~/.agents/skills ~/.claude/skills
+$ ln -s "$PWD/skills/jr" ~/.agents/skills/jr
 $ ln -s "$PWD/skills/jr" ~/.claude/skills/jr
 ```
 

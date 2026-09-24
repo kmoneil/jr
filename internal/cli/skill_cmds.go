@@ -61,7 +61,7 @@ was written. It refuses before writing anything when the directory holds a
 file the skill does not write, even with --force, and when it holds one the
 skill does write and --force was not given:
 
-    ` + buildinfo.App + ` skill --dir ~/.claude/skills/` + buildinfo.App + `
+    ` + buildinfo.App + ` skill --dir ~/.agents/skills/` + buildinfo.App + `
 
 The Markdown is the output, so nothing else is written to stdout: there is no
 result envelope, and --format does not apply. It is deliberately in every
@@ -70,7 +70,7 @@ that most needs to explain itself.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " skill",
 			buildinfo.App + " skill workflows",
-			buildinfo.App + " skill --dir ~/.claude/skills/" + buildinfo.App,
+			buildinfo.App + " skill --dir ~/.agents/skills/" + buildinfo.App,
 		}, "\n"),
 		Args: []registry.Arg{{
 			Name:  "reference",
