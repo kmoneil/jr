@@ -7,9 +7,11 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/kmoneil/jr/internal/auth"
 	"github.com/kmoneil/jr/internal/exitcode"
 	"github.com/kmoneil/jr/internal/render"
 )
@@ -423,6 +425,15 @@ func TestCredentialFileIsNotWorldReadable(t *testing.T) {
 		"auth", "login", "--no-verify", "--site", "acme.atlassian.invalid", "--token-stdin")
 
 	path := filepath.Join(env["XDG_STATE_HOME"], "jr", "credentials.toml")
+	if runtime.GOOS == "windows" {
+		// No mode to read there. Reading the file back through the store runs
+		// the store's ACL check on what this command path wrote, and
+		// TestTheStoreIsPrivateToItsUserOnWindows holds the DACL itself.
+		if _, ok, err := (auth.FileStore{Path: path}).Lookup("acme.atlassian.invalid"); err != nil || !ok {
+			t.Errorf("the store refuses what auth login wrote: ok = %v, err = %v", ok, err)
+		}
+		return
+	}
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatalf("stat %s: %v", path, err)

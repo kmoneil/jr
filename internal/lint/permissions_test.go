@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strconv"
 	"testing"
@@ -62,6 +63,11 @@ var writers = map[string]func(t *testing.T, root string) string{
 // The same failure the profile-count table had, and the same fix: read the
 // document, drive the real code, compare.
 func TestTheDocumentedModesAreTheOnesOnDisk(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the table is Unix modes, which Windows does not have; " +
+			"docs/architecture.md says what holds there, and " +
+			"TestTheStoreIsPrivateToItsUserOnWindows holds the store to it")
+	}
 	documented := modesFromDoc(t)
 	if len(documented) == 0 {
 		t.Fatalf("%s: no permissions table found; this test asserted nothing",

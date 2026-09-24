@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -154,7 +155,7 @@ func contractKinds(t *testing.T, dir string, p profile) []kind {
 func buildProfile(t *testing.T, dir string, p profile) string {
 	t.Helper()
 
-	out := filepath.Join(dir, "jr-"+p.name)
+	out := filepath.Join(dir, exeName("jr-"+p.name))
 	// -buildvcs=false because this package builds the binary from several
 	// tests at once, and `go build` shells out to git to stamp the revision
 	// into it. Concurrent invocations lose that race, and the build fails
@@ -178,6 +179,17 @@ func buildProfile(t *testing.T, dir string, p profile) string {
 		t.Fatalf("build %s (tags=%q): %v\n%s", p.name, p.tags, err, combined)
 	}
 	return out
+}
+
+// exeName is a binary's file name as this platform runs it. Windows will not
+// execute a file without an executable extension, so a profile built as
+// jr-full there was reported as not found by every test that asked it
+// anything.
+func exeName(name string) string {
+	if runtime.GOOS == "windows" {
+		return name + ".exe"
+	}
+	return name
 }
 
 // askBinary runs a built profile and returns its stdout.

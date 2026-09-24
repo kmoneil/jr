@@ -199,7 +199,7 @@ it, so a partially-written document can never be parsed as a whole one.
 
 ## Supply chain
 
-- **Four direct dependencies**, listed with their licences in [NOTICE](NOTICE).
+- **Six direct dependencies**, listed with their licences in [NOTICE](NOTICE).
   Nothing is vendored; `go.sum` pins every module.
 - **`make vuln` runs govulncheck** over the full tag set and fails closed. It is
   part of `make ci`.

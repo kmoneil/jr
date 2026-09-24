@@ -347,6 +347,19 @@ listing publishes the hostname even though every file in it is 0600.
 install. An existing 0755 is not repaired on read, changing permissions nobody
 asked this tool to change is its own surprise.
 
+**On Windows the modes above mean nothing**, and the table is asserted on Unix
+only. Go reports every Windows file as 0666, or 0444 when it is read-only, and
+what decides who can open a file is its ACL. Every file and directory here
+inherits its directory's, which under `%USERPROFILE%` grants the user, SYSTEM
+and Administrators. The credential store alone is held to more, because it is
+the secret: it is written with a protected DACL granting the current user and
+nobody else, and refused on read when its owner, or any entry that grants
+anything, names an account other than the user, SYSTEM or Administrators, which
+are what root is to 0600. A null DACL, a filesystem with no ACL at all, and an
+entry type it does not read are refused too. `internal/auth/private_windows.go`
+is the rule and `TestTheStoreIsPrivateToItsUserOnWindows` and
+`TestAStoreOthersCanOpenIsRefusedOnWindows` hold it.
+
 The table covers what `jr` writes, which is not the whole credential chain.
 `DefaultChain` has three providers: the environment, the store above, and
 `~/.netrc`. **`.netrc` is read at whatever mode it has, deliberately**, and it

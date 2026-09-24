@@ -182,9 +182,11 @@ func probeConfigWideStore(t *testing.T) map[string]string {
 	}
 	store := "[credentials.\"https://probe.atlassian.invalid\"]\n" +
 		"user = \"ada\"\ntoken = \"not-a-real-token\"\n"
-	if err := os.WriteFile(filepath.Join(dir, "credentials.toml"), []byte(store), 0o644); err != nil {
+	path := filepath.Join(dir, "credentials.toml")
+	if err := os.WriteFile(path, []byte(store), 0o644); err != nil {
 		t.Fatalf("write store: %v", err)
 	}
+	openToOthers(t, path)
 	return env
 }
 

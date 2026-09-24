@@ -16,45 +16,54 @@ func env(pairs map[string]string) jctx.Getenv {
 	return func(k string) string { return pairs[k] }
 }
 
+// abs makes a slash-rooted path absolute on this platform. "/cfg" is absolute
+// on Unix and relative on Windows, where an absolute path names a volume, and
+// XDG requires an absolute path: these tests are about the layout under a
+// root, not about which root.
+func abs(p string) string {
+	return filepath.Join(filepath.VolumeName(os.TempDir())+string(filepath.Separator),
+		filepath.FromSlash(p))
+}
+
 func TestDefaultPathsAreXDG(t *testing.T) {
 	paths, err := jctx.DefaultPaths(env(map[string]string{
-		"XDG_CONFIG_HOME": "/cfg",
-		"XDG_STATE_HOME":  "/state",
-		"XDG_CACHE_HOME":  "/cache",
-		"HOME":            "/home/ada",
+		"XDG_CONFIG_HOME": abs("/cfg"),
+		"XDG_STATE_HOME":  abs("/state"),
+		"XDG_CACHE_HOME":  abs("/cache"),
+		"HOME":            abs("/home/ada"),
 	}))
 	if err != nil {
 		t.Fatalf("DefaultPaths: %v", err)
 	}
-	if paths.Config != "/cfg/jr" {
+	if paths.Config != abs("/cfg/jr") {
 		t.Errorf("Config = %q", paths.Config)
 	}
-	if paths.State != "/state/jr" {
+	if paths.State != abs("/state/jr") {
 		t.Errorf("State = %q", paths.State)
 	}
-	if paths.Cache != "/cache/jr" {
+	if paths.Cache != abs("/cache/jr") {
 		t.Errorf("Cache = %q", paths.Cache)
 	}
 
 	// The config file is $XDG_CONFIG_HOME/jr/config.toml — not a hidden file
 	// inside a hidden directory inside a namespaced directory inside .config.
-	if got := paths.ConfigFile(nil); got != "/cfg/jr/config.toml" {
+	if got := paths.ConfigFile(nil); got != abs("/cfg/jr/config.toml") {
 		t.Errorf("ConfigFile = %q", got)
 	}
-	if strings.Contains(paths.ConfigFile(nil), "/.") {
+	if strings.Contains(paths.ConfigFile(nil), string(filepath.Separator)+".") {
 		t.Errorf("the config path hides a component: %s", paths.ConfigFile(nil))
 	}
 }
 
 func TestDefaultPathsFallBackToHome(t *testing.T) {
-	paths, err := jctx.DefaultPaths(env(map[string]string{"HOME": "/home/ada"}))
+	paths, err := jctx.DefaultPaths(env(map[string]string{"HOME": abs("/home/ada")}))
 	if err != nil {
 		t.Fatalf("DefaultPaths: %v", err)
 	}
 	want := map[string]string{
-		"config": "/home/ada/.config/jr",
-		"state":  "/home/ada/.local/state/jr",
-		"cache":  "/home/ada/.cache/jr",
+		"config": abs("/home/ada/.config/jr"),
+		"state":  abs("/home/ada/.local/state/jr"),
+		"cache":  abs("/home/ada/.cache/jr"),
 	}
 	got := map[string]string{"config": paths.Config, "state": paths.State, "cache": paths.Cache}
 	for k, v := range want {
@@ -70,12 +79,12 @@ func TestDefaultPathsFallBackToHome(t *testing.T) {
 func TestRelativeXDGIsIgnored(t *testing.T) {
 	paths, err := jctx.DefaultPaths(env(map[string]string{
 		"XDG_CONFIG_HOME": "relative/path",
-		"HOME":            "/home/ada",
+		"HOME":            abs("/home/ada"),
 	}))
 	if err != nil {
 		t.Fatalf("DefaultPaths: %v", err)
 	}
-	if paths.Config != "/home/ada/.config/jr" {
+	if paths.Config != abs("/home/ada/.config/jr") {
 		t.Errorf("Config = %q, want the fallback", paths.Config)
 	}
 }

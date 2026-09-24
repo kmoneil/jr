@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -356,6 +357,10 @@ func TestFileStoreRoundTrip(t *testing.T) {
 // TestStoredCredentialIsNotWorldReadable is the whole point of a separate
 // store. A credential other users can read is not stored, it is published.
 func TestStoredCredentialIsNotWorldReadable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a mode means nothing on Windows; " +
+			"TestTheStoreIsPrivateToItsUserOnWindows reads the DACL instead")
+	}
 	path := filepath.Join(t.TempDir(), "credentials.toml")
 	store := auth.FileStore{Path: path}
 	if err := store.Save("acme.atlassian.invalid", auth.Credential{
@@ -385,6 +390,10 @@ func TestStoredCredentialIsNotWorldReadable(t *testing.T) {
 // TestOverlyOpenStoreIsRefused matters because reading it anyway and warning
 // would mean the credential is used, and stays exposed, every single time.
 func TestOverlyOpenStoreIsRefused(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a mode opens nothing on Windows; " +
+			"TestAStoreOthersCanOpenIsRefusedOnWindows opens the ACL instead")
+	}
 	content := "[credentials.\"acme.atlassian.invalid\"]\nscheme = \"bearer\"\ntoken = \"" +
 		theToken + "\"\n"
 

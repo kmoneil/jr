@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -73,7 +74,9 @@ func TestNothingIsMoreComplexThanItsReason(t *testing.T) {
 			// worse test, not a simpler one.
 			continue
 		}
-		key := f.Pos.Filename + ":" + f.FuncName
+		// Slash-separated, because the exemptions are, and gocognit reports
+		// a Windows path with backslashes.
+		key := filepath.ToSlash(f.Pos.Filename) + ":" + f.FuncName
 		seen[key] = true
 
 		allowed, ok := exempt[key]

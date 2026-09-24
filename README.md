@@ -449,7 +449,7 @@ that only lists wins is not one.
 sell; the licence text is the whole of what is asked. Copyright 2026 Kevin
 O'Neil, because a licence is a grant from somebody, and the notice is who.
 
-Nothing is vendored, and [NOTICE](NOTICE) lists the five direct dependencies a
+Nothing is vendored, and [NOTICE](NOTICE) lists the six direct dependencies a
 binary links, with their licences and the one upstream NOTICE that has to travel
 with them.
 

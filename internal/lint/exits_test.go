@@ -522,7 +522,10 @@ func (idx *sourceIndex) follow(
 	dir, name string, path []string,
 	seen map[string]bool, out map[exitcode.Code]string,
 ) {
-	key := dir + "." + name
+	// Slash-separated whatever the platform, because serverChosenExits is:
+	// with a Windows path this missed transport.Err, followed it, and
+	// reported three commands as reaching every exit Jira can send.
+	key := filepath.ToSlash(dir) + "." + name
 	if seen[key] || serverChosenExits[key] {
 		return
 	}

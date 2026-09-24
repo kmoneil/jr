@@ -54,7 +54,7 @@ tool computes, because a minute is the finest bound JQL has.
 | `NO_SITE` | 2 | No site configured. The `remedy` names all three ways: `jr auth login --site <host>`, `--site`, or `JIRA_SITE` |
 | `NO_CREDENTIALS` | 4 | A site is known, nothing authenticates against it |
 | `INCOMPLETE_CREDENTIAL` | 4 | Half a credential. Usually an email with no token, or the reverse |
-| `STORE_PERMISSIONS` | 4 | The credential file is readable by others. It is refused above mode 0600 |
+| `STORE_PERMISSIONS` | 4 | The credential file is readable by others. It is refused above mode 0600, and on Windows when its ACL lets in an account other than the user, SYSTEM or Administrators |
 | `UNKNOWN_DEPLOYMENT` | - | The `serverInfo` probe returned a `deploymentType` neither Cloud nor Data Center. Refused rather than guessed: guessing Cloud sends v3 to a v2 server, and guessing Data Center uses offset pagination against a cursor API |
 
 `jr schema`, `jr contract`, and `jr --describe` all work with no credential and
