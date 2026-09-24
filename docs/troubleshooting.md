@@ -19,8 +19,8 @@ know why the tool is refusing something it could have guessed at.
 ## It will not start
 
 Everything else on this page assumes a binary that runs. This section is for
-when it does not, and the cause is never `jr` itself: it is macOS refusing to
-execute a file it cannot attribute to a signed developer.
+when it does not, and the cause is never `jr` itself: it is macOS or Windows
+refusing to execute a file it cannot attribute to a signed developer.
 
 ### macOS says it cannot check `jr` for malware
 
@@ -93,6 +93,49 @@ $ git clone https://github.com/kmoneil/jr && cd jr && make build
 The GUI route works too: after the first refusal, System Settings, then Privacy
 & Security, then **Open Anyway**. It is listed last because it approves one copy
 of one file and tells you nothing about where that file came from.
+
+### Windows says it protected your PC
+
+`Microsoft Defender SmartScreen prevented an unrecognized app from starting`,
+under **Windows protected your PC**, when `jr.exe` is started from Explorer.
+
+Windows marks a file a browser downloads with the Mark of the Web, an alternate
+data stream named `Zone.Identifier`, and extracting a marked zip in Explorer
+marks what comes out of it. SmartScreen stops a marked program that no publisher
+signed and that it does not recognise, and released `jr.exe` binaries are not
+signed: they are cross-compiled on GitHub's Linux runners, which hold no
+code-signing certificate. Ask for the mark directly:
+
+```powershell
+> Get-Item .\jr.exe -Stream Zone.Identifier
+```
+
+Three fixes, cheapest first.
+
+**Install it with Scoop**, or with the PowerShell steps in
+[the README](../README.md#without-scoop). Both fetch with PowerShell rather
+than a browser, and neither sets the mark:
+
+```powershell
+> scoop bucket add kmoneil https://github.com/kmoneil/scoop-bucket
+> scoop install kmoneil/jr
+```
+
+**Or clear the mark** on a copy you have already satisfied yourself about, which
+the attestation is for:
+
+```powershell
+> gh attestation verify jr-full_<version>_windows_amd64.zip --repo kmoneil/jr
+> Unblock-File .\jr.exe
+```
+
+**Or choose More info, then Run anyway**, which approves one copy of one file
+and tells you nothing about where that file came from.
+
+**Smart App Control is different.** On a Windows 11 machine with it switched on,
+an unsigned program it does not recognise is blocked whether or not it carries
+the mark, and it offers no exception for a single program, so `jr` runs there
+only with Smart App Control off.
 
 ### An antivirus or endpoint agent says the same thing in different words
 
