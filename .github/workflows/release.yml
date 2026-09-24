@@ -67,9 +67,40 @@ jobs:
           printf 'tag %s, binary reports %s\n' "$want" "$got"
           [ "$want" = "$got" ] || { echo "the binary does not report the tag"; exit 1; }
 
+  # The suite on Windows, on the tagged commit, for the reason the gate above
+  # re-runs make ci: a tag can sit on a commit that never had a green run, and a
+  # Windows binary is published only for a commit whose suite has passed on
+  # Windows. The steps are ci.yml's test-windows job, and the two change
+  # together.
+  verify-windows:
+    name: the suite on windows
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: make
+        run: choco install make --version=4.4.1 --no-progress -y
+      - name: gocognit
+        run: go install github.com/uudashr/gocognit/cmd/gocognit@$(make -s print-GOCOGNIT_VERSION)
+      - name: test
+        run: |
+          status=0
+          for tags in "" "mcp" "mcp,write" "prompt,render,mcp,write,admin"; do
+            echo "=== tags=${tags:-none}"
+            go test -tags "$tags" ./... || status=1
+          done
+          exit "$status"
+      - name: the lock race, twenty times
+        run: go test -count=20 -run 'TestConcurrentClaimsElectOneWinner|TestAReleaseOutlastsAWaiterReadingTheLock' ./internal/idem/
+
   build:
     name: ${{ matrix.profile }} ${{ matrix.goos }}/${{ matrix.goarch }}
-    needs: verify
+    needs: [verify, verify-windows]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
@@ -78,7 +109,7 @@ jobs:
         # rather than a build convenience: somebody choosing jr-reader for an
         # agent needs it for their own machine, not only for linux/amd64.
         profile: [full, agent, reader, ci]
-        goos: [linux, darwin]
+        goos: [linux, darwin, windows]
         goarch: [amd64, arm64]
     steps:
       - uses: actions/checkout@v7
@@ -105,13 +136,24 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           name="jr-${{ matrix.profile }}_${version}_${{ matrix.goos }}_${{ matrix.goarch }}"
           mkdir -p "dist/$name"
-          cp "$src" "dist/$name/jr"
           cp LICENSE NOTICE README.md "dist/$name/"
-          tar -C dist -czf "dist/$name.tar.gz" "$name"
+          # A zip holding jr.exe for Windows, because a zip is what Windows
+          # opens with nothing installed, Explorer or Expand-Archive, and what
+          # Scoop extracts without installing 7-Zip first. Windows runs nothing
+          # without an executable extension, so the name carries one there.
+          if [ "${{ matrix.goos }}" = windows ]; then
+            cp "$src" "dist/$name/jr.exe"
+            (cd dist && zip -qrX "$name.zip" "$name")
+          else
+            cp "$src" "dist/$name/jr"
+            tar -C dist -czf "dist/$name.tar.gz" "$name"
+          fi
       - uses: actions/upload-artifact@v7
         with:
           name: jr-${{ matrix.profile }}-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: dist/*.tar.gz
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
           if-no-files-found: error
 
   publish:
@@ -135,11 +177,13 @@ jobs:
       - name: checksums
         run: |
           cd dist
-          sha256sum *.tar.gz > checksums.txt
+          sha256sum *.tar.gz *.zip > checksums.txt
           cat checksums.txt
       - uses: actions/attest-build-provenance@v4
         with:
-          subject-path: dist/*.tar.gz
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
       - name: create the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -162,7 +206,7 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" \
             --title "${GITHUB_REF_NAME}" \
             --notes-file notes.md \
-            dist/*.tar.gz dist/checksums.txt
+            dist/*.tar.gz dist/*.zip dist/checksums.txt
 
   # The Homebrew formula pins four URLs and four digests, and moving them was
   # the one step of a release still done by hand. kmoneil/homebrew-tap does the

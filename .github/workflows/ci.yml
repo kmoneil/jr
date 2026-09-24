@@ -136,7 +136,9 @@ jobs:
   # because Windows will not delete a file a waiter holds open.
   #
   # One job running the four tag sets in turn rather than a matrix: one log
-  # holds every failure, and a Windows runner is the slow queue.
+  # holds every failure, and a Windows runner is the slow queue. release.yml's
+  # verify-windows runs these steps on a tagged commit before any Windows
+  # binary is built, and the two change together.
   test-windows:
     name: test on windows, every profile
     runs-on: windows-latest

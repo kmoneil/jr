@@ -12,11 +12,11 @@ import (
 // The other half of the comparison is goModPath, which vuln_test.go declares.
 const noticePath = "../../NOTICE"
 
-// platforms is every operating system somebody can build this for. The
-// releases are linux and darwin, and windows is here because `go build` takes
-// it and cobra reaches a module there that it reaches nowhere else: attribution
-// that is correct only on the platforms we happen to ship is attribution that
-// breaks the moment somebody builds their own.
+// platforms is every operating system somebody can build this for, which is
+// also every one a release ships. Windows matters here beyond that: cobra
+// reaches a module there that it reaches nowhere else, and an ACL is read
+// through x/sys only there, so attribution checked only on the other two would
+// be wrong for the third.
 var platforms = []string{"linux", "darwin", "windows"}
 
 // noticeModule matches a module path where NOTICE lists one, which is at the
