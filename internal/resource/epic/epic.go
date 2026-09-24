@@ -1,7 +1,7 @@
 // Package epic is the epic resource.
 //
-// It knows nothing about any other resource, and nothing outside cmd, tui,
-// mcp, workflow, and internal/commands may import it — which is what keeps it
+// It knows nothing about any other resource, and nothing outside cmd, mcp,
+// workflow, and internal/commands may import it, which is what keeps it
 // independently compilable and what makes compile-out work.
 //
 // Epics live on the agile API at site.Info.AgileBase. Moving issues into and

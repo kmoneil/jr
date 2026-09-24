@@ -1,8 +1,8 @@
 // Package jql is the jql resource: the commands that check a query without
 // running it.
 //
-// It knows nothing about any other resource, and nothing outside cmd, tui,
-// mcp, workflow, and internal/commands may import it — which is what keeps it
+// It knows nothing about any other resource, and nothing outside cmd, mcp,
+// workflow, and internal/commands may import it, which is what keeps it
 // independently compilable and what makes compile-out work.
 //
 // It shares a name with internal/jql, the library it is the command surface

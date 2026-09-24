@@ -1,7 +1,7 @@
 // Package board is the board resource.
 //
-// It knows nothing about any other resource, and nothing outside cmd, tui,
-// mcp, workflow, and internal/commands may import it — which is what keeps it
+// It knows nothing about any other resource, and nothing outside cmd, mcp,
+// workflow, and internal/commands may import it, which is what keeps it
 // independently compilable and what makes compile-out work.
 //
 // Boards are the first thing in this tool that does not live on the platform

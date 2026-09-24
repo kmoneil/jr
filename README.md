@@ -341,14 +341,10 @@ not shipped at all.
   own build tag rather than in the reader profile.
 - `--no-color`. Nothing emits ANSI, so it would be a flag that does nothing.
 
-`jr ui` used to head this list, marked lowest priority. It came off on
-2026-09-24 as a decision, not a delivery: no TUI is planned, for the reasons
-above. The `tui`, `browser`, and `clipboard` tags had already gone on
-2026-08-13, having never gated anything: they came from the spec's tag table,
-written before any code was, and no build ever carried a feature behind them. A
-tag that names a capability no build can perform is the one thing this tool
-promises not to do, and each of them is a two-line file on the day somebody
-needs it.
+The `tui`, `browser`, and `clipboard` tags were dropped on 2026-08-13, having
+never gated anything: they came from the spec's tag table, written before any
+code was, and no build ever carried a feature behind them. A tag that names a
+capability no build can perform is the one thing this tool promises not to do.
 
 Everything else described in this README is built. 68 commands in the full
 build, and `internal/lint` asserts that number against the binaries rather than

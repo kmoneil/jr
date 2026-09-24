@@ -153,12 +153,11 @@ func TestTheTagsThatGateCodeGateTheRightCode(t *testing.T) {
 // excludes nothing a caller could notice.
 //
 // internal/buildinfo holds one tag_<name>.go per tag whose whole job is to
-// record that the tag is set, and internal/tui is a package doc waiting for a
-// UI. Counting either would make this audit report exactly the reassurance it
+// record that the tag is set, and internal/adf/doc.go is a package doc.
+// Counting either would make this audit report exactly the reassurance it
 // exists to withhold.
 var stubs = []string{
 	"internal/buildinfo/",
-	"internal/tui/doc.go",
 	"internal/adf/doc.go",
 }
 
