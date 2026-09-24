@@ -78,6 +78,8 @@ var notAJrFlag = map[string]string{
 	"--repo": "gh release download and gh attestation verify, in the install " +
 		"steps in README.md and docs/getting-started.md",
 	"--pattern": "gh release download, in the same install steps",
+	"--prefix": "brew --prefix, in the link to the skill the Homebrew formula " +
+		"installs, in README.md and docs/recipes.md",
 	"--no-color": "README.md names it as a flag this tool deliberately does " +
 		"not have, because nothing emits ANSI and it would do nothing",
 	"--token": "README.md names it as the flag that cannot exist, because a " +

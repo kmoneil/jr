@@ -56,7 +56,7 @@ $ brew install kmoneil/tap/jr
 ```
 
 macOS and Linux, both architectures. That is the whole step, and it brings the
-shell completions with it.
+shell completions and [the agent skill](#the-agent-skill) with it.
 
 <details>
 <summary>Other ways: release archives, verifying a download, building from source</summary>
@@ -356,8 +356,18 @@ $ bin/jr-reader skill | grep 'commands, profile'
 46 commands, profile `reader`, tags `mcp`.
 ```
 
-Install it into a directory a skill loader reads. The binary writes the whole
-skill, `SKILL.md` and its references, the same bytes `jr skill` prints:
+Installed with Homebrew, the formula has already written it, from the binary
+it installed. Homebrew does not write into your home directory, so link it
+once, and every `brew upgrade` moves the skill with the binary:
+
+```console
+$ mkdir -p ~/.claude/skills
+$ ln -s "$(brew --prefix)/opt/jr/share/jr/skill" ~/.claude/skills/jr
+```
+
+Otherwise, install it into a directory a skill loader reads. The binary writes
+the whole skill, `SKILL.md` and its references, the same bytes `jr skill`
+prints:
 
 ```console
 $ jr skill --dir ~/.claude/skills/jr
