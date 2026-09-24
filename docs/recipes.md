@@ -1227,17 +1227,21 @@ $ ln -s "$PWD/skills/jr" .claude/skills/jr          # this project only
 
 A symlink means `git pull` updates the skill. A copy does not.
 
-**Copy it, if you only have the binary.** The skill is four documents, so copy
-them in a loop rather than one at a time:
+**Write it from the binary, if that is all you have.** `--dir` writes the whole
+skill, `SKILL.md` and each reference under `references/`, the same bytes
+`jr skill` prints, so nothing here has to know which references there are:
 
 ```console
-$ dest=~/.claude/skills/jr
-$ mkdir -p "$dest/references"
-$ jr skill > "$dest/SKILL.md"
-$ for ref in workflows failures gotchas; do
-      jr skill "$ref" > "$dest/references/$ref.md"
-  done
+$ jr skill --dir ~/.claude/skills/jr        # personal, every project
+$ jr skill --dir .claude/skills/jr          # this project only
 ```
+
+It prints nothing; exit 0 means every file was written. It never replaces a
+file unless told to, so running it where a skill already is answers
+`DESTINATION_EXISTS`, and `--force` replaces the skill's own files. Anything
+else in the directory is `STRAY_FILES`, even with `--force`, and the refusal
+names it: after an upgrade that is usually a reference an older release
+carried, which would otherwise sit beside a skill that no longer mentions it.
 
 **Generate it from the binary the agent will actually run.** The skill carries a
 command inventory taken from the registry of whichever binary printed it, so it
@@ -1245,12 +1249,12 @@ describes that build and not the project:
 
 ```console
 $ bin/jr-reader skill | grep 'commands, profile'
-41 commands, profile `reader`, tags `mcp`.
+46 commands, profile `reader`, tags `mcp`.
 ```
 
 A reader build's skill lists no mutating commands, because a reader build holds
 none. Handing a model the full build's skill and the reader binary would
-describe 21 commands it cannot call.
+describe 22 commands it cannot call.
 
 **For a host that reads `AGENTS.md`** rather than a skill directory, the same
 document works as-is; it is Markdown with a YAML header that other hosts ignore:

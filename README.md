@@ -356,16 +356,22 @@ $ bin/jr-reader skill | grep 'commands, profile'
 46 commands, profile `reader`, tags `mcp`.
 ```
 
-Install it by symlinking the copy in this repository, which `make skill`
-regenerates and a test refuses to let go stale:
+Install it into a directory a skill loader reads. The binary writes the whole
+skill, `SKILL.md` and its references, the same bytes `jr skill` prints:
+
+```console
+$ jr skill --dir ~/.claude/skills/jr
+```
+
+Or symlink the copy in this repository, which `make skill` regenerates and a
+test refuses to let go stale:
 
 ```console
 $ ln -s "$PWD/skills/jr" ~/.claude/skills/jr
 ```
 
-Or generate it from the binary, for a host that reads a skill directory, an
-`AGENTS.md`, or anything else that takes Markdown. The full instructions, both
-ways, are in [recipes.md](docs/recipes.md#installing-the-skill).
+What `--dir` refuses, and the form for a host that reads `AGENTS.md` instead,
+are in [recipes.md](docs/recipes.md#installing-the-skill).
 
 It is in every profile including `ci`, because the build that most needs to
 explain itself is the smallest one.
