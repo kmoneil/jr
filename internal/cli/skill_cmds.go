@@ -12,6 +12,7 @@ import (
 
 	"github.com/kmoneil/jr/internal/buildinfo"
 	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/exitcode"
 	"github.com/kmoneil/jr/internal/registry"
 	"github.com/kmoneil/jr/internal/render"
 )
@@ -40,7 +41,7 @@ const (
 func (a *app) skillCommand() *registry.Command {
 	return &registry.Command{
 		Path:    []string{"skill"},
-		Summary: "Print the agent skill for this build",
+		Summary: "Print the agent skill for this build, or write it to a directory",
 		Description: strings.TrimSpace(`
 Writes the instructions an agent needs to drive this tool correctly, as
 Markdown, to stdout.
@@ -53,9 +54,14 @@ inventory it carries is what this build contains rather than what the project
 has. A reader build's skill lists no mutating commands, because a reader build
 holds none.
 
-Install it wherever the agent reads skills from:
+--dir writes the whole skill into a directory instead, laid out the way a skill
+loader reads one: SKILL.md, and each reference under references/. The bytes are
+the ones the command prints, and nothing is printed; exit 0 means every file
+was written. It refuses before writing anything when the directory holds a
+file the skill does not write, even with --force, and when it holds one the
+skill does write and --force was not given:
 
-    ` + buildinfo.App + ` skill > .claude/skills/` + buildinfo.App + `/SKILL.md
+    ` + buildinfo.App + ` skill --dir ~/.claude/skills/` + buildinfo.App + `
 
 The Markdown is the output, so nothing else is written to stdout: there is no
 result envelope, and --format does not apply. It is deliberately in every
@@ -64,19 +70,64 @@ that most needs to explain itself.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " skill",
 			buildinfo.App + " skill workflows",
+			buildinfo.App + " skill --dir ~/.claude/skills/" + buildinfo.App,
 		}, "\n"),
 		Args: []registry.Arg{{
 			Name:  "reference",
 			Usage: "one of: " + strings.Join(skillReferences(), ", "),
 		}},
+		Flags: []registry.Flag{
+			{
+				Name: "dir", Type: registry.TypeString,
+				Usage: "write the whole skill into this directory instead of printing it",
+			},
+			{
+				Name: "force", Type: registry.TypeBool,
+				Usage: "with --dir, replace the skill's files where they already exist",
+			},
+		},
 		// The Markdown is the output, not a result document. An envelope around
 		// it would produce something no skill loader can read.
+		//
+		// That stays true under --dir, which prints nothing: a document saying
+		// which files were written would make this a command with an output
+		// kind, and one that owns stdout only sometimes is a tool `mcp serve`
+		// offers, which would let a peer write files on the server's host.
 		OwnsStdout: true,
+		ExitCodes:  []exitcode.Code{exitcode.Conflict},
+		Validate:   validateSkill,
 		Run:        a.runSkill,
 	}
 }
 
+// validateSkill refuses the combinations that would otherwise be answered with
+// something other than what was asked.
+func validateSkill(_ context.Context, inv *registry.Invocation) error {
+	dir := inv.Flags.String("dir")
+	switch {
+	case inv.Flags.WasSet("dir") && dir == "":
+		// Most likely a variable that was never set, `--dir "$SKILLS"`.
+		// Printing the skill instead would be a different command exiting 0.
+		return errs.Usage("EMPTY_DIR", "--dir was given an empty path").
+			WithRemedy("pass the directory to write the skill into")
+	case dir == "" && inv.Flags.Bool("force"):
+		return errs.Usage("FORCE_WITHOUT_DIR",
+			"--force replaces the skill's files, and without --dir none are written").
+			WithRemedy("pass --dir with it, or drop --force")
+	case dir != "" && len(inv.Args) > 0:
+		return errs.Usage("DIR_AND_REFERENCE",
+			"--dir writes the whole skill, and %q names one reference", inv.Args[0]).
+			WithRemedy("drop the reference to write the whole skill, " +
+				"or drop --dir to print that one reference")
+	}
+	return nil
+}
+
 func (a *app) runSkill(_ context.Context, inv *registry.Invocation) (*render.Doc, error) {
+	if dir := inv.Flags.String("dir"); dir != "" {
+		return nil, a.writeSkillDir(dir, inv.Flags.Bool("force"))
+	}
+
 	name := skillMain
 	if len(inv.Args) > 0 {
 		ref := inv.Args[0]
@@ -89,18 +140,28 @@ func (a *app) runSkill(_ context.Context, inv *registry.Invocation) (*render.Doc
 		name = path.Join(skillRefDir, ref+".md")
 	}
 
-	body, err := fs.ReadFile(skillAssets, path.Join(skillRoot, name))
+	out, err := a.skillDocument(name)
 	if err != nil {
-		return nil, errs.Runtime("SKILL_UNREADABLE",
-			"cannot read the embedded skill %s", name).Wrap(err)
+		return nil, err
 	}
-
-	out := strings.ReplaceAll(string(body), commandsToken, a.skillInventory())
 	if _, err := fmt.Fprint(a.stdout, out); err != nil {
 		return nil, errs.Runtime("SKILL_UNWRITABLE",
 			"cannot write the skill").Wrap(err)
 	}
 	return nil, nil
+}
+
+// skillDocument is one file of the skill as this binary prints it: the
+// embedded text, with this build's command inventory where the token stands.
+// Printing and --dir both come through here, so the two cannot disagree about
+// a byte.
+func (a *app) skillDocument(name string) (string, error) {
+	body, err := fs.ReadFile(skillAssets, path.Join(skillRoot, name))
+	if err != nil {
+		return "", errs.Runtime("SKILL_UNREADABLE",
+			"cannot read the embedded skill %s", name).Wrap(err)
+	}
+	return strings.ReplaceAll(string(body), commandsToken, a.skillInventory()), nil
 }
 
 // skillInventory renders this build's command list as a Markdown table.

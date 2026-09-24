@@ -319,7 +319,7 @@ commands because it contains none.
 | `project statuses` |  | List the statuses each issue type can be in |
 | `project versions` |  | List a project's versions |
 | `schema` |  | Describe every command this build contains |
-| `skill` |  | Print the agent skill for this build |
+| `skill` |  | Print the agent skill for this build, or write it to a directory |
 | `sprint add` | `M` | Move issues into a sprint |
 | `sprint close` | `M D` | Close an active sprint |
 | `sprint create` | `M` | Create a future sprint on a board |

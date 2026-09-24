@@ -2969,10 +2969,10 @@ it lists only what this build contains.
 
 ### `jr skill`
 
-Print the agent skill for this build
+Print the agent skill for this build, or write it to a directory
 
 ```
-jr skill [reference]
+jr skill [reference] [flags]
 ```
 
 Examples:
@@ -2980,15 +2980,21 @@ Examples:
 ```console
 jr skill
 jr skill workflows
+jr skill --dir ~/.claude/skills/jr
 ```
 
 | Argument | Required | Description |
 | --- | --- | --- |
 | `reference` | no | one of: failures, gotchas, workflows |
 
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--dir` | `string` | — | write the whole skill into this directory instead of printing it |
+| `--force` | `bool` | — | with --dir, replace the skill's files where they already exist |
+
 Emits no result document: this command owns stdout.
 
-Exit codes: `0` OK, `1` ERROR, `2` USAGE
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `7` CONFLICT
 
 Writes the instructions an agent needs to drive this tool correctly, as
 Markdown, to stdout.
@@ -3001,9 +3007,14 @@ inventory it carries is what this build contains rather than what the project
 has. A reader build's skill lists no mutating commands, because a reader build
 holds none.
 
-Install it wherever the agent reads skills from:
+--dir writes the whole skill into a directory instead, laid out the way a skill
+loader reads one: SKILL.md, and each reference under references/. The bytes are
+the ones the command prints, and nothing is printed; exit 0 means every file
+was written. It refuses before writing anything when the directory holds a
+file the skill does not write, even with --force, and when it holds one the
+skill does write and --force was not given:
 
-    jr skill > .claude/skills/jr/SKILL.md
+    jr skill --dir ~/.claude/skills/jr
 
 The Markdown is the output, so nothing else is written to stdout: there is no
 result envelope, and --format does not apply. It is deliberately in every

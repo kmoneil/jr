@@ -890,6 +890,22 @@ never causes this, because it is set once for a whole shell. The sibling
 `--age`, `--with-comments`, `--raw-body`, `--no-context-fields`) for the
 same reason: there is no document for them to shape.
 
+### `STRAY_FILES` / `DESTINATION_EXISTS` from `jr skill --dir`
+
+`jr skill --dir` never replaces a file without `--force`, so running it where a
+skill already is answers `DESTINATION_EXISTS`, exit 7. `--force` replaces the
+skill's own files:
+
+```console
+$ jr skill --dir ~/.claude/skills/jr --force
+```
+
+`STRAY_FILES`, also exit 7, is refused even with `--force`: the directory holds
+something the skill does not write, and `detail` names it. After an upgrade
+that is usually a reference an older release carried, which would otherwise
+sit beside a skill that no longer mentions it. Delete what it names, or point
+`--dir` at an empty directory. `NOT_A_DIRECTORY` means the path is a file.
+
 ### `TRANSITION_UNAVAILABLE`
 
 A row in a move plan whose workflow had no such transition when the plan was

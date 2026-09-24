@@ -446,6 +446,8 @@ var commandNotSwept = map[string]string{
 		"at a time by TestEditingOneSettingLeavesTheRestAlone, " +
 		"TestUnsetClearsWhatAnEmptyFlagCannot, and " +
 		"TestARepeatableEnumAcceptsEveryLegalValue",
+	"skill": "prints Markdown, or writes it into a directory; " +
+		"skill_dir_test.go drives --dir and --force against a temp dir",
 }
 
 func mustLookup(t *testing.T, name string) *registry.Command {

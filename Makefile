@@ -337,7 +337,7 @@ skill:
 	@echo
 	@echo "skills/jr rewritten from the binary."
 	@echo "The inventory it carries is the full build's; generate your own with"
-	@echo "  $(BIN)/$(BINARY)-reader skill > wherever/SKILL.md"
+	@echo "  $(BIN)/$(BINARY)-reader skill --dir wherever"
 
 ## docs: regenerate docs/commands.md from the registry
 .PHONY: docs
