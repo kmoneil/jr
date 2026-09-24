@@ -1,7 +1,7 @@
 // Package meta answers "what can I actually do to this issue".
 //
-// It knows nothing about any other resource, and nothing outside cmd, tui,
-// mcp, workflow, and internal/commands may import it — which is what keeps it
+// It knows nothing about any other resource, and nothing outside cmd, mcp,
+// workflow, and internal/commands may import it, which is what keeps it
 // independently compilable and what makes compile-out work.
 //
 // The fetching and the name resolution live in internal/site rather than here,

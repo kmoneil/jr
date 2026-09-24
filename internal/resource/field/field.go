@@ -1,8 +1,8 @@
 // Package field is the field resource: what a site calls its fields, and what
 // their ids are.
 //
-// It knows nothing about any other resource, and nothing outside cmd, tui,
-// mcp, workflow, and internal/commands may import it — which is what keeps it
+// It knows nothing about any other resource, and nothing outside cmd, mcp,
+// workflow, and internal/commands may import it, which is what keeps it
 // independently compilable and what makes compile-out work.
 //
 // The catalogue itself lives in internal/site rather than here, because it is
