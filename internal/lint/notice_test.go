@@ -70,7 +70,9 @@ func TestTheDependencyCountsMatchGoMod(t *testing.T) {
 	direct, indirect := requiresFromGoMod(t)
 
 	counts := regexp.MustCompile(`(?i)(\w+) direct dependenc(?:y|ies)(?: and (\w+) indirect)?`)
-	for _, path := range []string{noticePath, readmePath} {
+	// SECURITY.md said four through the fifth and the sixth, because this
+	// read two of the three documents that count.
+	for _, path := range []string{noticePath, readmePath, securityDoc} {
 		body := strings.Join(readLines(t, path), "\n")
 		found := counts.FindAllStringSubmatch(body, -1)
 		if len(found) == 0 {

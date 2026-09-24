@@ -3,6 +3,7 @@ package idem_test
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -621,6 +622,10 @@ func TestTheLockIsReleasedOnEveryPath(t *testing.T) {
 // holds issue keys and a caller's own identifiers, which is not a credential
 // but is not public either.
 func TestTheLedgerIsNotWorldReadable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a mode means nothing on Windows; the ledger inherits its " +
+			"directory's ACL, as docs/architecture.md says")
+	}
 	dir := t.TempDir()
 	l := ledgerAt(t, dir, testNow)
 	if _, err := l.Claim(site, "k", "issue.create"); err != nil {
@@ -641,6 +646,10 @@ func TestTheLedgerIsNotWorldReadable(t *testing.T) {
 // proceeding anyway would let the caller believe a retry is safe when the next
 // run will find an empty ledger and send the request again.
 func TestAnUnwritableLedgerFailsTheClaim(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a directory's read-only attribute does not stop a file being " +
+			"created in it on Windows, the way the mode does not stop root")
+	}
 	dir := t.TempDir()
 	state := filepath.Join(dir, "state")
 	if err := os.MkdirAll(state, 0o700); err != nil {

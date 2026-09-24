@@ -151,14 +151,12 @@ func TestDoctorReportsACredentialStoreOtherUsersCanRead(t *testing.T) {
 	jira := newDoctorSite(t, doctorSite{})
 	env := doctorEnv(t, jira.URL, withCredential)
 	store := filepath.Join(env["XDG_STATE_HOME"], "jr", "credentials.toml")
-	if err := os.Chmod(store, 0o644); err != nil {
-		t.Fatalf("chmod: %v", err)
-	}
+	openToOthers(t, store)
 
 	doc := runDoctor(t, env)
 
 	failedCheck(t, doc, "credential", "STORE_PERMISSIONS")
-	if !strings.Contains(doc.check(t, "credential").Remedy, "chmod") {
+	if !strings.Contains(doc.check(t, "credential").Remedy, storeRemedy) {
 		t.Errorf("the remedy does not say how to fix it: %q",
 			doc.check(t, "credential").Remedy)
 	}

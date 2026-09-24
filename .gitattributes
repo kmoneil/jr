@@ -1,0 +1,14 @@
+# Line endings, and why this file has to exist.
+#
+# The output contract is held byte for byte by goldens, and the requests behind
+# it by cassettes, all under testdata/. On a Windows checkout with the default
+# core.autocrlf, git rewrites text files to CRLF on the way out, jr still writes
+# LF, and every golden comparison fails about a contract nobody touched. The
+# tests are right and the checkout is wrong.
+* text=auto eol=lf
+
+# Every testdata/ is exempt from translation in both directions, not merely
+# pinned to LF. A cassette holds the bytes a server sent and a fuzz corpus entry
+# holds the bytes that broke something; whether either is text is not git's
+# call.
+**/testdata/** -text

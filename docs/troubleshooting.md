@@ -271,6 +271,16 @@ remedy names the exact path:
 $ chmod 600 <path from the error>
 ```
 
+On Windows it is the file's ACL rather than a mode, and `detail` names every
+account it lets in besides you, SYSTEM and Administrators. The remedy removes
+what the file inherited and grants you alone; an account `detail` still names
+afterwards was granted explicitly, and `icacls <path> /remove <account>` takes
+it away:
+
+```console
+> icacls "<path from the error>" /inheritance:r /grant:r "<your account>:F"
+```
+
 ### `UNKNOWN_DEPLOYMENT` — the probe did not recognise the server
 
 `jr` detects Cloud vs Data Center from `/rest/api/2/serverInfo` rather than

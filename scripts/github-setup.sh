@@ -67,6 +67,7 @@ CHECKS=(
 	"test (tags=mcp)"
 	"test (tags=mcp,write)"
 	"test (tags=prompt,render,mcp,write,admin)"
+	"test on windows, every profile"
 )
 
 say "== ruleset on main =="

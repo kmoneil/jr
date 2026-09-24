@@ -824,10 +824,13 @@ do not catch, add the test in the same change and cite it here.
   **Enforced by:** `TestAbsolutePathIsRefused`, `TestRelativeDoesNotEchoTheURL`.
 - **A credential never reaches the config file.** `config.toml` holds a
   credential reference; the store is a separate file under the state directory
-  at mode 0600, and is refused on read if it is wider. The config is meant to be
-  hand-edited and kept in a dotfiles repository.
+  at mode 0600, and is refused on read if it is wider. On Windows, where a mode
+  means nothing, it is written with a DACL granting the current user alone and
+  refused on read if it lets in anybody but the user, SYSTEM or Administrators.
+  The config is meant to be hand-edited and kept in a dotfiles repository.
   **Enforced by:** `TestConfigNeverHoldsACredential`, `TestConfigFileNeverContainsACredential`,
-  `TestOverlyOpenStoreIsRefused`.
+  `TestOverlyOpenStoreIsRefused`, `TestTheStoreIsPrivateToItsUserOnWindows`,
+  `TestAStoreOthersCanOpenIsRefusedOnWindows`.
 - **`auth.Secret` does not stringify.** It has `String` and `Format` methods so
   `%v`, `%s`, and `%q` all print `REDACTED`. `Reveal()` is the only way out, and
   it is greppable, so every place a credential can escape is one search away.

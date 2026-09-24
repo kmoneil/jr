@@ -130,6 +130,46 @@ jobs:
       - name: test
         run: go test -race -tags "${{ matrix.tags }}" ./...
 
+  # The suite on Windows. Its first run found two product bugs no Linux run
+  # could have: the credential store refused its own file, because Go reports
+  # every Windows file as 0666, and the idempotency lock outlived its holder,
+  # because Windows will not delete a file a waiter holds open.
+  #
+  # One job running the four tag sets in turn rather than a matrix: one log
+  # holds every failure, and a Windows runner is the slow queue.
+  test-windows:
+    name: test on windows, every profile
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      # The runner has Git Bash and no make, and the tool versions are read
+      # out of the Makefile, as they are everywhere else.
+      - name: make
+        run: choco install make --version=4.4.1 --no-progress -y
+      - name: gocognit
+        run: go install github.com/uudashr/gocognit/cmd/gocognit@$(make -s print-GOCOGNIT_VERSION)
+      # No -race: the ubuntu legs cover the request budget's concurrency, and
+      # what this job is for is the platform.
+      - name: test
+        run: |
+          status=0
+          for tags in "" "mcp" "mcp,write" "prompt,render,mcp,write,admin"; do
+            echo "=== tags=${tags:-none}"
+            go test -tags "$tags" ./... || status=1
+          done
+          exit "$status"
+      # The idempotency lock raced on Windows in two ways, and each showed in
+      # some legs of the loop above and not others. One pass a leg proves
+      # little about a race; twenty cost a few seconds.
+      - name: the lock race, twenty times
+        run: go test -count=20 -run 'TestConcurrentClaimsElectOneWinner|TestAReleaseOutlastsAWaiterReadingTheLock' ./internal/idem/
+
   contract:
     name: output contract is unchanged
     runs-on: ubuntu-latest

@@ -19,8 +19,8 @@ const storePerm fs.FileMode = 0o600
 // storeHeader explains the file to whoever opens it.
 const storeHeader = `# jr credentials. Keep this file private.
 #
-# Written by ` + "`jr auth login`" + `. Mode 0600 is enforced on read: this
-# file is refused if it is readable by anyone else.
+# Written by ` + "`jr auth login`" + `. It is refused on read if anyone else
+# can open it: mode 0600 on Unix, an ACL granting only you on Windows.
 #
 # This is NOT the config file. Do not commit it.
 
@@ -141,11 +141,8 @@ func (s FileStore) load() (*storeFile, error) {
 	}
 	// Refuse a file others can read. Reading it anyway and warning would mean
 	// the credential is used, and stays exposed, every time.
-	if perm := info.Mode().Perm(); perm&0o077 != 0 {
-		return nil, errs.Auth("STORE_PERMISSIONS",
-			"%s is readable by other users", s.Path).
-			WithDetail("mode is %04o, want %04o", perm, storePerm).
-			WithRemedy("run: chmod 600 %s", s.Path)
+	if err := checkPrivate(s.Path, info); err != nil {
+		return nil, err
 	}
 
 	data, err := os.ReadFile(s.Path) //nolint:gosec // the path comes from XDG resolution.
@@ -177,11 +174,10 @@ func (s FileStore) write(file *storeFile) error {
 	return writeSecretFile(s.Path, buf.Bytes())
 }
 
-// writeSecretFile writes atomically at mode 0600.
+// writeSecretFile writes atomically, private to the user writing it.
 //
-// The temporary file is created with the final mode rather than chmod'ed
-// afterwards, so there is no instant during which the credential exists on disk
-// world-readable.
+// The temporary file is restricted before anything is written to it, so there
+// is no instant during which the credential exists on disk readable by others.
 func writeSecretFile(path string, data []byte) error {
 	dir := filepath.Dir(path)
 	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".*")
@@ -191,7 +187,7 @@ func writeSecretFile(path string, data []byte) error {
 	tmpName := tmp.Name()
 	defer func() { _ = os.Remove(tmpName) }()
 
-	if err := tmp.Chmod(storePerm); err != nil {
+	if err := restrictPrivate(tmp); err != nil {
 		_ = tmp.Close()
 		return errs.Auth("STORE_UNWRITABLE", "cannot restrict %s", tmpName).Wrap(err)
 	}

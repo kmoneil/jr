@@ -103,6 +103,7 @@ func (l *Ledger) lock() (func() error, error) {
 	// clock exists so a test can age an *entry* without waiting; a test that
 	// froze it here would spin forever, because the deadline could never pass.
 	deadline := time.Now().Add(wait)
+	var deniedSince time.Time
 	for {
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 		if err == nil {
@@ -114,9 +115,14 @@ func (l *Ledger) lock() (func() error, error) {
 			return func() error { return release(path, id) }, nil
 		}
 		if !errors.Is(err, fs.ErrExist) {
+			if waitOutDeletion(err, &deniedSince) {
+				time.Sleep(lockPoll)
+				continue
+			}
 			return nil, errs.Runtime("LEDGER_UNWRITABLE",
 				"cannot lock %s", l.Path).Wrap(err)
 		}
+		deniedSince = time.Time{}
 
 		if l.breakStaleLock(path) {
 			continue
@@ -129,6 +135,31 @@ func (l *Ledger) lock() (func() error, error) {
 		}
 		time.Sleep(lockPoll)
 	}
+}
+
+// transientWait bounds how long a lock operation waits out another process
+// holding the lock file in a state it cannot act on yet. On Unix nothing does.
+// On Windows it lasts the microseconds another process takes to read the file
+// or delete it, so a second is several orders of magnitude of room.
+const transientWait = time.Second
+
+// waitOutDeletion reports whether a create that failed other than as "exists"
+// is a lock still being deleted, and so worth another look, rather than a
+// directory this user cannot write.
+//
+// Windows answers a create over a file mid-delete with access denied, the same
+// error an unwritable directory gets, so the two are told apart by how long it
+// lasts: a delete is over in microseconds, and a denial past transientWait is
+// reported as the permission failure it then is. since holds when the denials
+// began; the caller clears it when the create fails any other way.
+func waitOutDeletion(err error, since *time.Time) bool {
+	if !deletePending(err) {
+		return false
+	}
+	if since.IsZero() {
+		*since = time.Now()
+	}
+	return time.Since(*since) <= transientWait
 }
 
 // release removes the lock file if it still carries this holder's id.
@@ -147,7 +178,7 @@ func release(path, id string) error {
 	// portable filesystem primitive offers. It is microseconds wide and needs
 	// this process to be stale at exactly that moment, where the version this
 	// replaces was wide open for as long as the stall lasted.
-	_ = os.Remove(path)
+	_ = removeLock(path)
 	return nil
 }
 
@@ -232,5 +263,5 @@ func (l *Ledger) breakStaleLock(path string) bool {
 	}
 	// Removing the wrong file here would let two writers in at once, so a
 	// failed remove is not treated as success.
-	return os.Remove(path) == nil
+	return removeLock(path) == nil
 }

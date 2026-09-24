@@ -1,3 +1,9 @@
+//go:build !windows
+
+// The scripts under test are the development toolchain, which runs on macOS
+// and Linux. Nothing under scripts/ ships, and under Git Bash on Windows MSYS
+// rewrites their arguments before they run, so what these would measure there
+// is the emulation.
 package lint_test
 
 import (
