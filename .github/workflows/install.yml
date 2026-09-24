@@ -72,9 +72,11 @@ jobs:
           if ("v$got" -ne $latest) {
             throw "jr version reports $got, and the latest release is $latest"
           }
-          foreach ($file in 'SKILL.md', 'references\failures.md') {
-            $skill = Join-Path $env:USERPROFILE ".claude\skills\jr\$file"
-            if (-not (Test-Path $skill)) { throw "the skill has no $skill" }
+          foreach ($dir in '.agents\skills\jr', '.claude\skills\jr') {
+            foreach ($file in 'SKILL.md', 'references\failures.md') {
+              $skill = Join-Path $env:USERPROFILE "$dir\$file"
+              if (-not (Test-Path $skill)) { throw "the skill has no $skill" }
+            }
           }
           "installed jr $got from $jr, with the skill"
 
@@ -118,9 +120,11 @@ jobs:
           if ($got -ne $manifest.version) {
             throw "jr version reports $got, and the bucket's manifest is at $($manifest.version)"
           }
-          foreach ($file in 'SKILL.md', 'references\failures.md') {
-            $skill = Join-Path $env:USERPROFILE ".claude\skills\jr\$file"
-            if (-not (Test-Path $skill)) { throw "the skill has no $skill" }
+          foreach ($dir in '.agents\skills\jr', '.claude\skills\jr') {
+            foreach ($file in 'SKILL.md', 'references\failures.md') {
+              $skill = Join-Path $env:USERPROFILE "$dir\$file"
+              if (-not (Test-Path $skill)) { throw "the skill has no $skill" }
+            }
           }
           if (Test-Path (Join-Path $env:USERPROFILE 'scoop\apps\7zip')) {
             throw 'Scoop installed 7-Zip to install jr'
