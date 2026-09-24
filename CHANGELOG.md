@@ -20,6 +20,66 @@ accident.
 
 Nothing yet.
 
+## [0.17.2] - 2026-09-24
+
+**Take this one if you run jr on Windows, which no earlier release could do.**
+Every profile now ships for `windows/amd64` and `windows/arm64`. The suite runs
+on Windows in CI and again on the tagged commit before any Windows binary is
+built, and its first run found the two reasons a Windows build of any earlier
+release could not have worked: the credential store refused its own file, and
+the idempotency lock outlived its holder. Nothing changes on macOS or Linux.
+
+### Added
+
+- **Windows builds of every profile**, as
+  `jr-<profile>_<version>_windows_<arch>.zip` holding `jr.exe`, `LICENSE`,
+  `NOTICE` and `README.md` in one directory named for the archive. A zip
+  because Windows opens one with nothing installed; `checksums.txt` and build
+  provenance cover the zips as they cover the tarballs.
+
+### Fixed, on Windows
+
+- **The credential store refused its own file on every read after
+  `jr auth login`.** Go reports every Windows file as `0666`, and the check was
+  a Unix mode. On Windows the store is written with a protected DACL granting
+  the current user alone, and refused on read when its owner or any granting
+  entry names an account other than the user, SYSTEM or Administrators. The
+  remedy names `icacls`, and `detail` names every account the ACL lets in.
+- **The idempotency lock outlived its holder under contention.** Windows will
+  not delete a file another process holds open, and a create over a file mid-
+  delete is refused as access denied, so concurrent writes with idempotency
+  keys stopped at `LEDGER_LOCKED` or failed with `LEDGER_UNWRITABLE`. Both are
+  waited out for up to a second.
+
+### Documentation
+
+- The README and docs/recipes.md link the skill the Homebrew formula has
+  installed since kmoneil/homebrew-tap PR 15, written at install by the binary
+  it installs: `ln -s "$(brew --prefix)/opt/jr/share/jr/skill"
+  ~/.claude/skills/jr`, once, and every `brew upgrade` moves it.
+- docs/architecture.md says what holds on Windows where the permissions table
+  does not, and docs/troubleshooting.md gives `STORE_PERMISSIONS` its Windows
+  remedy.
+
+### Internal
+
+- CI runs the suite on `windows-latest` under all four tag sets, and the two
+  lock tests twenty times; the release runs the same steps before it builds.
+- `.gitattributes` keeps text LF in every checkout, and every `testdata/`
+  untranslated.
+- `golang.org/x/sys` is a direct dependency, imported only by the Windows
+  build, to read and write an ACL.
+
+### Output contract
+
+- No kind moved a schema version, no exit code changed meaning, and no error
+  `code` changed.
+- On Windows, `STORE_PERMISSIONS` carries an ACL in `detail` and `icacls` in
+  its remedy where Unix carries a mode and `chmod`. Both are text, and `code` is
+  the field to branch on.
+- **Priced a patch.** A platform is added and no invocation that worked before
+  behaves differently.
+
 ## [0.17.1] - 2026-09-24
 
 **Take this one if you install the agent skill from the binary rather than
@@ -2741,7 +2801,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.17.1...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.17.2...main
+[0.17.2]: https://github.com/kmoneil/jr/releases/tag/v0.17.2
 [0.17.1]: https://github.com/kmoneil/jr/releases/tag/v0.17.1
 [0.17.0]: https://github.com/kmoneil/jr/releases/tag/v0.17.0
 [0.16.0]: https://github.com/kmoneil/jr/releases/tag/v0.16.0
