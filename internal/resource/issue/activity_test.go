@@ -2,6 +2,7 @@ package issue_test
 
 import (
 	"io"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -190,7 +191,6 @@ func runActivityOn(
 		t.Fatal("issue activity is not registered")
 	}
 
-	conn, replayer := replayConn(t, fixture)
 	flags := registry.NewFlags()
 	// The window the recording was made in. The cutoff is also applied to each
 	// event, so a window that excluded the fixture's own timestamps would empty
@@ -203,13 +203,15 @@ func runActivityOn(
 			apply(flags)
 		}
 	}
-	// --limit is global, and the CLI layer hands it to a command as
-	// inv.Limit rather than as a flag. A test that sets it through the flag
-	// hook gets it carried across the same way.
+	// --limit and --max-requests are global, and the CLI layer hands them to a
+	// command as inv.Limit and as the transport's budget rather than as flags.
+	// A test that sets either through the flag hook gets it carried across the
+	// same way.
 	limit := registry.Limit{All: true}
 	if n := flags.Int("limit"); n > 0 {
 		limit = registry.Limit{N: n}
 	}
+	conn, replayer := replayConnBudget(t, fixture, flags.Int("max-requests"))
 	inv := &registry.Invocation{
 		Jira: &stubSession{
 			doer: &stubDoer{
@@ -536,19 +538,43 @@ func TestActivityOnDataCenterIsWholeAndStillSorted(t *testing.T) {
 	}
 }
 
+// replayConnBudget is replayConn with a request budget, zero meaning none.
+func replayConnBudget(
+	t *testing.T, fixture string, budget int,
+) (*transport.Client, *transport.Replayer) {
+	t.Helper()
+	cassette, err := transport.LoadCassette(filepath.Join("testdata", fixture))
+	if err != nil {
+		t.Fatalf("load %s: %v", fixture, err)
+	}
+	replayer := transport.NewReplayer(cassette)
+	conn, err := transport.New(transport.Options{
+		BaseURL: "https://recorded.invalid", HTTPClient: replayer.Client(),
+		Retries: -1, MaxRequests: budget,
+	})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+	return conn, replayer
+}
+
 // runTwoPages is a feed over two candidates, one per page. Candidates arrive in
 // issue-key order, which says nothing about when anything happened on them: the
 // higher key, on page one, holds the older comment, and the lower key, on page
-// two, holds the newer one.
-func runTwoPages(t *testing.T, limit int) (rows []string, out string, result registry.StreamResult) {
+// two, holds the newer one. A budget of one request stops the walk after page
+// one; zero means none.
+func runTwoPages(
+	t *testing.T, limit, budget int,
+) (rows []string, out string, result registry.StreamResult) {
 	t.Helper()
 	out, result, replayer := runActivityOn(t, site.DataCenter,
 		"activity-two-pages.datacenter.json", "key in (ENG-1, ENG-2)", farPast,
 		func(f registry.Flags) {
 			f.SetInt("page-size", 1)
 			f.SetInt("limit", limit)
+			f.SetInt("max-requests", budget)
 		})
-	if got := replayer.Unplayed(); len(got) != 0 {
+	if got := replayer.Unplayed(); budget == 0 && len(got) != 0 {
 		t.Errorf("recorded requests nobody made: %v", got)
 	}
 	return strings.Split(strings.TrimRight(out, "\n"), "\n")[1:], out, result
@@ -558,10 +584,14 @@ func runTwoPages(t *testing.T, limit int) (rows []string, out string, result reg
 // one page. A feed sorted one page at a time is newest first inside each page
 // and in key order between them, and every test above reads a single page.
 func TestActivityIsNewestFirstAcrossPages(t *testing.T) {
-	rows, out, result := runTwoPages(t, 0)
+	rows, out, result := runTwoPages(t, 0, 0)
 
 	if !result.Complete {
 		t.Error("a feed that read every candidate reported itself partial")
+	}
+	if result.Total != 0 {
+		t.Errorf("a complete feed reported a total of %d; only a cut one has "+
+			"anything to say it about", result.Total)
 	}
 	if len(rows) != 2 {
 		t.Fatalf("want 2 rows, got %d:\n%s", len(rows), out)
@@ -577,7 +607,7 @@ func TestActivityIsNewestFirstAcrossPages(t *testing.T) {
 // way, so exit 3 is right; what is wrong is which event it kept. Stopping once
 // page one fills the limit keeps the older event and never shows the newer one.
 func TestALimitedActivityFeedKeepsTheNewest(t *testing.T) {
-	rows, out, result := runTwoPages(t, 1)
+	rows, out, result := runTwoPages(t, 1, 0)
 
 	if result.Complete {
 		t.Error("a feed cut at --limit reported itself complete")
@@ -588,5 +618,30 @@ func TestALimitedActivityFeedKeepsTheNewest(t *testing.T) {
 	if got := strings.Split(rows[0], "\t")[1]; got != "ENG-1" {
 		t.Errorf("--limit 1 kept %s's older event over ENG-1's newer one:\n%s",
 			got, out)
+	}
+	// Every candidate was read before the limit applied, so the feed knows
+	// exactly what it cut.
+	if result.Total != 2 {
+		t.Errorf("Total = %d, want 2: the feed held two events and wrote one",
+			result.Total)
+	}
+}
+
+// TestABudgetCutFeedStatesNoTotal is the other side of that total. A walk the
+// budget stopped left candidates unread, so however many events it holds, it
+// cannot know how many the whole answer had: page two here holds one more.
+func TestABudgetCutFeedStatesNoTotal(t *testing.T) {
+	rows, out, result := runTwoPages(t, 0, 1)
+
+	if result.Complete || result.StoppedBy != render.StopBudget {
+		t.Fatalf("want a budget cut, got complete=%v stopped-by=%q:\n%s",
+			result.Complete, result.StoppedBy, out)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("want page one's event, got %d rows:\n%s", len(rows), out)
+	}
+	if result.Total != 0 {
+		t.Errorf("a budget cut stated a total of %d; page two was never read",
+			result.Total)
 	}
 }

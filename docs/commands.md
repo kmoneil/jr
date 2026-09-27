@@ -1026,7 +1026,7 @@ Newest first across the whole feed, so every candidate issue is read before a
 row is written, whatever --limit says. Candidates arrive in issue-key order,
 which says nothing about when anything happened on them, and the newest event
 can sit on the last page. --limit keeps the newest events; it does not make the
-run cheaper.
+run cheaper. When it cuts, the warning's total says how many events there were.
 
 This is the question the filters on `issue list` each answer part of.
 --involving finds issues somebody touched; --changed-by finds issues whose one
@@ -1332,7 +1332,8 @@ scope, oldest first, with a cursor to poll again from.
 Oldest first across the whole window, so every candidate issue is read before a
 row is written, whatever --limit says. Candidates arrive in issue-key order,
 which says nothing about when a change was made. --limit keeps the oldest
-changes; it does not make the poll cheaper.
+changes; it does not make the poll cheaper. When it cuts, the warning's total
+says how many changes the window held.
 
 This is the question a diff of two listings cannot answer. A listing says what an
 issue is now, so polling one and comparing shows that something moved without

@@ -369,6 +369,10 @@ func TestALimitedFeedKeepsTheOldest(t *testing.T) {
 		t.Errorf("changes = %v, want only the older save 600: --limit 1 kept "+
 			"page one's newer change", ids)
 	}
+	if result.Total != 2 {
+		t.Errorf("Total = %d, want 2: the window held two changes and the "+
+			"answer carries one", result.Total)
+	}
 }
 
 // TestTheFeedIssuesNoCursorWhenTheChangelogWasClipped is the same rule for the
