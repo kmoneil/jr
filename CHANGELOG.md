@@ -20,6 +20,64 @@ accident.
 
 Nothing yet.
 
+## [0.17.3] - 2026-09-27
+
+**Take this one if you read `jr issue activity` or `jr issue changes` over more
+than one page of issues, or with `--limit`.** Both promised one time-ordered
+feed and delivered it a page at a time: rows were in time order inside each
+page of candidate issues and in issue-key order between pages. Under `--limit`
+it was invisible: the run exited 3 with `complete="false"`, correctly, over rows
+that were not the newest (or the oldest) the command claimed, only the ones page
+one held.
+
+### Fixed
+
+- **`issue activity` is newest first across the whole feed, and `issue changes`
+  oldest first across the whole window.** Both read every candidate before
+  writing a row, and `--limit` keeps the newest events or the oldest changes.
+- **That costs requests, and it is the point.** Both commands default to
+  `--limit 50`. A default run that used to stop after one page of candidates now
+  reads all of them, because the newest fifty cannot be known any other way.
+  `--limit` bounds output, not requests; to make a run cheaper, narrow it with
+  `--project`, `--jql` or a shorter `--since`.
+
+### Added
+
+- **A limit-cut feed says how many rows it held.** When `--limit` cuts
+  `issue activity` or `issue changes`, the `RESULT_TRUNCATED` warning carries
+  `total` directly after `count`, in every format, so `count 10, total 347`
+  says what raising the limit would return. It is written only where it is
+  exact: a run the request budget stopped carries none, and neither does any
+  other collection.
+
+### Documentation
+
+- docs/output-contract.md documents the warning's `total`, including the one a
+  clipped comment thread's warning always wrote without saying so, and gains a
+  stability-policy row for correcting rows that contradicted a command's own
+  description.
+- docs/troubleshooting.md shows the total under exit 3, docs/invariants.md
+  carries both rules, and the skill's failure table tells an agent what `total`
+  means.
+
+### Internal
+
+- `scripts/preflight` sorts changed files in byte order. Under a macOS locale it
+  handed the same change to gofumpt in a different order than CI did, and its
+  own test failed on the order alone.
+
+### Output contract
+
+- No kind moved a schema version, no exit code changed meaning, and no error
+  `code` changed.
+- `RESULT_TRUNCATED` gains an optional `total` for these two commands. The
+  warning's `v` stays `1`.
+- Row order and, under `--limit`, row selection changed for `issue activity`
+  and `issue changes` wherever the candidates spanned more than one page: they
+  now match what both descriptions always said.
+- **Priced a patch**, under the new row for correcting rows that contradicted a
+  command's own description, and the row for adding an optional element.
+
 ## [0.17.2] - 2026-09-24
 
 **Take this one if you run jr on Windows, which no earlier release could do.**
