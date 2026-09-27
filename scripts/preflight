@@ -67,11 +67,16 @@ fi
 
 # changed_files is every path that differs from the base in the working tree,
 # staged or not, and every untracked file that is not ignored.
+#
+# Sorted in byte order, which is git's own. A locale collates punctuation its
+# own way: macOS's en_US.UTF-8 puts b/b_test.go before b/b.go, so the same
+# change reached the tools in a different order on a Mac than on CI, and
+# TestEveryPreflightStepCanFail failed on the order alone.
 changed_files() {
 	{
 		git diff --name-only --no-renames "$base" --
 		git ls-files --others --exclude-standard
-	} | sort -u
+	} | LC_ALL=C sort -u
 }
 
 # packages maps changed files onto the packages that own them. A fixture under
@@ -95,7 +100,7 @@ packages() {
 		esac
 		ls "$dir"/*.go >/dev/null 2>&1 || continue
 		if [ "$dir" = . ]; then echo "."; else echo "./$dir"; fi
-	done | sort -u
+	done | LC_ALL=C sort -u
 }
 
 if [ "$mode" = all ]; then
