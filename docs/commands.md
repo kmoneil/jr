@@ -1022,6 +1022,12 @@ Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, 
 Merges four sources into one time-ordered feed: comments, transitions, other
 field changes, and worklogs. Newest first.
 
+Newest first across the whole feed, so every candidate issue is read before a
+row is written, whatever --limit says. Candidates arrive in issue-key order,
+which says nothing about when anything happened on them, and the newest event
+can sit on the last page. --limit keeps the newest events; it does not make the
+run cheaper.
+
 This is the question the filters on `issue list` each answer part of.
 --involving finds issues somebody touched; --changed-by finds issues whose one
 named field they moved. Neither says what was done, and assembling that by hand
@@ -1322,6 +1328,11 @@ Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, 
 
 An incremental feed of recorded changes: every field that moved on every issue in
 scope, oldest first, with a cursor to poll again from.
+
+Oldest first across the whole window, so every candidate issue is read before a
+row is written, whatever --limit says. Candidates arrive in issue-key order,
+which says nothing about when a change was made. --limit keeps the oldest
+changes; it does not make the poll cheaper.
 
 This is the question a diff of two listings cannot answer. A listing says what an
 issue is now, so polling one and comparing shows that something moved without

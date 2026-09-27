@@ -648,8 +648,8 @@ $ jr issue history ENG-412           # or the changelog, in full
 ```
 
 `issue activity` has no `--page-token` and never will: an event feed is merged
-and sorted from three projections across a page of issues, so an offset into the
-result would not describe a place any request could start from. Read the
+and sorted from three projections across every candidate issue, so an offset into
+the result would not describe a place any request could start from. Read the
 `remedy`, which is per-error and always right, rather than the generic advice for
 exit 3, which cannot be right for every command at once.
 
