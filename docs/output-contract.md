@@ -2033,6 +2033,18 @@ The rows:
   answer was right.** A new code for a condition that used to produce a correct
   result is refusing something that used to work, which is the breaking row
   above and not this one.
+- Correcting rows that contradicted the command's own description, with the
+  invocation and the document's shape unchanged: **additive, so the patch
+  position moves.** The previous answer was wrong by the command's own account,
+  so a consumer that depended on it depended on the defect, and there is
+  nothing on a command line for anybody to edit. That is the reading of the row
+  above, which prices fixing a wrong answer by what a caller has to change. It
+  is not the text row further up, which protects output that was stable and
+  also correct, the kind somebody records and diffs against. Written for
+  0.17.3, where `issue activity` and `issue changes` began ordering rows across
+  every page, as both descriptions had always said, rather than one page at a
+  time, and `--limit` began keeping the newest (or oldest) rows rather than
+  whatever page one held.
 - Adding a command: **additive, so the patch position moves.** No invocation
   anybody makes changes, no document anybody parses changes shape, and
   `jr schema` grows by a leaf. The reader it matters to is looking for a
