@@ -219,6 +219,18 @@ do not catch, add the test in the same change and cite it here.
   and reconciling against it is what turns a quietly short result into
   `PAGINATION_SHORT`. Cloud sends no count, and there the check is inert.
   **Enforced by:** `TestAWalkShortOfTheServersCountIsRefused`.
+- **A feed merged from many issues is ordered across the whole walk, and
+  `--limit` cuts it after the sort.** Candidates arrive in issue-key order,
+  which says nothing about when anything happened on them, so a feed sorted one
+  page at a time is in time order inside each page and key order between them.
+  `issue activity` and `issue changes` both did this until 2026-09-27, and a
+  `--limit` that stopped the walk early kept whatever page one held: exit 3 and
+  `complete="false"`, correctly, over rows that were not the newest (or the
+  oldest) the command claimed. Neither is visible on a single page, which is all
+  any earlier test read.
+  **Enforced by:** `TestActivityIsNewestFirstAcrossPages`,
+  `TestALimitedActivityFeedKeepsTheNewest`, `TestTheFeedIsOldestFirstAcrossPages`,
+  `TestALimitedFeedKeepsTheOldest`.
 - **Issue keys never sort as text.** `IDO-999` is below `IDO-1000` as an issue
   and above it as a string. Use `issue.ParseKey` and `Key.Compare`, and keep the
   check that verifies the server agrees, because the failure mode otherwise is a

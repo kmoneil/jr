@@ -2,7 +2,6 @@ package issue
 
 import (
 	"context"
-	"errors"
 	"slices"
 	"sort"
 	"strconv"
@@ -263,6 +262,12 @@ func activityCommand() *registry.Command {
 		Description: strings.TrimSpace(`
 Merges four sources into one time-ordered feed: comments, transitions, other
 field changes, and worklogs. Newest first.
+
+Newest first across the whole feed, so every candidate issue is read before a
+row is written, whatever --limit says. Candidates arrive in issue-key order,
+which says nothing about when anything happened on them, and the newest event
+can sit on the last page. --limit keeps the newest events; it does not make the
+run cheaper.
 
 This is the question the filters on ` + "`issue list`" + ` each answer part of.
 --involving finds issues somebody touched; --changed-by finds issues whose one
@@ -607,7 +612,11 @@ func runActivity(
 	}
 	want := activityFilter(inv)
 
-	var clipped, atLimit bool
+	var (
+		events  []Event
+		clipped bool
+		read    int
+	)
 	result, err := client.ListStream(ctx, ListOptions{
 		Query: QueryOptions{
 			Project:      activityProject(inv),
@@ -622,38 +631,46 @@ func runActivity(
 		WithWorklogs:  want.kinds[EventWorklog],
 		WithChangelog: want.kinds[EventTransition] || want.kinds[EventField],
 	}, func(page []Issue, total int) error {
-		events, short, err := eventsForPage(ctx, client, page, want)
+		got, short, err := eventsForPage(ctx, client, page, want)
 		if err != nil {
 			return err
 		}
 		if short {
 			clipped = true
 		}
-		sortEvents(events)
-		// Bounded by --limit like any other collection. The issue search is
-		// deliberately unbounded — every candidate has to be read before its
-		// events can be merged and sorted — so this is the only place the
-		// caller's limit can apply, and without it the flag was declared,
-		// bound, and dropped.
-		bounded, err := writeRows(inv, out, events,
-			func(e Event) *render.Node { return e.Node() })
-		if err != nil {
-			return err
-		}
-		if bounded {
-			atLimit = true
-			return errStopPaging
-		}
-		inv.Progress.Update(out.Count(), total)
+		events = append(events, got...)
+		read += len(page)
+		inv.Progress.Update(read, total)
 		return nil
 	})
-	if err != nil && !errors.Is(err, errStopPaging) {
+	if err != nil {
+		return registry.StreamResult{}, err
+	}
+
+	// Candidates arrive in issue-key order, which says nothing about when
+	// anything happened on them, so the newest event can be on the last page.
+	// The feed is ordered, and --limit applied, only once every candidate has
+	// been read. Sorting each page as it arrived was newest first inside a page
+	// and key order between pages, and a limit that stopped the walk early kept
+	// whichever events page one held rather than the newest ones.
+	sortEvents(events)
+	bounded, err := writeRows(inv, out, events,
+		func(e Event) *render.Node { return e.Node() })
+	if err != nil {
 		return registry.StreamResult{}, err
 	}
 	switch {
-	case atLimit:
+	case !result.Complete:
+		// The candidate walk was cut short, and with no token to resume from,
+		// saying which bound did it is the whole remedy: a spent budget here
+		// is `--max-requests` and the query, never `--limit`. It comes first
+		// because an unread candidate can hold an event newer than any written.
+		return registry.StreamResult{
+			Complete: false, StoppedBy: result.StoppedBy,
+		}, nil
+	case bounded:
 		// Bounded by the caller. There is no resume token: an event feed is
-		// merged and sorted from three projections across a page of issues,
+		// merged and sorted from three projections across every candidate,
 		// and an offset into the result would not describe a place any request
 		// can start from.
 		return registry.StreamResult{
@@ -662,19 +679,8 @@ func runActivity(
 	case clipped:
 		return registry.StreamResult{Complete: false, PartialElement: "event"}, nil
 	}
-	// Anything else that cut this short was the candidate walk, and with no
-	// token to resume from, saying which bound did it is the whole remedy: a
-	// spent budget here is `--max-requests` and the query, never `--limit`,
-	// which this command is usually run with set to all.
-	return registry.StreamResult{
-		Complete: result.Complete, StoppedBy: result.StoppedBy,
-	}, nil
+	return registry.StreamResult{Complete: true}, nil
 }
-
-// errStopPaging ends the page loop once the caller's limit is reached, so a
-// bounded feed stops fetching rather than reading every candidate and throwing
-// the rest away.
-var errStopPaging = errors.New("stop paging")
 
 // eventsForPage turns one page of issues into the events the caller asked for,
 // topping up the worklogs that the projection cut off.

@@ -2,7 +2,6 @@ package issue
 
 import (
 	"context"
-	"errors"
 	"sort"
 	"strings"
 	"time"
@@ -99,6 +98,11 @@ func changesCommand() *registry.Command {
 		Description: strings.TrimSpace(`
 An incremental feed of recorded changes: every field that moved on every issue in
 scope, oldest first, with a cursor to poll again from.
+
+Oldest first across the whole window, so every candidate issue is read before a
+row is written, whatever --limit says. Candidates arrive in issue-key order,
+which says nothing about when a change was made. --limit keeps the oldest
+changes; it does not make the poll cheaper.
 
 This is the question a diff of two listings cannot answer. A listing says what an
 issue is now, so polling one and comparing shows that something moved without
@@ -342,34 +346,40 @@ func streamFeed(
 	ctx context.Context, inv *registry.Invocation, out *render.Stream,
 	client *Client, opt ListOptions, window ChangeWindow,
 ) (feedOutcome, render.Stop, error) {
-	var clipped, atLimit bool
+	var (
+		rows    []FeedChange
+		clipped bool
+		read    int
+	)
 	result, err := client.ListStream(ctx, opt, func(page []Issue, total int) error {
-		rows, short := feedRows(page, window)
+		got, short := feedRows(page, window)
 		if short {
 			clipped = true
 		}
-		sortFeed(rows)
-		bounded, err := writeRows(inv, out, rows,
-			func(f FeedChange) *render.Node { return f.Node() })
-		if err != nil {
-			return err
-		}
-		if bounded {
-			atLimit = true
-			return errStopPaging
-		}
-		inv.Progress.Update(out.Count(), total)
+		rows = append(rows, got...)
+		read += len(page)
+		inv.Progress.Update(read, total)
 		return nil
 	})
-	switch {
-	case err != nil && !errors.Is(err, errStopPaging):
+	if err != nil {
 		return feedShort, "", err
-	case atLimit, result == nil:
-		// errStopPaging is this command's own --limit reaching its end, and it
-		// comes back as an error, so there is no walk result to ask.
-		return feedShort, render.StopLimit, nil
+	}
+
+	// Oldest first across the whole window, which needs every candidate read
+	// first: they arrive in issue-key order, which says nothing about when a
+	// change was made. Sorting each page as it arrived put the pages in key
+	// order, and a limit that stopped the walk early kept page one's changes
+	// rather than the oldest ones.
+	sortFeed(rows)
+	bounded, err := writeRows(inv, out, rows,
+		func(f FeedChange) *render.Node { return f.Node() })
+	switch {
+	case err != nil:
+		return feedShort, "", err
 	case !result.Complete:
 		return feedShort, result.StoppedBy, nil
+	case bounded:
+		return feedShort, render.StopLimit, nil
 	case clipped:
 		return feedClipped, "", nil
 	}

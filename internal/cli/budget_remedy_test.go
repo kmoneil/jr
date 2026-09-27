@@ -82,7 +82,7 @@ func TestABudgetCutNamesTheBudgetAndNotTheLimit(t *testing.T) {
 		},
 		{
 			// This one cannot. An event feed is merged from three projections
-			// across a page of issues, so there is no position to resume from,
+			// across every candidate issue, so there is no position to resume from,
 			// which is what makes a wrong remedy unfollowable rather than
 			// merely unhelpful.
 			name: "issue activity",

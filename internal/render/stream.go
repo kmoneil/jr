@@ -345,8 +345,8 @@ type Truncation struct {
 	Count int
 	// NextPageToken resumes, on the commands that have one. Empty is a real
 	// answer here: `issue activity` merges a feed out of three projections
-	// across a page of issues, and no offset into that describes a place a
-	// request can start from.
+	// across every candidate issue, and no offset into that describes a place
+	// a request can start from.
 	NextPageToken string
 	// PartialElement names the container inside a row that was clipped, for the
 	// case where the rows are all present and something within one of them is

@@ -203,6 +203,13 @@ func runActivityOn(
 			apply(flags)
 		}
 	}
+	// --limit is global, and the CLI layer hands it to a command as
+	// inv.Limit rather than as a flag. A test that sets it through the flag
+	// hook gets it carried across the same way.
+	limit := registry.Limit{All: true}
+	if n := flags.Int("limit"); n > 0 {
+		limit = registry.Limit{N: n}
+	}
 	inv := &registry.Invocation{
 		Jira: &stubSession{
 			doer: &stubDoer{
@@ -213,7 +220,7 @@ func runActivityOn(
 			},
 			conn: conn, kind: kind, unscoped: true,
 		},
-		Flags: flags, Limit: registry.Limit{All: true},
+		Flags: flags, Limit: limit,
 		Stderr: io.Discard, Progress: registry.NoProgress,
 	}
 
@@ -526,5 +533,60 @@ func TestActivityOnDataCenterIsWholeAndStillSorted(t *testing.T) {
 			t.Fatalf("row %d is newer than the one before it, so the feed "+
 				"inherited the server's order:\n%s", i, out)
 		}
+	}
+}
+
+// runTwoPages is a feed over two candidates, one per page. Candidates arrive in
+// issue-key order, which says nothing about when anything happened on them: the
+// higher key, on page one, holds the older comment, and the lower key, on page
+// two, holds the newer one.
+func runTwoPages(t *testing.T, limit int) (rows []string, out string, result registry.StreamResult) {
+	t.Helper()
+	out, result, replayer := runActivityOn(t, site.DataCenter,
+		"activity-two-pages.datacenter.json", "key in (ENG-1, ENG-2)", farPast,
+		func(f registry.Flags) {
+			f.SetInt("page-size", 1)
+			f.SetInt("limit", limit)
+		})
+	if got := replayer.Unplayed(); len(got) != 0 {
+		t.Errorf("recorded requests nobody made: %v", got)
+	}
+	return strings.Split(strings.TrimRight(out, "\n"), "\n")[1:], out, result
+}
+
+// TestActivityIsNewestFirstAcrossPages is the ordering promise over more than
+// one page. A feed sorted one page at a time is newest first inside each page
+// and in key order between them, and every test above reads a single page.
+func TestActivityIsNewestFirstAcrossPages(t *testing.T) {
+	rows, out, result := runTwoPages(t, 0)
+
+	if !result.Complete {
+		t.Error("a feed that read every candidate reported itself partial")
+	}
+	if len(rows) != 2 {
+		t.Fatalf("want 2 rows, got %d:\n%s", len(rows), out)
+	}
+	if got := strings.Split(rows[0], "\t")[1]; got != "ENG-1" {
+		t.Errorf("first row is %s's older event, not ENG-1's newer one, so "+
+			"the feed is newest first only within a page:\n%s", got, out)
+	}
+}
+
+// TestALimitedActivityFeedKeepsTheNewest is the same promise under --limit, and
+// the one a caller cannot see is broken. The feed says it is incomplete either
+// way, so exit 3 is right; what is wrong is which event it kept. Stopping once
+// page one fills the limit keeps the older event and never shows the newer one.
+func TestALimitedActivityFeedKeepsTheNewest(t *testing.T) {
+	rows, out, result := runTwoPages(t, 1)
+
+	if result.Complete {
+		t.Error("a feed cut at --limit reported itself complete")
+	}
+	if len(rows) != 1 {
+		t.Fatalf("want 1 row under --limit 1, got %d:\n%s", len(rows), out)
+	}
+	if got := strings.Split(rows[0], "\t")[1]; got != "ENG-1" {
+		t.Errorf("--limit 1 kept %s's older event over ENG-1's newer one:\n%s",
+			got, out)
 	}
 }

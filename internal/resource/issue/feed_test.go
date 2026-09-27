@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -53,9 +54,31 @@ func feedIssue(key string, total int, saves ...string) string {
 // already evidenced by activity-recorded.cloud.json, whose changelog projection
 // this mirrors, down to the bound it reports.
 type feedServer struct {
-	issues   []string
+	issues []string
+	// pages, when set, replaces issues: one response each, with Cloud's cursor
+	// naming the next.
+	pages    [][]string
 	searches int
 	queries  []string
+}
+
+// page answers one search. Without pages every issue arrives on a single last
+// page, which is what most of these tests are about.
+func (f *feedServer) page(cursor string) string {
+	if f.pages == nil {
+		return fmt.Sprintf(`{"issues":[%s],"isLast":true}`,
+			strings.Join(f.issues, ","))
+	}
+	n := 0
+	if cursor != "" {
+		n, _ = strconv.Atoi(strings.TrimPrefix(cursor, "page-"))
+	}
+	if n+1 < len(f.pages) {
+		return fmt.Sprintf(`{"issues":[%s],"isLast":false,"nextPageToken":"page-%d"}`,
+			strings.Join(f.pages[n], ","), n+1)
+	}
+	return fmt.Sprintf(`{"issues":[%s],"isLast":true}`,
+		strings.Join(f.pages[n], ","))
 }
 
 func (f *feedServer) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -67,8 +90,7 @@ func (f *feedServer) RoundTrip(r *http.Request) (*http.Response, error) {
 	case strings.Contains(r.URL.Path, "/search"):
 		f.searches++
 		f.queries = append(f.queries, r.URL.Query().Get("jql"))
-		body = fmt.Sprintf(`{"issues":[%s],"isLast":true}`,
-			strings.Join(f.issues, ","))
+		body = f.page(r.URL.Query().Get("nextPageToken"))
 	}
 	return &http.Response{
 		StatusCode: http.StatusOK,
@@ -299,6 +321,53 @@ func TestTheFeedIssuesNoCursorWhenItWasCutShort(t *testing.T) {
 	if token := sinceTokenOf(t, doc); token != "" {
 		t.Errorf("a truncated poll issued a cursor %q, so the next poll would "+
 			"start after changes this one never reported", token)
+	}
+}
+
+// twoPageFeed is a window over two candidates, one per page. Candidates arrive
+// in issue-key order, which says nothing about when a change was made: the
+// higher key, on page one, holds the newer save, and the lower key, on page
+// two, holds the older one.
+func twoPageFeed() *feedServer {
+	return &feedServer{pages: [][]string{
+		{feedIssue("ENG-2", 1,
+			feedSave("601", "2026-08-17T14:20:00.000+0000", "labels", "", "newer"))},
+		{feedIssue("ENG-1", 1,
+			feedSave("600", "2026-08-17T14:00:00.000+0000", "status", "To Do", "Done"))},
+	}}
+}
+
+// TestTheFeedIsOldestFirstAcrossPages is the ordering promise over more than one
+// page. A consumer applies these rows in order, so a feed sorted one page at a
+// time hands it page two's older change after page one's newer one.
+func TestTheFeedIsOldestFirstAcrossPages(t *testing.T) {
+	server := twoPageFeed()
+	doc, result := runFeed(t, server, render.JSON, everyRow)
+
+	if server.searches != 2 {
+		t.Fatalf("%d searches, want 2: this asserts nothing about pages", server.searches)
+	}
+	if !result.Complete {
+		t.Fatalf("a poll that read every candidate is incomplete: %s", doc)
+	}
+	if ids := changeIDs(t, doc); len(ids) != 2 || ids[0] != "600" {
+		t.Errorf("changes = %v, want the older save 600 first: the feed is "+
+			"oldest first only within a page", ids)
+	}
+}
+
+// TestALimitedFeedKeepsTheOldest is the same promise under --limit. No cursor is
+// issued either way, so nothing is lost for good; what is wrong is which change
+// the answer holds, and a caller reading it cannot tell.
+func TestALimitedFeedKeepsTheOldest(t *testing.T) {
+	doc, result := runFeed(t, twoPageFeed(), render.JSON, registry.Limit{N: 1})
+
+	if result.Complete {
+		t.Error("a poll cut at --limit reported itself complete")
+	}
+	if ids := changeIDs(t, doc); len(ids) != 1 || ids[0] != "600" {
+		t.Errorf("changes = %v, want only the older save 600: --limit 1 kept "+
+			"page one's newer change", ids)
 	}
 }
 
