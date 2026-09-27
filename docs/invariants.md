@@ -231,6 +231,15 @@ do not catch, add the test in the same change and cite it here.
   **Enforced by:** `TestActivityIsNewestFirstAcrossPages`,
   `TestALimitedActivityFeedKeepsTheNewest`, `TestTheFeedIsOldestFirstAcrossPages`,
   `TestALimitedFeedKeepsTheOldest`.
+- **A truncation warning states a `total` only where it is exact.** A feed cut
+  by `--limit` after reading every candidate knows how many rows it held, and
+  says so beside the `count`. Nothing else may: a budget cut left candidates
+  unread, a paged collection never held its set, and a `total` of zero beside
+  two rows would be a number somebody believes. A clipped element's warning
+  keeps `total` for the element, so one name never carries two numbers.
+  **Enforced by:** `TestALimitCutWarningStatesTheTotal`,
+  `TestAnUnknownTotalIsNotWritten`, `TestABudgetCutFeedStatesNoTotal`,
+  `TestAClippedElementKeepsItsTotal`.
 - **Issue keys never sort as text.** `IDO-999` is below `IDO-1000` as an issue
   and above it as a string. Use `issue.ParseKey` and `Key.Compare`, and keep the
   check that verifies the server agrees, because the failure mode otherwise is a

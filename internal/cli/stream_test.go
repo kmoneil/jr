@@ -16,6 +16,13 @@ import (
 // the CLI's streaming path can be tested on its own.
 func fakeStream(t *testing.T, rows int, complete bool, token string) *registry.Registry {
 	t.Helper()
+	return fakeResult(t, rows, registry.StreamResult{Complete: complete, NextPageToken: token})
+}
+
+// fakeResult is fakeStream ending in whatever result a test hands it, for the
+// fields of a truncated result that only a command knows.
+func fakeResult(t *testing.T, rows int, result registry.StreamResult) *registry.Registry {
+	t.Helper()
 	r := registry.New()
 	r.Register(&registry.Command{
 		Path:           []string{"fake", "list"},
@@ -41,7 +48,7 @@ func fakeStream(t *testing.T, rows int, complete bool, token string) *registry.R
 				}
 				inv.Progress.Update(out.Count(), rows)
 			}
-			return registry.StreamResult{Complete: complete, NextPageToken: token}, nil
+			return result, nil
 		},
 	})
 	return r
@@ -114,6 +121,39 @@ func TestStreamedTruncationStillExitsPartial(t *testing.T) {
 		if got.stdout == "" {
 			t.Errorf("%s: a truncated result produced no data", format)
 		}
+	}
+}
+
+// TestALimitCutWarningStatesTheTotal is what a caller cut short by --limit needs
+// to decide what to do next: raise it, narrow the query, or stop there. A
+// command that read the whole set before writing any of it knows the number,
+// and the warning carries it in every format.
+func TestALimitCutWarningStatesTheTotal(t *testing.T) {
+	cut := registry.StreamResult{StoppedBy: render.StopLimit, Total: 347}
+	for _, format := range []string{"tsv", "xml", "json", "yaml"} {
+		got := runStream(t, fakeResult(t, 2, cut), "fake", "list", "--format", format)
+		if got.exit != exitcode.Partial {
+			t.Errorf("%s: exit = %v, want %v", format, got.exit, exitcode.Partial)
+		}
+		if !strings.Contains(got.stderr, "347") {
+			t.Errorf("%s: the warning does not say how many rows there were:\n%s",
+				format, got.stderr)
+		}
+	}
+	if got := runStream(t, fakeResult(t, 2, cut), "fake", "list"); !strings.Contains(
+		got.stderr, "count\t2\ntotal\t347\n") {
+		t.Errorf("the total is not beside the count it qualifies:\n%s", got.stderr)
+	}
+}
+
+// TestAnUnknownTotalIsNotWritten keeps zero meaning unknown. Most truncated
+// results cannot know their total, and a warning that printed `total 0` beside
+// two rows would be a number a caller could believe.
+func TestAnUnknownTotalIsNotWritten(t *testing.T) {
+	got := runStream(t, fakeResult(t, 2, registry.StreamResult{StoppedBy: render.StopLimit}),
+		"fake", "list")
+	if strings.Contains(got.stderr, "total") {
+		t.Errorf("a warning with no known total wrote one:\n%s", got.stderr)
 	}
 }
 

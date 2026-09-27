@@ -357,6 +357,9 @@ type Truncation struct {
 	PartialElement string
 	// StoppedBy is which bound ended it, from the only layer that knows.
 	StoppedBy Stop
+	// Total is how many rows the result held before the bound cut it, where
+	// the command knows exactly. Zero means unknown and writes nothing.
+	Total int
 }
 
 // WriteStreamTruncation emits the warning that accompanies exit 3 for a
@@ -379,5 +382,5 @@ func truncationNodeFor(t Truncation) *Node {
 			Items:         make([]*Node, t.Count),
 			NextPageToken: t.NextPageToken,
 		},
-	}, t.PartialElement, t.StoppedBy)
+	}, t.PartialElement, t.StoppedBy, t.Total)
 }

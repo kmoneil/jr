@@ -75,16 +75,25 @@ func errorNode(e *errs.Error) *Node {
 // emitted for every format, not only TSV: the XML and JSON envelopes also carry
 // complete="false", but the exit code and the stderr warning are what a script
 // checks.
-func truncationNode(d *Doc, partialElement string, stop Stop) *Node {
+func truncationNode(d *Doc, partialElement string, stop Stop, total int) *Node {
 	if d.Collection == nil {
 		return recordTruncationNode(d)
 	}
 	c := d.Collection
+	partial := incompleteItem(c.Items)
 	n := El("warning").Attr("v", strconv.Itoa(diagnosticVersion)).
 		Leaf("code", TruncatedCode).
 		Leaf("message", "result set was truncated before it was exhausted").
 		Leaf("kind", d.Kind).
 		Leaf("count", strconv.Itoa(len(c.Items)))
+	// The total the rows were cut from, where the command read the whole set
+	// before writing any of it. It sits beside the count it qualifies, which is
+	// where a clipped element puts its own, so `total` always means "of what
+	// the count before it counted". A clipped element's case writes none here:
+	// its total is the container's, and two under one name would be a guess.
+	if total > 0 && partial == nil && partialElement == "" {
+		n.Leaf("total", strconv.Itoa(total))
+	}
 	n.LeafIf("next-page-token", c.NextPageToken)
 
 	// A collection can be short for two different reasons and they have
@@ -98,7 +107,7 @@ func truncationNode(d *Doc, partialElement string, stop Stop) *Node {
 	//
 	// A buffered document is asked; a streamed one is told, because its rows
 	// were bytes on stdout before this ran.
-	if partial := incompleteItem(c.Items); partial != nil {
+	if partial != nil {
 		n.Leaf("element", partial.Name)
 		if count, ok := partial.AttrValue("count"); ok {
 			n.Leaf("count", count)

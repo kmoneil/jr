@@ -55,6 +55,7 @@ func (a *app) stream(ctx context.Context, rc *registry.Command, inv *registry.In
 		NextPageToken:  result.NextPageToken,
 		PartialElement: result.PartialElement,
 		StoppedBy:      result.StoppedBy,
+		Total:          result.Total,
 	}, format); err != nil {
 		return err
 	}

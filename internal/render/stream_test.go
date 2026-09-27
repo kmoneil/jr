@@ -246,3 +246,20 @@ func TestStreamCounts(t *testing.T) {
 		_ = s.Close(true, "")
 	}
 }
+
+// TestAClippedElementKeepsItsTotal is the one place the warning already wrote a
+// `total`: beside the count of a container clipped inside a row. A collection
+// total there would be a second number under the same name, so the element's
+// case writes none, whatever the command knew.
+func TestAClippedElementKeepsItsTotal(t *testing.T) {
+	var out strings.Builder
+	err := render.WriteStreamTruncation(&out, render.Truncation{
+		Kind: "issue.activity", Count: 2, PartialElement: "event", Total: 5,
+	}, render.TSV)
+	if err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if strings.Contains(out.String(), "total") {
+		t.Errorf("a clipped-element warning carries a collection total:\n%s", out.String())
+	}
+}

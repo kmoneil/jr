@@ -267,7 +267,7 @@ Newest first across the whole feed, so every candidate issue is read before a
 row is written, whatever --limit says. Candidates arrive in issue-key order,
 which says nothing about when anything happened on them, and the newest event
 can sit on the last page. --limit keeps the newest events; it does not make the
-run cheaper.
+run cheaper. When it cuts, the warning's total says how many events there were.
 
 This is the question the filters on ` + "`issue list`" + ` each answer part of.
 --involving finds issues somebody touched; --changed-by finds issues whose one
@@ -672,9 +672,11 @@ func runActivity(
 		// Bounded by the caller. There is no resume token: an event feed is
 		// merged and sorted from three projections across every candidate,
 		// and an offset into the result would not describe a place any request
-		// can start from.
+		// can start from. Every candidate was read before the limit applied,
+		// so the total is exact, and it is what a caller needs to choose
+		// between raising the limit, narrowing the query, and stopping there.
 		return registry.StreamResult{
-			Complete: false, StoppedBy: render.StopLimit,
+			Complete: false, StoppedBy: render.StopLimit, Total: len(events),
 		}, nil
 	case clipped:
 		return registry.StreamResult{Complete: false, PartialElement: "event"}, nil

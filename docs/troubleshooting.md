@@ -628,6 +628,20 @@ $ jr issue list --project ENG --limit 500      # a bigger bound
 $ jr issue list --page-token <token from the warning>   # resume
 ```
 
+`issue activity` and `issue changes` read every candidate before `--limit`
+applies, so their warning also says how many rows the whole answer held. Raising
+the limit to that number gets all of them, and it costs no more requests than
+the run just made:
+
+```console
+$ jr issue activity --since -7d --limit 10
+# stderr: RESULT_TRUNCATED, count: 10, total: 347, remedy: raise --limit, or
+#         use --limit all
+```
+
+A warning with no `total` means the number is not known, which is every other
+collection and any run the request budget stopped.
+
 If a script inherited a failure from this, it is checking `$?` without treating
 3 as a success — see [recipes.md](recipes.md#scripting-and-ci).
 

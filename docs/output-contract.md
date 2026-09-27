@@ -581,6 +581,30 @@ stopped by the budget used to be told to raise `--limit`, on `issue activity`,
 which also has no `--page-token`, so every word of the remedy named something
 the caller could not do.
 
+**The warning carries `total` where the command knows it.** `issue activity` and
+`issue changes` read every candidate before `--limit` applies, because the rows
+they merge are ordered by when things happened and candidates arrive in key
+order, so a cut there is a cut of a set held whole. The warning then says how
+many rows that set held, directly after the `count` it qualifies:
+
+```
+code    RESULT_TRUNCATED
+kind    issue.activity
+count   10
+total   347
+remedy  raise --limit, or use --limit all
+```
+
+A clipped element's warning already wrote a `total`, beside the element's own
+`count`, and this document did not say so until this paragraph. Both mean the
+same thing: of what the `count` before it counted. The two never share a
+warning; a clipped element's warning carries only the element's. An absent
+`total` means unknown, never zero: every other collection pages rather than
+holding its set, and a run the request budget stopped left candidates unread.
+Adding it is additive under the stability policy, so the patch position moves.
+The warning is not a kind and has no shape golden, and its `v` has stayed `1`
+through the optional fields added before this one.
+
 **A walk can also fail rather than truncate.** Truncation says the answer stops
 where a bound put it. When a paged walk stops on its own while holding fewer
 rows than Jira counted for the query it started from, that reading is not
@@ -615,7 +639,7 @@ about the answer cannot be read off the answer itself.
 
 | Code               | Emitted by                                      | What it says                                                                                                                                                                                                                        |
 | ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RESULT_TRUNCATED` | any collection                                  | The result is not exhaustive. It accompanies exit 3 and `complete="false"`, and carries the resume token where one exists.                                                                                                            |
+| `RESULT_TRUNCATED` | any collection                                  | The result is not exhaustive. It accompanies exit 3 and `complete="false"`, carries the resume token where one exists, and carries `total` where the command read the whole set before `--limit` cut it.                             |
 | `POSSIBLE_DUPLICATE` | `issue create`, `issue clone`                 | An identical request succeeded within the last 60 seconds and this one carried no idempotency key.                                                                                                                                   |
 | `UNKNOWN_LABEL`    | `issue list`, from `--label` and `--not-label`   | No issue on this site carries that label. The query still runs and still exits 0.                                                                                                                                                    |
 | `SCOPE_MISMATCH`   | `issue list`, `issue activity`, `issue changes` | A raw `--jql` selects a project the effective scope excludes, so those rows cannot come back. The query still runs and still exits 0.                                                                                                 |

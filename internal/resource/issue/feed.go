@@ -102,7 +102,8 @@ scope, oldest first, with a cursor to poll again from.
 Oldest first across the whole window, so every candidate issue is read before a
 row is written, whatever --limit says. Candidates arrive in issue-key order,
 which says nothing about when a change was made. --limit keeps the oldest
-changes; it does not make the poll cheaper.
+changes; it does not make the poll cheaper. When it cuts, the warning's total
+says how many changes the window held.
 
 This is the question a diff of two listings cannot answer. A listing says what an
 issue is now, so polling one and comparing shows that something moved without
@@ -266,7 +267,7 @@ func runChanges(
 		return registry.StreamResult{}, err
 	}
 
-	whole, stop, err := streamFeed(ctx, inv, out, client, opt, window)
+	end, err := streamFeed(ctx, inv, out, client, opt, window)
 	if err != nil {
 		return registry.StreamResult{}, err
 	}
@@ -275,7 +276,7 @@ func runChanges(
 	// Advancing past a window that was cut short is how a feed loses a change
 	// while reporting itself fine, which is the failure this command exists to
 	// make impossible rather than unlikely.
-	switch whole {
+	switch end.outcome {
 	case feedWhole:
 		out.SetNextSinceToken(EncodeChangeCursor(window.Cursor(info.Kind)))
 		return registry.StreamResult{Complete: true}, nil
@@ -286,8 +287,20 @@ func runChanges(
 		// of what to do about it. There is no page token either: the rows are
 		// merged from the changelogs of many issues, so an offset into them
 		// names no place a request can start from.
-		return registry.StreamResult{Complete: false, StoppedBy: stop}, nil
+		return registry.StreamResult{
+			Complete: false, StoppedBy: end.stop, Total: end.total,
+		}, nil
 	}
+}
+
+// feedEnd is how a poll ended: whether a cursor is owed, which bound stopped
+// it if one did, and how many changes the window held when that bound was
+// --limit. The total is zero in every other case, because a budget cut left
+// candidates unread and cannot know it.
+type feedEnd struct {
+	outcome feedOutcome
+	stop    render.Stop
+	total   int
 }
 
 // How a poll ended, which is what decides whether a cursor is issued.
@@ -345,7 +358,7 @@ func feedRequest(
 func streamFeed(
 	ctx context.Context, inv *registry.Invocation, out *render.Stream,
 	client *Client, opt ListOptions, window ChangeWindow,
-) (feedOutcome, render.Stop, error) {
+) (feedEnd, error) {
 	var (
 		rows    []FeedChange
 		clipped bool
@@ -362,7 +375,7 @@ func streamFeed(
 		return nil
 	})
 	if err != nil {
-		return feedShort, "", err
+		return feedEnd{outcome: feedShort}, err
 	}
 
 	// Oldest first across the whole window, which needs every candidate read
@@ -375,15 +388,15 @@ func streamFeed(
 		func(f FeedChange) *render.Node { return f.Node() })
 	switch {
 	case err != nil:
-		return feedShort, "", err
+		return feedEnd{outcome: feedShort}, err
 	case !result.Complete:
-		return feedShort, result.StoppedBy, nil
+		return feedEnd{outcome: feedShort, stop: result.StoppedBy}, nil
 	case bounded:
-		return feedShort, render.StopLimit, nil
+		return feedEnd{outcome: feedShort, stop: render.StopLimit, total: len(rows)}, nil
 	case clipped:
-		return feedClipped, "", nil
+		return feedEnd{outcome: feedClipped}, nil
 	}
-	return feedWhole, "", nil
+	return feedEnd{outcome: feedWhole}, nil
 }
 
 // feedWindow resolves --since into the interval this poll reports.
