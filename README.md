@@ -12,6 +12,7 @@ It would rather fail than hand you something that merely looks right.
 [![Release](https://img.shields.io/github/v/release/kmoneil/jr?label=release&color=f5a623)](https://github.com/kmoneil/jr/releases/latest)
 ![MCP: built in](https://img.shields.io/badge/MCP-server%20built%20in-f5a623)
 ![Network in tests: none](https://img.shields.io/badge/tests-never%20touch%20the%20network-4c1)
+[![Sponsor](https://img.shields.io/badge/sponsor-%E2%99%A5-f5a623?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/kmoneil)
 
 **[Install](#install)** ·
 [Getting started](docs/getting-started.md) ·
