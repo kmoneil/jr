@@ -183,6 +183,43 @@ func TestExtraPermitsCallerNamedElements(t *testing.T) {
 	}
 }
 
+// TestExtraStructuredHoldsAContainerToItsShape covers the open shape whose
+// value is not a scalar: a Data Center sprint field arrives as a container,
+// and Extra.Structured is the shape its children are held to. A container is
+// checked against the declared structure, a scalar extra stays a leaf under
+// the same declaration, and a container the structure does not describe is
+// refused rather than passed.
+func TestExtraStructuredHoldsAContainerToItsShape(t *testing.T) {
+	open := widget()
+	open.Extra = &render.Extra{
+		Named: "a requested field id",
+		Type:  render.TypeString,
+		Structured: &render.Schema{
+			Element: "ignored, the container's own name is substituted",
+			Children: []render.Child{
+				{Schema: render.Leaf("sprint", render.TypeString), Repeated: true},
+			},
+		},
+	}
+
+	container := validWidget().Child(render.El("customfield_10020").
+		Child(render.El("sprint").SetText("Board Sprint 4")))
+	if err := open.Conform(container, "test"); err != nil {
+		t.Fatalf("a container matching the declared structure was refused: %v", err)
+	}
+
+	scalar := validWidget().Leaf("customfield_10042", "3")
+	if err := open.Conform(scalar, "test"); err != nil {
+		t.Fatalf("a scalar extra was held to the container's structure: %v", err)
+	}
+
+	bad := validWidget().Child(render.El("customfield_10020").
+		Child(render.El("bogus").SetText("x")))
+	if err := open.Conform(bad, "test"); err == nil {
+		t.Error("a container violating the declared structure was accepted")
+	}
+}
+
 // TestWriteRefusesANonConformingDocument is the enforcement that makes the
 // published schema worth trusting. render.Write validates before it emits a
 // byte, so a document that does not match its contract never reaches stdout.
