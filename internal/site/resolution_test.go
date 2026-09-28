@@ -212,3 +212,30 @@ func TestAResolutionFieldThatListsNothingConstrainsNothing(t *testing.T) {
 		t.Errorf("got %+v, want the input as typed and no id", got)
 	}
 }
+
+// TestAShortIDListLeavesTheTailUnpaired pins the positional pairing at its
+// boundary. The fetch builds AllowedValues and AllowedIDs index for index, so
+// a shorter id list only arrives from a caller constructing the field; when it
+// does, every value is still offered and the values past the ids have none.
+func TestAShortIDListLeavesTheTailUnpaired(t *testing.T) {
+	tr := site.Transition{
+		Name: "Close Issue",
+		Fields: []site.MetaField{{
+			ID:            "resolution",
+			Name:          "Resolution",
+			AllowedValues: []string{"Done", "Duplicate", "Cannot Reproduce"},
+			AllowedIDs:    []string{"1", "3"},
+		}},
+	}
+	got, err := tr.Resolution("cannot reproduce")
+	if err != nil {
+		t.Fatalf("the value past the id list was refused: %v", err)
+	}
+	if got.Name != "Cannot Reproduce" || got.ID != "" {
+		t.Errorf("got %+v, want Cannot Reproduce with no id", got)
+	}
+	got, err = tr.Resolution("3")
+	if err != nil || got.Name != "Duplicate" || got.ID != "3" {
+		t.Errorf("id 3 = %+v, %v, want Duplicate (3)", got, err)
+	}
+}
