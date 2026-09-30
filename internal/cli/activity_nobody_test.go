@@ -15,6 +15,12 @@ const bulkyComment = "Here is the whole investigation.\n\n" +
 	"```go\nfunc main() {\n\tfor i := range 100 {\n\t\tprintln(i)\n\t}\n}\n```\n\n" +
 	"and a second paragraph nobody reading a feed of timestamps wanted."
 
+// fixtureSince bounds the feed by the fixture's own dates rather than by the
+// clock. These tests asked for `--since -7d` over events stamped 2026-09-22,
+// and a week later every event fell outside the window: one test failed, and
+// the other kept passing with no rows left to check.
+const fixtureSince = "2026-09-21"
+
 // activityJira serves one issue with one comment and one transition, so a feed
 // has an event that carries a body and an event that does not.
 func activityJira(t *testing.T) string {
@@ -86,12 +92,12 @@ func TestNoBodyDropsTheBodyAndKeepsTheEvent(t *testing.T) {
 	env := credentialed(t)
 	mustRun(t, env, "context", "create", "work", "--site", url, "--project", "ENG")
 
-	full := mustRun(t, env, "issue", "activity", "--since", "-7d")
+	full := mustRun(t, env, "issue", "activity", "--since", fixtureSince)
 	if !strings.Contains(full.stdout, "whole investigation") {
 		t.Fatalf("the fixture's body never reached the default output:\n%s", full.stdout)
 	}
 
-	lean := mustRun(t, env, "issue", "activity", "--since", "-7d", "--no-body")
+	lean := mustRun(t, env, "issue", "activity", "--since", fixtureSince, "--no-body")
 
 	if strings.Contains(lean.stdout, "whole investigation") {
 		t.Errorf("--no-body still emitted the body:\n%s", lean.stdout)
@@ -119,9 +125,16 @@ func TestNoBodyDropsTheColumnInTSV(t *testing.T) {
 	env := credentialed(t)
 	mustRun(t, env, "context", "create", "work", "--site", url, "--project", "ENG")
 
-	got := mustRun(t, env, "issue", "activity", "--since", "-7d", "--no-body", "--format", "tsv")
+	got := mustRun(t, env, "issue", "activity", "--since", fixtureSince, "--no-body", "--format", "tsv")
 
-	header := strings.Split(strings.Split(got.stdout, "\n")[0], "\t")
+	lines := strings.Split(strings.TrimRight(got.stdout, "\n"), "\n")
+	// The row checks below pass over a header alone, so the feed has to hold
+	// both of the fixture's events for them to mean anything.
+	if len(lines) != 3 {
+		t.Fatalf("want a header and the fixture's two events, got %d lines:\n%s",
+			len(lines), got.stdout)
+	}
+	header := strings.Split(lines[0], "\t")
 	for _, h := range header {
 		if h == "body" {
 			t.Errorf("--no-body left the body column in place: %v", header)
@@ -135,7 +148,7 @@ func TestNoBodyDropsTheColumnInTSV(t *testing.T) {
 	}
 	// And the rows are not ragged, which is what a column set and a row shape
 	// disagreeing looks like.
-	for line := range strings.SplitSeq(strings.TrimRight(got.stdout, "\n"), "\n") {
+	for _, line := range lines {
 		if n := len(strings.Split(line, "\t")); n != len(want) {
 			t.Errorf("row has %d cells, header has %d: %q", n, len(want), line)
 		}
