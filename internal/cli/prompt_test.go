@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -17,7 +18,7 @@ import (
 // every other harness in this tree deliberately hands commands a pipe.
 //
 // It drives the built binary under `script`, which allocates a pty, types a
-// token, and checks three things at once — that the prompt appeared, that the
+// token, and checks three things at once: that the prompt appeared, that the
 // token was accepted, and that the token was not echoed back onto the screen,
 // which is the property a person is trusting when they type a secret in front
 // of somebody.
@@ -39,7 +40,7 @@ func TestLoginPromptsOnATerminal(t *testing.T) {
 	// prompt only.
 	//
 	// script(1) copies its own stdin into the pty, and the line discipline
-	// echoes that before the child has read anything or turned echo off — so a
+	// echoes that before the child has read anything or turned echo off. So a
 	// naive "the token is nowhere in the output" fails on the harness rather
 	// than on the program. Typing only once the prompt has appeared, and
 	// judging only what follows it, makes the echo state under test the one
@@ -68,9 +69,9 @@ func promptExchangeWith(t *testing.T, flags, input string) (before, after string
 	bin := buildForPrompt(t)
 	home := t.TempDir()
 
-	cmd := exec.Command("script", "-q", "-c",
-		bin+" auth login --site jira.example.invalid --no-verify"+flags,
-		"/dev/null")
+	cmd := scriptCommand(append([]string{
+		bin, "auth", "login", "--site", "jira.example.invalid", "--no-verify",
+	}, strings.Fields(flags)...)...)
 	cmd.Env = append(os.Environ(),
 		"XDG_CONFIG_HOME="+filepath.Join(home, "config"),
 		"XDG_STATE_HOME="+filepath.Join(home, "state"),
@@ -134,11 +135,27 @@ func promptExchangeWith(t *testing.T, flags, input string) (before, after string
 	if _, err := io.WriteString(stdin, input); err != nil {
 		t.Fatalf("type: %v", err)
 	}
+	// BSD script(1) turns the end of its stdin into an EOF on the pty. Sent
+	// before the child reads, that EOF can take the place of the line typed
+	// ahead of it; sent here, the child is already reading and the EOF queues
+	// behind the token. Measured 90 of 90 on macOS, 2026-09-30.
 	_ = stdin.Close()
 
 	rest, _ := io.ReadAll(stdout)
 	_ = cmd.Wait()
 	return before, string(rest)
+}
+
+// scriptCommand runs argv on a pty under script(1), whose two common builds
+// disagree on the grammar. util-linux, which CI has, takes the command as one
+// string after -c. The BSD one macOS ships has no -c and takes the command as
+// the arguments after the transcript file; handed the util-linux form it prints
+// its usage and exits, and the test reports a broken pipe on the token.
+func scriptCommand(argv ...string) *exec.Cmd {
+	if runtime.GOOS == "linux" {
+		return exec.Command("script", "-q", "-c", strings.Join(argv, " "), "/dev/null")
+	}
+	return exec.Command("script", append([]string{"-q", "/dev/null"}, argv...)...)
 }
 
 // TestTokenStdinAtATerminalAlsoPrompts covers the other way a person gets here.
