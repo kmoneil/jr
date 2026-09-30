@@ -33,6 +33,15 @@ func endlessJira(t *testing.T) string {
 			_, _ = w.Write([]byte(`{"version":"9.12.0","deploymentType":"Server",` +
 				`"serverTime":"2026-08-28T12:00:00.000+0000"}`))
 			return
+		case r.Method == http.MethodPost:
+			// The count issue activity sizes its sweep with, answering as
+			// though the set were one page. A count that trails its set is
+			// how a sweep the guard admitted still meets the budget: Cloud's
+			// is documented to lag a recent update, and neither deployment's
+			// counts the worklog top-ups. Answering the true total would have
+			// the guard refuse the walk this file exists to cut.
+			_, _ = w.Write([]byte(`{"startAt":0,"maxResults":0,"total":2,"issues":[]}`))
+			return
 		}
 
 		startAt, _ := strconv.Atoi(r.URL.Query().Get("startAt"))

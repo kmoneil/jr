@@ -343,7 +343,7 @@ different command answering the same invocation. `jr issue activity --since -1d`
 means every event, and a default that quietly held some back would be the thing
 this tool exists not to do. Name the exclusion and it is yours.
 
-Four things it will not pretend about:
+Five things it will not pretend about:
 
 - **It is scoped to the context's project unless you say otherwise.** "What did
   I do today" is a question about you, not about one project, and scoped to one
@@ -359,6 +359,22 @@ Four things it will not pretend about:
   service account and never match a person. A developer who spent the day on an
   issue entirely through commits has no events here, and the empty answer is
   correct rather than wrong.
+- **A sweep too big to answer is refused rather than run.** `--user` narrows the
+  answer and not the search: every issue updated in the window is read, with
+  its changelog, comments and worklogs, and the person is matched afterwards.
+  One request counts the candidates first, and past ten search pages (a
+  thousand issues at the default page size) the run exits 2 with
+  `SWEEP_TOO_LARGE`. Narrow the candidates to the person's involvement, the
+  fields `issue list --involving` covers plus the transitions they made:
+
+  ```console
+  $ jr issue activity --since -7d --user currentUser --all-projects \
+      --jql 'assignee = currentUser() OR reporter = currentUser() OR creator = currentUser() OR worklogAuthor = currentUser() OR status changed by currentUser()'
+  ```
+
+  That misses a comment, or a change to a field other than status, on an issue
+  they are not otherwise tied to. When the whole sweep is the question, pass the
+  `--max-requests` value the refusal names.
 - **Some of it may be clipped**, and then the run exits 3 rather than looking
   whole. Cloud sends the newest twenty comments of a longer thread; both
   deployments send the *oldest* twenty worklogs, which for a feed about recent

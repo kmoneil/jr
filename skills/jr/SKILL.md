@@ -24,6 +24,7 @@ have. Report it or act on what it tells you. Do not reach for a way past it.
 | You see | Do not | Do |
 | --- | --- | --- |
 | `UNCONSTRAINED_QUERY` | Add `--jql 'project is not empty'` to satisfy the filter check | Scope it (`--project`, `--status`, a date bound) or pass `--all-projects` if a whole-instance sweep is genuinely intended |
+| `SWEEP_TOO_LARGE` | Pass a huge `--max-requests` to get past it | Narrow the candidates: `--project`, a shorter `--since`, or `--jql` with the person's involvement (see gotchas). Pass the `--max-requests` the `remedy` names only when the whole sweep is the question, and say what it cost |
 | Exit 3, `RESULT_TRUNCATED` | Report the rows you got as the answer | Resume with `--page-token`, or say the result is partial and how much you saw. Where the warning carries `total`, that is how many rows the whole answer held |
 | `UNKNOWN_USER`, `UNKNOWN_FIELD`, `UNKNOWN_TRANSITION`, `UNKNOWN_RESOLUTION` | Guess another spelling and retry | Read `detail`. It lists the real candidates with their ids. Pass an id |
 | `INVALID_USAGE`, `UNKNOWN_COMMAND` | Re-read the help output and guess again | Read `detail`. A mistyped flag, verb, or command name carries the near misses; an empty `detail` means nothing is close, so check `jr schema` rather than trying another spelling |
@@ -175,6 +176,10 @@ Feeding results to a model is the common case and format choice dominates it.
   mistaken for a `--limit` you can raise. Whether there is a token to resume
   from depends on the command: `issue list` has one, `issue activity` and
   `issue changes` have none, and the `remedy` is what says which.
+- **`issue activity` sizes its sweep before it starts.** Past ten search pages,
+  or past what `--max-requests` leaves, it refuses with `SWEEP_TOO_LARGE` and
+  reads nothing, because it cannot resume a sweep cut short. The count is one
+  request, on every run.
 - Ask for the columns you need. Fetching fields you will not read costs tokens on
   the way out and requests on the way in.
 - **`issue activity --no-body`** when the question is what was touched and when.

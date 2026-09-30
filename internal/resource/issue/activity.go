@@ -288,8 +288,19 @@ The context's project scopes the candidate search, exactly as it does on
 ` + "`issue list`" + `, and --all-projects lifts it. That matters more here than it does
 there. This is the command somebody points at "what did I do today", and scoped
 to one project it answers a narrower question in bytes identical to the wider
-one: a complete, empty, exit-0 feed. There is no separate refusal for an
-unbounded sweep, because --since is required and already bounds one.
+one: a complete, empty, exit-0 feed.
+
+**A sweep too large to answer is refused before it starts.** Every candidate's
+changelog, comments and worklogs are downloaded, and --user, --kind and the
+field filters apply only afterwards, so the cost grows with everybody's updates
+in the window rather than with the caller's. One request counts the candidates
+first. Above ten search pages, a thousand issues at the default page size, the
+run exits 2 with SWEEP_TOO_LARGE, naming the count and the fewest requests the
+sweep can take. Narrow it with --project, --jql or a shorter --since, or pass
+--max-requests at or above that number to accept the cost. A --max-requests
+that leaves fewer is refused the same way, because this command has no resume
+token and a sweep the budget cuts short cannot be continued. The number is a
+floor: an issue holding more than twenty worklogs costs one request more.
 
 **Where the comment half comes from.** Comment authorship is not searchable in
 JQL on either deployment, so comments are matched here rather than by the
@@ -432,6 +443,11 @@ func validateActivity(ctx context.Context, inv *registry.Invocation) error {
 	if err := requirePageSize(inv); err != nil {
 		return err
 	}
+	// Last of the refusals, because it is the only one that costs a request
+	// whatever the flags say, and a flag that is wrong should not be paid for.
+	if err := refuseSweepTooLarge(ctx, inv); err != nil {
+		return err
+	}
 
 	// After every refusal, because a warning in front of a rejection is noise
 	// in front of the answer. Reading the scope through activityProject means
@@ -456,6 +472,17 @@ func activityProject(inv *registry.Invocation) string {
 		return ""
 	}
 	return inv.Jira.Project()
+}
+
+// activityQuery is the candidate search, read by the sweep, by the count that
+// sizes it, and by --explain, so none of the three can describe a query the
+// others do not send.
+func activityQuery(inv *registry.Invocation) QueryOptions {
+	return QueryOptions{
+		Project:      activityProject(inv),
+		JQL:          inv.Flags.String("jql"),
+		UpdatedAfter: inv.Flags.String(sinceFlag),
+	}
 }
 
 // resolveActivityCutoff turns --since into the instant the event filter uses,
@@ -618,11 +645,7 @@ func runActivity(
 		read    int
 	)
 	result, err := client.ListStream(ctx, ListOptions{
-		Query: QueryOptions{
-			Project:      activityProject(inv),
-			JQL:          inv.Flags.String("jql"),
-			UpdatedAfter: inv.Flags.String(sinceFlag),
-		},
+		Query:    activityQuery(inv),
 		Limit:    registry.Limit{All: true},
 		PageSize: pageSize,
 		Fields:   DefaultFields(),

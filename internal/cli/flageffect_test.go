@@ -864,6 +864,10 @@ func sweepResponse(path string, kind site.Kind) string {
 	// search below instead.
 	case strings.HasSuffix(path, "/jql/parse"):
 		return `{"queries":[{"query":"x","errors":[],"warnings":[]}]}`
+	// Before /search as well. Cloud sizes an activity sweep with this, and
+	// Data Center with the bounded search below, whose total is the count.
+	case strings.HasSuffix(path, "/search/approximate-count"):
+		return `{"count":2}`
 	case strings.HasSuffix(path, "/field"):
 		return `[` + sweepField("customfield_10042", "Story Points") + `,` +
 			sweepField("customfield_10043", "Sprint Goal") + `]`

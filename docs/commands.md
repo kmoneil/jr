@@ -1047,8 +1047,19 @@ The context's project scopes the candidate search, exactly as it does on
 `issue list`, and --all-projects lifts it. That matters more here than it does
 there. This is the command somebody points at "what did I do today", and scoped
 to one project it answers a narrower question in bytes identical to the wider
-one: a complete, empty, exit-0 feed. There is no separate refusal for an
-unbounded sweep, because --since is required and already bounds one.
+one: a complete, empty, exit-0 feed.
+
+**A sweep too large to answer is refused before it starts.** Every candidate's
+changelog, comments and worklogs are downloaded, and --user, --kind and the
+field filters apply only afterwards, so the cost grows with everybody's updates
+in the window rather than with the caller's. One request counts the candidates
+first. Above ten search pages, a thousand issues at the default page size, the
+run exits 2 with SWEEP_TOO_LARGE, naming the count and the fewest requests the
+sweep can take. Narrow it with --project, --jql or a shorter --since, or pass
+--max-requests at or above that number to accept the cost. A --max-requests
+that leaves fewer is refused the same way, because this command has no resume
+token and a sweep the budget cuts short cannot be continued. The number is a
+floor: an issue holding more than twenty worklogs costs one request more.
 
 **Where the comment half comes from.** Comment authorship is not searchable in
 JQL on either deployment, so comments are matched here rather than by the

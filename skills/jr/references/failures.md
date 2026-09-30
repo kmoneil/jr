@@ -104,6 +104,13 @@ until it had every issue in every project the credential can see. The default
 bound of 50 is what makes an unfiltered query harmless, so only the pairing is
 refused. Scope it, or pass `--all-projects` to mean it.
 
+`SWEEP_TOO_LARGE` refuses an `issue activity` sweep past ten search pages, or
+past what `--max-requests` leaves. The sweep reads every candidate's changelog,
+comments and worklogs before `--user` or `--kind` discard anything, so its cost
+follows everybody's updates in the window. The `message` names the count and
+the fewest requests the sweep takes; narrow the candidates, or pass the
+`--max-requests` the `remedy` names to accept the cost.
+
 ## Resolution refusals
 
 A field, a user, a transition, an issue type, or a transition's resolution is
