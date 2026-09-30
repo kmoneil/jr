@@ -129,26 +129,7 @@ func checkByParse(ctx context.Context, client Doer, info Info, query string) (JQ
 // is a heavier answer than a parse and it is the only one available, which is
 // why the result says which was used.
 func checkBySearch(ctx context.Context, client Doer, info Info, query string) (JQLCheck, error) {
-	path := info.APIBase() + "/search"
-
-	body, err := json.Marshal(map[string]any{
-		// validateQuery is a boolean here. "strict" is Cloud's spelling on its
-		// own parse endpoint, and sending it to Data Center is a deserialization
-		// error that arrives as `valid="false"`, a working query reported
-		// broken, which is the worst answer this can give.
-		"jql": query, "maxResults": 0, "validateQuery": true,
-	})
-	if err != nil {
-		return JQLCheck{}, errs.Runtime("ENCODE_FAILED",
-			"cannot encode the query").Wrap(err)
-	}
-
-	resp, err := client.Do(ctx, transport.Request{
-		Method: transport.MethodPost,
-		Path:   path,
-		Header: map[string][]string{"Content-Type": {"application/json"}},
-		Body:   body,
-	})
+	resp, err := searchNoRows(ctx, client, info, query)
 	if err != nil {
 		return JQLCheck{}, err
 	}
@@ -178,6 +159,29 @@ func checkBySearch(ctx context.Context, client Doer, info Info, query string) (J
 		Query: query, Valid: true,
 		Warnings: parsed.WarningMessages, Method: JQLBySearch,
 	}, nil
+}
+
+// searchNoRows is Data Center's search bounded to zero rows, which is both its
+// validity check and its count. One request shape for both, so the recording
+// that evidences one evidences the other.
+func searchNoRows(ctx context.Context, client Doer, info Info, query string) (*transport.Response, error) {
+	body, err := json.Marshal(map[string]any{
+		// validateQuery is a boolean here. "strict" is Cloud's spelling on its
+		// own parse endpoint, and sending it to Data Center is a deserialization
+		// error that arrives as `valid="false"`, a working query reported
+		// broken, which is the worst answer this can give.
+		"jql": query, "maxResults": 0, "validateQuery": true,
+	})
+	if err != nil {
+		return nil, errs.Runtime("ENCODE_FAILED",
+			"cannot encode the query").Wrap(err)
+	}
+	return client.Do(ctx, transport.Request{
+		Method: transport.MethodPost,
+		Path:   info.APIBase() + "/search",
+		Header: map[string][]string{"Content-Type": {"application/json"}},
+		Body:   body,
+	})
 }
 
 // JQLMessages pulls Jira's own error text out of a refusal.

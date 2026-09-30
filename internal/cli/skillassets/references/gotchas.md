@@ -182,6 +182,22 @@ updated it**, not that the named person did.
 `--assignee currentUser --updated-after -7d` answers "assigned to me and touched
 by anyone this week."
 
+**`issue activity --user` narrows the answer, not the search.** Every issue
+updated in the window is read and the person is matched afterwards, because
+three of the four event kinds are not searchable. Across a whole instance that
+is everybody's week, and past ten pages it is refused with `SWEEP_TOO_LARGE`.
+Narrow the candidates to the person's involvement, the fields `--involving`
+covers plus the transitions they made:
+
+```bash
+jr issue activity --since -7d --user currentUser --all-projects \
+  --jql 'assignee = currentUser() OR reporter = currentUser() OR creator = currentUser() OR worklogAuthor = currentUser() OR status changed by currentUser()'
+```
+
+It misses a comment, or a change to any field but status, on an issue they are
+not otherwise tied to, which are the two limits above. If the question was
+"everything they did", say so in the answer.
+
 The five who-touched-it flags are genuinely different questions:
 
 | Question | Flag |

@@ -243,6 +243,13 @@ func TestAnOmittedPageSizeStillPagesAtTheDefault(t *testing.T) {
 		checked++
 		t.Run(c.Name(), func(t *testing.T) {
 			inv := invocationWith(c, "ENG-1")
+			// A site that answers, because issue activity sizes its sweep in
+			// Validate whatever the flags say. The claim here is that an absent
+			// flag is not refused, and a site that cannot be reached would
+			// refuse it for a different reason.
+			inv.Jira = sweepSession{
+				rt: &recordingTransport{kind: site.DataCenter}, kind: site.DataCenter,
+			}
 			if err := c.Validate(t.Context(), inv); err != nil {
 				t.Errorf("%s refused an invocation that never mentioned "+
 					"--page-size: %v", c.Name(), err)

@@ -240,6 +240,21 @@ do not catch, add the test in the same change and cite it here.
   **Enforced by:** `TestALimitCutWarningStatesTheTotal`,
   `TestAnUnknownTotalIsNotWritten`, `TestABudgetCutFeedStatesNoTotal`,
   `TestAClippedElementKeepsItsTotal`.
+- **An activity sweep is sized before it starts, and a missing count is never
+  read as a free one.** `issue activity` downloads every candidate before any
+  filter but the query applies, so it costs everybody's updates in the window,
+  and a sweep cut short cannot be resumed. One count in `Validate` sizes it in
+  the pages the walk will really send, which for an offset walk at the largest
+  page size is one row fewer per page. Past ten of them, or past what
+  `--max-requests` leaves, it is `SWEEP_TOO_LARGE` before a page is sent, and the
+  `--max-requests` the remedy names buys the whole walk. A response with no count
+  is `MALFORMED_COUNT`, because zero is the cheapest sweep there is. Raised by
+  issue 149: a week across a Data Center instance, about sixty pages, killed
+  after five minutes with nothing on stdout.
+  **Enforced by:** `TestTheReportedSweepIsRefusedBeforeAPage`,
+  `TestTheNumberTheRefusalNamesIsEnough`,
+  `TestTheCeilingIsTenPagesOfTheWalkTheSweepWillMake`,
+  `TestAnAbsentCountIsNotZero`.
 - **Issue keys never sort as text.** `IDO-999` is below `IDO-1000` as an issue
   and above it as a string. Use `issue.ParseKey` and `Key.Compare`, and keep the
   check that verifies the server agrees, because the failure mode otherwise is a

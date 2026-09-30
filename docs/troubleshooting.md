@@ -679,6 +679,47 @@ $ jr issue list --limit all --project ENG      # scope it
 $ jr issue list --limit all --all-projects     # or mean it
 ```
 
+### `SWEEP_TOO_LARGE`: an activity sweep bigger than you asked to pay for
+
+`jr issue activity` reads every issue updated in the window, with all of its
+changelog, comments and worklogs, before `--user`, `--kind` or the field filters
+discard anything. So the cost follows everybody's activity rather than yours: a
+week across a whole instance can be sixty pages and several minutes. One request
+counts the candidates first, and past ten pages the run is refused before any of
+them is read:
+
+```console
+$ jr issue activity --since -7d --user currentUser --all-projects
+# stderr: SWEEP_TOO_LARGE: issue activity would read 5873 candidate issues, at
+#         least 60 search requests, and it spends at most 10 without
+#         --max-requests
+```
+
+Narrowing the candidates is almost always the better answer:
+
+```console
+$ jr issue activity --since -7d --user currentUser                  # the context's project
+$ jr issue activity --since -1d --user currentUser --all-projects   # a shorter window
+$ jr issue activity --since -7d --user currentUser --all-projects \
+    --jql 'assignee = currentUser() OR reporter = currentUser() OR creator = currentUser() OR worklogAuthor = currentUser() OR status changed by currentUser()'
+```
+
+The third is the person's involvement: the fields `issue list --involving`
+covers, plus the transitions they made. It misses a comment, or a change to a
+field other than status, on an issue they are not otherwise tied to, because
+JQL cannot search either.
+
+When the whole sweep is what you want, pass the number the `remedy` names:
+
+```console
+$ jr --max-requests 63 issue activity --since -7d --user currentUser --all-projects
+```
+
+That number is a floor. An issue holding more than twenty worklogs costs one
+request more, so an accepted sweep can still stop at exit 3, and the feed has no
+resume token. A `--max-requests` below the floor is refused the same way rather
+than run to a partial feed.
+
 ### "Today" is not my today
 
 Nothing is broken and the result is complete. Jira evaluates every date you send

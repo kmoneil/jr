@@ -1,0 +1,34 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/3/search/approximate-count",
+        "body": "{\"jql\":\"updated \\u003e= \\\"-30d\\\" ORDER BY issuekey DESC\"}"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=298;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=150;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "300"
+          ],
+          "X-Ratelimit-Remaining": [
+            "298"
+          ]
+        },
+        "body": "{\"count\":4}"
+      }
+    }
+  ]
+}

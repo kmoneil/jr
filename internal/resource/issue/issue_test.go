@@ -2,6 +2,7 @@ package issue_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"path/filepath"
 	"slices"
@@ -1961,15 +1962,34 @@ type stubSession struct {
 	// catalogue stays a stub.
 	metaClient site.Doer
 	// baseURL is what the deployment reports as its own address. Empty is the
-	// realistic default here — most tests do not care — and is also the case
-	// --url has to refuse.
+	// realistic default here, since most tests do not care, and is also the
+	// case --url has to refuse.
 	baseURL string
+	// candidates is what the count in front of an activity sweep answers.
+	// Zero is a sweep of one page, which is what a test about anything else
+	// wants.
+	candidates int
 }
 
 func (s *stubSession) Connect(context.Context) (*transport.Client, site.Info, error) {
 	kind := s.kind
 	if kind == "" {
 		kind = site.Cloud
+	}
+	if s.conn == nil {
+		// Validation reads the request budget off the connection, and a test
+		// of validation alone gives none. An empty cassette is a client with
+		// no budget that answers nothing, so a request that reaches it fails
+		// the test rather than dereferencing nil.
+		conn, err := transport.New(transport.Options{
+			BaseURL:    "https://unanswered.invalid",
+			HTTPClient: transport.NewReplayer(&transport.Cassette{}).Client(),
+			Retries:    -1,
+		})
+		if err != nil {
+			return nil, site.Info{}, err
+		}
+		s.conn = conn
 	}
 	return s.conn, site.Info{Kind: kind, BaseURL: s.baseURL}, nil
 }
@@ -1994,8 +2014,11 @@ func (s *stubSession) Metadata(context.Context) (*site.Metadata, error) {
 			client = s.doer
 		}
 		s.meta = &site.Metadata{
-			Client: jqlChecked{inner: client, verdict: s.jqlVerdict, kind: kind},
-			Info:   site.Info{Kind: kind},
+			Client: jqlChecked{
+				inner: client, verdict: s.jqlVerdict, kind: kind,
+				candidates: s.candidates,
+			},
+			Info: site.Info{Kind: kind},
 		}
 	}
 	return s.meta, nil
@@ -2065,8 +2088,8 @@ func (s *stubDoer) Do(_ context.Context, r transport.Request) (*transport.Respon
 	}, nil
 }
 
-// jqlChecked answers the server-side query check and passes everything else to
-// the client underneath.
+// jqlChecked answers the server-side query check, and the count that sizes an
+// activity sweep, and passes everything else to the client underneath.
 //
 // Every raw --jql is checked against Jira before the command runs, on the
 // metadata client. A stub built to answer a catalogue lookup answers that check
@@ -2076,26 +2099,33 @@ func (s *stubDoer) Do(_ context.Context, r transport.Request) (*transport.Respon
 //
 // Intercepting a POST to /search is safe on this client and only on this one:
 // the metadata client fetches fields, users, labels and transitions, and never
-// searches. It is the command's own transport that runs the query.
+// searches. It is the command's own transport that runs the query. On Data
+// Center the check and the count are the same zero-row search, so one answer
+// carries both.
 type jqlChecked struct {
-	inner   site.Doer
-	verdict string
-	kind    site.Kind
+	inner      site.Doer
+	verdict    string
+	kind       site.Kind
+	candidates int
 }
 
 func (j jqlChecked) Do(ctx context.Context, r transport.Request) (*transport.Response, error) {
 	parse := j.kind == site.Cloud && strings.Contains(r.Path, "/jql/parse")
+	count := j.kind == site.Cloud && strings.HasSuffix(r.Path, "/search/approximate-count")
 	search := j.kind != site.Cloud && r.Method == transport.MethodPost &&
 		strings.HasSuffix(r.Path, "/search")
-	if !parse && !search {
+	if !parse && !count && !search {
 		return j.inner.Do(ctx, r)
 	}
 	body := j.verdict
-	if body == "" {
+	switch {
+	case count:
+		body = fmt.Sprintf(`{"count":%d}`, j.candidates)
+	case body != "":
+	case search:
+		body = fmt.Sprintf(`{"issues":[],"warningMessages":[],"total":%d}`, j.candidates)
+	default:
 		body = `{"queries":[{"query":"","errors":[],"warnings":[]}]}`
-		if search {
-			body = `{"issues":[],"warningMessages":[]}`
-		}
 	}
 	return &transport.Response{
 		Status: 200,

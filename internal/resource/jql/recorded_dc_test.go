@@ -155,3 +155,31 @@ func TestTheRecordedDataCenterRefusalIsAConversationAServerHad(t *testing.T) {
 		t.Errorf("the refused query was never sent: %v", unplayed)
 	}
 }
+
+// TestTheRecordedDataCenterCheckIsAlsoTheCount is the evidence for the count
+// issue activity sizes its sweep with, on Data Center.
+//
+// Data Center has no count endpoint, and its zero-row search is the check above
+// and the count both: site.CountIssues sends the same body, so the replayer
+// matching it means this recording was made against the request the count
+// builds. What the check discards, the count keeps: the total, exact on this
+// deployment.
+func TestTheRecordedDataCenterCheckIsAlsoTheCount(t *testing.T) {
+	conn, replayer := recordedConn(t, "validate-recorded.datacenter.json")
+
+	got, err := site.CountIssues(t.Context(), conn,
+		site.Info{Kind: site.DataCenter}, "project = ENG ORDER BY key DESC")
+	if err != nil {
+		t.Fatalf("the request the count builds is not the one the server "+
+			"answered: %v", err)
+	}
+	if got.Issues != 5 {
+		t.Errorf("count = %d, want the recorded total of 5", got.Issues)
+	}
+	if got.Approximate {
+		t.Error("a Data Center total was reported as an estimate")
+	}
+	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+		t.Errorf("the count was never sent: %v", unplayed)
+	}
+}

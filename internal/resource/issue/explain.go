@@ -22,11 +22,7 @@ func explainList(inv *registry.Invocation) (*render.Doc, error) {
 // explainActivity answers --explain for issue activity, whose query carries
 // --since exactly as typed.
 func explainActivity(inv *registry.Invocation) (*render.Doc, error) {
-	return explainQuery(QueryOptions{
-		Project:      activityProject(inv),
-		JQL:          inv.Flags.String("jql"),
-		UpdatedAfter: inv.Flags.String(sinceFlag),
-	}, nil)
+	return explainQuery(activityQuery(inv), nil)
 }
 
 // explainChanges answers --explain for issue changes. The bound it sends is a

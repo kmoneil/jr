@@ -645,3 +645,52 @@ func TestABudgetCutFeedStatesNoTotal(t *testing.T) {
 			result.Total)
 	}
 }
+
+// TestTheCeilingIsTenPagesOfTheWalkTheSweepWillMake pins the boundary and the
+// arithmetic under it.
+//
+// The ceiling is ten search pages, counted in the pages the sweep will really
+// send. A cursor page and a keyset page each bring a full page of new rows, so a
+// thousand candidates is ten. An offset page asks again for the row the last one
+// ended on, and at the largest page size that leaves ninety-nine new rows, so
+// the same thousand is eleven. That is the walk --all-projects makes on Data
+// Center, which is the walk the report that raised this was on.
+func TestTheCeilingIsTenPagesOfTheWalkTheSweepWillMake(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		kind        site.Kind
+		allProjects bool
+		candidates  int
+		refused     bool
+	}{
+		{"a keyset walk of ten pages", site.DataCenter, false, 1000, false},
+		{"a keyset walk of eleven", site.DataCenter, false, 1001, true},
+		{"an offset walk of the same thousand is eleven", site.DataCenter, true, 1000, true},
+		{"an offset walk of ten", site.DataCenter, true, 991, false},
+		{"a cursor walk of ten", site.Cloud, true, 1000, false},
+		{"a cursor walk of eleven", site.Cloud, true, 1001, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd, ok := registry.Lookup("issue.activity")
+			if !ok {
+				t.Fatal("issue activity is not registered")
+			}
+			flags := registry.NewFlags()
+			flags.SetString("since", "-7d")
+			flags.SetBool("all-projects", tc.allProjects)
+			err := cmd.Validate(t.Context(), &registry.Invocation{
+				Jira: &stubSession{
+					doer: &stubDoer{body: catalogueJSON}, kind: tc.kind,
+					candidates: tc.candidates,
+				},
+				Flags: flags, Stderr: io.Discard, Progress: registry.NoProgress,
+			})
+			switch {
+			case tc.refused && errs.Coerce(err).Code != "SWEEP_TOO_LARGE":
+				t.Errorf("%d candidates were not refused: %v", tc.candidates, err)
+			case !tc.refused && err != nil:
+				t.Errorf("%d candidates were refused: %v", tc.candidates, err)
+			}
+		})
+	}
+}
