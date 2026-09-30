@@ -1180,6 +1180,34 @@ All three are exit 2 and not 9. A missing field is malformed data, which is what
 and fails the same way. What the caller has is a combination this site cannot
 support and a remedy that works on the next invocation.
 
+### A change to a list is the elements that moved
+
+`issue history`, `issue activity` and `issue changes` write one row per field a
+save changed. For a field holding several values, the row is **one element
+added or removed**: an addition carries `to` and no `from`, a removal carries
+`from` and no `to`, and each carries the element's id where the field has
+ids. A save that added one and removed another is two rows.
+
+That is how Jira itself records Component and Fix Version, and it is passed
+through. Two fields arrive differently, as the whole list before and after,
+and are split here into the same shape. Measured on Cloud and on Data Center
+10.4.0, 2026-09-30:
+
+| Field        | Jira sends                                             | Written as                                     |
+| ------------ | ------------------------------------------------------ | ---------------------------------------------- |
+| `Component`  | one item per element, with its id                      | as sent                                        |
+| `Fix Version`| one item per element, with its id                      | as sent                                        |
+| `labels`     | both whole lists, joined by a space, no ids            | one row per label added or removed             |
+| `Sprint`     | both whole lists: ids joined by `, `, names the same   | one row per sprint added or removed, with its id |
+| watchers     | nothing: adding or removing a watcher is not recorded  | no row                                         |
+
+The split is made only where it is exact. A label cannot hold a space. Sprint
+ids are numeric, and the names pair with them by position only when both
+lists have the same length; a sprint name holding `, ` makes them differ, and
+that row keeps both lists whole, as does a save the split sees no difference
+in. Until 2026-09-30 every labels and Sprint row carried both lists, so a row
+grew with every sprint an issue had been through (issue 120).
+
 ## TSV escaping
 
 Every record is one line and every field is one column. Within a field:
