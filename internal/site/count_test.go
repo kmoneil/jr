@@ -7,6 +7,37 @@ import (
 	"github.com/kmoneil/jr/internal/site"
 )
 
+// TestTheRecordedCloudCountIsAConversationAServerHad is the Cloud half of the
+// evidence; the Data Center half is the JQL check's own recording, replayed in
+// internal/resource/jql.
+//
+// Recorded from the sandbox on 2026-09-30 by the refusal itself: `issue
+// activity --since -30d --all-projects` with `--max-requests 1` and a warm probe
+// cache, so the one request allowed was the count and the refusal after it sent
+// nothing. The replayer matches method, path and body, so a count here means
+// Cloud accepted the body this code builds, `ORDER BY` included, and answered
+// with `count` at the top level.
+func TestTheRecordedCloudCountIsAConversationAServerHad(t *testing.T) {
+	client, replayer := recordedClientAt(t,
+		"count-recorded.cloud.json", "https://recorded.invalid")
+
+	got, err := site.CountIssues(t.Context(), client, site.Info{Kind: site.Cloud},
+		`updated >= "-30d" ORDER BY issuekey DESC`)
+	if err != nil {
+		t.Fatalf("the request the count builds is not the one the server "+
+			"answered: %v", err)
+	}
+	if got.Issues != 4 {
+		t.Errorf("count = %d, want the recorded 4", got.Issues)
+	}
+	if !got.Approximate {
+		t.Error("Cloud's estimate was reported as exact")
+	}
+	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+		t.Errorf("the count was never sent: %v", unplayed)
+	}
+}
+
 // TestAnAbsentCountIsNotZero keeps the one wrong reading out.
 //
 // A count is what an activity sweep is sized by, and zero is the cheapest sweep

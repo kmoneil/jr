@@ -168,6 +168,26 @@ func TestTheNumberTheRefusalNamesIsEnough(t *testing.T) {
 	}
 }
 
+// TestTheRecordedRefusalReadsAsASentence is the refusal the sandbox gave when
+// its count was recorded, four candidates and one request allowed, which is
+// where a floor of one first met a message written for many: "at least 1
+// search requests".
+func TestTheRecordedRefusalReadsAsASentence(t *testing.T) {
+	jira := sweepJira(t, "Cloud", 4)
+	env := credentialed(t)
+	mustRun(t, env, "context", "create", "work", "--site", jira.url, "--project", "ENG")
+
+	// Two requests: the probe on a cold cache, and the count.
+	got := run(t, env, "--max-requests", "2", "issue", "activity", "--since", "-30d",
+		"--all-projects")
+
+	const want = "issue activity would read about 4 candidate issues, " +
+		"at least 1 search request, and --max-requests leaves 0"
+	if !strings.Contains(got.stderr, want) {
+		t.Errorf("want %q in:\n%s", want, got.stderr)
+	}
+}
+
 // namedBudget reads the --max-requests value out of the refusal's remedy.
 func namedBudget(t *testing.T, stderr string) int {
 	t.Helper()

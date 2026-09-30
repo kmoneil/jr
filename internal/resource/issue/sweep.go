@@ -3,7 +3,6 @@ package issue
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/kmoneil/jr/internal/errs"
 	"github.com/kmoneil/jr/internal/registry"
@@ -73,8 +72,8 @@ func refuseSweepTooLarge(ctx context.Context, inv *registry.Invocation) error {
 	// What --max-requests has to say for this sweep to run: what validation
 	// has spent already, which the next run spends again, plus the floor.
 	enough := conn.Requests() + floor
-	sized := fmt.Sprintf("issue activity would read %s candidate issues, "+
-		"at least %d search requests", countWords(count), floor)
+	sized := fmt.Sprintf("issue activity would read %s, at least %s",
+		countWords(count), plural(floor, "search request"))
 	detail := fmt.Sprintf("every candidate is read before --user, --kind and "+
 		"the field filters apply; the candidate query: %s", query)
 	if remaining < 0 {
@@ -123,7 +122,7 @@ func (c *Client) freshPerPage(opt ListOptions, pageSize int) int {
 // estimate, and a refusal quoting it as exact would claim more than was known.
 func countWords(c site.IssueCount) string {
 	if c.Approximate {
-		return "about " + strconv.Itoa(c.Issues)
+		return "about " + plural(c.Issues, "candidate issue")
 	}
-	return strconv.Itoa(c.Issues)
+	return plural(c.Issues, "candidate issue")
 }
