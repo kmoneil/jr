@@ -45,12 +45,28 @@ spells out. With `--max-requests` given, the sweep runs when the budget covers
 it and is refused when it does not, because the feed has no resume token and a
 sweep the budget cuts short cannot be continued.
 
+**Take this one too if a script reads labels or Sprint changes from
+`issue history`, `issue activity` or `issue changes`.** A change to either
+was one row carrying the whole list before and the whole list after, so a save
+on a long-lived issue repeated every sprint it had been through, twice (issue
+120). It is now one row per label or sprint added or removed: an addition has
+`to` and no `from`, a removal `from` and no `to`, and a sprint carries its id.
+That is how Jira already records a component or a fix version, so every
+multi-valued field now reads one way. Measured on both deployments first:
+components and fix versions were already one element per row, and watcher
+changes are not in the changelog at all, so neither changes. The split is made
+only where it is exact. A sprint whose name holds `, `, and anything else that
+cannot be split without guessing, keeps both lists as before.
+
 ### Documentation
 
 - docs/troubleshooting.md gains `SWEEP_TOO_LARGE`, with the narrowing recipe
   and the `--max-requests` that accepts the cost; docs/recipes.md carries the
   recipe beside the activity examples, and the skill's failure table, cost
   notes and gotchas tell an agent to narrow before it accepts.
+- docs/output-contract.md gains "A change to a list is the elements that
+  moved", with what each deployment sends for each multi-valued field, and
+  docs/recipes.md says how to read one where `issue history` is introduced.
 - The README and the repository link GitHub Sponsors.
 
 ### Internal
@@ -76,6 +92,13 @@ sweep the budget cuts short cannot be continued.
 - Every `issue activity` run makes one more request, the count, so a
   `--max-requests` that was exactly enough before is one short now, and is
   refused rather than cut.
+- **Priced a minor, on a second row.** A labels or Sprint change in
+  `issue history`, `issue activity` and `issue changes` is one row per element
+  added or removed, where it was one row holding both whole lists. The
+  documents parse identically, and `issue.history`, `issue.activity` and
+  `issue.changes` stay at `v` 1 because their shape did not change; what a row
+  holds did, for inputs where it was stable, which is the stability policy's
+  row for a minor.
 - No exit code changed meaning.
 
 ## [0.17.3] - 2026-09-27
