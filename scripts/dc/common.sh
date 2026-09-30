@@ -17,6 +17,19 @@ jr=${JR:-$repo/bin/jr}
 
 say() { printf '%s\n' "$*" >&2; }
 
+# rig_python runs Python through uv, at a version this rig names, rather than
+# whatever python3 is first on PATH. macOS ships 3.9 at /usr/bin, and
+# licence.py's annotations need 3.10: on 2026-09-30 `make dc-up` got as far as
+# starting the containers and then died in setup.sh with a TypeError. The Linux
+# dev container had a newer python3, which is why nothing had seen it.
+rig_python() {
+	command -v uv >/dev/null || {
+		say "uv is not installed: https://docs.astral.sh/uv/getting-started/"
+		exit 1
+	}
+	uv run --quiet --no-project --python '>=3.12' python "$@"
+}
+
 # jira_base prints a URL that actually reaches this rig's Jira, or fails.
 #
 # Two answers are possible and both are ordinary. On a machine running Docker

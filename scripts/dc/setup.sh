@@ -34,7 +34,7 @@ licence() {
 		return
 	fi
 	say "licence: fetching the published Data Center timebomb key"
-	python3 ./licence.py
+	rig_python ./licence.py
 }
 
 # token prints the current XSRF token from the cookie jar.

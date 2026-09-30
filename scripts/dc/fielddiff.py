@@ -1,9 +1,12 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.12"
+# ///
 """Report every field a constructed cassette claims that no recording carries.
 
 Run from the repository root, after a recording session:
 
-    python3 scripts/dc/fielddiff.py
+    uv run scripts/dc/fielddiff.py
 
 A hand-written fixture asserts both halves of an exchange, so it can invent a
 field the server never sends — and the code then comes to depend on it. That is

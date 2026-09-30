@@ -16,6 +16,11 @@ make dc-record  # every cassette in manifest.tsv
 make dc-down    # destroy it, including the licence
 ```
 
+It needs Docker with Compose (on the Mac, OrbStack provides both) and
+[uv](https://docs.astral.sh/uv/getting-started/), which runs the rig's Python at
+3.12 or later whatever `python3` is first on PATH. macOS's own is 3.9, and the
+licence script needs 3.10.
+
 ## The licence, which is the part that nearly stopped this
 
 Atlassian's self-serve Data Center trials ended on **30 March 2026**, and Data
@@ -171,7 +176,7 @@ reaches curl on stdin rather than on its command line.
 ## After recording: what the fixtures still claim
 
 ```sh
-python3 scripts/dc/fielddiff.py
+uv run scripts/dc/fielddiff.py
 ```
 
 It walks every Data Center cassette, groups them by endpoint, and reports each

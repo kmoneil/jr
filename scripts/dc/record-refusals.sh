@@ -46,7 +46,7 @@ JIRA_RECORD="$work/1.json" "$jr" issue create \
 JIRA_RECORD="$work/2.json" "$jr" issue create \
 	--project "$project" --type Bug --summary "a summary" >/dev/null 2>"$work/warn"
 
-python3 - "$work" "$repo/$dir/create-twice-recorded.datacenter.json" <<'PY'
+rig_python - "$work" "$repo/$dir/create-twice-recorded.datacenter.json" <<'PY'
 import json, sys
 
 work, target = sys.argv[1], sys.argv[2]
@@ -94,7 +94,7 @@ say "recording -> $dir/delete-parent-recorded.datacenter.json"
 JIRA_RECORD="$repo/$dir/delete-parent-recorded.datacenter.json" \
 	"$jr" issue delete "$parent" --yes >/dev/null 2>&1 || true
 
-python3 - "$repo/$dir/delete-parent-recorded.datacenter.json" <<'PY'
+rig_python - "$repo/$dir/delete-parent-recorded.datacenter.json" <<'PY'
 import json, sys
 
 path = sys.argv[1]
