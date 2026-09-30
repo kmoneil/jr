@@ -240,6 +240,17 @@ do not catch, add the test in the same change and cite it here.
   **Enforced by:** `TestALimitCutWarningStatesTheTotal`,
   `TestAnUnknownTotalIsNotWritten`, `TestABudgetCutFeedStatesNoTotal`,
   `TestAClippedElementKeepsItsTotal`.
+- **A change to a list is the elements that moved, and a split is made only
+  where it is exact.** Jira records Component and Fix Version one element per
+  item and labels and Sprint as both whole lists, so one save of a long-lived
+  issue's sprints repeated every sprint it had been through, twice (issue 120).
+  labels split on a space, which a label cannot hold, and Sprint on its numeric
+  ids, pairing names by position only when both lists are the same length. Any
+  other case keeps the row whole, because a delta that might be wrong is worse
+  than the verbose row that is right.
+  **Enforced by:** `TestALabelsChangeIsTheLabelsThatMoved`,
+  `TestASprintChangeIsTheSprintsThatMoved`, `TestAComponentWasAlreadyTheDelta`,
+  `TestAListThatCannotBeSplitExactlyStaysWhole`.
 - **An activity sweep is sized before it starts, and a missing count is never
   read as a free one.** `issue activity` downloads every candidate before any
   filter but the query applies, so it costs everybody's updates in the window,

@@ -242,6 +242,10 @@ $ jr issue history ENG-101 --changed-field status
 $ jr issue list --involving ada --updated-after -7d --with-comments --format json
 ```
 
+A field holding several values changes one element per row: adding a label is a
+row with only `to`, removing a sprint a row with only `from`, the same way Jira
+records a component. A save that did both is two rows.
+
 **Reach for `--changed-field` before reading a bare `issue history`.** A
 changelog carries every description and Acceptance Criteria edit as a full
 before-and-after body on a single row, so one issue with a few revisions can

@@ -174,7 +174,9 @@ type rawItem struct {
 	ToString   *string `json:"toString"`
 }
 
-// flatten turns one save into one Change per field it touched.
+// flatten turns one save into one Change per field it touched, and a field
+// Jira records as a whole list into one Change per element it added or
+// removed (see splitList).
 func (r rawHistory) flatten() ([]Change, error) {
 	created, err := normalizeTime("created", r.Created)
 	if err != nil {
@@ -187,6 +189,12 @@ func (r rawHistory) flatten() ([]Change, error) {
 		c := Change{
 			ID: r.ID, Author: author, Created: created,
 			Field: item.Field, FieldID: item.FieldID, FieldType: item.FieldType,
+		}
+		if delta, ok := splitList(item); ok {
+			for _, d := range delta {
+				out = append(out, d.applyTo(c))
+			}
+			continue
 		}
 		c.From, c.FromID, c.HasFrom = side(item.FromString, item.From)
 		c.To, c.ToID, c.HasTo = side(item.ToString, item.To)
