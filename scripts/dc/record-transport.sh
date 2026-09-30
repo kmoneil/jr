@@ -41,7 +41,7 @@ summary=$(printf 'x%.0s' $(seq 1 300))
 JIRA_RECORD="$work/3.json" "$jr" issue create \
 	--project "${SEED_PROJECT:-ENG}" --type Task --summary "$summary" >/dev/null 2>&1 || true
 
-python3 - "$work" "$repo/$out" <<'PY'
+rig_python - "$work" "$repo/$out" <<'PY'
 import json, sys
 
 work, target = sys.argv[1], sys.argv[2]

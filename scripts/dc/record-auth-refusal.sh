@@ -61,7 +61,7 @@ mkdir -p "$(dirname "$repo/$out")"
 # Exit 4 is the recording, so a non-zero status here is success.
 JIRA_RECORD="$repo/$out" "$jr" user me >/dev/null 2>&1 || true
 
-python3 - "$repo/$out" <<'PY'
+rig_python - "$repo/$out" <<'PY'
 import json, sys
 
 path = sys.argv[1]

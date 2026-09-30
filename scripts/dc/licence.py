@@ -1,4 +1,7 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.12"
+# ///
 """Print the Data Center timebomb licence this rig runs on.
 
 Atlassian publishes timebomb licences for running a Data Center product without
