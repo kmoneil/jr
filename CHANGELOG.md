@@ -20,6 +20,64 @@ accident.
 
 Nothing yet.
 
+## [0.18.0] - 2026-09-30
+
+**Take this one if you, or an agent, point `jr issue activity` at more than one
+project or a long window.** `--user`, `--kind` and the field filters narrow what
+the feed writes and not what it reads: every issue updated in the window is a
+candidate, and every candidate's changelog, comments and worklogs are
+downloaded before the filters run. So "what did I do this week" across a whole
+instance paid for everybody's week. The report that raised it (issue 149) was
+about sixty pages on Data Center, killed after five minutes with nothing on
+stdout, for 31 events. `--limit` never helped, because every candidate is read
+before the newest events are chosen.
+
+**The sweep is sized before it starts, and one too large is refused.** One
+request counts the candidates: Data Center's exact total, or Cloud's
+approximate count, which the refusal quotes as "about N". Past ten search pages
+(a thousand issues at the default page size, somewhat fewer on a Data Center
+`--all-projects` walk, which gains 99 new issues a page), the run exits 2 with
+`SWEEP_TOO_LARGE` before reading any of them. The refusal names the count, the
+fewest requests the sweep can take, and the `--max-requests` value that accepts
+the cost. Narrowing is usually the better answer: `--project`, a shorter
+`--since`, or `--jql` with the person's involvement, which docs/recipes.md
+spells out. With `--max-requests` given, the sweep runs when the budget covers
+it and is refused when it does not, because the feed has no resume token and a
+sweep the budget cuts short cannot be continued.
+
+### Documentation
+
+- docs/troubleshooting.md gains `SWEEP_TOO_LARGE`, with the narrowing recipe
+  and the `--max-requests` that accepts the cost; docs/recipes.md carries the
+  recipe beside the activity examples, and the skill's failure table, cost
+  notes and gotchas tell an agent to narrow before it accepts.
+- The README and the repository link GitHub Sponsors.
+
+### Internal
+
+- The prompt tests run under the BSD `script(1)` macOS ships, as well as
+  util-linux's; on a Mac they failed on a clean tree and stopped
+  `scripts/land` after every rebase.
+- Two `--no-body` tests had asked for the last seven days over fixed fixture
+  dates, so one failed and one stopped checking anything a week after they
+  were written. Both are pinned to the fixture's dates.
+- Six mutants the weekly sweep caught are killed, and the sweep is back at
+  its baseline.
+
+### Output contract
+
+- No kind moved.
+- New error code, exit 2, on `issue activity`: `SWEEP_TOO_LARGE`.
+- **Priced a minor, on one row.** `jr issue activity` over more than ten search
+  pages of candidates without `--max-requests`, or over more than a given
+  `--max-requests` leaves, ran and now exits 2 with `SWEEP_TOO_LARGE`, having
+  read no page. Refusing an input that used to be accepted is the stability
+  policy's row for a minor.
+- Every `issue activity` run makes one more request, the count, so a
+  `--max-requests` that was exactly enough before is one short now, and is
+  refused rather than cut.
+- No exit code changed meaning.
+
 ## [0.17.3] - 2026-09-27
 
 **Take this one if you read `jr issue activity` or `jr issue changes` over more
