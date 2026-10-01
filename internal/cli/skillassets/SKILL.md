@@ -213,7 +213,8 @@ Mutations are gated on purpose, and the gates are cheap to satisfy honestly.
 4. **A plan for more than one issue.** `issue edit` refuses several keys unless
    `--plan-out <file>` is given, and that writes a document instead of sending
    anything: one row per issue, each carrying its own baseline, and the change
-   written once. Read it, then run it with `--apply <file>`. Every row is
+   written once. Read it, then run it with `--apply <file>`. The plan is the
+   preview, so `--dry-run` beside `--apply` is refused. Every row is
    attempted and reported `applied`, `skipped` or `failed` with its own code, a
    row somebody changed since the plan is refused with nothing sent, and running
    the same apply again skips whatever already landed. This is the only path to

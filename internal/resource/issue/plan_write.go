@@ -638,8 +638,9 @@ func planOutFlag() registry.Flag {
 func applyFlag() registry.Flag {
 	return registry.Flag{
 		Name: applyFlagName, Type: registry.TypeString,
-		Usage: "run a plan written by --plan-out; takes no issue keys and no " +
-			"field flags, because the plan carries both",
+		Usage: "run a plan written by --plan-out; takes no issue keys, no field " +
+			"flags and no --dry-run, because the plan carries the first two and " +
+			"is itself the preview",
 	}
 }
 
@@ -658,6 +659,9 @@ func validateEditShape(inv *registry.Invocation) error {
 		return errs.Usage("CONFLICTING_PLAN_FLAGS",
 			"--"+planOutFlagName+" writes a plan and --"+applyFlagName+" runs one").
 			WithRemedy("write it in one invocation and run it in another")
+	}
+	if apply != "" && inv.Flags.Bool("dry-run") {
+		return dryRunApplyConflict()
 	}
 	if apply != "" {
 		return validateApplyShape(inv)
@@ -680,6 +684,21 @@ func validateEditShape(inv *registry.Invocation) error {
 				"it, then run it with --" + applyFlagName)
 	}
 	return nil
+}
+
+// dryRunApplyConflict is the refusal for --dry-run beside --apply.
+//
+// It is the pair --plan-out beside --dry-run was always refused as, from the
+// other half of a plan. Before it existed the pair was read by nothing: all
+// three verbs dispatched --apply before --dry-run was looked at, so a caller
+// who asked to preview a plan ran it, every row was written, and the document
+// said issue.apply at exit 0. The plan file is the preview, which is the reason
+// to write one, so a dry run of it has nothing to add.
+func dryRunApplyConflict() error {
+	return errs.Usage("CONFLICTING_PLAN_FLAGS",
+		"--dry-run sends nothing and --"+applyFlagName+" sends what the plan holds").
+		WithRemedy("the plan is the preview: read it, then run --" + applyFlagName +
+			" without --dry-run")
 }
 
 // validateApplyShape refuses the flags an apply cannot honour.

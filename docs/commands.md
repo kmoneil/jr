@@ -1123,7 +1123,7 @@ jr issue assign ENG-101 'Ada Lovelace' --if-unchanged eyJkIjo
 | `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
 | `--plan-out` | `string` | — | write a plan for these issues to this file and send nothing; apply it later with --apply |
-| `--apply` | `string` | — | run a plan written by --plan-out; takes no issue keys and no field flags, because the plan carries both |
+| `--apply` | `string` | — | run a plan written by --plan-out; takes no issue keys, no field flags and no --dry-run, because the plan carries the first two and is itself the preview |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -1791,7 +1791,7 @@ jr issue edit ENG-101 --field-json customfield_11350='"ENG-42"'
 | `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
 | `--plan-out` | `string` | — | write a plan for these issues to this file and send nothing; apply it later with --apply |
-| `--apply` | `string` | — | run a plan written by --plan-out; takes no issue keys and no field flags, because the plan carries both |
+| `--apply` | `string` | — | run a plan written by --plan-out; takes no issue keys, no field flags and no --dry-run, because the plan carries the first two and is itself the preview |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -2278,7 +2278,7 @@ jr issue move ENG-101 Done --idempotency-key deploy-42
 | `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
 | `--plan-out` | `string` | — | write a plan for these issues to this file and send nothing; apply it later with --apply |
-| `--apply` | `string` | — | run a plan written by --plan-out; takes no issue keys and no field flags, because the plan carries both |
+| `--apply` | `string` | — | run a plan written by --plan-out; takes no issue keys, no field flags and no --dry-run, because the plan carries the first two and is itself the preview |
 
 | Emits | Schema | When |
 | --- | --- | --- |

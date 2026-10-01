@@ -1728,6 +1728,11 @@ change set. Both documents also go to stdout, so a caller with no shell to
 redirect with, which is every caller over MCP, still gets the document every
 other command produces.
 
+`--dry-run` beside `--apply` is refused before the plan is read. The plan is
+the preview, and an apply is the half that sends. Until the refusal existed
+the pair was not read at all, and the apply ran: a caller who asked to preview
+a plan wrote every row.
+
 On move and assign the arguments follow one rule: every argument before the
 last is a key, and the last is the transition or the assignee.
 
@@ -1800,7 +1805,7 @@ duplicate.
 | `PLAN_TAKES_NO_KEYS`       | 2    | `--apply` was given issue keys as well. It takes its issues from the plan.                                                                                                                                                                                                       |
 | `PLAN_CARRIES_THE_CHANGE`  | 2    | `--apply` was given field flags as well. Whether the flag overrode the plan or the plan won, the document somebody reviewed would stop being the change that runs.                                                                                                                |
 | `PLAN_CARRIES_THE_BASELINE`| 2    | `--apply` was given `--if-unchanged` as well. The plan already holds one baseline per row.                                                                                                                                                                                        |
-| `CONFLICTING_PLAN_FLAGS`   | 2    | `--plan-out` with `--apply`, or `--plan-out` with `--dry-run`. The first pair writes a plan and runs one; the second both send nothing and each names a different document, and a command emits one.                                                                              |
+| `CONFLICTING_PLAN_FLAGS`   | 2    | `--plan-out` with `--apply`, `--plan-out` with `--dry-run`, or `--apply` with `--dry-run`. The first pair writes a plan and runs one; the second both send nothing and each names a different document, and a command emits one; the third asks to preview a plan by running it, when the plan file is the preview.                                                                              |
 | `UNKNOWN_ISSUE`            | 5    | A key given to `--plan-out` is not an issue this credential can read. Refused while planning rather than recorded, because a plan is what you read *instead* of finding out at apply time.                                                                                        |
 
 ### The sprint lifecycle

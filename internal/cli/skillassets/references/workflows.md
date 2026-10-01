@@ -59,7 +59,8 @@ nothing and writes a document: one row per issue, each carrying its own
 baseline and an idempotency key, with the change written once because a plan
 applies one change to many issues. On move and assign, every argument before
 the last is a key and the last is the transition or the assignee. Read the
-document, then `--apply <file>` with the same verb.
+document, then `--apply <file>` with the same verb. The document is the
+preview: `--dry-run` beside `--apply` is refused rather than read.
 
 ```console
 jr issue edit ENG-101 ENG-102 ENG-103 --add-label triaged --plan-out plan.xml
