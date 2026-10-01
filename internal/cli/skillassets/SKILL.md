@@ -116,6 +116,12 @@ the empty success above.
 - **`complete="true"` is the only proof you have everything.** It appears in the
   envelope of every format that has one. TSV has no envelope, which is why exit 3
   and the stderr warning exist. Check one of the three, every time.
+- **Do not pipe `jr` when the exit code matters.** In `jr ... | head` the shell
+  reports `head`'s status, so exit 3 and exit 2 vanish, and after `2>&1` the
+  truncation warning on stderr is cut off before it arrives. Shape the output
+  with `--limit`, `--field` and `--format` instead of `head`, `cut` and `grep`.
+  If a pipe is unavoidable, `set -o pipefail` first, or write to files and read
+  the status: `jr ... >out.tsv 2>err.json; echo $?`.
 
 An error is always shaped the same way and always carries a machine-stable
 `code`, plus `retryable` and `exit`:
