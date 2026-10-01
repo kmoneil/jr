@@ -73,6 +73,8 @@ func checkByParse(ctx context.Context, client Doer, info Info, query string) (JQ
 	resp, err := client.Do(ctx, transport.Request{
 		Method: transport.MethodPost,
 		Path:   path,
+		// A parse: sending it twice reads twice and changes nothing.
+		Idempotent: true,
 		// A query Jira would run with warnings is not one to call valid without
 		// saying so. That was the argument for `strict`, and `strict` is the
 		// mode that does not do it.
@@ -179,8 +181,10 @@ func searchNoRows(ctx context.Context, client Doer, info Info, query string) (*t
 	return client.Do(ctx, transport.Request{
 		Method: transport.MethodPost,
 		Path:   info.APIBase() + "/search",
-		Header: map[string][]string{"Content-Type": {"application/json"}},
-		Body:   body,
+		// A search: sending it twice reads twice and changes nothing.
+		Idempotent: true,
+		Header:     map[string][]string{"Content-Type": {"application/json"}},
+		Body:       body,
 	})
 }
 

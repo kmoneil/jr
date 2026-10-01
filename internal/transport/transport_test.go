@@ -460,31 +460,113 @@ func TestPostIsReplayedAfterRateLimiting(t *testing.T) {
 	}
 }
 
-// TestReplayablePostIsRetried covers a caller holding an idempotency key, for
-// whom a duplicate is not possible.
-func TestReplayablePostIsRetried(t *testing.T) {
+// TestAnIdempotentPostIsRetried covers a query sent as a POST: reading twice
+// changes nothing, so an upstream error is retried as it would be for a GET.
+//
+// It replaced TestReplayablePostIsRetried, which said a caller holding an
+// idempotency key was one "for whom a duplicate is not possible". It was
+// possible: the key guards a second run of the command, and this retry happens
+// inside one, so a keyed create answered 503 after Jira made the issue made
+// another (2026-10-01).
+func TestAnIdempotentPostIsRetried(t *testing.T) {
 	var calls atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		if calls.Add(1) < 3 {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
-		w.WriteHeader(http.StatusCreated)
+		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
 
 	c, _ := newTestClient(t, srv, transport.Options{Retries: 3})
 	resp, err := c.Do(t.Context(), transport.Request{
-		Method: http.MethodPost, Path: "/x", Body: []byte(`{}`), Replayable: true,
+		Method: http.MethodPost, Path: "/rest/api/2/search", Body: []byte(`{}`),
+		Idempotent: true,
 	})
 	if err != nil {
 		t.Fatalf("do: %v", err)
 	}
-	if resp.Status != http.StatusCreated {
+	if resp.Status != http.StatusOK {
 		t.Errorf("status = %d", resp.Status)
 	}
 	if resp.Attempts != 3 {
 		t.Errorf("Attempts = %d, want 3", resp.Attempts)
+	}
+}
+
+// TestAWriteAnsweredWithA5xxHasAnUnknownOutcome is what the caller is told
+// when a POST that was not resent came back 503: not a transient error to
+// retry, which for an unkeyed create would make the duplicate this client
+// declined to, but a write whose outcome nobody knows.
+func TestAWriteAnsweredWithA5xxHasAnUnknownOutcome(t *testing.T) {
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+
+	c, _ := newTestClient(t, srv, transport.Options{Retries: 3})
+	resp, err := c.Do(t.Context(), transport.Request{
+		Method: http.MethodPost, Path: "/rest/api/2/issue", Body: []byte(`{}`),
+	})
+	if err != nil {
+		t.Fatalf("do: %v", err)
+	}
+	if n := calls.Load(); n != 1 {
+		t.Errorf("the server saw %d attempts at a write; it must see one", n)
+	}
+	e := errs.Coerce(transport.Err(resp))
+	if e.Code != "OUTCOME_UNKNOWN" || e.Retryable || e.Exit != exitcode.Remote {
+		t.Errorf("got %s exit %v retryable %t, want OUTCOME_UNKNOWN exit %v "+
+			"retryable false", e.Code, e.Exit, e.Retryable, exitcode.Remote)
+	}
+	if !strings.Contains(e.Remedy, "check whether it happened") {
+		t.Errorf("remedy = %q, want it to say to check before sending again", e.Remedy)
+	}
+
+	// A read answered the same way is still an ordinary, retryable failure.
+	get, err := c.Do(t.Context(), transport.Request{Method: http.MethodGet, Path: "/rest/api/2/issue/ENG-1"})
+	if err != nil {
+		t.Fatalf("do: %v", err)
+	}
+	if e := errs.Coerce(transport.Err(get)); e.Code != "UPSTREAM_ERROR" || !e.Retryable {
+		t.Errorf("a GET answered 503 reports %s retryable %t, want UPSTREAM_ERROR "+
+			"retryable", e.Code, e.Retryable)
+	}
+}
+
+// TestAWriteWhoseConnectionDroppedHasAnUnknownOutcome is the same doubt
+// arriving as a dropped connection: the request was written and no answer
+// came, so Jira may have acted on it.
+func TestAWriteWhoseConnectionDroppedHasAnUnknownOutcome(t *testing.T) {
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		hijacker, ok := w.(http.Hijacker)
+		if !ok {
+			t.Error("the test server cannot drop a connection")
+			return
+		}
+		conn, _, err := hijacker.Hijack()
+		if err == nil {
+			_ = conn.Close()
+		}
+	}))
+	defer srv.Close()
+
+	c, _ := newTestClient(t, srv, transport.Options{Retries: 3})
+	_, err := c.Do(t.Context(), transport.Request{
+		Method: http.MethodPost, Path: "/rest/api/2/issue", Body: []byte(`{}`),
+	})
+	if n := calls.Load(); n != 1 {
+		t.Errorf("the server saw %d attempts at a write; it must see one", n)
+	}
+	e := errs.Coerce(err)
+	if e.Code != "OUTCOME_UNKNOWN" || e.Retryable {
+		t.Errorf("got %s retryable %t, want OUTCOME_UNKNOWN retryable false: %v",
+			e.Code, e.Retryable, err)
 	}
 }
 

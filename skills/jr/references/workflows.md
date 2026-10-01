@@ -179,10 +179,12 @@ jr issue create --type Bug --summary "..." --idempotency-key "$(uuidgen)"
 `--dry-run` prints the exact request, body included, and sends nothing.
 
 `--idempotency-key` is what makes a retry safe. Without one, a create that timed
-out after Jira processed it becomes two issues when you retry. With one, the
-repeat returns the original result marked `replayed="true"` and exit 0. Generate
-the key before the first attempt and reuse it on every retry of that same
-logical create.
+out after Jira processed it becomes two issues when you retry. With one, a
+repeat after a run that finished returns the original result marked
+`replayed="true"` and exit 0, and a repeat after `OUTCOME_UNKNOWN`, when nobody
+knows whether the first attempt landed, is refused as `IDEMPOTENT_IN_FLIGHT`
+until the claim goes stale: check first. Generate the key before the first
+attempt and reuse it on every retry of that same logical create.
 
 ## Editing something you read first
 

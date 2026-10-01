@@ -1,7 +1,8 @@
 # Failures
 
 Every error carries a machine-stable `code`. Branch on the code, never on the
-message. `retryable` is `true` only for `RATE_LIMIT` and `REMOTE`.
+message. `retryable` is `true` only for `RATE_LIMIT` and `REMOTE`, except
+`OUTCOME_UNKNOWN`, a write that may already have happened, which never is.
 
 The pattern throughout: **if a request cannot be honored exactly, it fails.**
 Most of what looks like a bug is the tool declining to guess.
@@ -164,7 +165,8 @@ Two specifics worth knowing:
 
 `RATE_LIMIT` (8) and `REMOTE` (9) are the only codes with `retryable` true. `jr`
 already retried per `--retries` (default 3) before reporting either, so back off
-before trying again rather than looping immediately.
+before trying again rather than looping immediately. The exception is
+`OUTCOME_UNKNOWN` (9), below.
 
 `PAGINATION_SHORT` (9) is a walk that stopped holding fewer rows than Jira
 counted for the query it started from, and it exists because every other
@@ -184,10 +186,13 @@ edits, and the message names the row expected and the row found. If it repeats,
 narrow the query, or scope it to one project with `--project`, where paging is
 by issue key and cannot shift.
 
-A non-idempotent request is **not** replayed after an upstream error. A POST that
-got a 503 may have been processed before the failure, and retrying it is how one
-`issue create` becomes two issues. Only a 429, which is a refusal before
-processing, or an explicit idempotency key allows a POST retry.
+A non-idempotent request is **not** replayed after an upstream error, with an
+idempotency key or without. A POST that got a 503 may have been processed before
+the failure, and retrying it is how one `issue create` becomes two issues. Only
+a 429, which is a refusal before processing, is retried. Such a failure is
+`OUTCOME_UNKNOWN` (9) with `retryable` false: read what you were changing to see
+whether it happened, and do not resend it blind. With a key the claim stays
+held, and a repeat inside ten minutes is refused as `IDEMPOTENT_IN_FLIGHT`.
 
 `INVALID_ENCODING` (2) is text you supplied that is not valid UTF-8; correct it.
 `UNRENDERABLE_VALUE` (1) came back from Jira and names the field: the value holds

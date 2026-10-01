@@ -133,7 +133,8 @@ An error is always shaped the same way and always carries a machine-stable
 
 Branch on `code`, never on `message`. `retryable` is `true` only for
 `RATE_LIMIT` and `REMOTE`; retrying anything else burns budget on a verdict that
-will not change.
+will not change. One `REMOTE` code is never retryable: `OUTCOME_UNKNOWN`, a
+write that may already have happened. Check whether it did before resending it.
 
 ## Exit codes are your control flow
 
@@ -146,7 +147,7 @@ will not change.
 | 5 | `NOT_FOUND` | The thing does not exist. Do not search for a near match unless asked |
 | 6 | `PERMISSION` | Authenticated but not allowed. Stop and report |
 | 7 | `CONFLICT` | Stale write or invalid transition. Re-read, then retry |
-| 8, 9 | `RATE_LIMIT`, `REMOTE` | Transient. `retryable` is true. Back off and retry |
+| 8, 9 | `RATE_LIMIT`, `REMOTE` | Transient: back off and retry. Not `OUTCOME_UNKNOWN`, whose `retryable` is false: check whether the write happened first |
 | 10 | `BLOCKED` | Local policy refused. Stop. Do not work around it |
 
 Codes never change meaning. New conditions get new codes.
@@ -202,7 +203,9 @@ Mutations are gated on purpose, and the gates are cheap to satisfy honestly.
    irreversible change, run it and read it before the real invocation.
 2. **`--idempotency-key <k>` on creates.** A retried `issue create` without one
    is how a single request becomes two issues. With one, the repeat returns the
-   original result and says `replayed="true"`.
+   original result and says `replayed="true"`. After `OUTCOME_UNKNOWN` nobody
+   knows whether the first attempt landed, so the key stays claimed and a repeat
+   is refused as `IDEMPOTENT_IN_FLIGHT` until you have checked.
 3. **`--if-unchanged <precondition>` on edits you based on a read.** It refuses a
    changed issue with `STALE_WRITE` at exit 7, having sent nothing. It is a
    read-compare with a one-round-trip window, not an atomic swap, and it says so

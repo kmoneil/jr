@@ -579,6 +579,12 @@ $ jr issue create --type Task --summary 'Ship release 42' \
 
 Run it twice and the second returns the first issue instead of making another.
 
+That holds when the first run finished. When it ended in `OUTCOME_UNKNOWN`, a
+503 or a dropped connection after the request went out, nobody knows whether
+the issue exists, `jr` included, so the key stays claimed and a second run
+inside ten minutes is refused as `IDEMPOTENT_IN_FLIGHT`. Look first:
+`jr issue list --creator currentUser --created-after -10m`.
+
 The same flag is on `issue move`, where it matters more: a transition is not
 idempotent, so a retry that guesses wrong either fails confusingly or does the
 work again.
