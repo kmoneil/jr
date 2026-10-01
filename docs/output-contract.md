@@ -772,9 +772,10 @@ Three kinds of note, and the rule for what earns one is whether `jr` chose it:
   an unscoped sweep and a sweep whose scope nobody reported are opposite answers
   and a missing key cannot tell them apart;
 - **bounds the command resolved**, contributed per command. `issue activity`
-  reports the instant a bare `--since` became, which is read in the Jira
-  account's timezone rather than the caller's and appears on no envelope in any
-  format, and the account a `--user currentUser` resolved to.
+  reports the instants `--since` and `--until` became, a bare date being read in
+  the Jira account's timezone rather than the caller's, and neither appearing on
+  any envelope in any format, and the account a `--user currentUser` resolved
+  to.
 
 A flag the caller typed literally never appears. `--kind comment` is still on
 their command line, and repeating input at somebody cannot tell them anything

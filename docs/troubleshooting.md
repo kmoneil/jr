@@ -1036,7 +1036,8 @@ rather than quietly sending an empty description, and
 
 ### `UNBOUNDABLE_DATE`
 
-`jr issue activity --since startOfWeek()`, or any other date function. Every
+`jr issue activity --since startOfWeek()`, or any other date function, on
+`--since` or on `--until`. Every
 other date flag is a clause the server evaluates, so a function is passed
 through. This one is not: comments are not searchable in JQL, so `issue
 activity` matches most of its events in this process, and `--since` has to bound
@@ -1057,6 +1058,20 @@ exit 0 with events from outside the window in it.
 
 The same refusal reaches `jr issue changes` for the same reason: its window is
 compared here, so a boundary only Jira can compute cannot be one of its ends.
+
+### `EMPTY_WINDOW`
+
+`jr issue activity --since -1d --until -2d`: the window ends before it starts,
+or where it starts. `--until` keeps the events *before* its instant, so a window
+whose ends resolve to the same instant holds nothing, and the empty, complete
+feed it would answer with reads as "nothing happened". The detail names the
+instant each end resolved to, which matters when one is a bare date: that is
+read in the Jira account's timezone, not yours.
+
+```console
+$ jr issue activity --since -2h --until -1h
+$ jr issue activity --since "2026-09-30 09:00" --until "2026-09-30 09:30"
+```
 
 ### `INVALID_SINCE_TOKEN`
 

@@ -993,12 +993,14 @@ Examples:
 ```console
 jr issue activity --since -7d
 jr issue activity --since -7d --user ada
+jr issue activity --since -2h --until -1h
 jr issue activity --since -1d --kind transition --format json
 ```
 
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--since` | `string` | — | only events at or after this date or offset, e.g. -7d; required, and it bounds the issues searched as well as the events reported; a date function like startOfWeek() is refused here, because this command compares dates itself (required) |
+| `--until` | `string` | — | only events before this date or offset, e.g. -1h; ends the window --since starts, and bounds the events reported but not the issues searched, so it does not make a sweep cheaper; a date function is refused, as on --since |
 | `--user` | `string` | — | only events by this person, by display name, email, or id; the word currentUser resolves to the caller |
 | `--kind` | `string` | — | only events of this kind: comment, transition, field, or worklog; repeat for several (repeatable) |
 | `--jql` | `string` | — | raw JQL narrowing the issues searched, combined with --since and always parenthesized |
@@ -1042,6 +1044,13 @@ events. An absolute date is read in the Jira account's timezone, which is what
 Jira reads it in and costs one request to learn; a relative offset names an
 instant and costs nothing; a date function is refused, because computing one
 here would substitute this client's notion of a boundary for the server's.
+
+--until ends the window, in the same forms: events before its instant. --since
+keeps the events at or after its own, so two windows that meet at an instant
+share no event and miss none. It narrows the answer and not the search: an
+issue changed inside the window may have changed again since, so every issue
+updated after --since is still read, and --until makes the answer exact without
+making the sweep cheaper.
 
 The context's project scopes the candidate search, exactly as it does on
 `issue list`, and --all-projects lifts it. That matters more here than it does

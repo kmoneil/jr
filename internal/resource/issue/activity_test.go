@@ -3,11 +3,13 @@ package issue_test
 import (
 	"io"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/exitcode"
 	"github.com/kmoneil/jr/internal/jql"
 	"github.com/kmoneil/jr/internal/registry"
 	"github.com/kmoneil/jr/internal/render"
@@ -150,12 +152,13 @@ func TestActivityIsInEveryBuild(t *testing.T) {
 	}
 }
 
-// activitySinceKey mirrors the unexported key the command leaves its resolved
-// cutoff under, and farPast is an instant older than any recording in this
-// tree. The two together are how a dated cassette is held still without
-// switching off the filter that reads the date.
+// activitySinceKey and activityUntilKey mirror the unexported keys the command
+// leaves its resolved window under, and farPast is an instant older than any
+// recording in this tree. Together they are how a dated cassette is held still
+// without switching off the filter that reads the date.
 const (
 	activitySinceKey = "issue.activity.since"
+	activityUntilKey = "issue.activity.until"
 	farPast          = "2000-01-01T00:00:00Z"
 )
 
@@ -182,6 +185,18 @@ func runActivityAgainst(
 // because that state is the bug.
 func runActivityOn(
 	t *testing.T, kind site.Kind, fixture, query, cutoff string,
+	set ...func(registry.Flags),
+) (string, registry.StreamResult, *transport.Replayer) {
+	t.Helper()
+	return runActivityIn(t, kind, fixture, query, activityWindow{since: cutoff}, set...)
+}
+
+// activityWindow pins the feed's instants after Validate has resolved the
+// flags against the clock. An empty end keeps what Validate resolved.
+type activityWindow struct{ since, until string }
+
+func runActivityIn(
+	t *testing.T, kind site.Kind, fixture, query string, window activityWindow,
 	set ...func(registry.Flags),
 ) (string, registry.StreamResult, *transport.Replayer) {
 	t.Helper()
@@ -238,8 +253,11 @@ func runActivityOn(
 	// and the half of --since that this command exists for was covered by
 	// nothing. An instant older than any recording keeps the fixture stable and
 	// leaves the filter running.
-	if cutoff != "" {
-		inv.SetValue(activitySinceKey, cutoff)
+	if window.since != "" {
+		inv.SetValue(activitySinceKey, window.since)
+	}
+	if window.until != "" {
+		inv.SetValue(activityUntilKey, window.until)
 	}
 
 	var buf strings.Builder
@@ -488,6 +506,17 @@ func validateActivityWith(
 	t *testing.T, since string, doer *stubDoer,
 ) (string, error) {
 	t.Helper()
+	inv, err := validateActivityWindow(t, since, "", doer)
+	cutoff, _ := inv.Value(activitySinceKey).(string)
+	return cutoff, err
+}
+
+// validateActivityWindow runs Validate with both ends of a window and returns
+// the invocation, which holds the instants each end resolved to.
+func validateActivityWindow(
+	t *testing.T, since, until string, doer *stubDoer,
+) (*registry.Invocation, error) {
+	t.Helper()
 
 	cmd, ok := registry.Lookup("issue.activity")
 	if !ok {
@@ -495,14 +524,166 @@ func validateActivityWith(
 	}
 	flags := registry.NewFlags()
 	flags.SetString("since", since)
+	if until != "" {
+		flags.SetString("until", until)
+	}
 	flags.SetInt("page-size", 50)
 	inv := &registry.Invocation{
 		Jira:  &stubSession{metaClient: doer, unscoped: true},
 		Flags: flags, Stderr: io.Discard, Progress: registry.NoProgress,
 	}
-	err := cmd.Validate(t.Context(), inv)
-	cutoff, _ := inv.Value(activitySinceKey).(string)
-	return cutoff, err
+	return inv, cmd.Validate(t.Context(), inv)
+}
+
+// accountDoer answers /myself with the recorded Cloud sandbox's zone.
+func accountDoer() *stubDoer {
+	return &stubDoer{body: catalogueJSON, byPath: map[string]string{"myself": accountJSON}}
+}
+
+// feedRows is a TSV feed's rows, without its header.
+func feedRows(feed string) []string {
+	return strings.Split(strings.TrimRight(feed, "\n"), "\n")[1:]
+}
+
+// TestUntilEndsTheWindowBeforeItsInstant is --until on a recorded feed. Two
+// windows that meet at an instant inside the fixture's span split the feed
+// between them: every event lands in exactly one, and the event at the
+// instant lands in the later one, because --since is inclusive and --until is
+// not. A window for "the half hour before 09:30" then holds nothing that
+// happened at 09:30, and an hourly poll counts nothing twice.
+//
+// It moves the resolved instants rather than the flags, for the reason
+// TestTheCutoffBoundsTheFeedAndNotOnlyTheSearch gives.
+func TestUntilEndsTheWindowBeforeItsInstant(t *testing.T) {
+	all, _, _ := runActivity(t, nil)
+	rows := feedRows(all)
+	if len(rows) < 3 {
+		t.Fatalf("only %d rows; this asserts nothing about a bound", len(rows))
+	}
+	// Newest first, so the second row's instant leaves rows on both sides.
+	edge := strings.Split(rows[1], "\t")[0]
+
+	const fixture, query = "activity-recorded.cloud.json", "key = AGL-3"
+	earlier, _, _ := runActivityIn(t, site.Cloud, fixture, query,
+		activityWindow{since: farPast, until: edge})
+	later, _, _ := runActivityIn(t, site.Cloud, fixture, query,
+		activityWindow{since: edge})
+
+	before, after := feedRows(earlier), feedRows(later)
+	if len(before) == 0 || len(after) == 0 {
+		t.Fatalf("windows meeting at %s split %d rows into %d and %d",
+			edge, len(rows), len(before), len(after))
+	}
+	for _, row := range before {
+		if at := strings.Split(row, "\t")[0]; at >= edge {
+			t.Errorf("the window ending at %s kept an event at %s", edge, at)
+		}
+	}
+	if split := slices.Concat(after, before); !slices.Equal(split, rows) {
+		t.Errorf("the windows either side of %s are not the feed they split:\n"+
+			"whole:\n%s\nsplit:\n%s", edge, strings.Join(rows, "\n"),
+			strings.Join(split, "\n"))
+	}
+}
+
+// TestEveryAcceptedUntilIsBoundedOrRefused is the --since table again, at the
+// other end. An --until that ParseDate accepts and the event filter cannot
+// resolve would be a window that only looked closed, so every form either
+// becomes an instant or is refused by name.
+func TestEveryAcceptedUntilIsBoundedOrRefused(t *testing.T) {
+	for _, input := range []string{
+		"-7d", "+30m", "2w", "-1M", "-2h", "-7D", "-4w 2d",
+		"2026-08-10", "2026/08/10", "2026-08-10 00:00", "2026/08/10 13:45",
+		"startOfWeek()", "endOfDay(-1)", "now()",
+	} {
+		inv, err := validateActivityWindow(t, "-3650d", input, accountDoer())
+		until, _ := inv.Value(activityUntilKey).(string)
+		switch jql.ClassifyDate(input) {
+		case jql.DateRelative, jql.DateAbsolute:
+			if err != nil || until == "" {
+				t.Errorf("--until %q names an instant and resolved to %q: %v",
+					input, until, err)
+			}
+		case jql.DateFunction:
+			if err == nil {
+				t.Errorf("--until %q cannot be resolved here and was accepted as %q",
+					input, until)
+				continue
+			}
+			if e := errs.Coerce(err); e.Code != "UNBOUNDABLE_DATE" ||
+				!strings.Contains(e.Message, "--until") {
+				t.Errorf("--until %q refused as %s (%s), want UNBOUNDABLE_DATE "+
+					"naming --until", input, e.Code, e.Message)
+			}
+		case jql.DateInvalid:
+			t.Errorf("%q classifies as invalid; this table is stale", input)
+		}
+	}
+}
+
+// TestAWindowThatHoldsNoInstantIsRefused is --until at or before --since. Either
+// would answer with an empty, complete feed, and an empty feed reads as
+// "nothing happened" about a window nobody meant to ask about.
+func TestAWindowThatHoldsNoInstantIsRefused(t *testing.T) {
+	for _, tc := range []struct{ since, until string }{
+		{"-1d", "-2d"},
+		{"2026-08-10", "2026-08-10"},
+		{"2026-08-10 09:30", "2026-08-10 09:00"},
+	} {
+		_, err := validateActivityWindow(t, tc.since, tc.until, accountDoer())
+		if err == nil {
+			t.Errorf("--since %s --until %s was accepted", tc.since, tc.until)
+			continue
+		}
+		if e := errs.Coerce(err); e.Code != "EMPTY_WINDOW" || e.Exit != exitcode.Usage {
+			t.Errorf("--since %s --until %s refused as %s at exit %v, want "+
+				"EMPTY_WINDOW at exit 2", tc.since, tc.until, e.Code, e.Exit)
+		}
+	}
+}
+
+// TestAWindowOfTwoDatesAsksForTheZoneOnce is the price
+// TestAnAbsoluteSinceCostsOneRequestAndAnOffsetCostsNone pins, for a window
+// with a wall clock at each end. Both are read in the same account's zone, so
+// the second costs nothing more.
+func TestAWindowOfTwoDatesAsksForTheZoneOnce(t *testing.T) {
+	doer := accountDoer()
+	if _, err := validateActivityWindow(t, "2026-08-10", "2026-08-11", doer); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	if doer.calls != 1 {
+		t.Errorf("a window of two dates made %d metadata requests, want 1", doer.calls)
+	}
+}
+
+// TestAWrongEndIsRefusedBeforeTheZoneIsRead keeps a refusal free. A wall clock
+// at one end costs a request for the account's zone, and a date function at
+// the other is refused whatever that request says, so asking first would pay
+// for an answer the caller cannot use.
+func TestAWrongEndIsRefusedBeforeTheZoneIsRead(t *testing.T) {
+	doer := accountDoer()
+	_, err := validateActivityWindow(t, "2026-08-10", "startOfWeek()", doer)
+	if err == nil || errs.Coerce(err).Code != "UNBOUNDABLE_DATE" {
+		t.Fatalf("--until startOfWeek() was not refused as UNBOUNDABLE_DATE: %v", err)
+	}
+	if doer.calls != 0 {
+		t.Errorf("a refused window made %d metadata requests first", doer.calls)
+	}
+}
+
+// TestAnEmptyFeedNamesWhereItsWindowEnds is the EMPTY_RESULT frame. The
+// instant --until became is on no envelope, and an empty answer is the one
+// that cannot show it any other way.
+func TestAnEmptyFeedNamesWhereItsWindowEnds(t *testing.T) {
+	inv, err := validateActivityWindow(t, "-2h", "-1h", accountDoer())
+	if err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	cmd, _ := registry.Lookup("issue.activity")
+	until, _ := inv.Value(activityUntilKey).(string)
+	if notes := cmd.EmptyFrame(inv); !slices.Contains(notes, "until="+until) {
+		t.Errorf("the empty frame is %v, want until=%s among it", notes, until)
+	}
 }
 
 // TestActivityOnDataCenterIsWholeAndStillSorted is the other deployment, and it

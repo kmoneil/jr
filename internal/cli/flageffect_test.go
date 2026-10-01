@@ -555,6 +555,10 @@ var probeAltByFlag = map[string]string{
 	"board":             "2",
 	"sprint":            "2",
 	"page-size":         "25",
+	// Before every event in the fixture, which are all at 2026-01-01, so the
+	// window holds none of them. An offset would do it only until the clock
+	// moved past the fixture's own dates, so this is a date.
+	"until": "2025-12-31",
 }
 
 // probeByFlag is where a flag's value has to be shaped rather than merely
@@ -565,6 +569,7 @@ var probeByFlag = map[string]string{
 	// the query with it, so a window that excludes the fixture leaves the feed
 	// empty and every other flag on the command reads as dead.
 	"since":          "-3650d",
+	"until":          "-1d",
 	"kind":           "comment",
 	"jql":            "labels = probe",
 	"sort":           "updated",
