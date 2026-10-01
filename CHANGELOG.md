@@ -20,6 +20,77 @@ accident.
 
 Nothing yet.
 
+## [0.19.0] - 2026-10-01
+
+**Take this one if anything you run passes `--idempotency-key`, or applies a
+plan.** Two promises `jr` makes about writes were not kept. Both were found by
+reading the code while designing something else, not by a report, and both are
+the kind a test suite misses when its harness cannot produce the failure.
+
+**A keyed create could make two issues.** `jr issue create --idempotency-key K`
+that met a 503 after Jira had already made the issue, which is what a proxy
+timing out in front of a slow create answers, sent the create again and
+reported the second issue at exit 0. The first was an orphan nobody was told
+about. The key protects a second run of the command, through the ledger; the
+transport's own retry happens inside one run and never asked it. The same
+replay sent a keyed `issue move` twice, reporting a move that happened as
+`BAD_REQUEST`, sent every move row of a plan apply twice, and reached
+`issue clone`. `jr` now never sends a write again after an answer that leaves it
+unknown whether it happened, key or no key.
+
+**A write whose outcome is unknown says so.** A 5xx, a connection that dropped
+after the request went out, or a timeout on a write is now `OUTCOME_UNKNOWN`,
+exit 9, with `retryable` false and a remedy that says to check before trying
+again. It was `UPSTREAM_ERROR`, `NETWORK` or `TIMEOUT` with `retryable` true,
+and the skill told agents to back off and retry any exit 9: for a create
+without a key, that retry is the duplicate. With a key the claim stays held, so
+a repeat inside ten minutes is refused as `IDEMPOTENT_IN_FLIGHT` instead of
+making another.
+
+**A dry run of an apply wrote.** `jr issue edit --apply plan.xml --dry-run`, and
+the same on `issue move` and `issue assign`, applied the plan for real:
+`--dry-run` was never read once `--apply` was given. The pair is now refused
+with `CONFLICTING_PLAN_FLAGS` before the plan is read; the plan file is the
+preview. If you ran that combination believing nothing happened, check the
+issues the plan named.
+
+**Three reads retry now.** Data Center's validating search, and Cloud's JQL
+check and issue count, travel as POSTs, and a 503 on one of them was never
+retried. They are marked as reads and retried like any other.
+
+### Documentation
+
+- docs/troubleshooting.md: `OUTCOME_UNKNOWN` replaces "A write failed and you
+  do not know whether it happened", which said `jr` never replayed a write;
+  `CONFLICTING_PLAN_FLAGS` gains an entry.
+- docs/output-contract.md, docs/recipes.md and the skill's exit table,
+  failures and workflows no longer say a key makes resending safe or that every
+  exit 9 is retryable, and the plans section says the plan is the preview.
+
+### Internal
+
+- Two sweeps in the shape of the flag sweep: every mutating command under
+  `--dry-run` with each of its flags, which may send no write, and every
+  mutating command at the default retry budget against a server that applies a
+  write and then answers 503, which may land no non-idempotent write twice.
+  Each has a negative control and a table a new command cannot skip. The second
+  found `issue clone`, which nobody had listed.
+- The Data Center rig runs its Python through uv, at 3.12 or later.
+
+### Output contract
+
+- No kind moved.
+- New error code, exit 9, never retryable: `OUTCOME_UNKNOWN`, for a write whose
+  outcome is unknown. A read keeps `UPSTREAM_ERROR`, `NETWORK` and `TIMEOUT`.
+- **Priced a minor, on two rows.** `--apply` with `--dry-run` on `issue edit`,
+  `issue move` and `issue assign` ran the plan and now exits 2 with
+  `CONFLICTING_PLAN_FLAGS`, having sent nothing: refusing an input that used to
+  be accepted. And a write answered 5xx, cut off or timed out now carries a
+  different `code` and `retryable` than it did, while a keyed `issue create`,
+  `issue clone` or `issue move` that used to succeed by sending twice now exits
+  9: the same input carrying a different code.
+- No exit code changed meaning.
+
 ## [0.18.0] - 2026-09-30
 
 **Take this one if you, or an agent, point `jr issue activity` at more than one
@@ -2941,6 +3012,9 @@ recent enough to be worth reading.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
 [unreleased]: https://github.com/kmoneil/jr/compare/v0.17.2...main
+[0.19.0]: https://github.com/kmoneil/jr/releases/tag/v0.19.0
+[0.18.0]: https://github.com/kmoneil/jr/releases/tag/v0.18.0
+[0.17.3]: https://github.com/kmoneil/jr/releases/tag/v0.17.3
 [0.17.2]: https://github.com/kmoneil/jr/releases/tag/v0.17.2
 [0.17.1]: https://github.com/kmoneil/jr/releases/tag/v0.17.1
 [0.17.0]: https://github.com/kmoneil/jr/releases/tag/v0.17.0
