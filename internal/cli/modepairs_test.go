@@ -54,13 +54,13 @@ var modePairs = map[string]modePair{
 	"issue.assign --apply --if-unchanged": {refused: "PLAN_CARRIES_THE_BASELINE"},
 	"issue.assign --apply --plan-out":     {refused: "CONFLICTING_PLAN_FLAGS"},
 	"issue.assign --dry-run --if-unchanged": {
-		open:  "if-unchanged-is-dropped-by-plan-out-and-dry-run",
-		means: "the preview is printed without the comparison the real run would refuse on",
+		test:  "TestADryRunComparesTheBaseline",
+		means: "the preview compares, and a stale one is refused as the write would be",
 	},
 	"issue.assign --dry-run --plan-out": {refused: "CONFLICTING_PLAN_FLAGS"},
 	"issue.assign --if-unchanged --plan-out": {
-		open:  "if-unchanged-is-dropped-by-plan-out-and-dry-run",
-		means: "the plan is written with its own baseline and the caller's is never compared",
+		test:  "TestAPlanComparesTheCallersBaseline",
+		means: "the token is compared before the plan is built, against any issue it holds",
 	},
 
 	"issue.attachment.download --force --output": {
@@ -108,13 +108,13 @@ var modePairs = map[string]modePair{
 		means: "the plan carries the file's bytes as the description",
 	},
 	"issue.edit --dry-run --if-unchanged": {
-		open:  "if-unchanged-is-dropped-by-plan-out-and-dry-run",
-		means: "the preview is printed without the comparison the real run would refuse on",
+		test:  "TestADryRunComparesTheBaseline",
+		means: "the preview compares, and a stale one is refused as the write would be",
 	},
 	"issue.edit --dry-run --plan-out": {refused: "CONFLICTING_PLAN_FLAGS"},
 	"issue.edit --if-unchanged --plan-out": {
-		open:  "if-unchanged-is-dropped-by-plan-out-and-dry-run",
-		means: "the plan is written with its own baseline and the caller's is never compared",
+		test:  "TestAPlanComparesTheCallersBaseline",
+		means: "the token is compared before the plan is built, against any issue it holds",
 	},
 
 	"issue.get --no-context-fields --raw-field": {refused: "RAW_FIELD_ALONE"},
@@ -131,8 +131,8 @@ var modePairs = map[string]modePair{
 		test: "TestADryRunDoesNotConsumeTheKey", means: "a preview does not claim the key",
 	},
 	"issue.move --dry-run --if-unchanged": {
-		open:  "if-unchanged-is-dropped-by-plan-out-and-dry-run",
-		means: "the preview is printed without the comparison the real run would refuse on",
+		test:  "TestADryRunComparesTheBaseline",
+		means: "the preview compares, and a stale one is refused as the move would be",
 	},
 	"issue.move --dry-run --plan-out": {refused: "CONFLICTING_PLAN_FLAGS"},
 	"issue.move --idempotency-key --if-unchanged": {
@@ -141,8 +141,8 @@ var modePairs = map[string]modePair{
 	},
 	"issue.move --idempotency-key --plan-out": {refused: "CONFLICTING_PLAN_FLAGS"},
 	"issue.move --if-unchanged --plan-out": {
-		open:  "if-unchanged-is-dropped-by-plan-out-and-dry-run",
-		means: "the plan is written with its own baseline and the caller's is never compared",
+		test:  "TestAPlanComparesTheCallersBaseline",
+		means: "the token is compared before the plan is built, against any issue it holds",
 	},
 
 	"issue.watch --dry-run --remove": {
@@ -160,7 +160,7 @@ var modePairs = map[string]modePair{
 // maxOpenModePairs is the ledger's ceiling. It only falls: a pair decided or
 // fixed lowers it, and a new open pair has to be argued for in review rather
 // than added by raising a number nobody reads.
-const maxOpenModePairs = 12
+const maxOpenModePairs = 6
 
 // TestEveryModePairIsDecided holds every pair of mode flags on every command to
 // a decision: refused, asserted by a named test, or open on a card.

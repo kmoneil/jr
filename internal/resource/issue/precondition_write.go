@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"strings"
 
 	"github.com/kmoneil/jr/internal/buildinfo"
 	"github.com/kmoneil/jr/internal/errs"
@@ -119,7 +120,7 @@ func invalidPrecondition() *errs.Error {
 //
 // In Command.Validate, with the rest of the local refusals, so a bad token
 // costs no round trip and cannot arrive after a write has gone out.
-func validatePrecondition(inv *registry.Invocation) error {
+func validatePrecondition(inv *registry.Invocation, keys []string) error {
 	encoded := inv.Flags.String(ifUnchangedFlag)
 	if encoded == "" {
 		// An empty value and an absent flag are the same string at this layer
@@ -149,23 +150,51 @@ func validatePrecondition(inv *registry.Invocation) error {
 		return err
 	}
 
-	// Both through ParseKey rather than compared as text, so ENG-1 and eng-1
-	// are the one issue they are.
-	want, ok := ParseKey(inv.Args[0])
-	if !ok {
-		// The verb's own key check reports this better than a precondition
-		// error would; leave it to say so.
+	// Through ParseKey rather than compared as text, so ENG-1 and eng-1 are
+	// the one issue they are. A plan writes several, and a token describing
+	// any of them is one the plan can compare before it is built.
+	got, _ := ParseKey(p.Key)
+	var writing []string
+	for _, k := range keys {
+		want, ok := ParseKey(k)
+		if !ok {
+			// The verb's own key check reports this better than a
+			// precondition error would; leave it to say so.
+			return nil
+		}
+		if got.String() == want.String() {
+			return nil
+		}
+		writing = append(writing, want.String())
+	}
+	if len(writing) == 0 {
 		return nil
 	}
-	got, _ := ParseKey(p.Key)
-	if got.String() != want.String() {
-		return invalidPrecondition().
-			WithDetail("it describes %s, and this command is writing to %s",
-				got, want).
-			WithRemedy("read the issue you are about to write: `%s issue get %s`",
-				buildinfo.App, want)
+	return invalidPrecondition().
+		WithDetail("it describes %s, and this command is writing to %s",
+			got, strings.Join(writing, ", ")).
+		WithRemedy("read the issue you are about to write: `%s issue get %s`",
+			buildinfo.App, writing[0])
+}
+
+// checkPlanBaseline compares --if-unchanged before a plan is built, against
+// the issue the token names, which validatePrecondition has held to one of
+// the plan's keys.
+//
+// It was accepted and never compared until 2026-10-01, so a plan was written
+// over a change the caller never saw, and the apply that followed wrote over
+// it: a plan's rows take their baselines from its own search, which reads
+// each issue as it is now rather than as the caller read it.
+func checkPlanBaseline(ctx context.Context, inv *registry.Invocation, c *Client) error {
+	encoded := inv.Flags.String(ifUnchangedFlag)
+	if encoded == "" {
+		return nil
 	}
-	return nil
+	p, err := ParsePrecondition(encoded)
+	if err != nil {
+		return err
+	}
+	return compareUnchanged(ctx, c, p.Key, encoded)
 }
 
 // checkUnchanged reads the issue and refuses the write if it has moved.

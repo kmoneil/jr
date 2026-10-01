@@ -582,6 +582,8 @@ field.
 read it. Pass the precondition attribute from issue get; a stale one exits 7
 and sends nothing. Without it the last write wins and the earlier one is lost
 silently, which is the ordinary outcome of two callers editing one issue.
+--dry-run compares it too, so a preview of a stale write is refused as the
+write would be, and so does --plan-out, before any plan is written.
 
 Jira offers no conditional request on an issue, so the check is a read, a
 comparison, and then the write, and the window between the read and the write
@@ -718,7 +720,7 @@ func validateEdit(ctx context.Context, inv *registry.Invocation) error {
 			return err
 		}
 	}
-	if err := validatePrecondition(inv); err != nil {
+	if err := validatePrecondition(inv, inv.Args); err != nil {
 		return err
 	}
 
@@ -917,14 +919,16 @@ func runEdit(ctx context.Context, inv *registry.Invocation) (*render.Doc, error)
 	if err != nil {
 		return nil, err
 	}
-	if inv.Flags.Bool("dry-run") {
-		return registry.DryRunDoc("issue.edit", req), nil
-	}
-	// Before the write and after the request is built, so a request this tool
-	// would have refused to build never costs the extra read.
+	// After the request is built, so a request this tool would have refused to
+	// build never costs the extra read, and before the preview, so a dry run
+	// of a stale write is refused the way the write would be. It printed
+	// "would send" over a change until 2026-10-01.
 	checked, err := checkUnchanged(ctx, inv, client, opt.Key)
 	if err != nil {
 		return nil, err
+	}
+	if inv.Flags.Bool("dry-run") {
+		return registry.DryRunDoc("issue.edit", req), nil
 	}
 	if err := client.send(ctx, req); err != nil {
 		return nil, err
@@ -1185,7 +1189,7 @@ func validateMove(_ context.Context, inv *registry.Invocation) error {
 				"--idempotency-key cannot be given as well").
 			WithRemedy("drop the flag; the plan's rows each carry their own")
 	}
-	if err := validatePrecondition(inv); err != nil {
+	if err := validatePrecondition(inv, keys); err != nil {
 		return err
 	}
 	if key := inv.Flags.String("idempotency-key"); key != "" {
@@ -1324,15 +1328,17 @@ func sendMove(
 	if err != nil {
 		return nil, claim.releaseUnsent(err)
 	}
+	// Before the preview as well as the send: a dry run of a stale move is
+	// refused the way the move would be.
+	checked, err := checkUnchanged(ctx, inv, client, inv.Args[0])
+	if err != nil {
+		return nil, claim.releaseUnsent(err)
+	}
 	if inv.Flags.Bool("dry-run") {
 		// Unreachable with a claim held: claimMove does not claim for a dry
 		// run, because a preview that consumed the key would make the real
 		// invocation after it a replay of a request nobody sent.
 		return registry.DryRunDoc("issue.move", req), nil
-	}
-	checked, err := checkUnchanged(ctx, inv, client, inv.Args[0])
-	if err != nil {
-		return nil, claim.releaseUnsent(err)
 	}
 
 	// Never replayed after an upstream error, key or no key: the key guards a
