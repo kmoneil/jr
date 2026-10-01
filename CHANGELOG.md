@@ -20,6 +20,68 @@ accident.
 
 Nothing yet.
 
+## [0.19.2] - 2026-10-01
+
+**Take this one if a script or an agent reads a truncated result to decide what
+to do next.** The `RESULT_TRUNCATED` warning carried `total`, how many rows the
+whole answer held, on two commands. It now carries it wherever `jr` knows the
+number: on every list that reads its whole set before `--limit` cuts it (the
+board, epic, sprint, project, component, version, status, field, transition,
+create-field, link and attachment lists), on `issue list` against Data Center,
+whose search counts every query, and on `issue comment list` and
+`issue worklog list`, whose endpoints send a count. "100 of 104" and "100 of
+5,000" now read differently, which is the difference between one more page and
+a narrower question (issue 217). Where nothing counts the rows, `issue list`
+and `issue history` on Cloud and `user list`, there is still no `total`, and
+its absence still means unknown.
+
+**`issue activity --until` ends a window.** "What changed in the half hour
+before 09:30" is one command rather than a feed trimmed by hand (issue 215).
+`--since` keeps the events at or after its instant and `--until` the events
+before its own, so two windows that meet share no event and miss none. It
+narrows the answer and not the search: every issue updated after `--since` is
+still read. A window that holds no instant is refused as `EMPTY_WINDOW`.
+
+**`project list --match` finds projects by key or name**, ignoring case, and
+repeats for any of several, in place of `--limit all` piped to `grep`
+(issue 220). `jr` applies it on both deployments, so they agree, and it costs
+no request, because the listing already reads the whole catalogue. A blank
+`--match` is refused as `EMPTY_QUERY`, so an unset shell variable cannot list
+everything as if it had been filtered.
+
+### Documentation
+
+- The skill's main page says that a pipe hides the exit code: `jr ... | head`
+  reports `head`'s zero over a truncated result's 3 (issue 221). It was only in
+  reference files an agent may never open.
+- docs/troubleshooting.md gains `EMPTY_WINDOW` and `EMPTY_QUERY`,
+  docs/recipes.md an incident-window recipe, and docs/getting-started.md finds
+  a project's key with `--match`.
+
+### Internal
+
+- A fourth sweep, driven from the registry with a negative control and a
+  ledger: every paginated command is cut to one row on both deployments, and
+  the warning's `total` has to be the answer's size, or the ledger has to say
+  why the command cannot know it. Against 0.19.1 it failed 34 runs across 17
+  commands.
+- The paging sweep's fake no longer sends a count on Cloud's enhanced search,
+  which the real server never does.
+
+### Output contract
+
+- No kind moved.
+- New error code, exit 2, on `issue activity`: `EMPTY_WINDOW`, for `--until`
+  at or before `--since`.
+- `EMPTY_QUERY`, exit 2, which `user list` gives a blank search, is also what
+  `project list` gives a blank `--match`.
+- **Priced a patch.** The warning's `total` is populated for inputs where it
+  used to be absent, which is the stability policy's row for an optional
+  element the schema already declared. `issue activity --until` and
+  `project list --match` are new optional flags; nothing that ran before is
+  refused or answered differently.
+- No exit code changed meaning.
+
 ## [0.19.1] - 2026-10-01
 
 **Take this one if you pass `--if-unchanged` beside `--dry-run` or
@@ -3046,7 +3108,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.17.2...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.19.2...main
+[0.19.2]: https://github.com/kmoneil/jr/releases/tag/v0.19.2
 [0.19.1]: https://github.com/kmoneil/jr/releases/tag/v0.19.1
 [0.19.0]: https://github.com/kmoneil/jr/releases/tag/v0.19.0
 [0.18.0]: https://github.com/kmoneil/jr/releases/tag/v0.18.0
