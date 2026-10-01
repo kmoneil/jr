@@ -730,6 +730,19 @@ do not catch, add the test in the same change and cite it here.
   skipping it.
   **Enforced by:** `TestEveryPreflightStepCanFail`,
   `TestPreflightChecksThePackagesThatChanged`.
+- **`scripts/land` merges exactly the commit it waited on, and moves no branch
+  it did not switch to.** It asked GitHub for the pull request's head straight
+  after pushing a rebase, before GitHub had registered the push, so it waited on
+  the head the push replaced, found it green, and handed the merge a head whose
+  checks had not started; the ruleset refused it on PRs 197 and 228. It now
+  waits on the commit its checkout holds, refuses a checkout holding commits
+  origin does not, and merges with `--match-head-commit`, so the server refuses
+  any other head. Run from a worktree while the base was checked out in another,
+  it discarded the failed switch and pulled the base into the pull request's own
+  branch (PR 230); it now says where the base is and leaves both alone.
+  **Enforced by:** `TestLandWaitsOnTheHeadItPushed`,
+  `TestLandFromAWorktreeLeavesTheBaseWhereItIs`,
+  `TestLandRefusesAHeadOriginHasNotSeen`.
 - **A commit on the default branch is refused before it exists.** `main` is
   protected, so the push is refused anyway, but by then the commit has to be
   moved; it happened twice before the guard. The pre-commit hook runs
