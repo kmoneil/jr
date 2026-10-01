@@ -4,11 +4,13 @@
 #   scripts/land <pr-number>
 #
 # Steps, refusing loudly at each: a clean tree; the PR's branch checked
-# out; a rebase onto the base when the ruleset would refuse the merge as
-# behind, with the generated files re-verified afterwards, because a
-# textually clean rebase can still disagree with its generators when the
-# other side moved a kind, a command, or a doc; a green ci-wait; a squash
-# merge that deletes the branch; the base pulled.
+# out, holding nothing origin does not; a rebase onto the base when the
+# ruleset would refuse the merge as behind, with the generated files
+# re-verified afterwards, because a textually clean rebase can still
+# disagree with its generators when the other side moved a kind, a command,
+# or a doc; a green ci-wait on the commit this checkout holds; a squash
+# merge of exactly that commit, which deletes the branch; the base pulled,
+# when this checkout can switch to it.
 #
 # It never resolves a conflict and never force-pushes anything but the
 # PR's own head branch. A stopped rebase is left in place for a human.
@@ -36,6 +38,15 @@ git switch -q "$branch" 2>/dev/null ||
 	git switch -q -c "$branch" --track "origin/$branch"
 git pull -q --ff-only origin "$branch"
 
+# What land waits on and merges is this checkout's head, so it has to be
+# the one GitHub has. A local commit nobody pushed has no checks that will
+# ever run, and merging the pushed head instead would leave it behind.
+if [ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/$branch")" ]; then
+	echo "land: $branch has commits that are not on origin; push them," \
+		"or drop them, before landing" >&2
+	exit 1
+fi
+
 if ! git merge-base --is-ancestor "origin/$base" HEAD; then
 	echo "land: $branch is behind origin/$base; rebasing"
 	if ! git rebase "origin/$base"; then
@@ -55,9 +66,28 @@ if ! git merge-base --is-ancestor "origin/$base" HEAD; then
 	git push -q --force-with-lease
 fi
 
-"$here/ci-wait" --pr "$pr"
+# The commit to wait on is the one this checkout holds, which after a
+# rebase is the one just pushed. Asking GitHub for the PR's head raced the
+# push: it answered with the head the push replaced, ci-wait found that
+# green, and the merge was handed a head whose checks had not started (PRs
+# 197 and 228; the ruleset refused both). ci-wait waits on a commit with no
+# checks yet rather than reading it as green, and --match-head-commit has
+# the server refuse to merge anything else.
+head=$(git rev-parse HEAD)
+"$here/ci-wait" "$head"
 
-gh pr merge "$pr" --squash --delete-branch
-git switch -q "$base" 2>/dev/null || true
-git pull -q --ff-only origin "$base"
+gh pr merge "$pr" --squash --delete-branch --match-head-commit "$head"
+
+# The base can be checked out in another worktree, and git will not switch
+# to it here then. The pull used to run anyway, into the branch this
+# checkout was still on (PR 230), so say where the base is instead.
+if git switch -q "$base" 2>/dev/null; then
+	git pull -q --ff-only origin "$base"
+else
+	where=$(git worktree list --porcelain | awk -v ref="branch refs/heads/$base" '
+		/^worktree / { tree = substr($0, 10) }
+		$0 == ref { print tree }')
+	echo "land: $base is checked out in ${where:-another worktree}," \
+		"so it was not pulled here; pull it there" >&2
+fi
 echo "landed: PR $pr onto $base"
