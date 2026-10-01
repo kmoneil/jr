@@ -20,6 +20,41 @@ accident.
 
 Nothing yet.
 
+## [0.19.1] - 2026-10-01
+
+**Take this one if you pass `--if-unchanged` beside `--dry-run` or
+`--plan-out`.** On `issue edit`, `issue move` and `issue assign` both accepted
+the token and never compared it. A dry run of a write the real run would refuse
+as `STALE_WRITE` printed "would send" at exit 0. A plan was written over a
+change the caller never saw: it takes fresh baselines from its own search, so
+the apply that followed wrote over the change. Both compare now, and a stale
+preview or plan is refused `STALE_WRITE` at exit 7 with nothing written. A
+plan's token may name any issue the plan holds, where it had to name the first.
+
+### Internal
+
+- Three more sweeps, each driven from the registry, each with a negative
+  control and a ledger that only falls:
+  - every example a command publishes resolves to that command, checked with
+    `--describe`, because `--help` answered a mistyped subcommand at exit 0;
+  - every pair of mode flags on a command is refused, asserted by a named test,
+    or open on a card, which is what found the `--if-unchanged` drop above;
+  - every paginated command answers identically when the server sends one row
+    per page. It found a Data Center walk that stops at a page smaller than it
+    asked for and refuses the result as `PAGINATION_SHORT`, loudly rather than
+    silently; carded, not yet fixed.
+
+### Output contract
+
+- No kind moved, and no code was added.
+- **Priced a patch.** A dry run or a plan of a stale issue given
+  `--if-unchanged` exited 0 and now exits 7 with `STALE_WRITE`. The old answer
+  was wrong by the flag's own description, which is the stability policy's row
+  for a condition that used to be reported as a success.
+- A plan's `--if-unchanged` token may describe any issue the plan holds, which
+  used to be refused: accepting an input, additive.
+- No exit code changed meaning.
+
 ## [0.19.0] - 2026-10-01
 
 **Take this one if anything you run passes `--idempotency-key`, or applies a
@@ -3012,6 +3047,7 @@ recent enough to be worth reading.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
 [unreleased]: https://github.com/kmoneil/jr/compare/v0.17.2...main
+[0.19.1]: https://github.com/kmoneil/jr/releases/tag/v0.19.1
 [0.19.0]: https://github.com/kmoneil/jr/releases/tag/v0.19.0
 [0.18.0]: https://github.com/kmoneil/jr/releases/tag/v0.18.0
 [0.17.3]: https://github.com/kmoneil/jr/releases/tag/v0.17.3
