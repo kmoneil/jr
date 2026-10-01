@@ -189,6 +189,10 @@ Feeding results to a model is the common case and format choice dominates it.
   request, on every run.
 - Ask for the columns you need. Fetching fields you will not read costs tokens on
   the way out and requests on the way in.
+- **`issue activity --until`** ends a window, so "the half hour before the
+  outage" is one command rather than a feed you trim by hand. It keeps events
+  before its instant and `--since` keeps those at or after its own, so windows
+  that meet never share an event. It narrows the answer and not the sweep.
 - **`issue activity --no-body`** when the question is what was touched and when.
   The body is the feed's only unbounded column, and a day with a few long
   comments in it is mostly comment. The events all survive; only their text

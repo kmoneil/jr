@@ -241,6 +241,7 @@ func sortEvents(events []Event) {
 // Activity flag names.
 const (
 	sinceFlag = "since"
+	untilFlag = "until"
 	userFlag  = "user"
 	kindFlag  = "kind"
 )
@@ -283,6 +284,13 @@ events. An absolute date is read in the Jira account's timezone, which is what
 Jira reads it in and costs one request to learn; a relative offset names an
 instant and costs nothing; a date function is refused, because computing one
 here would substitute this client's notion of a boundary for the server's.
+
+--until ends the window, in the same forms: events before its instant. --since
+keeps the events at or after its own, so two windows that meet at an instant
+share no event and miss none. It narrows the answer and not the search: an
+issue changed inside the window may have changed again since, so every issue
+updated after --since is still read, and --until makes the answer exact without
+making the sweep cheaper.
 
 The context's project scopes the candidate search, exactly as it does on
 ` + "`issue list`" + `, and --all-projects lifts it. That matters more here than it does
@@ -336,6 +344,7 @@ feed that exits 3 is not the same answer as an empty feed that exits 0.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue activity --since -7d",
 			buildinfo.App + " issue activity --since -7d --user ada",
+			buildinfo.App + " issue activity --since -2h --until -1h",
 			buildinfo.App + " issue activity --since -1d --kind transition --format json",
 		}, "\n"),
 		Flags: []registry.Flag{{
@@ -345,6 +354,12 @@ feed that exits 3 is not the same answer as an empty feed that exits 0.`),
 				"events reported; a date function like startOfWeek() is " +
 				"refused here, because this command compares dates itself",
 			Required: true,
+		}, {
+			Name: untilFlag, Type: registry.TypeString,
+			Usage: "only events before this date or offset, e.g. -1h; ends the " +
+				"window --since starts, and bounds the events reported but not " +
+				"the issues searched, so it does not make a sweep cheaper; a " +
+				"date function is refused, as on --since",
 		}, {
 			Name: userFlag, Type: registry.TypeString,
 			Usage: "only events by this person, by display name, email, or id; " +
@@ -423,11 +438,15 @@ func validateActivity(ctx context.Context, inv *registry.Invocation) error {
 				WithRemedy("pass one of them, or drop --kind for all four")
 		}
 	}
-	since := inv.Flags.String(sinceFlag)
-	if _, err := jql.ParseDate(since); err != nil {
+	if _, err := jql.ParseDate(inv.Flags.String(sinceFlag)); err != nil {
 		return err
 	}
-	if err := resolveActivityCutoff(ctx, inv, since); err != nil {
+	if until := inv.Flags.String(untilFlag); until != "" {
+		if _, err := jql.ParseDate(until); err != nil {
+			return err
+		}
+	}
+	if err := resolveActivityWindow(ctx, inv); err != nil {
 		return err
 	}
 	if err := resolveActivityUser(ctx, inv); err != nil {
@@ -485,8 +504,52 @@ func activityQuery(inv *registry.Invocation) QueryOptions {
 	}
 }
 
-// resolveActivityCutoff turns --since into the instant the event filter uses,
-// and refuses what it cannot turn into one.
+// activityEnd is one end of the window: the flag that set it, what was typed,
+// and the instant it resolved to.
+type activityEnd struct {
+	flag, value, instant string
+}
+
+// needsAccountZone refuses an end only Jira could compute, and reports whether
+// any end is a wall clock that has to be read in the account's zone. Every
+// refusal comes before the request that reads the zone, so a flag that is
+// wrong is not paid for.
+func needsAccountZone(ends []activityEnd) (bool, error) {
+	zoned := false
+	for _, end := range ends {
+		switch jql.ClassifyDate(end.value) {
+		case jql.DateFunction:
+			// Resolving one here means computing it, and computing it means
+			// substituting this client's notion of a boundary for Jira's:
+			// startOfWeek() carries the server's idea of which day a week
+			// starts on. docs/output-contract.md says dates are passed through
+			// for that reason, and this command is the one that also has to
+			// compare them. So the honest answer is to decline the combination
+			// rather than to bound the issues and leave the events unbounded.
+			return false, errs.Usage("UNBOUNDABLE_DATE",
+				"--%s cannot take a date function on this command", end.flag).
+				WithDetail("%s filters events in this process, and computing %s "+
+					"here would substitute this client's boundary for Jira's",
+					strings.Join([]string{buildinfo.App, "issue", "activity"}, " "),
+					strings.TrimSpace(end.value)).
+				WithRemedy("use an absolute date like 2026-08-10, or a relative " +
+					"offset like -7d")
+		case jql.DateAbsolute:
+			// An absolute literal is a wall clock, and Jira reads it in the
+			// account's zone. Only this form needs the request.
+			zoned = true
+		case jql.DateRelative, jql.DateInvalid:
+			// An offset names an instant, which is the same in every zone, so
+			// this form costs no request. DateInvalid cannot arrive: ParseDate
+			// refused it above, and ActivityCutoff reports it rather than
+			// guessing.
+		}
+	}
+	return zoned, nil
+}
+
+// resolveActivityWindow turns --since, and --until when it is given, into the
+// instants the event filter uses, and refuses what it cannot turn into one.
 //
 // The refusal is the point. --since does two jobs: it goes to the server as
 // `updated >=`, which bounds the *issues*, and it bounds each *event* here.
@@ -494,50 +557,56 @@ func activityQuery(inv *registry.Invocation) QueryOptions {
 // years ago, so a --since that reaches only the first job answers a question
 // about issues while claiming to answer one about events. That is what it did
 // for four of the seven forms it accepted, at exit 0 and complete="true".
-func resolveActivityCutoff(
-	ctx context.Context, inv *registry.Invocation, since string,
-) error {
+// --until has only the second job, so the same refusals keep it from having
+// none.
+func resolveActivityWindow(ctx context.Context, inv *registry.Invocation) error {
+	ends := []activityEnd{{flag: sinceFlag, value: inv.Flags.String(sinceFlag)}}
+	if until := inv.Flags.String(untilFlag); until != "" {
+		ends = append(ends, activityEnd{flag: untilFlag, value: until})
+	}
+	zoned, err := needsAccountZone(ends)
+	if err != nil {
+		return err
+	}
 	var loc *time.Location
-	switch jql.ClassifyDate(since) {
-	case jql.DateFunction:
-		// Resolving one here means computing it, and computing it means
-		// substituting this client's notion of a boundary for Jira's:
-		// startOfWeek() carries the server's idea of which day a week starts
-		// on. docs/output-contract.md says dates are passed through for that
-		// reason, and this command is the one that also has to compare them.
-		// So the honest answer is to decline the combination rather than to
-		// bound the issues and leave the events unbounded.
-		return errs.Usage("UNBOUNDABLE_DATE",
-			"--%s cannot take a date function on this command", sinceFlag).
-			WithDetail("%s filters events in this process, and computing %s "+
-				"here would substitute this client's boundary for Jira's",
-				strings.Join([]string{buildinfo.App, "issue", "activity"}, " "),
-				strings.TrimSpace(since)).
-			WithRemedy("use an absolute date like 2026-08-10, or a relative " +
-				"offset like -7d")
-	case jql.DateAbsolute:
-		// An absolute literal is a wall clock, and Jira reads it in the
-		// account's zone. Only this form needs the request.
-		resolved, err := accountLocation(ctx, inv)
-		if err != nil {
+	if zoned {
+		// Once, however many ends are wall clocks: they are all read in the
+		// same account's zone.
+		if loc, err = accountLocation(ctx, inv); err != nil {
 			return err
 		}
-		loc = resolved
-	case jql.DateRelative, jql.DateInvalid:
-		// An offset names an instant, which is the same in every zone, so this
-		// form costs no request. DateInvalid cannot arrive: ParseDate refused
-		// it above, and ActivityCutoff reports it rather than guessing.
 	}
 
-	cutoff := ActivityCutoff(since, loc, time.Now())
-	if cutoff == "" {
-		return errs.Usage("UNBOUNDABLE_DATE",
-			"--%s cannot be resolved to an instant", sinceFlag).
-			WithDetail("input: %s", strings.TrimSpace(since)).
-			WithRemedy("use an absolute date like 2026-08-10, or a relative " +
-				"offset like -7d")
+	// One reading of the clock for both ends, so a window of two offsets is
+	// exactly as wide as the caller wrote it.
+	now := time.Now()
+	for i := range ends {
+		ends[i].instant = ActivityCutoff(ends[i].value, loc, now)
+		if ends[i].instant == "" {
+			return errs.Usage("UNBOUNDABLE_DATE",
+				"--%s cannot be resolved to an instant", ends[i].flag).
+				WithDetail("input: %s", strings.TrimSpace(ends[i].value)).
+				WithRemedy("use an absolute date like 2026-08-10, or a relative " +
+					"offset like -7d")
+		}
 	}
-	inv.SetValue(activitySinceKey, cutoff)
+	inv.SetValue(activitySinceKey, ends[0].instant)
+	if len(ends) == 1 {
+		return nil
+	}
+
+	// Both are RFC 3339 in UTC to the second, so they order as strings, and a
+	// window ending where it starts holds no instant: --until is exclusive.
+	since, until := ends[0].instant, ends[1].instant
+	if until <= since {
+		return errs.Usage("EMPTY_WINDOW",
+			"--%s has to be after --%s", untilFlag, sinceFlag).
+			WithDetail("--%s resolved to %s and --%s to %s",
+				sinceFlag, since, untilFlag, until).
+			WithRemedy("--since starts the window and --until ends it, before " +
+				"its own instant; check which way round the two go")
+	}
+	inv.SetValue(activityUntilKey, until)
 	return nil
 }
 
@@ -797,6 +866,9 @@ type activityWant struct {
 	kinds map[string]bool
 	user  site.User
 	since string
+	// until is exclusive where since is inclusive, so two windows that meet at
+	// an instant share no event and miss none. Empty means now.
+	until string
 	// noBody drops the text of a comment or a worklog note, keeping the event.
 	//
 	// The event is the answer to "what did I touch"; the body is the answer to
@@ -824,6 +896,9 @@ func (w activityWant) accepts(e Event) bool {
 	if w.since != "" && e.At < w.since {
 		return false
 	}
+	if w.until != "" && e.At >= w.until {
+		return false
+	}
 	// Before the user check, because a field the caller excluded is not
 	// theirs to attribute either: --not-changed-field Rank means the Rank
 	// rows are gone whoever moved them.
@@ -848,8 +923,9 @@ func activityFilter(inv *registry.Invocation) activityWant {
 	}
 	user, _ := inv.Value(activityUserKey).(site.User)
 	since, _ := inv.Value(activitySinceKey).(string)
+	until, _ := inv.Value(activityUntilKey).(string)
 	return activityWant{
-		kinds: kinds, user: user, since: since,
+		kinds: kinds, user: user, since: since, until: until,
 		noBody: inv.Flags.Bool(noBodyFlag),
 		fields: newHistoryFilter(inv),
 	}
@@ -857,6 +933,10 @@ func activityFilter(inv *registry.Invocation) activityWant {
 
 // activitySinceKey is where the resolved --since instant is left for the body.
 const activitySinceKey = "issue.activity.since"
+
+// activityUntilKey is where the resolved --until instant is left, when there is
+// one.
+const activityUntilKey = "issue.activity.until"
 
 // activityEmptyFrame names the bounds an empty feed was computed over.
 //
@@ -876,13 +956,17 @@ func activityEmptyFrame(inv *registry.Invocation) []string {
 	if want.since != "" {
 		notes = append(notes, "since="+want.since)
 	}
+	if want.until != "" {
+		notes = append(notes, "until="+want.until)
+	}
 	if want.user.ID != "" {
 		notes = append(notes, "user="+want.user.ID)
 	}
 	return notes
 }
 
-// ActivityCutoff turns --since into the instant an event is compared against.
+// ActivityCutoff turns --since or --until into the instant an event is compared
+// against.
 //
 // Exported for the test that holds it to the set `jql.ParseDate` accepts,
 // because getting this wrong shows up as a feed that is quietly too wide or too

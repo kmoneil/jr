@@ -347,6 +347,20 @@ different command answering the same invocation. `jr issue activity --since -1d`
 means every event, and a default that quietly held some back would be the thing
 this tool exists not to do. Name the exclusion and it is yours.
 
+A window has two ends, and `--until` is the second. "What changed in the half
+hour before the outage" is one command rather than a feed trimmed by hand:
+
+```console
+$ jr issue activity --since "2026-09-30 09:00" --until "2026-09-30 09:30" --all-projects
+```
+
+`--until` keeps the events *before* its instant and `--since` keeps those at or
+after its own, so two windows that meet share no event and miss none. A bare
+date or time is read in the Jira account's timezone, as on `--since`. It
+narrows the answer and not the search: an issue changed inside the window may
+have changed again since, so every issue updated after `--since` is still read,
+and a sweep `SWEEP_TOO_LARGE` would refuse is refused with or without it.
+
 Five things it will not pretend about:
 
 - **It is scoped to the context's project unless you say otherwise.** "What did
