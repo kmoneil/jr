@@ -308,14 +308,15 @@ func TestCommandsWithoutASessionFailLoudly(t *testing.T) {
 }
 
 func runList(
-	t *testing.T, kind site.Kind, limit registry.Limit,
+	t *testing.T, kind site.Kind, limit registry.Limit, set ...func(registry.Flags),
 ) (string, registry.StreamResult, *transport.Replayer) {
 	t.Helper()
-	return runListFixture(t, kind, limit, "projects."+string(kind)+".json")
+	return runListFixture(t, kind, limit, "projects."+string(kind)+".json", set...)
 }
 
 func runListFixture(
 	t *testing.T, kind site.Kind, limit registry.Limit, fixture string,
+	set ...func(registry.Flags),
 ) (string, registry.StreamResult, *transport.Replayer) {
 	t.Helper()
 
@@ -325,9 +326,13 @@ func runListFixture(
 	}
 
 	conn, replayer := replayConn(t, fixture)
+	flags := registry.NewFlags()
+	for _, apply := range set {
+		apply(flags)
+	}
 	inv := &registry.Invocation{
 		Jira:  &stubSession{conn: conn, kind: kind},
-		Flags: registry.NewFlags(), Limit: limit,
+		Flags: flags, Limit: limit,
 		Stderr: io.Discard, Progress: registry.NoProgress,
 	}
 
@@ -511,6 +516,65 @@ func TestTheThreePerProjectListingsRunAsCommands(t *testing.T) {
 					}
 				}
 			})
+		}
+	}
+}
+
+// TestMatchKeepsKeysAndNamesContainingTheText is --match on both deployments,
+// which answer it identically because neither server is asked to apply it.
+// Cloud's search takes a query of its own, and a rule only Cloud applied would
+// be one Data Center could not be held to.
+func TestMatchKeepsKeysAndNamesContainingTheText(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		texts []string
+		want  string
+	}{
+		// The key matches and the name, Operations, does not.
+		{"a key", []string{"ops"}, "OPS"},
+		// The name matches and the key does not, in another case.
+		{"a name, ignoring case", []string{"ERATION"}, "OPS"},
+		{"any of several", []string{"gineer", "ops"}, "ENG,OPS"},
+		{"nothing", []string{"storage"}, ""},
+	} {
+		for _, kind := range deployments {
+			t.Run(tc.name+"/"+string(kind), func(t *testing.T) {
+				out, result, _ := runList(t, kind, registry.Limit{All: true},
+					func(f registry.Flags) {
+						for _, text := range tc.texts {
+							f.SetString("match", text)
+						}
+					})
+				if !result.Complete {
+					t.Error("a filtered catalogue read whole was reported incomplete")
+				}
+				var keys []string
+				for _, line := range strings.Split(strings.TrimRight(out, "\n"), "\n")[1:] {
+					keys = append(keys, strings.SplitN(line, "\t", 2)[0])
+				}
+				if got := strings.Join(keys, ","); got != tc.want {
+					t.Errorf("--match %v kept %q, want %q", tc.texts, got, tc.want)
+				}
+			})
+		}
+	}
+}
+
+// TestABlankMatchIsRefused keeps an unset shell variable from listing the whole
+// catalogue as if it had been filtered: every key contains the empty string.
+func TestABlankMatchIsRefused(t *testing.T) {
+	cmd, _ := registry.Lookup("project.list")
+	for _, text := range []string{"", "  "} {
+		flags := registry.NewFlags()
+		flags.SetString("match", "eng")
+		flags.SetString("match", text)
+		err := cmd.Validate(t.Context(), &registry.Invocation{Flags: flags})
+		if err == nil {
+			t.Errorf("--match %q was accepted", text)
+			continue
+		}
+		if code := errs.Coerce(err).Code; code != "EMPTY_QUERY" {
+			t.Errorf("--match %q refused as %s, want EMPTY_QUERY", text, code)
 		}
 	}
 }

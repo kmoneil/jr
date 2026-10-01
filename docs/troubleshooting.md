@@ -684,6 +684,18 @@ $ jr issue list --limit all --project ENG      # scope it
 $ jr issue list --limit all --all-projects     # or mean it
 ```
 
+### `EMPTY_QUERY`: a search with nothing to search for
+
+`jr user list ""`, or `jr project list --match ""`. Blank text matches
+everything, so the answer would be the whole directory or the whole catalogue
+presented as if it had been filtered, which is what `--match "$TEAM"` prints
+when `TEAM` is unset. Give it some text, or leave the filter out:
+
+```console
+$ jr project list --match network
+$ jr project list --limit all
+```
+
 ### `SWEEP_TOO_LARGE`: an activity sweep bigger than you asked to pay for
 
 `jr issue activity` reads every issue updated in the window, with all of its
