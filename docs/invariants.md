@@ -757,6 +757,19 @@ do not catch, add the test in the same change and cite it here.
   **Enforced by:** `TestACommentIsRefusedWhereTheTransitionCannotTakeOne`,
   `TestACommentIsAcceptedWhereTheScreenTakesOne`,
   `TestADataCenterScreenKeepsACommentItDoesNotList`.
+- **`--dry-run` sends no write, in any mode.** Declaring the flag is not the
+  promise. `TestMutatingCommandsAreSafeByConstruction` checks the declaration,
+  and on 2026-10-01 `issue edit`, `issue move` and `issue assign` all declared
+  it and, beside `--apply`, ran the plan and wrote every row at exit 0, because
+  each dispatched the apply before anything read the flag. The pair is refused
+  now. Every mutating command the flag sweep can drive is run under `--dry-run`
+  with each of its flags at every probe value, on both deployments, and fails on
+  any request that writes. An apply needs a real plan, which no probe value is,
+  so a command declaring `--apply` has to name the test that drives one, and a
+  command the sweep cannot drive names the test that covers it instead.
+  **Enforced by:** `TestADryRunSendsNoWrite`, `TestTheDryRunSweepCanFail`,
+  `TestADryRunOfAnApplySendsNothing`, `TestUploadDryRunPrintsNoFileContents`,
+  `TestDryRunSendsNothing`.
 - **Every body this tool sends is encoded for the deployment it is going to.**
   Cloud stores documents and refuses a string where a comment body belongs;
   Data Center stores wiki markup and refuses a document. `bodyValue` is the one

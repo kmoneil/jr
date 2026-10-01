@@ -43,6 +43,9 @@ func validateVerbShape(inv *registry.Invocation, lastName string, changeFlags []
 			"--"+planOutFlagName+" writes a plan and --"+applyFlagName+" runs one").
 			WithRemedy("write it in one invocation and run it in another")
 	}
+	if apply != "" && inv.Flags.Bool("dry-run") {
+		return dryRunApplyConflict()
+	}
 	if apply != "" {
 		return validateVerbApplyShape(inv, changeFlags)
 	}

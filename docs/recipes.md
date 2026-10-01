@@ -998,6 +998,9 @@ Then run it:
 $ jr issue edit --apply plan.xml
 ```
 
+The plan is the preview, so `--dry-run` beside `--apply` is refused: it would
+ask to see what the file already shows.
+
 Every row is attempted. Each is reported `applied`, `skipped` or `failed` with
 its own error code, and a row somebody edited since you planned it is refused
 with nothing sent while the rest still go through. The exit is whatever stopped

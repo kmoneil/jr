@@ -20,13 +20,21 @@ type planVerbsRecorder struct {
 	moves       map[string]string // key -> transition id sent
 	resolutions map[string]string // key -> resolution name sent with it
 	assigns     map[string]string // key -> assignee value sent
+	edits       map[string]int    // key -> edits received
 }
 
 func newPlanVerbsRecorder() *planVerbsRecorder {
 	return &planVerbsRecorder{
 		moves: map[string]string{}, resolutions: map[string]string{},
-		assigns: map[string]string{},
+		assigns: map[string]string{}, edits: map[string]int{},
 	}
+}
+
+// writes counts the issues any mutating request reached.
+func (r *planVerbsRecorder) writes() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.moves) + len(r.assigns) + len(r.edits)
 }
 
 // planVerbsJira serves three issues whose workflows differ: ENG-1 and ENG-3
@@ -95,6 +103,11 @@ func planVerbsJiraWith(
 			_ = json.NewDecoder(r.Body).Decode(&body)
 			rec.mu.Lock()
 			rec.assigns[key], _ = body["name"].(string)
+			rec.mu.Unlock()
+			w.WriteHeader(http.StatusNoContent)
+		case key != "" && r.Method == http.MethodPut:
+			rec.mu.Lock()
+			rec.edits[key]++
 			rec.mu.Unlock()
 			w.WriteHeader(http.StatusNoContent)
 		case key != "" && r.Method == http.MethodGet:
@@ -298,5 +311,47 @@ func TestApplyRefusesAPlanForAnotherVerb(t *testing.T) {
 	}
 	if len(rec.moves) != 0 {
 		t.Errorf("a refused apply reached the server: %v", rec.moves)
+	}
+}
+
+// TestADryRunOfAnApplySendsNothing is the regression for --dry-run beside
+// --apply. All three verbs dispatched --apply before anything read --dry-run,
+// so `issue edit --apply plan.xml --dry-run` ran the plan: every row's write
+// went out and the document said issue.apply, at exit 0, under a flag whose
+// usage says "send nothing". The pair is refused before the plan is read, the
+// way --plan-out beside --dry-run always was.
+func TestADryRunOfAnApplySendsNothing(t *testing.T) {
+	for _, tc := range []struct {
+		verb string
+		plan []string
+	}{
+		{"edit", []string{"ENG-1", "ENG-3", "--add-label", "triaged"}},
+		{"move", []string{"ENG-1", "ENG-3", "Done"}},
+		{"assign", []string{"ENG-1", "ENG-3", "Ada Lovelace"}},
+	} {
+		t.Run(tc.verb, func(t *testing.T) {
+			rec := newPlanVerbsRecorder()
+			url := planVerbsJira(t, rec)
+			env := credentialed(t)
+			mustRun(t, env, "context", "create", "work", "--site", url, "--project", "ENG")
+			path := filepath.Join(t.TempDir(), tc.verb+".plan.xml")
+			planned := append([]string{"issue", tc.verb}, tc.plan...)
+			mustRun(t, env, append(planned, "--plan-out", path)...)
+
+			got := run(t, env, "issue", tc.verb, "--apply", path, "--dry-run")
+			if sent := rec.writes(); sent != 0 {
+				t.Errorf("a dry run of an apply wrote to %d issues; stdout:\n%s",
+					sent, got.stdout)
+			}
+			if got.exit != exitcode.Usage {
+				t.Errorf("exit = %v, want 2; stderr = %s", got.exit, got.stderr)
+			}
+			if !strings.Contains(got.stderr, "CONFLICTING_PLAN_FLAGS") {
+				t.Errorf("the refusal does not name the conflict:\n%s", got.stderr)
+			}
+			if got.stdout != "" {
+				t.Errorf("a refusal wrote a document:\n%s", got.stdout)
+			}
+		})
 	}
 }

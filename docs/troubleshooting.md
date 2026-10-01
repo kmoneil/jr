@@ -1248,6 +1248,14 @@ Refused rather than compared, because comparing a value from somewhere else
 would report "the issue changed", which is a claim about your issue that nobody
 checked.
 
+### `CONFLICTING_PLAN_FLAGS` (exit 2)
+
+Two plan flags that cannot go together. `--plan-out` writes a plan and
+`--apply` runs one, so they are two invocations. `--dry-run` goes with neither:
+beside `--plan-out` both send nothing, and beside `--apply` the plan you
+already wrote is the preview. To see what an apply will do, read the plan
+file, then run `--apply <file>` on its own.
+
 ### Setting a field `jr` has no flag for
 
 `issue create` and `issue edit` name a handful of fields directly. Everything
