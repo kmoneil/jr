@@ -1823,6 +1823,8 @@ field.
 read it. Pass the precondition attribute from issue get; a stale one exits 7
 and sends nothing. Without it the last write wins and the earlier one is lost
 silently, which is the ordinary outcome of two callers editing one issue.
+--dry-run compares it too, so a preview of a stale write is refused as the
+write would be, and so does --plan-out, before any plan is written.
 
 Jira offers no conditional request on an issue, so the check is a read, a
 comparison, and then the write, and the window between the read and the write

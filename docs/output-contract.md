@@ -1628,6 +1628,14 @@ refuses the write if the issue has changed since the caller read it. Without it
 two callers editing one issue both exit 0 and the earlier write is lost, with
 nothing truncated, nothing in error, and nothing to say it happened.
 
+**`--dry-run` and `--plan-out` compare it too.** A preview of a stale write is
+refused `STALE_WRITE`, as the write would be, and so is a plan, before any file
+is written; a plan's token may describe any issue the plan holds, and one that
+describes none of them is `INVALID_PRECONDITION`. Until 2026-10-01 both
+accepted the token and never compared it, so a preview said "would send" for a
+write the real run refused, and a plan was built over a change the caller never
+saw, with fresh baselines from its own search.
+
 `issue.get` v11 carries a `precondition` attribute, which is what the flag takes.
 It is opaque: what it holds is the millisecond timestamp Jira served, and the
 `updated` element is RFC 3339 to the second, so conditioning on the published

@@ -249,6 +249,9 @@ func runMovePlanOut(
 		Resolution: inv.Flags.String("resolution"),
 		Comment:    inv.Flags.String("comment"),
 	}
+	if err := checkPlanBaseline(ctx, inv, client); err != nil {
+		return nil, err
+	}
 	plan, err := BuildMovePlan(ctx, inv, client, info, planKeys(args), change)
 	if err != nil {
 		return nil, err
@@ -266,6 +269,9 @@ func runAssignPlanOut(
 	path string,
 ) (*render.Doc, error) {
 	args, last := lastArgSplit(inv)
+	if err := checkPlanBaseline(ctx, inv, client); err != nil {
+		return nil, err
+	}
 	plan, err := BuildAssignPlan(ctx, client, info, planKeys(args),
 		resolvedAssignee(inv, last))
 	if err != nil {

@@ -1224,6 +1224,10 @@ $ jr issue edit ENG-101 --priority High --if-unchanged eyJkIjoiY2xvdWQi...
 Retrying with the _same_ precondition will fail the same way every time, which
 is the point: it describes a version of the issue that no longer exists.
 
+A `--dry-run` and a `--plan-out` given `--if-unchanged` compare it as well, so
+this can come back from a preview or a plan before anything is written. The
+loop is the same.
+
 `updated` moves for any change, including a comment somebody added, so this can
 refuse a write that would not actually have collided. That is deliberate — the
 alternative is deciding which changes count, and getting that wrong loses an

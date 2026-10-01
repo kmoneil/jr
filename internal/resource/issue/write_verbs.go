@@ -177,7 +177,7 @@ func validateAssign(ctx context.Context, inv *registry.Invocation) error {
 					"last is the assignee")
 		}
 	}
-	if err := validatePrecondition(inv); err != nil {
+	if err := validatePrecondition(inv, keys); err != nil {
 		return err
 	}
 	return validateAssignee(ctx, inv, assignee)
@@ -201,12 +201,14 @@ func runAssign(ctx context.Context, inv *registry.Invocation) (*render.Doc, erro
 	if err != nil {
 		return nil, err
 	}
-	if inv.Flags.Bool("dry-run") {
-		return registry.DryRunDoc("issue.assign", req), nil
-	}
+	// Before the preview as well as the send: a dry run of a stale assignment
+	// is refused the way the assignment would be.
 	checked, err := checkUnchanged(ctx, inv, client, inv.Args[0])
 	if err != nil {
 		return nil, err
+	}
+	if inv.Flags.Bool("dry-run") {
+		return registry.DryRunDoc("issue.assign", req), nil
 	}
 	if err := client.send(ctx, req); err != nil {
 		return nil, err

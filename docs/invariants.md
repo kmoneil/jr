@@ -169,6 +169,14 @@ do not catch, add the test in the same change and cite it here.
   whose ceiling only falls. A new mode flag, or a command with two, fails until
   somebody decides each pair.
   **Enforced by:** `TestEveryModePairIsDecided`, `TestTheModePairSweepCanFail`.
+- **`--if-unchanged` is compared in every mode that takes it.** A single write,
+  a `--dry-run` and a `--plan-out` all read the issue and refuse a stale token
+  with `STALE_WRITE` before anything is sent or written. The preview and the
+  plan accepted the token and never compared it until 2026-10-01, so a preview
+  said "would send" for a write the run refused, and a plan was built over a
+  change the caller never saw. A plan's token may name any issue the plan holds.
+  **Enforced by:** `TestADryRunComparesTheBaseline`,
+  `TestAPlanComparesTheCallersBaseline`.
 - **Paging is invisible.** Every paginated command answers with the same
   document whether the server sends a collection in one page or one row per
   page, with `total` and `isLast` saying there is more. Jira caps pages and an

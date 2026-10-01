@@ -767,6 +767,9 @@ func runPlanOut(
 		keys = append(keys, key.String())
 	}
 
+	if err := checkPlanBaseline(ctx, inv, client); err != nil {
+		return nil, err
+	}
 	plan, err := BuildPlan(ctx, client, info, change, keys)
 	if err != nil {
 		return nil, err
