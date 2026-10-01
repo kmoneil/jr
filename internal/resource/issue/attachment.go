@@ -226,14 +226,14 @@ func runAttachmentList(
 	}
 
 	found := len(items)
-	items, complete := registry.Bound(inv.Limit, items)
+	items, result := registry.Cut(inv.Limit, items)
 	for _, a := range items {
 		if err := out.Write(a.Node()); err != nil {
 			return registry.StreamResult{}, err
 		}
 	}
 	inv.Progress.Update(out.Count(), found)
-	return registry.StreamResult{Complete: complete}, nil
+	return result, nil
 }
 
 // stdoutDestination is what --output takes to mean "the terminal".

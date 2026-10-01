@@ -629,10 +629,11 @@ $ jr issue list --project ENG --limit 500      # a bigger bound
 $ jr issue list --page-token <token from the warning>   # resume
 ```
 
-`issue activity` and `issue changes` read every candidate before `--limit`
-applies, so their warning also says how many rows the whole answer held. Raising
-the limit to that number gets all of them, and it costs no more requests than
-the run just made:
+Where the command knows how many rows the whole answer held, the warning says so
+as `total`, beside the `count` it wrote. `issue activity`, `issue changes` and
+most other lists read their whole set before `--limit` applies, so raising the
+limit to that number gets all of them for no more requests than the run just
+made:
 
 ```console
 $ jr issue activity --since -7d --limit 10
@@ -640,8 +641,11 @@ $ jr issue activity --since -7d --limit 10
 #         use --limit all
 ```
 
-A warning with no `total` means the number is not known, which is every other
-collection and any run the request budget stopped.
+`issue list` on Data Center carries the count its search gave, so `count: 100`
+beside `total: 104` is one more page, and beside `total: 5000` it is a question
+to narrow. A warning with no `total` means the number is not known: `issue list`
+on Cloud, whose search counts nothing, `user list`, `issue history` on Cloud,
+and a feed the request budget stopped.
 
 If a script inherited a failure from this, it is checking `$?` without treating
 3 as a success — see [recipes.md](recipes.md#scripting-and-ci).

@@ -426,14 +426,14 @@ func runList(
 	}
 
 	found := len(sprints)
-	sprints, complete := registry.Bound(inv.Limit, sprints)
+	sprints, result := registry.Cut(inv.Limit, sprints)
 	for _, s := range sprints {
 		if err := out.Write(s.Node()); err != nil {
 			return registry.StreamResult{}, err
 		}
 	}
 	inv.Progress.Update(out.Count(), found)
-	return registry.StreamResult{Complete: complete}, nil
+	return result, nil
 }
 
 func getCommand() *registry.Command {

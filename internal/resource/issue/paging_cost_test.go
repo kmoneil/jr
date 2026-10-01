@@ -195,6 +195,78 @@ func TestAListCostsTheRoundTripsItShould(t *testing.T) {
 	}
 }
 
+// TestACutListKnowsWhatItWasCutFrom is the count a list cut short carries to
+// its truncation warning: on Data Center, the one the first page gave for the
+// walk's own query, and on Cloud nothing, because its cursor API counts
+// nothing.
+//
+// The resumed half is what makes it a count of the answer this run was asked
+// for. A resumed walk starts below a keyset bound, a page there counts a
+// narrower query than the first run's did, and the run is owed what is left
+// from the resume point rather than the project's size.
+func TestACutListKnowsWhatItWasCutFrom(t *testing.T) {
+	const total = 250
+
+	for _, kind := range deployments {
+		t.Run(string(kind), func(t *testing.T) {
+			srv, _ := pagingServer(t, kind, total)
+			defer srv.Close()
+
+			conn, err := transport.New(transport.Options{BaseURL: srv.URL})
+			if err != nil {
+				t.Fatalf("new transport: %v", err)
+			}
+			client := &issue.Client{Transport: conn, Site: site.Info{Kind: kind, Version: "test"}}
+			list := func(limit int, token string) *issue.ListResult {
+				t.Helper()
+				result, err := client.List(t.Context(), issue.ListOptions{
+					Query:     issue.QueryOptions{Project: "ENG"},
+					Limit:     registry.Limit{N: limit},
+					PageToken: token,
+					Fields:    issue.DefaultFields(),
+				})
+				if err != nil {
+					t.Fatalf("list: %v", err)
+				}
+				if result.Complete {
+					t.Fatalf("%d of %d issues came back complete", limit, total)
+				}
+				return result
+			}
+
+			first := list(100, "")
+			resumed := list(50, first.NextPageToken)
+
+			if kind == site.Cloud {
+				if first.Owed != nil || resumed.Owed != nil {
+					t.Errorf("Cloud's search sends no count, and the walk claimed one")
+				}
+				return
+			}
+			for _, tc := range []struct {
+				name string
+				got  *int
+				want int
+			}{
+				{"the first run", first.Owed, total},
+				{"the resumed run", resumed.Owed, total - 100},
+			} {
+				if tc.got == nil || *tc.got != tc.want {
+					t.Errorf("%s was owed %s rows, want %d", tc.name, describeCount(tc.got), tc.want)
+				}
+			}
+		})
+	}
+}
+
+// describeCount renders a count the server may not have given.
+func describeCount(n *int) string {
+	if n == nil {
+		return "no count of"
+	}
+	return strconv.Itoa(*n)
+}
+
 // TestKeysetPaysOneExtraRequestWhenTheSetDividesEvenly measures a deployment
 // difference in cost that nothing had written down.
 //

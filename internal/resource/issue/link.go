@@ -269,14 +269,14 @@ func runLinkList(
 	}
 
 	found := len(links)
-	links, complete := registry.Bound(inv.Limit, links)
+	links, result := registry.Cut(inv.Limit, links)
 	for _, link := range links {
 		if err := out.Write(link.Node()); err != nil {
 			return registry.StreamResult{}, err
 		}
 	}
 	inv.Progress.Update(out.Count(), found)
-	return registry.StreamResult{Complete: complete}, nil
+	return result, nil
 }
 
 // LinkListDoc renders links as a document.

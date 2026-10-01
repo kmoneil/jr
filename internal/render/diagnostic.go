@@ -86,11 +86,12 @@ func truncationNode(d *Doc, partialElement string, stop Stop, total int) *Node {
 		Leaf("message", "result set was truncated before it was exhausted").
 		Leaf("kind", d.Kind).
 		Leaf("count", strconv.Itoa(len(c.Items)))
-	// The total the rows were cut from, where the command read the whole set
-	// before writing any of it. It sits beside the count it qualifies, which is
-	// where a clipped element puts its own, so `total` always means "of what
-	// the count before it counted". A clipped element's case writes none here:
-	// its total is the container's, and two under one name would be a guess.
+	// The total the rows were cut from, where the command knows it: it held
+	// the whole set, or the server counted it. It sits beside the count it
+	// qualifies, which is where a clipped element puts its own, so `total`
+	// always means "of what the count before it counted". A clipped element's
+	// case writes none here: its total is the container's, and two under one
+	// name would be a guess.
 	if total > 0 && partial == nil && partialElement == "" {
 		n.Leaf("total", strconv.Itoa(total))
 	}

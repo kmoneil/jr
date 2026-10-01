@@ -351,14 +351,14 @@ func runList(
 	}
 
 	found := len(boards)
-	boards, complete := registry.Bound(inv.Limit, boards)
+	boards, result := registry.Cut(inv.Limit, boards)
 	for _, b := range boards {
 		if err := out.Write(b.Node()); err != nil {
 			return registry.StreamResult{}, err
 		}
 	}
 	inv.Progress.Update(out.Count(), found)
-	return registry.StreamResult{Complete: complete}, nil
+	return result, nil
 }
 
 // listProject resolves the scope of a board listing.

@@ -137,6 +137,12 @@ type ListResult struct {
 	// Total is what the server said the whole result set holds, when it says.
 	// Cloud's cursor API does not.
 	Total int
+	// Owed is how many rows the walk's own query held by the count on its
+	// first response, less any a resumed walk had already passed: the size of
+	// the answer a limit or a budget cut short. Total is overwritten by every
+	// page, and a keyset page counts a narrower query than the first did.
+	// Nil when the server gave no count.
+	Owed *int
 	// Complete is true only if the result set is exhaustive. It is false when
 	// a limit or a budget cut it short, and then NextPageToken resumes.
 	Complete      bool
@@ -212,7 +218,7 @@ func (c *Client) ListStream(
 	for {
 		want, satisfied := wantFor(opt.Limit, pageSize, out.Fetched)
 		if satisfied {
-			return truncated(out, token, render.StopLimit)
+			return truncated(out, seen, token, render.StopLimit)
 		}
 
 		read, err := c.readPage(ctx, opt, token, want, out, onPage)
@@ -220,7 +226,7 @@ func (c *Client) ListStream(
 			// A spent request budget is not a failure: it means there is more,
 			// and the caller gets what was fetched plus a way to resume.
 			if transport.IsBudgetExceeded(err) && out.Fetched > 0 {
-				return truncated(out, token, render.StopBudget)
+				return truncated(out, seen, token, render.StopBudget)
 			}
 			return nil, err
 		}
@@ -233,7 +239,7 @@ func (c *Client) ListStream(
 		token = next
 
 		if stopEarly(opt.Limit, out.Fetched, len(read.issues)) {
-			return truncated(out, token, render.StopLimit)
+			return truncated(out, seen, token, render.StopLimit)
 		}
 	}
 }
@@ -269,6 +275,19 @@ func reportedTotal(total *int) int {
 		return 0
 	}
 	return *total
+}
+
+// beyond is the count a server gave for an answer that was cut short, when it
+// says there was more than was written, for the truncation warning to set
+// beside the rows written: "100 of 104" and "100 of 5,000" call for different
+// next steps. Zero, which the warning reads as unknown, when there was no
+// count, or when the count is no larger than the rows written, because that
+// describes an answer that grew under the walk rather than its size.
+func beyond(count *int, written int) int {
+	if count == nil || *count <= written {
+		return 0
+	}
+	return *count
 }
 
 // counted is the number of rows the server said the walk's own query holds,
@@ -333,20 +352,30 @@ func (c *counted) first(page *searchResponse, reread int) {
 	}
 }
 
+// owed is how many rows the walk is owed by the server's first count, or nil
+// when there was no count to read.
+func (c counted) owed() *int {
+	if !c.known {
+		return nil
+	}
+	n := c.rows - c.from
+	return &n
+}
+
 // verify refuses a claim of completeness the server's own count contradicts.
 //
 // Fetching more than the count is not a disagreement: rows created while the
 // walk ran are counted by the later requests and not by the first, and a walk
 // that picks them up has still seen everything it set out to.
 func (c counted) verify(fetched int) error {
-	owed := c.rows - c.from
-	if !c.known || fetched >= owed {
+	owed := c.owed()
+	if owed == nil || fetched >= *owed {
 		return nil
 	}
 	return errs.Remote("PAGINATION_SHORT",
 		"paging stopped before it had returned every row Jira counted").
 		WithDetail("Jira counted %d rows for this query and paging returned %d",
-			owed, fetched).
+			*owed, fetched).
 		WithRemedy("re-run the query; if it repeats, narrow it with --project " +
 			"or lower --page-size")
 }
@@ -380,9 +409,11 @@ func streamOffsetPaged[T any](
 			return registry.StreamResult{}, err
 		}
 		if bounded {
-			// Bounded by the caller, so it is not complete and says so.
+			// Bounded by the caller, so it is not complete and says so, beside
+			// the server's count of the whole sub-resource.
 			return registry.StreamResult{
 				Complete: false, StoppedBy: render.StopLimit,
+				Total: beyond(total, out.Count()),
 			}, nil
 		}
 		inv.Progress.Update(out.Count(), reportedTotal(total))
@@ -587,10 +618,13 @@ func dropOverlap(issues []Issue, token PageToken) ([]Issue, int, error) {
 // The error return is always nil. It is there so every early exit is one line
 // that reads as a return of the same answer, rather than two assignments a
 // future edit can separate.
-func truncated(out *ListResult, token PageToken, stop render.Stop) (*ListResult, error) {
+func truncated(
+	out *ListResult, seen counted, token PageToken, stop render.Stop,
+) (*ListResult, error) {
 	out.Complete = false
 	out.NextPageToken = EncodePageToken(token)
 	out.StoppedBy = stop
+	out.Owed = seen.owed()
 	return out, nil
 }
 

@@ -258,10 +258,11 @@ type StreamResult struct {
 	// Leaving it unset describes the limit, which is what a command that
 	// bounds its own rows means.
 	StoppedBy render.Stop
-	// Total is how many rows the result held before --limit cut it, for a
-	// command that read the whole set before writing any of it. Zero means
-	// unknown, which is every other case: a truncated result holds at least
-	// one row more than it wrote, so zero is never a real total.
+	// Total is how many rows the answer held before a bound cut it, for a
+	// command that held the whole answer before writing any of it, or whose
+	// server counted it, as Data Center's search does. Zero means unknown,
+	// which is every other case: a truncated result holds at least one row
+	// more than it wrote, so zero is never a real total.
 	Total int
 }
 

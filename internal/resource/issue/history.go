@@ -507,7 +507,8 @@ func streamWholeHistory(
 		return registry.StreamResult{}, err
 	}
 
-	bounded, err := writeRows(inv, out, filter.apply(page.Changes),
+	rows := filter.apply(page.Changes)
+	bounded, err := writeRows(inv, out, rows,
 		func(c Change) *render.Node { return c.Node() })
 	if err != nil {
 		return registry.StreamResult{}, err
@@ -520,9 +521,15 @@ func streamWholeHistory(
 	// A changelog that claimed nothing is not a changelog that was whole. This
 	// path makes exactly one request by design, so there is no second one to
 	// resolve the doubt with, and an unknown length is reported as partial.
-	return registry.StreamResult{
-		Complete: !bounded && exhausted(page.Saves, page.Total),
-	}, nil
+	whole := exhausted(page.Saves, page.Total)
+	result := registry.StreamResult{Complete: !bounded && whole}
+	// Every row is in hand when every save is, so a cut of them knows its
+	// size. The count Jira sent is not that size: it counts saves, and a row
+	// is one changed field.
+	if bounded && whole {
+		result.Total = len(rows)
+	}
+	return result, nil
 }
 
 // HistoryDoc renders changes as a document, for a caller that buffers rather

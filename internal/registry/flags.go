@@ -161,6 +161,20 @@ func Bound[T any](l Limit, items []T) ([]T, bool) {
 	return items[:l.N], false
 }
 
+// Cut is Bound for a command that streams an answer it already holds whole,
+// and returns the result that command hands back: complete when nothing was
+// cut, and otherwise how many rows the answer held, which the truncation
+// warning sets beside the count it wrote. "1 of 2" and "1 of 2,000" call for
+// different next steps, and twelve commands holding the slice dropped its
+// length, because a boolean was all Bound gave them to return.
+func Cut[T any](l Limit, items []T) ([]T, StreamResult) {
+	kept, complete := Bound(l, items)
+	if complete {
+		return kept, StreamResult{Complete: true}
+	}
+	return kept, StreamResult{Total: len(items)}
+}
+
 // String renders the limit as the caller wrote it.
 func (l Limit) String() string {
 	if l.All {

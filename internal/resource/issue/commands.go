@@ -501,6 +501,10 @@ func runList(
 		Complete:      result.Complete,
 		NextPageToken: result.NextPageToken,
 		StoppedBy:     result.StoppedBy,
+		// Data Center's search counts the walk's own query and Cloud's sends
+		// no count, so a list cut short on Cloud cannot say what it was cut
+		// from.
+		Total: beyond(result.Owed, out.Count()),
 	}, nil
 }
 

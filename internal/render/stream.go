@@ -357,8 +357,9 @@ type Truncation struct {
 	PartialElement string
 	// StoppedBy is which bound ended it, from the only layer that knows.
 	StoppedBy Stop
-	// Total is how many rows the result held before the bound cut it, where
-	// the command knows exactly. Zero means unknown and writes nothing.
+	// Total is how many rows the answer held before the bound cut it, where
+	// the command knows: it held the whole answer, or the server counted it.
+	// Zero means unknown and writes nothing.
 	Total int
 }
 

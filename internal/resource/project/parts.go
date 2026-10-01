@@ -156,7 +156,7 @@ func runComponents(
 	}
 
 	found := len(components)
-	components, complete := registry.Bound(inv.Limit, components)
+	components, result := registry.Cut(inv.Limit, components)
 	for _, c := range components {
 		node := render.El("component").
 			Attr("id", c.ID).
@@ -169,7 +169,7 @@ func runComponents(
 		}
 	}
 	inv.Progress.Update(out.Count(), found)
-	return registry.StreamResult{Complete: complete}, nil
+	return result, nil
 }
 
 func versionsCommand() *registry.Command {
@@ -274,7 +274,7 @@ func runVersions(
 	}
 
 	found := len(versions)
-	versions, complete := registry.Bound(inv.Limit, versions)
+	versions, result := registry.Cut(inv.Limit, versions)
 	for _, v := range versions {
 		node := render.El("version").
 			Attr("id", v.ID).
@@ -289,7 +289,7 @@ func runVersions(
 		}
 	}
 	inv.Progress.Update(out.Count(), found)
-	return registry.StreamResult{Complete: complete}, nil
+	return result, nil
 }
 
 func statusesCommand() *registry.Command {
@@ -392,7 +392,7 @@ func runStatuses(
 	}
 
 	found := len(types)
-	types, complete := registry.Bound(inv.Limit, types)
+	types, result := registry.Cut(inv.Limit, types)
 	for _, t := range types {
 		statuses := make([]*render.Node, 0, len(t.Statuses))
 		names := make([]string, 0, len(t.Statuses))
@@ -414,7 +414,7 @@ func runStatuses(
 		}
 	}
 	inv.Progress.Update(out.Count(), found)
-	return registry.StreamResult{Complete: complete}, nil
+	return result, nil
 }
 
 // clientAndProject is the opening the three per-project listings share.
