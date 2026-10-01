@@ -189,6 +189,9 @@ Feeding results to a model is the common case and format choice dominates it.
   request, on every run.
 - Ask for the columns you need. Fetching fields you will not read costs tokens on
   the way out and requests on the way in.
+- **`project list --match <text>`** finds projects by key or name, ignoring
+  case; repeat it for any of several. It is one call, where `--limit all` piped
+  to `grep` is the whole catalogue and a pattern the tool never sees.
 - **`issue activity --until`** ends a window, so "the half hour before the
   outage" is one command rather than a feed you trim by hand. It keeps events
   before its instant and `--since` keeps those at or after its own, so windows

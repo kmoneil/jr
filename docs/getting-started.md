@@ -203,6 +203,7 @@ $ jr context list
 name              current  site                              project  board  readonly
 your-company      true     https://your-company.atlassian.net
 
+$ jr project list --match eng     # the key, if you do not know it
 $ jr context edit your-company --project ENG
 $ jr context show
 ```

@@ -235,6 +235,9 @@ func ListColumns() []render.Column {
 	}
 }
 
+// matchFlag narrows `project list` to keys and names containing some text.
+const matchFlag = "match"
+
 func listCommand() *registry.Command {
 	return &registry.Command{
 		Path:    []string{"project", "list"},
@@ -247,11 +250,25 @@ Data Center returns the lot from one request — and the split is behind the
 client, so the result is the same shape either way.
 
 Ordered by key rather than by whatever the server felt like, so two runs of a
-script agree.`),
+script agree.
+
+--match keeps the projects whose key or name contains its text, ignoring case;
+repeat it and a project matching any of the texts is kept. It is applied here,
+on both deployments, over the catalogue the listing reads whole anyway. Cloud's
+search takes a query of its own, but a rule the server applies is one this tool
+cannot hold to the same answer on Data Center, so the server is not asked to
+apply one.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " project list",
+			buildinfo.App + " project list --match network --match storage",
 			buildinfo.App + " project list --format json --limit all",
 		}, "\n"),
+		Flags: []registry.Flag{{
+			Name: matchFlag, Type: registry.TypeString, Repeatable: true,
+			Usage: "only projects whose key or name contains this text, " +
+				"ignoring case; repeat for projects matching any of several",
+		}},
+		Validate:       validateList,
 		Paginated:      true,
 		NeedsJira:      true,
 		CollectionName: "projects",
@@ -367,6 +384,43 @@ func sorted(projects []Project) []Project {
 	return projects
 }
 
+// validateList refuses a blank --match. Every key contains the empty string,
+// so a blank one is the whole catalogue answering as if it had been filtered,
+// which is what `--match "$TEAM"` with TEAM unset would otherwise get.
+func validateList(_ context.Context, inv *registry.Invocation) error {
+	for _, text := range inv.Flags.StringSlice(matchFlag) {
+		if strings.TrimSpace(text) == "" {
+			return errs.Usage("EMPTY_QUERY", "--%s cannot be blank", matchFlag).
+				WithRemedy("pass part of a project key or name, or leave out " +
+					"--match for every project")
+		}
+	}
+	return nil
+}
+
+// matching keeps the projects whose key or name contains any of the texts,
+// ignoring case, in the order they came. No texts keeps every project.
+//
+// The text is not trimmed. `--match " net"` asks for less than `--match net`
+// does, and trimming it would widen the answer without saying so.
+func matching(projects []Project, texts []string) []Project {
+	if len(texts) == 0 {
+		return projects
+	}
+	var kept []Project
+	for _, p := range projects {
+		key, name := strings.ToLower(p.Key), strings.ToLower(p.Name)
+		for _, text := range texts {
+			text = strings.ToLower(text)
+			if strings.Contains(key, text) || strings.Contains(name, text) {
+				kept = append(kept, p)
+				break
+			}
+		}
+	}
+	return kept
+}
+
 func runList(
 	ctx context.Context, inv *registry.Invocation, out *render.Stream,
 ) (registry.StreamResult, error) {
@@ -379,6 +433,7 @@ func runList(
 	if err != nil {
 		return registry.StreamResult{}, err
 	}
+	projects = matching(projects, inv.Flags.StringSlice(matchFlag))
 
 	found := len(projects)
 	projects, result := registry.Cut(inv.Limit, projects)

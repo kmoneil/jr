@@ -2848,11 +2848,13 @@ Examples:
 
 ```console
 jr project list
+jr project list --match network --match storage
 jr project list --format json --limit all
 ```
 
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
+| `--match` | `string` | — | only projects whose key or name contains this text, ignoring case; repeat for projects matching any of several (repeatable) |
 | `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
 
 | Emits | Schema | When |
@@ -2871,6 +2873,13 @@ client, so the result is the same shape either way.
 
 Ordered by key rather than by whatever the server felt like, so two runs of a
 script agree.
+
+--match keeps the projects whose key or name contains its text, ignoring case;
+repeat it and a project matching any of the texts is kept. It is applied here,
+on both deployments, over the catalogue the listing reads whole anyway. Cloud's
+search takes a query of its own, but a rule the server applies is one this tool
+cannot hold to the same answer on Data Center, so the server is not asked to
+apply one.
 
 ### `jr project statuses`
 
