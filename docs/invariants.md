@@ -159,6 +159,16 @@ do not catch, add the test in the same change and cite it here.
   used `--help` until 2026-10-01, and cobra answers a path it cannot resolve
   with the nearest parent's help at exit 0, so a mistyped subcommand passed.
   **Enforced by:** `TestEveryExampleParses`, `TestTheExampleSweepCanFail`.
+- **Every pair of mode flags on a command has been decided.** A mode flag
+  changes what a command does rather than what it acts on (`--dry-run`,
+  `--plan-out`, `--apply`, `--if-unchanged`, `--idempotency-key`, `--yes`,
+  `--raw-field`, ...), and the failure two of them invite is one silently
+  overruling the other: `--apply` beside `--dry-run` applied the plan. Each
+  pair is refused, which the sweep runs and checks against each flag alone;
+  asserted by a named test that has to exist; or open on a card, in a ledger
+  whose ceiling only falls. A new mode flag, or a command with two, fails until
+  somebody decides each pair.
+  **Enforced by:** `TestEveryModePairIsDecided`, `TestTheModePairSweepCanFail`.
 
 ## Queries and pagination
 
