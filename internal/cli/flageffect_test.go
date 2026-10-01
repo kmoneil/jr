@@ -883,6 +883,12 @@ func sweepResponse(path string, kind site.Kind) string {
 	case strings.Contains(path, "/project/search"):
 		return sweepPage(`"values"`, sweepProject("ENG", "Engineering"),
 			sweepProject("OPS", "Operations"))
+	// Data Center lists projects as a bare array at /project, where Cloud
+	// pages them at /project/search. Without this the sweep drove project
+	// list on Data Center into a refusal, so neither sweep saw it work there.
+	case strings.HasSuffix(path, "/rest/api/2/project"):
+		return `[` + sweepProject("ENG", "Engineering") + `,` +
+			sweepProject("OPS", "Operations") + `]`
 	case strings.Contains(path, "/search"):
 		return `{"startAt":0,"maxResults":50,"total":2,"isLast":true,"issues":[` +
 			sweepIssueKeyed(kind, "1", "ENG-2") + `,` +
