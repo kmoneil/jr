@@ -1,6 +1,7 @@
 package cli_test
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
@@ -9,14 +10,23 @@ import (
 	"github.com/kmoneil/jr/internal/exitcode"
 )
 
-// TestEveryExampleParses runs every example a command publishes.
+// TestEveryExampleParses runs every example a command publishes, and holds it
+// to naming that command.
 //
-// `--help` is appended, so cobra parses the line and prints the help text
-// without the command ever running: an unknown flag, a shorthand that does not
-// exist, and a flag that moved to another command all fail here, and nothing
-// reaches the network, the config, or Jira. That matters more than it sounds —
-// `jr auth status --site your-site.atlassian.net` is a published example, and a
-// test that *executed* the examples would resolve that name.
+// `--describe` is appended, so the line is parsed and resolved and the command
+// is described rather than run: an unknown flag, a shorthand that does not
+// exist, a flag that moved to another command, and a subcommand that does not
+// exist all fail here, and nothing reaches the network, the config, or Jira.
+// That matters more than it sounds: `jr auth status --site
+// your-site.atlassian.net` is a published example, and a test that *executed*
+// the examples would resolve that name.
+//
+// It appended `--help` until 2026-10-01, and that could not see a wrong path.
+// Cobra answers a path it cannot resolve with the nearest parent's help at exit
+// 0, so `jr issue link ad ENG-1 blocks ENG-2 --help` passed, while the same
+// line run bare is UNKNOWN_COMMAND. `--describe` resolves through jr, and the
+// document it prints names the command it described, which is also how a line
+// that names a real but different command is caught.
 //
 // It exists because `jr issue link add ENG-1 blocks ENG-2` shipped in --help
 // with the arguments in an order the command does not take, and was fixed by
@@ -41,12 +51,18 @@ func TestEveryExampleParses(t *testing.T) {
 			checked++
 
 			t.Run(c.Name()+"/"+line, func(t *testing.T) {
-				got := run(t, nil, append(args, "--help")...)
-				if got.exit == exitcode.OK {
+				// XML whatever the example asked for, because the name is read
+				// out of the document; the last --format given wins.
+				got := run(t, nil, append(args, "--describe", "--format", "xml")...)
+				if got.exit != exitcode.OK {
+					t.Errorf("%s publishes an example the binary will not parse:\n"+
+						"  %s\nexit %v\n%s", c.Name(), line, got.exit, got.stderr)
 					return
 				}
-				t.Errorf("%s publishes an example the binary will not parse:\n"+
-					"  %s\nexit %v\n%s", c.Name(), line, got.exit, got.stderr)
+				if named := describedCommand(got.stdout); named != c.Name() {
+					t.Errorf("%s publishes an example that runs %q instead:\n  %s",
+						c.Name(), named, line)
+				}
 			})
 		}
 	}
@@ -58,15 +74,38 @@ func TestEveryExampleParses(t *testing.T) {
 }
 
 // TestTheExampleSweepCanFail is the control. A parse check that accepts
-// anything is worse than none, and `--help` is exactly the kind of short
-// circuit that could swallow a bad flag on some future cobra.
+// anything is worse than none, and a short circuit like `--describe` is exactly
+// the kind of thing that could swallow a bad flag or a bad path on some future
+// cobra, which is what `--help` turned out to do with a path.
 func TestTheExampleSweepCanFail(t *testing.T) {
-	got := run(t, nil, "issue", "list", "--no-such-flag", "--help")
-	if got.exit != exitcode.Usage {
-		t.Errorf("`issue list --no-such-flag --help` exited %v, want %v: "+
-			"--help is short-circuiting the flag parse, so TestEveryExampleParses "+
-			"is asserting nothing", got.exit, exitcode.Usage)
+	for _, line := range [][]string{
+		{"issue", "list", "--no-such-flag", "--describe"},
+		{"issue", "moev", "ENG-1", "Done", "--describe"},
+		{"issue", "link", "ad", "ENG-1", "blocks", "ENG-2", "--describe"},
+	} {
+		if got := run(t, nil, line...); got.exit != exitcode.Usage {
+			t.Errorf("`%s` exited %v, want %v: --describe is short-circuiting "+
+				"the parse, so TestEveryExampleParses is asserting nothing",
+				strings.Join(line, " "), got.exit, exitcode.Usage)
+		}
 	}
+	got := run(t, nil, "issue", "list", "--describe")
+	if named := describedCommand(got.stdout); named != "issue.list" {
+		t.Errorf("`issue list --describe` was read as describing %q, so the "+
+			"name check cannot tell one command from another", named)
+	}
+}
+
+// describedName is the command a `--describe` document is about.
+var describedName = regexp.MustCompile(`<command name="([^"]+)"`)
+
+// describedCommand returns the command a `--describe` document describes, or ""
+// when it names none.
+func describedCommand(doc string) string {
+	if m := describedName.FindStringSubmatch(doc); m != nil {
+		return m[1]
+	}
+	return ""
 }
 
 // splitExample returns the arguments the example passes to this binary, or nil

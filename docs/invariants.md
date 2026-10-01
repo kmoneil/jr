@@ -151,6 +151,14 @@ do not catch, add the test in the same change and cite it here.
   tool's deliberate absences, go in `notAJrFlag` with the reason.
   **Enforced by:** `TestEveryFlagInAWorkedExampleExists`,
   `TestEveryCommandInAWorkedExampleExists`.
+- **Every example a command publishes parses as that command.** An example is
+  the one piece of documentation the binary prints itself, and `make docs`
+  copies it into docs/commands.md. Each is run with `--describe`, which
+  resolves the path and parses every flag without running anything, and the
+  document it prints has to name the command that published the example. It
+  used `--help` until 2026-10-01, and cobra answers a path it cannot resolve
+  with the nearest parent's help at exit 0, so a mistyped subcommand passed.
+  **Enforced by:** `TestEveryExampleParses`, `TestTheExampleSweepCanFail`.
 
 ## Queries and pagination
 
