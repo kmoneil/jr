@@ -169,6 +169,16 @@ do not catch, add the test in the same change and cite it here.
   whose ceiling only falls. A new mode flag, or a command with two, fails until
   somebody decides each pair.
   **Enforced by:** `TestEveryModePairIsDecided`, `TestTheModePairSweepCanFail`.
+- **Paging is invisible.** Every paginated command answers with the same
+  document whether the server sends a collection in one page or one row per
+  page, with `total` and `isLast` saying there is more. Jira caps pages and an
+  admin can lower the cap, so the second is a server a client meets. The
+  page-boundary bugs that reached users, a keyset walk that dropped every
+  project but the first and a feed sorted one page at a time, were in code
+  whose fixtures fit on one page; paging is implemented once per resource, and
+  one sweep holds all of them. A difference that is known and carded sits in a
+  ledger whose ceiling only falls.
+  **Enforced by:** `TestPagingIsInvisible`, `TestThePagingSweepCanFail`.
 
 ## Queries and pagination
 
