@@ -849,12 +849,29 @@ do not catch, add the test in the same change and cite it here.
   URLs count: userinfo and credential-shaped query params are redacted too, and a
   `*url.Error` is never printed raw.
   **Enforced by:** `TestTokenNeverReachesDebugOutput`.
-- **A non-idempotent request is not replayed after an upstream error.** A POST
-  that got a 503 may have been processed before the failure; retrying it is how
-  one `issue create` becomes two issues. Only a 429, refused before processing,
-  or an explicit `Replayable`, meaning the caller holds an idempotency key,
-  allows a POST retry.
-  **Enforced by:** `TestPostIsNotReplayedAfterAnUpstreamError`, `TestPostIsReplayedAfterRateLimiting`.
+- **A write is not sent again after an upstream error, key or no key.** A POST
+  that got a 503 may have been processed before the failure, and resending it is
+  how one `issue create` becomes two issues. Only a 429, refused before
+  processing, or a request marked `Idempotent` because a second sending has the
+  effect of one (a query sent as a POST), is resent. Holding an idempotency key
+  was an exemption until 2026-10-01, when one keyed create answered 503 after
+  Jira made the issue made a second: the ledger guards a second run of the
+  command, and a retry inside one never asks it. Every test that drove a keyed
+  write ran with retries off, so a sweep now drives every mutating command at
+  the default budget against a server that applies a write and then answers 503.
+  **Enforced by:** `TestPostIsNotReplayedAfterAnUpstreamError`,
+  `TestPostIsReplayedAfterRateLimiting`, `TestAnIdempotentPostIsRetried`,
+  `TestAWriteJiraMayHaveAppliedIsNotSentTwice`, `TestTheReplaySweepCanFail`,
+  `TestAKeyedCreateJiraMayHaveMadeIsNotSentAgain`,
+  `TestAKeyedMoveJiraMayHaveAppliedIsNotSentAgain`,
+  `TestAnApplyRowJiraMayHaveAppliedIsNotSentTwice`.
+- **A write whose outcome is unknown is never reported as retryable.** A 5xx, a
+  dropped connection or a passed deadline on a write leaves nobody knowing
+  whether it happened, and `retryable` true told an agent to send it again. It
+  is `OUTCOME_UNKNOWN` at exit 9 with `retryable` false; a read, or a write that
+  provably never left this process, keeps its ordinary code.
+  **Enforced by:** `TestAWriteAnsweredWithA5xxHasAnUnknownOutcome`,
+  `TestAWriteWhoseConnectionDroppedHasAnUnknownOutcome`.
 - **A retry this client declines to make is traced as a decision.** The rule
   above was enforced by a test that counts requests, which passes whether or not
   anything says why the count is one. It was one: `shouldRetry` built the reason

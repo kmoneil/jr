@@ -205,11 +205,18 @@ type Request struct {
 	// drain a stream to find out why its request failed.
 	Stream bool
 
-	// Replayable marks a non-idempotent request safe to retry, which is true
-	// when the caller holds an idempotency key. Without it, a POST is not
-	// replayed after an upstream error, because the server may have processed
-	// it before failing.
-	Replayable bool
+	// Idempotent marks a request whose second sending has the effect of one,
+	// although its method does not promise it: a query sent as a POST because
+	// its body says what to read. Such a request is retried after an upstream
+	// error as a GET is, and its failure is never an unknown outcome.
+	//
+	// It is a fact about the request and never about the caller. It used to be
+	// Replayable, set wherever an idempotency key was held, on the reasoning
+	// that a key made a retry safe. On 2026-10-01 one `issue create
+	// --idempotency-key` made two issues and reported the second: the ledger
+	// guards a second run of the command, and a retry inside this one never
+	// asks it.
+	Idempotent bool
 }
 
 // Response is a completed exchange with the body already read, unless the
@@ -235,6 +242,9 @@ type Response struct {
 	RequestID string
 	// Attempts is how many HTTP calls this response cost, including retries.
 	Attempts int
+	// Idempotent is the request's own mark, carried so that an error built
+	// from this response knows whether a 5xx left a write's outcome unknown.
+	Idempotent bool
 }
 
 // Close releases a streamed body, and does nothing for a buffered one.
@@ -380,7 +390,7 @@ func (c *Client) Do(ctx context.Context, r Request) (*Response, error) {
 			continue
 		}
 
-		retry, reason := shouldRetry(r.Method, resp.Status, r.Replayable)
+		retry, reason := shouldRetry(r.Method, resp.Status, r.Idempotent)
 		if !retry || attempt > c.retries {
 			return c.settle(r, target, requestID, attempt, resp, retry, reason), nil
 		}
@@ -416,7 +426,7 @@ func (c *Client) spend(attempt int, lastErr error) error {
 func (c *Client) retryNetwork(ctx context.Context, r Request, target *url.URL,
 	requestID string, attempt int, cause error,
 ) error {
-	retry, reason := shouldRetryNetworkError(ctx, r.Method, r.Replayable, cause)
+	retry, reason := shouldRetryNetworkError(ctx, r.Method, r.Idempotent, cause)
 	if !retry || attempt > c.retries {
 		// The same decision settle reports, one layer up. A dropped connection
 		// on a POST is not replayed for the reason a 503 is not, and the trace
@@ -424,7 +434,7 @@ func (c *Client) retryNetwork(ctx context.Context, r Request, target *url.URL,
 		// `attempt` already traced the network error does not cover it: the
 		// error is what happened, not what was decided about it.
 		c.traceNotRetried(r, target, requestID, attempt, 0, retry, reason)
-		return cause
+		return lostWrite(r, target, cause)
 	}
 	return c.waitBeforeRetry(ctx, r, target, requestID, attempt, nil, 0, reason)
 }
@@ -763,13 +773,14 @@ func (c *Client) receive(r Request, target *url.URL, requestID string, attempt i
 	c.observe(target, resp.TLS)
 
 	out := &Response{
-		Status:    resp.StatusCode,
-		Header:    resp.Header,
-		Body:      payload,
-		Method:    r.Method,
-		URL:       RedactURL(target),
-		RequestID: id,
-		Attempts:  attempt,
+		Status:     resp.StatusCode,
+		Header:     resp.Header,
+		Body:       payload,
+		Method:     r.Method,
+		URL:        RedactURL(target),
+		RequestID:  id,
+		Attempts:   attempt,
+		Idempotent: r.Idempotent,
 	}
 	if streaming {
 		out.Stream = scope.handOver(resp.Body, resp.ContentLength)

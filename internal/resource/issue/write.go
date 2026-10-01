@@ -514,10 +514,10 @@ func createWithLedger(
 				"created an issue already")
 	}
 
-	// A key means the caller holds an idempotency token, which is what makes a
-	// POST safe to replay after an upstream error.
-	req.Replayable = true
-
+	// Not replayed after an upstream error, key or no key. The key guards a
+	// second run of this command through the ledger; a retry inside this run
+	// comes after the claim and never asks the ledger, so replaying a create
+	// answered 503 is how one keyed create became two issues (2026-10-01).
 	made, err := client.Create(ctx, req)
 	if err != nil {
 		// A failure that happened before the request left this process proves
@@ -1335,11 +1335,11 @@ func sendMove(
 		return nil, claim.releaseUnsent(err)
 	}
 
-	// A key means the caller holds an idempotency token, which is what makes
-	// this POST safe for the transport to replay after an upstream error.
-	// Without one it is never retried, because a 503 can arrive after Jira has
-	// applied the transition.
-	req.Replayable = claim.held
+	// Never replayed after an upstream error, key or no key: the key guards a
+	// second run through the ledger, and the transport's retry inside this one
+	// never asks it. A replayed transition that Jira had already applied is
+	// refused from its new status, which reported a move that happened as a
+	// failure.
 	if err := client.send(ctx, req); err != nil {
 		if transport.NeverSent(err) {
 			claim.release()

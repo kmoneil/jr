@@ -170,7 +170,8 @@ Four fields do most of the work:
   a typo you can fix by reading it, and one that lists none is saying it has
   nothing close rather than that it did not look.
 - **`retryable`** is `true` only for `RATE_LIMIT` and `REMOTE`. Everything else
-  will fail identically if you run it again.
+  will fail identically if you run it again, and one `REMOTE` code is never
+  retryable: `OUTCOME_UNKNOWN`, a write that may already have happened.
 
 Errors go to **stderr**, in whatever `--format` you asked for, and a failing
 command writes **nothing at all** to stdout. So this is always safe:
@@ -1313,16 +1314,24 @@ One field was named twice. On an array field repeating `--field` is how you
 build the array, so this only fires when the field is not an array, or when
 `--field` and `--field-json` both name it.
 
-### A write failed and you do not know whether it happened
+### `OUTCOME_UNKNOWN` (exit 9): a write that may have happened
 
-`jr` never replays a non-idempotent request after an upstream error — a POST
-that got a 503 may have been processed before the failure, and retrying is how
-one `issue create` becomes two issues. So a failed create was probably not
-applied, but "probably" is not good enough to act on: check.
+A write was sent and the answer never said whether it happened: Jira returned a
+5xx, the connection dropped after the request went out, or the deadline passed.
+`jr` does not send it again, with or without an idempotency key, because a POST
+answered 503 may have been processed before the failure, and resending it is
+how one `issue create` becomes two issues. It is also not `retryable`, unlike
+every other exit 9: retrying is the duplicate. Look before deciding.
 
 ```console
 $ jr issue list --creator currentUser --created-after -10m
 ```
+
+A proxy timing out in front of a slow create answers this way after Jira has
+made the issue, so do not assume nothing happened. With `--idempotency-key` the
+key stays claimed: the same command again inside ten minutes is refused as
+`IDEMPOTENT_IN_FLIGHT` rather than making a second issue, which is the time to
+check.
 
 To make retries safe in the first place, hold a key:
 
@@ -1341,7 +1350,7 @@ otherwise invisible.
 ### Exit 8 (`RATE_LIMIT`) and exit 9 (`REMOTE`)
 
 These are the two retryable failures, and `jr` has already retried before you
-see them. Retries count against `--max-requests`, because a retry is another
+see them, except `OUTCOME_UNKNOWN`, which is neither (see above). Retries count against `--max-requests`, because a retry is another
 request from the server's side.
 
 ```console
@@ -1414,8 +1423,9 @@ you are still being throttled, that gap is why. Raising `--retries` will not
 help; wait out the server's interval instead.
 
 A `failure` line carrying a reason and a single attempt is `jr` refusing to
-replay a request that may already have been processed. That is deliberate, and
-re-running it by hand is a decision only you can make.
+replay a request that may already have been processed. That is deliberate, the
+error it ends in is `OUTCOME_UNKNOWN`, and re-running it by hand is a decision
+only you can make.
 
 ### See what a command would do
 

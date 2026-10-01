@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -203,6 +204,16 @@ func statusError(resp *Response) *errs.Error {
 	case resp.Status == http.StatusRequestEntityTooLarge:
 		e = errs.Usage("TOO_LARGE", "the request body is larger than Jira accepts")
 
+	case resp.Status >= 500 && resp.Method != "" &&
+		!idempotentMethods[resp.Method] && !resp.Idempotent:
+		// A write answered with a 5xx was not sent again, and nothing says
+		// whether it happened: a proxy timing out in front of a slow create
+		// answers exactly this after Jira made the issue.
+		e = errs.Remote("OUTCOME_UNKNOWN",
+			"Jira answered %d to a write it may already have applied", resp.Status).
+			WithRemedy("%s", unknownOutcomeRemedy)
+		e.Retryable = false
+
 	case resp.Status >= 500:
 		e = errs.Remote("UPSTREAM_ERROR", "Jira returned %d", resp.Status).
 			WithRemedy("this is usually transient; retry, or check the Atlassian status page")
@@ -226,6 +237,33 @@ func statusError(resp *Response) *errs.Error {
 		e = e.WithDetail("%s", detail)
 	}
 	return e.WithRequestID(resp.RequestID)
+}
+
+// unknownOutcomeRemedy is what to do about a write whose answer never said
+// whether it happened.
+const unknownOutcomeRemedy = "check whether it happened before you send it " +
+	"again: Jira may have applied it, and a second attempt can apply it twice"
+
+// lostWrite reports a connection-level failure on a write that may already
+// have reached Jira as what it is, an unknown outcome, and never as a
+// retryable error: an agent that retries a retryable failure would send the
+// duplicate this client declined to. A read, a write that provably never left
+// this process, and a cancellation keep the error they had.
+func lostWrite(r Request, target *url.URL, cause error) error {
+	if idempotentMethods[r.Method] || r.Idempotent || NeverSent(cause) {
+		return cause
+	}
+	e, ok := errors.AsType[*errs.Error](cause)
+	if !ok || !e.Retryable {
+		return cause
+	}
+	out := errs.Remote("OUTCOME_UNKNOWN",
+		"the connection failed after a write was sent, so Jira may have applied it").
+		WithDetail("%s", joinDetail(r.Method+" "+RedactURL(target), e.Message, e.Detail)).
+		WithRemedy("%s", unknownOutcomeRemedy).
+		Wrap(cause)
+	out.Retryable = false
+	return out
 }
 
 func joinDetail(parts ...string) string {

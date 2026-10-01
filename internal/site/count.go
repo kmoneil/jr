@@ -66,8 +66,10 @@ func countApproximately(ctx context.Context, client Doer, info Info, query strin
 	resp, err := client.Do(ctx, transport.Request{
 		Method: transport.MethodPost,
 		Path:   path,
-		Header: map[string][]string{"Content-Type": {"application/json"}},
-		Body:   body,
+		// A count: sending it twice reads twice and changes nothing.
+		Idempotent: true,
+		Header:     map[string][]string{"Content-Type": {"application/json"}},
+		Body:       body,
 	})
 	if err != nil {
 		return IssueCount{}, err

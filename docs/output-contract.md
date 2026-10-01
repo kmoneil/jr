@@ -1289,8 +1289,10 @@ Errors go to stderr in the requested format, always with a machine-stable
 ```
 
 `retryable` exists so an agent does not burn its budget retrying a syntax error,
-and does not give up on a 503. It is `true` only for `RATE_LIMIT` and `REMOTE`.
-It is always present, never omitted when false.
+and does not give up on a 503. It is `true` only for `RATE_LIMIT` and `REMOTE`,
+and one `REMOTE` code is never retryable: `OUTCOME_UNKNOWN`, a write Jira may
+already have applied, which a second attempt could apply twice (see
+[Idempotency](#idempotency)). It is always present, never omitted when false.
 
 `detail` and `remedy` are present when there is something useful to say.
 `request-id` is present for any failure that reached Jira.
@@ -1530,6 +1532,15 @@ A mutating command that carries an idempotency key records `(site, key)` before
 it sends anything, and the outcome afterwards. A repeat with the same key
 returns the original result rather than making a second one.
 
+**A key guards a second run, not a retry inside one.** No write is sent again
+after an upstream error, with a key or without: the claim is taken before the
+first attempt, and a resend inside the same run would never consult it. Until
+2026-10-01 a key marked the request replayable, and one keyed `issue create`
+answered 503 after Jira had made the issue made a second one, reported at exit
+0. A write whose answer never says whether it happened is `OUTCOME_UNKNOWN`, and
+its key stays claimed, so a repeat is refused as in flight until somebody has
+looked.
+
 | Code                      | Exit | Meaning                                                                                                                                                                                                |
 | ------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `IDEMPOTENCY_KEY_REUSED`  | 7    | The key was already used for a different request — another operation, or on `issue move` another issue or another transition. Answering one with the other's result would be worse than refusing.      |
@@ -1537,6 +1548,7 @@ returns the original result rather than making a second one.
 | `LEDGER_INVALID`          | 1    | The ledger could not be parsed. It is refused rather than ignored: everywhere else an unreadable cache is a miss because the cost is a round trip, and here the cost is a duplicate issue.             |
 | `LEDGER_LOCKED`           | 1    | Another run is writing the ledger and did not finish.                                                                                                                                                  |
 | `LEDGER_LOCK_STOLEN`      | 1    | This run was presumed dead while it held the ledger, so another run broke its lock and this run's write may have been lost. The request may or may not have been sent; read the issue before retrying. |
+| `OUTCOME_UNKNOWN`         | 9    | A write was sent and the answer never said whether it happened: a 5xx, a connection that dropped after the request went out, or a deadline that passed. It is not sent again, with or without a key, and unlike every other `REMOTE` code it is not `retryable`: Jira may already have applied it, and a second attempt can apply it twice. Read what you were changing to see whether it happened. With a key, a repeat is refused as `IDEMPOTENT_IN_FLIGHT` until the claim goes stale. |
 
 An attempt that claimed a key and then died leaves the claim pending, and a
 retry inside `idem.StaleClaim` is **refused** rather than allowed. The first

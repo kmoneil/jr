@@ -977,11 +977,10 @@ func applyRow(
 		return failed(err)
 	}
 
-	// The caller holds an idempotency key, which is what makes this safe to
-	// replay after an upstream error. The single-issue move applies the same
-	// rule when --idempotency-key is held, comment and all, so the three
-	// verbs replay under one discipline.
-	req.Replayable = true
+	// Not replayed after an upstream error. The row's key guards a second run
+	// of the apply through the ledger; the transport's retry inside this run
+	// never asks it, so a row Jira applied and answered 503 for would be sent
+	// twice.
 	if err := client.send(ctx, req); err != nil {
 		// Released only when the failure proves the request never arrived.
 		// Anything ambiguous keeps the claim, because a 503 can land after Jira

@@ -59,18 +59,20 @@ var idempotentMethods = map[string]bool{
 // shouldRetry decides whether a response is worth another attempt.
 //
 // The subtle case is a non-idempotent method. A POST that failed with a 503 may
-// well have been processed before the error — retrying it is how one `issue
+// well have been processed before the error, and retrying it is how one `issue
 // create` becomes two issues. So a POST is replayed only when the failure is
 // proof the request was not acted on (a 429 is refused before processing), or
-// when the caller has said it is safe because it holds an idempotency key.
-func shouldRetry(method string, status int, replayable bool) (bool, string) {
+// when the request is marked Idempotent because a second sending has the
+// effect of one. Holding an idempotency key is not that: see
+// Request.Idempotent.
+func shouldRetry(method string, status int, idempotent bool) (bool, string) {
 	switch {
 	case status == http.StatusTooManyRequests:
 		// Refused before processing, whatever the method.
 		return true, "rate limited"
 	case status < 500:
 		return false, ""
-	case idempotentMethods[method] || replayable:
+	case idempotentMethods[method] || idempotent:
 		return true, "upstream error"
 	default:
 		return false, "non-idempotent request not replayed after an upstream error"
@@ -85,7 +87,7 @@ func shouldRetry(method string, status int, replayable bool) (bool, string) {
 // how. An empty one means there was no policy decision, because the caller
 // stopped this. Saying "not retried" about a Ctrl-C would be noise.
 func shouldRetryNetworkError(
-	ctx context.Context, method string, replayable bool, err error,
+	ctx context.Context, method string, idempotent bool, err error,
 ) (bool, string) {
 	if ctx.Err() != nil || errors.Is(err, context.Canceled) ||
 		errors.Is(err, context.DeadlineExceeded) {
@@ -93,7 +95,7 @@ func shouldRetryNetworkError(
 	}
 	// A connection-level failure may have happened after the server accepted
 	// the request, so the same idempotency reasoning applies.
-	if idempotentMethods[method] || replayable {
+	if idempotentMethods[method] || idempotent {
 		return true, "network error"
 	}
 	return false, "non-idempotent request not replayed after a network error"

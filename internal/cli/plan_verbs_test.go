@@ -21,12 +21,17 @@ type planVerbsRecorder struct {
 	resolutions map[string]string // key -> resolution name sent with it
 	assigns     map[string]string // key -> assignee value sent
 	edits       map[string]int    // key -> edits received
+	moveSends   map[string]int    // key -> transition requests received
+	// failNext answers the next transition with 503 after applying it, the way
+	// a proxy that timed out in front of Jira does.
+	failNext bool
 }
 
 func newPlanVerbsRecorder() *planVerbsRecorder {
 	return &planVerbsRecorder{
 		moves: map[string]string{}, resolutions: map[string]string{},
 		assigns: map[string]string{}, edits: map[string]int{},
+		moveSends: map[string]int{},
 	}
 }
 
@@ -93,10 +98,18 @@ func planVerbsJiraWith(
 			_ = json.NewDecoder(r.Body).Decode(&body)
 			rec.mu.Lock()
 			rec.moves[key] = body.Transition.ID
+			rec.moveSends[key]++
 			if name := body.Fields.Resolution.Name; name != "" {
 				rec.resolutions[key] = name
 			}
+			fail := rec.failNext
+			rec.failNext = false
 			rec.mu.Unlock()
+			if fail {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				_, _ = w.Write([]byte(`{"errorMessages":["upstream timed out"]}`))
+				return
+			}
 			w.WriteHeader(http.StatusNoContent)
 		case strings.HasSuffix(r.URL.Path, "/assignee") && r.Method == http.MethodPut:
 			var body map[string]any
@@ -353,5 +366,44 @@ func TestADryRunOfAnApplySendsNothing(t *testing.T) {
 				t.Errorf("a refusal wrote a document:\n%s", got.stdout)
 			}
 		})
+	}
+}
+
+// TestAnApplyRowJiraMayHaveAppliedIsNotSentTwice is the replay class inside a
+// plan. A row's transition reached Jira, Jira moved the issue, and the answer
+// that came back was a 503. Every apply row was marked replayable because the
+// plan holds an idempotency key for it, so the transport sent the transition
+// again: a key guards a second run of the apply, and a retry inside one never
+// asks the ledger. The row is sent once, reported failed as OUTCOME_UNKNOWN,
+// because nothing says whether Jira moved it, and the rows after it still run.
+func TestAnApplyRowJiraMayHaveAppliedIsNotSentTwice(t *testing.T) {
+	rec := newPlanVerbsRecorder()
+	url := planVerbsJira(t, rec)
+	env := credentialed(t)
+	mustRun(t, env, "context", "create", "work", "--site", url, "--project", "ENG")
+	path := filepath.Join(t.TempDir(), "move.plan.xml")
+	mustRun(t, env, "issue", "move", "ENG-1", "ENG-3", "Done", "--plan-out", path)
+
+	rec.mu.Lock()
+	rec.failNext = true
+	rec.mu.Unlock()
+	got := run(t, env, "issue", "move", "--apply", path, "--retries", "1")
+
+	rec.mu.Lock()
+	sent, after := rec.moveSends["ENG-1"], rec.moves["ENG-3"]
+	rec.mu.Unlock()
+	if sent != 1 {
+		t.Errorf("ENG-1's transition reached Jira %d times; Jira had applied the "+
+			"first one before it answered 503", sent)
+	}
+	if !strings.Contains(got.stdout, `key="ENG-1" outcome="failed" code="OUTCOME_UNKNOWN"`) {
+		t.Errorf("the row Jira answered 503 for is not reported as an unknown "+
+			"outcome:\n%s", got.stdout)
+	}
+	if after != "33" {
+		t.Errorf("the row after the failure did not run: moves = %v", rec.moves)
+	}
+	if got.exit == exitcode.OK {
+		t.Errorf("an apply with a row answered 503 exited 0; stderr = %s", got.stderr)
 	}
 }
