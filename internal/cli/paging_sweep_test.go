@@ -160,6 +160,17 @@ func errCode(err error) string {
 func runPaged(t *testing.T, c *registry.Command, kind site.Kind, capped bool) (pagedRun, error) {
 	t.Helper()
 	fake := &pagingFake{kind: kind, capped: capped}
+	var out strings.Builder
+	err := runFor(t.Context(), c, pagedInvocation(t, c, kind, fake, "all"), &out)
+	return pagedRun{doc: freezeNow(out.String()), pages: fake.pages}, err
+}
+
+// pagedInvocation invokes a command against rt with its required flags and
+// arguments probed, under the limit given.
+func pagedInvocation(
+	t *testing.T, c *registry.Command, kind site.Kind, rt http.RoundTripper, limit string,
+) *registry.Invocation {
+	t.Helper()
 	flags := registry.NewFlags()
 	for _, f := range c.AllFlags() {
 		if f.Required {
@@ -174,19 +185,16 @@ func runPaged(t *testing.T, c *registry.Command, kind site.Kind, capped bool) (p
 			args = append(args, v)
 		}
 	}
-	limit, err := registry.ParseLimit("all")
+	parsed, err := registry.ParseLimit(limit)
 	if err != nil {
 		t.Fatalf("limit: %v", err)
 	}
-	inv := &registry.Invocation{
-		Jira:  faultSession{sweepSession: sweepSession{kind: kind}, rt: fake},
+	return &registry.Invocation{
+		Jira:  faultSession{sweepSession: sweepSession{kind: kind}, rt: rt},
 		Args:  args,
-		Flags: flags, Limit: limit, Format: render.XML,
+		Flags: flags, Limit: parsed, Format: render.XML,
 		Stderr: io.Discard, Progress: registry.NoProgress,
 	}
-	var out strings.Builder
-	err = runFor(t.Context(), c, inv, &out)
-	return pagedRun{doc: freezeNow(out.String()), pages: fake.pages}, err
 }
 
 // keyBound reads the keyset bound out of a search's JQL.
@@ -220,7 +228,11 @@ func (p *pagingFake) RoundTrip(r *http.Request) (*http.Response, error) {
 		}
 		return ""
 	}
-	paged := p.page(sweepResponse(r.URL.Path, p.kind),
+	// Cloud's enhanced search pages by cursor alone and counts nothing, so a
+	// fixture that sent a total there would hand the walk a number the server
+	// never does.
+	counted := p.kind != site.Cloud || !strings.HasSuffix(r.URL.Path, "/search/jql")
+	paged := p.page(sweepResponse(r.URL.Path, p.kind), counted,
 		param("startAt"), param("maxResults"), param("nextPageToken"), param("jql"))
 	return &http.Response{
 		StatusCode: http.StatusOK,
@@ -230,7 +242,7 @@ func (p *pagingFake) RoundTrip(r *http.Request) (*http.Response, error) {
 	}, nil
 }
 
-func (p *pagingFake) page(full, startAt, maxResults, token, jql string) string {
+func (p *pagingFake) page(full string, counted bool, startAt, maxResults, token, jql string) string {
 	var decoded any
 	if err := json.Unmarshal([]byte(full), &decoded); err != nil {
 		return full
@@ -285,6 +297,11 @@ func (p *pagingFake) page(full, startAt, maxResults, token, jql string) string {
 			p.pages++
 			v[name] = page
 			v["startAt"], v["maxResults"], v["total"], v["isLast"] = start, size, total, last
+			if !counted {
+				delete(v, "startAt")
+				delete(v, "maxResults")
+				delete(v, "total")
+			}
 			if last {
 				delete(v, "nextPageToken")
 			} else {

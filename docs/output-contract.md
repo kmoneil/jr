@@ -581,11 +581,9 @@ stopped by the budget used to be told to raise `--limit`, on `issue activity`,
 which also has no `--page-token`, so every word of the remedy named something
 the caller could not do.
 
-**The warning carries `total` where the command knows it.** `issue activity` and
-`issue changes` read every candidate before `--limit` applies, because the rows
-they merge are ordered by when things happened and candidates arrive in key
-order, so a cut there is a cut of a set held whole. The warning then says how
-many rows that set held, directly after the `count` it qualifies:
+**The warning carries `total` where the command knows it**, directly after the
+`count` it qualifies. "10 of 12" and "10 of 5,000" are different answers: one
+more page finishes the first, and the second needs a narrower question.
 
 ```
 code    RESULT_TRUNCATED
@@ -595,13 +593,36 @@ total   347
 remedy  raise --limit, or use --limit all
 ```
 
-A clipped element's warning already wrote a `total`, beside the element's own
-`count`, and this document did not say so until this paragraph. Both mean the
-same thing: of what the `count` before it counted. The two never share a
-warning; a clipped element's warning carries only the element's. An absent
-`total` means unknown, never zero: every other collection pages rather than
-holding its set, and a run the request budget stopped left candidates unread.
-Adding it is additive under the stability policy, so the patch position moves.
+A command knows it in one of two ways:
+
+- **It held the whole answer before a bound cut it.** `issue activity` and
+  `issue changes` read every candidate first, because the rows they merge are
+  ordered by when things happened and candidates arrive in key order. The board,
+  epic, sprint, project, component, version, status, field, transition,
+  create-field, link and attachment lists read their whole set first, because
+  their endpoints document no ordering or do not page at all. `issue history`
+  on Data Center has every entry in hand once the server has sent every save it
+  counted.
+- **The server counted the walk's own query.** `issue list` on Data Center
+  carries the count its search gave on the first page, less the rows a resumed
+  walk had already passed, so a run started from a `--page-token` says what was
+  left from where it began. `issue comment list` and `issue worklog list` carry
+  the count their endpoints send. A count is the server's when it was given,
+  and a set that changes under the walk can outgrow it, so a count no larger
+  than the rows written is not reported: it no longer describes the answer.
+
+Everything else has no `total`. Cloud's search counts nothing, so `issue list`
+on Cloud has none: its approximate-count endpoint is an estimate, and this field
+is a count. Cloud's changelog counts saves, and a row of `issue history` is one
+changed field. `user list` sends its limit to the server, which answers with a
+bare array. A feed the request budget stopped left candidates unread, and
+Jira's count of them is not a count of the events they hold.
+
+A clipped element's warning also writes a `total`, beside the element's own
+`count`. Both mean the same thing: of what the `count` before it counted. The
+two never share a warning; a clipped element's warning carries only the
+element's. An absent `total` means unknown, never zero. Writing it where it was
+absent is additive under the stability policy, so the patch position moves.
 The warning is not a kind and has no shape golden, and its `v` has stayed `1`
 through the optional fields added before this one.
 
@@ -639,7 +660,7 @@ about the answer cannot be read off the answer itself.
 
 | Code               | Emitted by                                      | What it says                                                                                                                                                                                                                        |
 | ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RESULT_TRUNCATED` | any collection                                  | The result is not exhaustive. It accompanies exit 3 and `complete="false"`, carries the resume token where one exists, and carries `total` where the command read the whole set before `--limit` cut it.                             |
+| `RESULT_TRUNCATED` | any collection                                  | The result is not exhaustive. It accompanies exit 3 and `complete="false"`, carries the resume token where one exists, and carries `total` where the command knows how many rows the whole answer held.                             |
 | `POSSIBLE_DUPLICATE` | `issue create`, `issue clone`                 | An identical request succeeded within the last 60 seconds and this one carried no idempotency key.                                                                                                                                   |
 | `UNKNOWN_LABEL`    | `issue list`, from `--label` and `--not-label`   | No issue on this site carries that label. The query still runs and still exits 0.                                                                                                                                                    |
 | `SCOPE_MISMATCH`   | `issue list`, `issue activity`, `issue changes` | A raw `--jql` selects a project the effective scope excludes, so those rows cannot come back. The query still runs and still exits 0.                                                                                                 |

@@ -201,7 +201,7 @@ func runTransitions(
 	// A workflow rarely offers more moves than a limit allows, but a
 	// bounded result is still reported as bounded. Reporting a cut list as
 	// complete is how somebody concludes a transition does not exist.
-	items, complete := registry.Bound(inv.Limit, items)
+	items, result := registry.Cut(inv.Limit, items)
 
 	nodes := make([]*render.Node, 0, len(items))
 	for _, t := range items {
@@ -214,7 +214,7 @@ func runTransitions(
 
 	// The endpoint has no cursor, so there is nothing to resume from. A token
 	// that meant nothing would be worse than none.
-	return registry.StreamResult{Complete: complete}, nil
+	return result, nil
 }
 
 // TransitionNode renders one transition.
@@ -341,7 +341,7 @@ func runCreateMeta(
 	}
 
 	fields := created.Fields
-	fields, complete := registry.Bound(inv.Limit, fields)
+	fields, result := registry.Cut(inv.Limit, fields)
 
 	nodes := make([]*render.Node, 0, len(fields))
 	for _, f := range fields {
@@ -352,7 +352,7 @@ func runCreateMeta(
 	}
 	inv.Progress.Update(out.Count(), len(created.Fields))
 
-	return registry.StreamResult{Complete: complete}, nil
+	return result, nil
 }
 
 // MetaFieldNode renders one field of a create screen or a transition screen.

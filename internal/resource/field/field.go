@@ -148,7 +148,7 @@ func runList(
 	// A bound the caller set is honored exactly, and the result says it was
 	// cut. Reporting a truncated catalogue as complete is how somebody
 	// concludes their field does not exist.
-	fields, complete := registry.Bound(inv.Limit, fields)
+	fields, result := registry.Cut(inv.Limit, fields)
 
 	nodes := make([]*render.Node, 0, len(fields))
 	for _, f := range fields {
@@ -162,7 +162,7 @@ func runList(
 	// There is no cursor to resume from: the next run fetches the same whole
 	// catalogue. Handing back a token that meant nothing would be worse than
 	// handing back none.
-	return registry.StreamResult{Complete: complete}, nil
+	return result, nil
 }
 
 // Node renders one field.

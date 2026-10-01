@@ -267,13 +267,20 @@ do not catch, add the test in the same change and cite it here.
   **Enforced by:** `TestActivityIsNewestFirstAcrossPages`,
   `TestALimitedActivityFeedKeepsTheNewest`, `TestTheFeedIsOldestFirstAcrossPages`,
   `TestALimitedFeedKeepsTheOldest`.
-- **A truncation warning states a `total` only where it is exact.** A feed cut
-  by `--limit` after reading every candidate knows how many rows it held, and
-  says so beside the `count`. Nothing else may: a budget cut left candidates
-  unread, a paged collection never held its set, and a `total` of zero beside
-  two rows would be a number somebody believes. A clipped element's warning
-  keeps `total` for the element, so one name never carries two numbers.
-  **Enforced by:** `TestALimitCutWarningStatesTheTotal`,
+- **A truncation warning states a `total` wherever it is known, and nowhere
+  else.** A command that held its whole answer before a bound cut it knows how
+  many rows it held, and a server that counted the walk's own query has said;
+  either goes beside the `count`. Nothing else may: a budget cut left a feed's
+  candidates unread, Cloud's search counts nothing and its approximate count is
+  an estimate, Cloud's changelog counts saves rather than rows, and a `total` of
+  zero beside two rows would be a number somebody believes. A clipped element's
+  warning keeps `total` for the element, so one name never carries two numbers.
+  Until 2026-10-01 only `issue activity` and `issue changes` wrote one, and
+  every other list that knew its total dropped it, twelve of them while holding
+  the slice (issue 217). The sweep cuts every paginated command to one row on
+  both deployments, and a command that cannot know names why in its ledger.
+  **Enforced by:** `TestATruncationSaysWhatItWasCutFrom`,
+  `TestACutListKnowsWhatItWasCutFrom`, `TestALimitCutWarningStatesTheTotal`,
   `TestAnUnknownTotalIsNotWritten`, `TestABudgetCutFeedStatesNoTotal`,
   `TestAClippedElementKeepsItsTotal`.
 - **A change to a list is the elements that moved, and a split is made only
