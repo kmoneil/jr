@@ -20,6 +20,72 @@ accident.
 
 Nothing yet.
 
+## [0.19.5] - 2026-10-02
+
+**Take this one if your issues link outward, or your projects are filed under
+categories.** Two reads the API had and this tool did not, issues 214 and 220,
+both measured on Cloud and Data Center before anything was built.
+
+`jr issue remotelink list` returns an issue's links to things outside Jira:
+the web links a person pastes in, and the links an integration writes to a
+commit, a build, a document. Until now `issue activity` showed a link being
+added and nothing could return its URL.
+
+```console
+$ jr issue remotelink list ENG-101
+id     application  relationship  title           url
+10000                             Deploy runbook  https://wiki.example.com/runbook
+10001  Example CI   mentioned in  Pipeline 42     https://ci.example.com/pipelines/42
+```
+
+- A link an application wrote names it, and may carry the remote side's own
+  resolved state. One a person added arrives with neither: Jira sends an empty
+  application object for it, and that is reported by absence, so a
+  `remotelink` with no `application` is a hand-added web link.
+- The id is the value an activity item names (`RemoteIssueLink` on Data
+  Center, `RemoteWorkItemLink` on Cloud), so the listing resolves what the
+  changelog refers to. After a removal the id resolves to nothing: read the
+  links while they exist.
+- `issue get --with-remote-links` folds the same set into the record. The
+  endpoint serves it whole in one response on both deployments, so unlike the
+  comment thread this container is never partial.
+
+`jr project list` now reports the category a project is filed under, and can
+filter by it, so "the platform team's projects" is one invocation on a site
+whose categories name the owning teams:
+
+```console
+$ jr project list --category Platform --with-category
+```
+
+- The `category` element carries the server's name and id, and is absent, not
+  empty, on a project with none, which is how both deployments report that.
+- `--category` keeps the projects filed under that exact name, ignoring case.
+  It is not a substring search, unlike `--match`: a category is a closed set
+  an administrator curates, so a fragment matches nothing rather than
+  guessing. A blank value is refused as `EMPTY_QUERY`.
+- The filter runs client-side on both deployments, because Cloud's search can
+  filter by category where Data Center's listing silently ignores the same
+  parameter, and a rule only one server applies cannot be held to one answer.
+- `--with-category` appends the column; the default table keeps its four
+  columns, because adding one there is a breaking change.
+
+### Output contract
+
+- New command: `issue remotelink list`; new kind `issue.remotelink.list` v1.
+- `issue.get` v12: an optional `remotelinks` container, present only with
+  `--with-remote-links`.
+- `project.list` v3 and `project.get` v3: an optional `category` element,
+  present when the server sent one.
+- New flags: `issue get --with-remote-links`; `project list --category` and
+  `--with-category`. `--raw-field` refuses `--with-remote-links` beside it,
+  as it refuses every document-shaping flag.
+- New error code: `MALFORMED_REMOTE_LINKS`, exit 9.
+- **Priced a patch.** Everything here is additive: a new command, a new kind,
+  and optional elements nothing existing looks for. The three kind versions
+  moved because a changed shape at an unchanged version is refused, and a
+  kind's version moving decides nothing about the release by itself.
+
 ## [0.19.4] - 2026-10-02
 
 **Take this one if you make several changes to one issue at a time.** Closing a
@@ -3231,6 +3297,7 @@ recent enough to be worth reading.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
 [unreleased]: https://github.com/kmoneil/jr/compare/v0.19.4...main
+[0.19.5]: https://github.com/kmoneil/jr/releases/tag/v0.19.5
 [0.19.4]: https://github.com/kmoneil/jr/releases/tag/v0.19.4
 [0.19.3]: https://github.com/kmoneil/jr/releases/tag/v0.19.3
 [0.19.2]: https://github.com/kmoneil/jr/releases/tag/v0.19.2
