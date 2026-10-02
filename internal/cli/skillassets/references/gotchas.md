@@ -37,12 +37,20 @@ For an account on `America/Chicago` in August, `startOfDay()` is 05:00Z, so
 Relative offsets like `-30d` are relative to now and unaffected. Anything with a
 day boundary in it is not.
 
-To mean your own day, convert it and send an absolute literal:
+To mean your own day, send your midnight as an RFC 3339 instant with your own
+offset on it. `jr` converts it into the account's zone, so you do not need to
+know what that zone is:
 
 ```bash
-start=$(TZ=Pacific/Auckland date -d "today 00:00" +%s)
-jr issue list --created-after "$(TZ=America/Chicago date -d @$start '+%Y-%m-%d %H:%M')"
+jr issue list --created-after "$(TZ=Pacific/Auckland date -d 'today 00:00' -Iseconds)"
 ```
+
+A timestamp `jr` printed goes straight back into any date flag the same way.
+JQL reads a date to the minute, so on `issue list` an instant with seconds is
+widened to the minute, outward, and `DATE_ROUNDED` on stderr names the bound
+that was sent: the answer can hold rows up to a minute outside the instant, and
+each row's own timestamp says which. `issue activity` compares events to the
+instant itself, so it is exact there.
 
 `startOfWeek()` and friends are passed through rather than computed locally on
 purpose: they carry Jira's own notion of when a week begins, which a converted

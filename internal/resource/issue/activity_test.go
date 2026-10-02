@@ -313,6 +313,9 @@ func TestActivityCutoffResolvesLocally(t *testing.T) {
 		"2026/08/10":       "2026-08-10T05:00:00Z",
 		"2026-08-10 00:00": "2026-08-10T05:00:00Z",
 		"2026/08/10 13:45": "2026-08-10T18:45:00Z",
+		// An instant is not a wall clock, so Chicago does not move it.
+		"2026-08-10T13:45:30Z":      "2026-08-10T13:45:30Z",
+		"2026-08-10T13:45:30+02:00": "2026-08-10T11:45:30Z",
 		// The server's to evaluate. This resolves to nothing, and the command
 		// refuses rather than running with no bound.
 		"startOfWeek()": "",
@@ -345,6 +348,8 @@ func TestEveryAcceptedSinceIsBoundedOrRefused(t *testing.T) {
 		"-7D", "-1W", "-2H", "-4w 2d", "-1w 7d",
 		"2026-08-10", "2026/08/10",
 		"2026-08-10 00:00", "2026/08/10 13:45",
+		// The instants this tool prints, which it refused until issue 213.
+		"2026-08-10T13:45:00Z", "2026-08-10T13:45Z", "2026-08-10T13:45:00+02:00",
 		"startOfWeek()", "endOfDay(-1)", "now()", "currentLogin()",
 	} {
 		if _, err := jql.ParseDate(input); err != nil {
@@ -357,7 +362,7 @@ func TestEveryAcceptedSinceIsBoundedOrRefused(t *testing.T) {
 		// "Either resolved or refused" on its own would pass a build that
 		// refused everything.
 		switch jql.ClassifyDate(input) {
-		case jql.DateRelative, jql.DateAbsolute:
+		case jql.DateRelative, jql.DateAbsolute, jql.DateInstant:
 			if err != nil {
 				t.Errorf("--since %q names an instant and was refused: %v", input, err)
 			}
@@ -594,12 +599,13 @@ func TestEveryAcceptedUntilIsBoundedOrRefused(t *testing.T) {
 	for _, input := range []string{
 		"-7d", "+30m", "2w", "-1M", "-2h", "-7D", "-4w 2d",
 		"2026-08-10", "2026/08/10", "2026-08-10 00:00", "2026/08/10 13:45",
+		"2026-08-10T13:45:00Z", "2026-08-10T13:45:00-05:00",
 		"startOfWeek()", "endOfDay(-1)", "now()",
 	} {
 		inv, err := validateActivityWindow(t, "-3650d", input, accountDoer())
 		until, _ := inv.Value(activityUntilKey).(string)
 		switch jql.ClassifyDate(input) {
-		case jql.DateRelative, jql.DateAbsolute:
+		case jql.DateRelative, jql.DateAbsolute, jql.DateInstant:
 			if err != nil || until == "" {
 				t.Errorf("--until %q names an instant and resolved to %q: %v",
 					input, until, err)

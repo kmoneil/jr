@@ -244,6 +244,32 @@ func TestAWindowFloorsItsQueryBoundToTheAccountsMinute(t *testing.T) {
 	}
 }
 
+// TestAWindowFloorNeverNamesAMinuteThatHappensTwice is the night the clocks go
+// back. New York reads 01:00 to 01:59 twice on 2026-11-01, so a bound of
+// "01:30" names two instants an hour apart, and a server reading it as the
+// later one skips an hour of changes the window still needs. The floor moves
+// on to 00:59, the nearest minute down that names one instant.
+func TestAWindowFloorNeverNamesAMinuteThatHappensTwice(t *testing.T) {
+	ny, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Skipf("no zone database: %v", err)
+	}
+	// 05:30Z is 01:30 EDT, the first time round.
+	w, err := issue.NewChangeWindow(
+		time.Date(2026, 11, 1, 5, 30, 0, 0, time.UTC),
+		time.Date(2026, 11, 1, 7, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("window: %v", err)
+	}
+	got, err := w.Floor(ny)
+	if err != nil {
+		t.Fatalf("floor: %v", err)
+	}
+	if want := "2026-11-01 00:59"; got != want {
+		t.Errorf("floor = %q, want %q", got, want)
+	}
+}
+
 func TestAWindowWithoutATimezoneIsRefused(t *testing.T) {
 	w, err := issue.NewChangeWindow(
 		time.Date(2026, 8, 17, 14, 0, 0, 0, time.UTC),

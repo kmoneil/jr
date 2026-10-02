@@ -70,6 +70,16 @@ func TestParseDateRejects(t *testing.T) {
 		{"startOfWeek(monday)", ""},
 		{"startOfWeek(", ""},
 		{"drop table()", ""},
+		// Shaped like an instant and not one. The first is Jira's own
+		// spelling, which carries no colon in its offset, and the second has
+		// no zone at all, so it names a wall clock and not an instant.
+		{"2026-08-11T16:37:31.272+0000", "an instant is RFC 3339"},
+		{"2026-05-12T09:00:00", "an instant is RFC 3339"},
+		{"2026-05-12t09:00:00z", "an instant is RFC 3339"},
+		{"2026-05-12T9:00:00Z", "an instant is RFC 3339"},
+		{"2026-05-12 09:00:00", "an instant is RFC 3339"},
+		{"2026-05-12T25:00:00Z", "an instant is RFC 3339"},
+		{"2026-05-12T09:00:00+2:00", "an instant is RFC 3339"},
 	}
 
 	for _, tc := range cases {
@@ -126,6 +136,9 @@ func FuzzParseDateDoesNotPanic(f *testing.F) {
 		"endOfDay(-1y)", "endOfDay(-1D)", `endOfDay("-1w 2d")`,
 		// Periods that match the pattern and cannot be held in a Duration.
 		"1000000d", "100000d 100000d",
+		// Instants, and the near misses of one.
+		"2026-05-12T09:00:00Z", "2026-05-12T09:00Z", "2026-05-12T11:00:00.5+02:00",
+		"2026-05-12T09:00:00+0000", "2026-05-12T09:00:00", "9999-12-31T23:59:59-14:00",
 	} {
 		f.Add(seed)
 	}
@@ -171,6 +184,15 @@ func TestClassifyDateNamesEveryFormParseDateAccepts(t *testing.T) {
 		"  2026-08-10  ":   jql.DateAbsolute,
 		"startOfWeek()":    jql.DateFunction,
 		"endOfDay(-1)":     jql.DateFunction,
+		// What this tool prints, and the spellings of it issue 213 found
+		// refused: without seconds, and with an offset.
+		"2026-05-12T09:00:00Z":      jql.DateInstant,
+		"2026-05-12T09:00Z":         jql.DateInstant,
+		"2026-05-12T11:00:00+02:00": jql.DateInstant,
+		"2026-05-12T04:00:00-05:00": jql.DateInstant,
+		"2026-05-12T09:00:00.000Z":  jql.DateInstant,
+		"  2026-05-12T09:00:00Z  ":  jql.DateInstant,
+		"2026-05-12T09:00:00":       jql.DateInvalid,
 		// Shape, not validity: a bad function is still classified as one, so
 		// that ParseDate can refuse it as a bad function rather than as a word.
 		"nonsense()": jql.DateFunction,
@@ -225,6 +247,11 @@ func TestResolveDateReadsALiteralInTheZoneItIsGiven(t *testing.T) {
 		"2026/08/10":       "2026-08-09T15:00:00Z",
 		"2026-08-10 13:45": "2026-08-10T04:45:00Z",
 		"2026/08/10 13:45": "2026-08-10T04:45:00Z",
+		// An instant names itself. Tokyo has nothing to add to it, and
+		// reading the clock in it as a wall clock would move it nine hours.
+		"2026-08-10T13:45:00Z":      "2026-08-10T13:45:00Z",
+		"2026-08-10T13:45:00+09:00": "2026-08-10T04:45:00Z",
+		"2026-08-10T13:45Z":         "2026-08-10T13:45:00Z",
 	} {
 		got, ok := jql.ResolveDate(input, tokyo, now)
 		if !ok {
@@ -457,6 +484,10 @@ func TestDateHasTimeOfDay(t *testing.T) {
 		"  2026-08-10 13:45  ": true,
 		"2026-08-10":           false,
 		"2026/08/10":           false,
+		// An instant reaches Jira as a minute of the account's clock, so it
+		// is refused wherever a time of day is.
+		"2026-08-10T13:45:00Z":      true,
+		"2026-08-10T13:45:00+02:00": true,
 		// An offset is arithmetic on the server's clock, and Data Center takes
 		// `-5d` on the same field it refuses `2026-08-10 00:00` on.
 		"-7d":  false,

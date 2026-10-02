@@ -137,6 +137,25 @@ func TestExplainNamesWhatItDidNotResolve(t *testing.T) {
 		}
 	})
 
+	t.Run("an instant is listed", func(t *testing.T) {
+		// The minute it becomes is read in the account's zone, which costs
+		// the request an explanation does not make.
+		got := run(t, env, "issue", "list", "--updated-after", "2026-05-12T09:00:30Z", "--explain")
+		if got.exit != exitcode.OK {
+			t.Fatalf("exit = %v, stderr = %s", got.exit, got.stderr)
+		}
+		if !strings.Contains(got.stdout, `<filter flag="updated-after">2026-05-12T09:00:30Z</filter>`) {
+			t.Errorf("unresolved does not name the instant:\n%s", got.stdout)
+		}
+		got = run(t, env, "issue", "activity", "--since", "2026-05-12T09:00:30Z", "--explain")
+		if got.exit != exitcode.OK {
+			t.Fatalf("exit = %v, stderr = %s", got.exit, got.stderr)
+		}
+		if !strings.Contains(got.stdout, `<filter flag="since">2026-05-12T09:00:30Z</filter>`) {
+			t.Errorf("unresolved does not name the instant --since:\n%s", got.stdout)
+		}
+	})
+
 	t.Run("currentUser is complete as typed", func(t *testing.T) {
 		got := run(t, env, "issue", "list", "--assignee", "currentUser", "--explain")
 		if got.exit != exitcode.OK {

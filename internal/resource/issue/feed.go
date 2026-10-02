@@ -329,7 +329,7 @@ func feedRequest(
 	if err != nil {
 		return ListOptions{}, err
 	}
-	loc, err := accountLocation(ctx, inv)
+	loc, err := accountLocation(ctx, inv, sinceFlag)
 	if err != nil {
 		return ListOptions{}, err
 	}
@@ -436,7 +436,7 @@ func feedWindow(
 		// offset names an instant and costs nothing.
 		var loc *time.Location
 		if jql.ClassifyDate(since) == jql.DateAbsolute {
-			resolved, err := accountLocation(ctx, inv)
+			resolved, err := accountLocation(ctx, inv, sinceFlag)
 			if err != nil {
 				return ChangeWindow{}, err
 			}

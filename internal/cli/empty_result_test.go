@@ -20,12 +20,19 @@ import (
 // nothing checked.
 func framedJira(t *testing.T, jql *atomic.Value, rows bool) string {
 	t.Helper()
+	return framedJiraIn(t, jql, rows, "Etc/UTC")
+}
+
+// framedJiraIn is framedJira with the account on a named zone, for a test about
+// a date the command has to read in it.
+func framedJiraIn(t *testing.T, jql *atomic.Value, rows bool, zone string) string {
+	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/myself"):
 			_, _ = w.Write([]byte(`{"accountId":"acc-1","name":"ada",` +
-				`"displayName":"Ada Lovelace","timeZone":"Etc/UTC"}`))
+				`"displayName":"Ada Lovelace","timeZone":"` + zone + `"}`))
 		case strings.HasSuffix(r.URL.Path, "/serverInfo"):
 			_, _ = w.Write([]byte(`{"version":"9.12.0","deploymentType":"Server",` +
 				`"serverTime":"2026-08-28T12:00:00.000+0000"}`))

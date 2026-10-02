@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/jql"
 	"github.com/kmoneil/jr/internal/site"
 )
 
@@ -238,18 +239,25 @@ func (w ChangeWindow) Holds(created time.Time) bool {
 // literal in that zone rather than in UTC. Passing UTC for an account on
 // America/Chicago produces a bound five hours wrong, silently, and in the
 // direction that drops changes.
+//
+// jql.MinuteBound does the rounding, the one place an instant becomes a
+// literal. This truncated in the account's zone itself until 2026-10-02, which
+// in the hour the clocks go back sent a minute that happens twice, and a server
+// reading it as the later one skips an hour of changes.
 func (w ChangeWindow) Floor(loc *time.Location) (string, error) {
 	if loc == nil {
 		return "", errs.Runtime("NO_TIMEZONE",
 			"a change feed cannot mint a query bound without the account's timezone")
 	}
-	return w.After.In(loc).Truncate(time.Minute).Format(jqlMinuteLayout), nil
+	literal, _, ok := jql.MinuteBound(w.After, loc, jql.RoundDown)
+	if !ok {
+		return "", errs.Usage("UNBOUNDABLE_DATE",
+			"--since cannot be sent as a minute of the account's clock").
+			WithDetail("bound %s, read in %s", w.After.Format(time.RFC3339), loc).
+			WithRemedy("pass a date or an offset to start a new feed")
+	}
+	return literal, nil
 }
-
-// jqlMinuteLayout is the absolute form JQL accepts with a time of day. It is one
-// of the layouts in internal/jql, spelled here because this renders a bound
-// rather than reading one.
-const jqlMinuteLayout = "2006-01-02 15:04"
 
 // Cursor is the resume point a poll over this window ends at.
 func (w ChangeWindow) Cursor(kind site.Kind) ChangeCursor {

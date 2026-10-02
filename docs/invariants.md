@@ -363,6 +363,24 @@ do not catch, add the test in the same change and cite it here.
 - **Retries count against `--max-requests`.** A retry is another request from
   the server's side; a budget that ignored them would bound nothing.
   **Enforced by:** `TestRetriesCountAgainstTheBudget`.
+- **No accepted date form reaches a query in a shape JQL refuses.** Every date
+  flag takes an RFC 3339 instant, which is what this tool prints, and Jira
+  refuses RFC 3339 on both deployments, so an instant is the one form whose
+  text cannot be passed on. A command that forgot to convert it would send a
+  query the server rejects, or, with a raw `--jql` beside it, one whose meaning
+  nobody checked. What reaches the query is classified, so a new form that is
+  accepted and not converted fails here.
+  **Enforced by:** `TestEveryDateFormIsSentAsSomethingJQLReads`.
+- **A date bound JQL cannot carry exactly moves outward, never inward, and never
+  to a minute that names two instants.** JQL bounds a date to a minute of the
+  account's clock. Rounding the start of a window up, or its end down, drops
+  part of the window with nothing in the rows to say so; sending a minute from
+  the hour the clocks repeat leaves the server to pick one of two instants an
+  hour apart, which `ChangeWindow.Floor` did until 2026-10-02. The sweep checks
+  a year of instants in eight zones, densely around every transition, against
+  a reading of the literal that does not use the code under test.
+  **Enforced by:** `TestEveryMinuteBoundHoldsTheInstantAndNamesOneReading`,
+  `TestAWindowFloorNeverNamesAMinuteThatHappensTwice`.
 
 ## Flags and commands
 

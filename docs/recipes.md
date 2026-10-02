@@ -94,16 +94,25 @@ $ jr user me | grep timezone
 
 If it is not your zone, `--created-after startOfDay()` is not your midnight. For
 an account on `America/Chicago`, it is 05:00Z, so "created today" starts five
-hours late and still reports itself complete. To mean your own day, convert it:
+hours late and still reports itself complete. To mean your own day, send your
+midnight as an RFC 3339 instant with your own offset, and `jr` converts it into
+the account's zone:
 
 ```console
-$ start=$(TZ=Pacific/Auckland date -d "today 00:00" +%s)
-$ jr issue list --created-after \
-    "$(TZ=America/Chicago date -d @$start '+%Y-%m-%d %H:%M')"
+$ jr issue list --created-after "$(TZ=Pacific/Auckland date -d 'today 00:00' -Iseconds)"
 ```
 
 Timestamps coming _back_ are always RFC 3339 in UTC, whichever way the query
-went in.
+went in, and any of them can go straight back into a date flag. That is how to
+ask what else happened around a moment you found:
+
+```console
+$ jr issue activity --since 2026-05-12T08:30:00Z --until 2026-05-12T09:30:00Z
+```
+
+JQL reads a date to the minute, so on `jr issue list` an instant with seconds
+is widened to the minute, outward, and `DATE_ROUNDED` on stderr names the bound
+that was sent. `jr issue activity` compares each event to the instant itself.
 
 ### When the flags do not cover it
 

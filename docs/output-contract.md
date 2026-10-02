@@ -655,7 +655,7 @@ fire on a change below the walk, because nothing it has already read moved.
 
 A warning is a structured document on stderr carrying a `code` and a `message`,
 in whatever format the invocation asked for. It never changes the exit code and
-never reaches stdout. There are six, and each exists because something true
+never reaches stdout. There are eight, and each exists because something true
 about the answer cannot be read off the answer itself.
 
 | Code               | Emitted by                                      | What it says                                                                                                                                                                                                                        |
@@ -666,6 +666,7 @@ about the answer cannot be read off the answer itself.
 | `SCOPE_MISMATCH`   | `issue list`, `issue activity`, `issue changes` | A raw `--jql` selects a project the effective scope excludes, so those rows cannot come back. The query still runs and still exits 0.                                                                                                 |
 | `UNKNOWN_CHANGED_FIELD` | `issue history`, from `--changed-field`    | No recorded change on that issue touched any of the named fields. It names the fields the issue does hold, and still exits 0.                                                                                                         |
 | `EMPTY_RESULT`     | any collection, when it is complete and holds no rows | The bounds the zero-row answer was computed over: the row count, the context scope or `scope=none`, and any bound the command resolved rather than the caller typed. Still exits 0.                                                    |
+| `DATE_ROUNDED`     | `issue list`, from a date flag given an RFC 3339 instant | JQL bounds a date to a minute of the account's clock, so the instant was moved outward to one: down for an `-after` flag, up for a `-before`. It names the instant typed, the literal sent, the zone, the instant that literal is, and how far it moved. The query still runs and still exits 0. |
 | `AMBIGUOUS_WIKI_MARKUP` | any write carrying a body, on Data Center only | A construct in the body has more than one reading, so how it renders cannot be predicted here. The write still happens and the exit stays 0: nothing is known to be wrong. Never emitted on Cloud, where a body becomes an ADF document and a brace is a brace. |
 
 `UNKNOWN_LABEL` exists because an empty answer to a mistyped label and an empty
@@ -1082,6 +1083,29 @@ Every date a caller **sends** is evaluated by Jira, in the timezone on the
 `startOfDay()` and the rest of the `startOf`/`endOf` family, and to a bare
 literal like `2026-08-10 00:00`.
 
+**An RFC 3339 instant is the one form converted here.** Every date flag takes
+one, `2026-05-12T09:00:00Z` or with a numeric offset, because that is what this
+tool prints, and a timestamp from one answer is the natural bound for the next.
+JQL refuses RFC 3339 on both deployments and cannot name an instant at all,
+only a minute of the account's clock, so the instant is converted into the
+account's zone, which costs one GET to `/myself`, and sent as a literal.
+
+- An instant on the minute is sent exactly, and nothing is said.
+- An instant with seconds, which is most of what this tool prints, moves
+  outward to the minute: down for an `-after` flag and up for a `-before`, so
+  the window sent holds the one asked for and less than a minute more on each
+  side. `DATE_ROUNDED` on stderr names the bound that was sent. Rounding inward
+  would drop part of the window with nothing in the rows to say so; refusing
+  would refuse the tool's own output.
+- A minute the account's clock shows twice, the night it goes back, names two
+  instants, and a literal cannot say which. It is never sent: the bound keeps
+  moving outward to a minute that names one, which on that night can cost up to
+  two hours more. A minute the clock skips going forward is stepped over the
+  same way.
+- A clock with no offset, `2026-05-12T09:00:00`, is refused as `INVALID_DATE`.
+  It names no instant, and a wall clock in the account's zone is spelled
+  `2026-05-12 09:00`.
+
 Measured against a Cloud site on 2026-08-10, from a host running UTC, for an
 issue created at `2026-08-10T14:02:37Z`:
 
@@ -1103,9 +1127,9 @@ answer to the question Jira was asked.
 the whole of the fix. The dates are passed through rather than resolved here on
 purpose: `startOfWeek()` carries Jira's own notion of when a week starts, and a
 client that computed an instant would be substituting its own. Where a caller
-means their own day rather than the account's, the way to say so is an absolute
-literal converted into the account's zone — `docs/recipes.md` has the
-conversion.
+means their own day rather than the account's, the way to say so is an instant
+carrying their own offset, `2026-08-10T00:00:00+12:00`, which needs no
+knowledge of the account's zone at all. `docs/recipes.md` has the shell for it.
 
 ### A minute is not accepted on every field
 
@@ -1132,7 +1156,8 @@ So `--worklog-after` and `--worklog-before` refuse a time of day on Data Center,
 with `INVALID_DATE` at exit 2, before the request is spent. They accept one on
 Cloud, because Cloud accepts one: the rule is the field and the deployment
 together, and a blanket refusal would invent a limit half the installed base
-does not have.
+does not have. An RFC 3339 instant is refused there too, because it always
+reaches Jira as a minute.
 
 ### A relative period is spelled two ways, and `M` is both of them
 
@@ -1183,6 +1208,7 @@ So this one flag is resolved locally, and what that costs is different per form:
 | -------------------------- | ------------------------------------------------------------------------ | -------- |
 | `-7d`, `+30m`, `2w`, `-4w 2d` | An offset names an instant, which is the same in every zone. A compound sums its components, here as well as at the server. | none     |
 | `2026-08-10`, with or without a time of day | A wall clock, read in the **account's** zone, because that is the clock Jira reads it in. | one GET to `/myself` |
+| `2026-08-10T13:45:00Z`, or with an offset | An instant, compared as itself. The query carries the account's minute at or below it, because JQL reads nothing finer; the events are held to the instant, so nothing in the answer moves and `DATE_ROUNDED` is not written. `--until` is not in the query and costs nothing. | one GET to `/myself` for `--since` |
 | `startOfWeek()` and any other function | Refused. See below.                                           | none     |
 
 A function is refused rather than approximated because computing one means
@@ -1194,7 +1220,7 @@ query, the events were compared against nothing, and the feed reported itself
 | Code                       | Exit | Meaning                                                                                                                                                  |
 | -------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `UNBOUNDABLE_DATE`         | 2    | `--since` names no instant this process can compute: a date function, on the one command that has to compare dates itself. `remedy` names the forms that work. |
-| `NO_ACCOUNT_TIMEZONE`      | 2    | An absolute `--since`, and the site did not report the account's zone. Both deployments send one, so this is a site breaking its own contract; reading the literal as UTC anyway would be wrong by the offset with nothing in the output to say so. |
+| `NO_ACCOUNT_TIMEZONE`      | 2    | An absolute `--since`, or an RFC 3339 instant on any date flag, and the site did not report the account's zone. Both deployments send one, so this is a site breaking its own contract; reading the literal as UTC anyway would be wrong by the offset with nothing in the output to say so. |
 | `UNKNOWN_ACCOUNT_TIMEZONE` | 2    | The site named a zone this build cannot resolve. The zone database is compiled in, so this is a name no database has.                                     |
 
 All three are exit 2 and not 9. A missing field is malformed data, which is what
@@ -1454,9 +1480,10 @@ exactly as `jql explain` reports them. It makes no request, deliberately:
 and it keeps working when the query is the thing that is broken.
 
 Values the command resolves only at send time are the one honest gap. A
-`--assignee` naming a person becomes an account id in the sent query, and
-`issue changes --since` becomes a floor computed in the account's timezone;
-resolving either here would cost the request this flag exists not to make.
+`--assignee` naming a person becomes an account id in the sent query,
+`issue changes --since` becomes a floor computed in the account's timezone, and
+an RFC 3339 instant on a date flag becomes a minute of the account's clock;
+resolving any of them here would cost the request this flag exists not to make.
 The explained query carries what was typed, and an `unresolved` list names
 each such filter with its flag, so a consumer can tell a literal query from
 one with substitutions pending. `jql.explain` is v2 for that element, which

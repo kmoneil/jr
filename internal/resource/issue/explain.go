@@ -12,17 +12,19 @@ import (
 //
 // It composes through listQuery and BuildQuery, the same funnel the command
 // sends through, so the report cannot drift from the request. The user
-// filters Validate would resolve against the server go out as typed and are
-// named under unresolved instead: resolution is a request, and an explanation
-// that made one would send the query it exists to show.
+// filters and the instants Validate would resolve against the server go out
+// as typed and are named under unresolved instead: resolution is a request,
+// and an explanation that made one would send the query it exists to show.
 func explainList(inv *registry.Invocation) (*render.Doc, error) {
-	return explainQuery(listQuery(inv), unresolvedUserFilters(inv))
+	return explainQuery(listQuery(inv), append(unresolvedUserFilters(inv),
+		unresolvedInstants(inv, listDateBounds)...))
 }
 
 // explainActivity answers --explain for issue activity, whose query carries
-// --since exactly as typed.
+// --since exactly as typed, unless it is an instant, which becomes a minute of
+// the account's clock and is named unresolved.
 func explainActivity(inv *registry.Invocation) (*render.Doc, error) {
-	return explainQuery(activityQuery(inv), nil)
+	return explainQuery(activityQuery(inv), unresolvedInstants(inv, activityDateBounds))
 }
 
 // explainChanges answers --explain for issue changes. The bound it sends is a
