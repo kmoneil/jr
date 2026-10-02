@@ -21,6 +21,8 @@ internal/resource/user datacenter	internal/resource/user/testdata/me-recorded.da
 internal/resource/user datacenter	internal/resource/user/testdata/users-recorded.datacenter.json	user list a
 
 internal/resource/project datacenter	internal/resource/project/testdata/projects-recorded.datacenter.json	project list
+internal/resource/project datacenter	internal/resource/project/testdata/projects-category-recorded.datacenter.json	project list --category Platform --with-category
+internal/resource/project datacenter	internal/resource/project/testdata/project-get-category-recorded.datacenter.json	project get ENG
 internal/resource/project datacenter	internal/resource/project/testdata/project-recorded.datacenter.json	project get ENG
 internal/resource/project datacenter	internal/resource/project/testdata/components-recorded.datacenter.json	project components ENG
 internal/resource/project datacenter	internal/resource/project/testdata/versions-recorded.datacenter.json	project versions ENG

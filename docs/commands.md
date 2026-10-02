@@ -2951,7 +2951,7 @@ jr project get --format json
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `project.get` | v2 | always |
+| `project.get` | v3 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
@@ -2975,17 +2975,20 @@ Examples:
 ```console
 jr project list
 jr project list --match network --match storage
+jr project list --category Platform --with-category
 jr project list --format json --limit all
 ```
 
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--match` | `string` | — | only projects whose key or name contains this text, ignoring case; repeat for projects matching any of several (repeatable) |
+| `--category` | `string` | — | only projects filed under this category, by exact name ignoring case; repeat for projects in any of several (repeatable) |
+| `--with-category` | `bool` | — | add the category column to the table; the structured formats always carry the element |
 | `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `project.list` | v2 | always |
+| `project.list` | v3 | always |
 
 Default TSV columns: `key`, `name`, `type`, `lead`
 
@@ -3006,6 +3009,15 @@ on both deployments, over the catalogue the listing reads whole anyway. Cloud's
 search takes a query of its own, but a rule the server applies is one this tool
 cannot hold to the same answer on Data Center, so the server is not asked to
 apply one.
+
+--category keeps the projects filed under that exact category name, ignoring
+case. A category is a closed set an administrator curates, so unlike --match
+it is not a substring search, and a project with no category never matches.
+It is applied here for the same reason as --match: Cloud's search can filter
+by categoryId where Data Center's listing silently ignores that parameter.
+
+The category element is always in the structured formats when the server sent
+one. --with-category adds it to the table as a column.
 
 ### `jr project statuses`
 

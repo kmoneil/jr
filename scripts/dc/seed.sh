@@ -181,6 +181,27 @@ else
 	say "version 1.0 created"
 fi
 
+# 3b. A project category, assigned to ENG, so the category element and the
+#     --category filter record against a server that actually sends one.
+#     Neither deployment sends the field at all on an uncategorised project;
+#     this instance has one project, so the absent case lives in the Cloud
+#     recording, which has two projects with no category beside one with.
+if api GET /rest/api/2/projectCategory | grep -q '"name":"Platform"'; then
+	say "category Platform exists"
+else
+	api POST /rest/api/2/projectCategory \
+		'{"name":"Platform","description":"The platform teams"}' >/dev/null
+	say "category Platform created"
+fi
+if api GET "/rest/api/2/project/$project" | grep -q '"projectCategory"'; then
+	say "project $project is categorised"
+else
+	cat_id=$(api GET /rest/api/2/projectCategory |
+		jq -r '.[] | select(.name=="Platform") | .id')
+	api PUT "/rest/api/2/project/$project" "{\"categoryId\":$cat_id}" >/dev/null
+	say "project $project filed under Platform"
+fi
+
 # 4. Issues. Mixed types, and one of everything a default column reads: an
 #    assignee, a label, a component, a fix version.
 #

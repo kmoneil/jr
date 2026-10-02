@@ -25,9 +25,9 @@ import (
 // Kinds and schema versions this resource emits.
 const (
 	KindList       = "project.list"
-	VersionList    = 2
+	VersionList    = 3
 	KindGet        = "project.get"
-	VersionGet     = 2
+	VersionGet     = 3
 	KindComponents = "project.components"
 	VersionComp    = 1
 	KindVersions   = "project.versions"
@@ -71,6 +71,17 @@ func Schema() *render.Schema {
 			{Schema: render.Leaf("name", render.TypeString)},
 			{Schema: render.Leaf("type", render.TypeString), Optional: true},
 			{Schema: render.Leaf("lead", render.TypeString), Optional: true},
+			// The category an administrator filed the project under, with the
+			// id Jira assigned it. Absent when the project has none: neither
+			// deployment sends the field at all then, and an empty element
+			// would turn "none" into a name.
+			{Schema: &render.Schema{
+				Element: "category",
+				Attrs: []render.Field{
+					{Name: "id", Type: render.TypeString, Optional: true},
+				},
+				Text: &render.Field{Type: render.TypeString},
+			}, Optional: true},
 		},
 	}
 }
@@ -175,6 +186,12 @@ type Project struct {
 	// any version probed and with or without expand, so a plain bool reported
 	// every project there as public on the strength of a missing field.
 	Private *bool
+	// Category is the name an administrator filed the project under, and
+	// CategoryID the id Jira assigned it. Both empty when the project has
+	// none, which is how both deployments report that: the field is absent,
+	// never null-named.
+	Category   string
+	CategoryID string
 }
 
 type rawProject struct {
@@ -191,6 +208,12 @@ type rawProject struct {
 		DisplayName string `json:"displayName"`
 		Name        string `json:"name"`
 	} `json:"lead"`
+	// A pointer for the same reason as isPrivate: both deployments omit the
+	// field on a project without a category, and absent has to stay absent.
+	Category *struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	} `json:"projectCategory"`
 }
 
 func (r rawProject) convert() Project {
@@ -203,6 +226,10 @@ func (r rawProject) convert() Project {
 		if out.Lead == "" {
 			out.Lead = r.Lead.Name
 		}
+	}
+	if r.Category != nil {
+		out.Category = r.Category.Name
+		out.CategoryID = r.Category.ID
 	}
 	return out
 }
@@ -219,10 +246,15 @@ func (p Project) Node() *render.Node {
 	if p.Private != nil {
 		n.Attr("private", strconv.FormatBool(*p.Private))
 	}
-	return n.
-		Leaf("name", p.Name).
+	n.Leaf("name", p.Name).
 		LeafIf("type", p.Type).
 		LeafIf("lead", p.Lead)
+	if p.Category != "" {
+		n.Child(render.El("category").
+			AttrIf("id", p.CategoryID).
+			SetText(p.Category))
+	}
+	return n
 }
 
 // ListColumns is the default TSV column set for `project list`.
@@ -237,6 +269,12 @@ func ListColumns() []render.Column {
 
 // matchFlag narrows `project list` to keys and names containing some text.
 const matchFlag = "match"
+
+// categoryFlag keeps the projects filed under a named category.
+const categoryFlag = "category"
+
+// withCategoryFlag adds the category column to the table.
+const withCategoryFlag = "with-category"
 
 func listCommand() *registry.Command {
 	return &registry.Command{
@@ -257,22 +295,41 @@ repeat it and a project matching any of the texts is kept. It is applied here,
 on both deployments, over the catalogue the listing reads whole anyway. Cloud's
 search takes a query of its own, but a rule the server applies is one this tool
 cannot hold to the same answer on Data Center, so the server is not asked to
-apply one.`),
+apply one.
+
+--category keeps the projects filed under that exact category name, ignoring
+case. A category is a closed set an administrator curates, so unlike --match
+it is not a substring search, and a project with no category never matches.
+It is applied here for the same reason as --match: Cloud's search can filter
+by categoryId where Data Center's listing silently ignores that parameter.
+
+The category element is always in the structured formats when the server sent
+one. --with-category adds it to the table as a column.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " project list",
 			buildinfo.App + " project list --match network --match storage",
+			buildinfo.App + " project list --category Platform --with-category",
 			buildinfo.App + " project list --format json --limit all",
 		}, "\n"),
 		Flags: []registry.Flag{{
 			Name: matchFlag, Type: registry.TypeString, Repeatable: true,
 			Usage: "only projects whose key or name contains this text, " +
 				"ignoring case; repeat for projects matching any of several",
+		}, {
+			Name: categoryFlag, Type: registry.TypeString, Repeatable: true,
+			Usage: "only projects filed under this category, by exact name " +
+				"ignoring case; repeat for projects in any of several",
+		}, {
+			Name: withCategoryFlag, Type: registry.TypeBool,
+			Usage: "add the category column to the table; the structured " +
+				"formats always carry the element",
 		}},
 		Validate:       validateList,
 		Paginated:      true,
 		NeedsJira:      true,
 		CollectionName: "projects",
 		Columns:        ListColumns(),
+		ColumnsFor:     listColumnsFor,
 		Outputs:        []registry.Output{{Kind: KindList, Version: VersionList}},
 		ExitCodes: []exitcode.Code{
 			exitcode.Partial, exitcode.Auth, exitcode.NotFound,
@@ -384,9 +441,11 @@ func sorted(projects []Project) []Project {
 	return projects
 }
 
-// validateList refuses a blank --match. Every key contains the empty string,
-// so a blank one is the whole catalogue answering as if it had been filtered,
-// which is what `--match "$TEAM"` with TEAM unset would otherwise get.
+// validateList refuses a blank --match or --category. Every key contains the
+// empty string, so a blank match is the whole catalogue answering as if it
+// had been filtered, which is what `--match "$TEAM"` with TEAM unset would
+// otherwise get; a blank category is the same mistake with a sharper wrong
+// answer, since nothing is filed under "".
 func validateList(_ context.Context, inv *registry.Invocation) error {
 	for _, text := range inv.Flags.StringSlice(matchFlag) {
 		if strings.TrimSpace(text) == "" {
@@ -395,7 +454,49 @@ func validateList(_ context.Context, inv *registry.Invocation) error {
 					"--match for every project")
 		}
 	}
+	for _, name := range inv.Flags.StringSlice(categoryFlag) {
+		if strings.TrimSpace(name) == "" {
+			return errs.Usage("EMPTY_QUERY", "--%s cannot be blank", categoryFlag).
+				WithRemedy("pass a category name, or leave out --category " +
+					"for every project")
+		}
+	}
 	return nil
+}
+
+// listColumnsFor appends the category column when it was asked for. The
+// default table stays as it was, because adding a column to the default set
+// is a breaking change, and the element is always in the structured formats.
+func listColumnsFor(inv *registry.Invocation) []render.Column {
+	cols := ListColumns()
+	if inv.Flags.Bool(withCategoryFlag) {
+		cols = append(cols, render.Column{Header: "category", Path: "category"})
+	}
+	return cols
+}
+
+// inCategory keeps the projects filed under any of the named categories,
+// compared whole and ignoring case. Substrings deliberately do not match: a
+// category is a closed set an administrator curates, so "Plat" matching
+// "Platform" would be a guess where --match is a search. A project with no
+// category can never match, because it is filed under nothing.
+func inCategory(projects []Project, names []string) []Project {
+	if len(names) == 0 {
+		return projects
+	}
+	var kept []Project
+	for _, p := range projects {
+		if p.Category == "" {
+			continue
+		}
+		for _, name := range names {
+			if strings.EqualFold(p.Category, name) {
+				kept = append(kept, p)
+				break
+			}
+		}
+	}
+	return kept
 }
 
 // matching keeps the projects whose key or name contains any of the texts,
@@ -434,6 +535,7 @@ func runList(
 		return registry.StreamResult{}, err
 	}
 	projects = matching(projects, inv.Flags.StringSlice(matchFlag))
+	projects = inCategory(projects, inv.Flags.StringSlice(categoryFlag))
 
 	found := len(projects)
 	projects, result := registry.Cut(inv.Limit, projects)
