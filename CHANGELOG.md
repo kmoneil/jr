@@ -20,6 +20,67 @@ accident.
 
 Nothing yet.
 
+## [0.19.3] - 2026-10-02
+
+**Take this one if you paste a timestamp `jr` printed back into a date flag.**
+Every date flag refused the RFC 3339 instants `jr` prints, so asking what else
+happened around a moment meant converting a UTC timestamp into the Jira
+account's timezone by hand, and a conversion off by an hour is a complete,
+exit-0 answer for the wrong window (issue 213). Every date flag now takes one:
+`2026-05-12T09:00:00Z`, without seconds, with a fraction, or with a numeric
+offset. JQL reads a date only to a minute of the account's clock, so `jr`
+converts the instant into that zone, which costs one request to learn, and only
+when a flag holds an instant.
+
+- An instant with seconds is widened to the minute, outward: down for an
+  `-after` flag and up for a `-before`, so the window sent holds the one you
+  asked for. On `issue list` the new `DATE_ROUNDED` warning names the bound
+  that was sent. An instant on the minute is sent exactly and nothing is said.
+- On the night the account's clock goes back, a minute in the repeated hour
+  names two instants, and `jr` never sends one: the bound moves on to a minute
+  that names one instant, up to two hours further, and the warning says why.
+- `issue activity` and `issue changes` compare each event to the instant
+  itself, so their answers are exact and they never warn.
+- A clock with no offset, and Jira's own `+0000` spelling, are refused as
+  `INVALID_DATE`, with a hint naming the two spellings that work. On Data
+  Center, `--worklog-after` and `--worklog-before` refuse an instant as they
+  refuse any time of day.
+
+**`issue changes` could skip an hour on the night the clocks go back.** Its
+query bound was the window's start truncated to the minute in the account's
+zone, and inside the repeated hour that minute names two instants. A server
+reading it as the later one left out an hour of changes the window still
+needed. The bound now moves to a minute that names one instant, as above.
+
+### Documentation
+
+- The recipe for meaning your own day, in docs/recipes.md,
+  docs/troubleshooting.md and the skill, is one command now: send your
+  midnight with your own offset, from `date -Iseconds`, and `jr` converts it.
+  docs/troubleshooting.md gains `DATE_ROUNDED`.
+
+### Internal
+
+- `scripts/land` waits on and merges the commit its checkout holds, refuses a
+  branch holding commits that are not pushed, and from a second worktree says
+  where the base is checked out instead of pulling into the pull request's
+  branch. It has a test now, against a bare repository and a stand-in `gh`.
+- Two new invariants: no accepted date form reaches a query in a shape JQL
+  refuses, and a rounded bound moves outward and never to a minute that names
+  two instants. The second is a year-long sweep in eight zones, dense around
+  every transition, checked against a reading that does not use the code.
+
+### Output contract
+
+- No kind moved.
+- New warning code on `issue list`: `DATE_ROUNDED`.
+- **Priced a patch.** An input that used to be refused now answers, and a
+  warning code is added, and the stability policy prices both as additive.
+  Nothing that ran before is refused or answered differently, except that
+  `issue changes` reads the hour it used to skip on the night the clocks go
+  back.
+- No exit code changed meaning.
+
 ## [0.19.2] - 2026-10-01
 
 **Take this one if a script or an agent reads a truncated result to decide what
@@ -3108,7 +3169,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.19.2...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.19.3...main
+[0.19.3]: https://github.com/kmoneil/jr/releases/tag/v0.19.3
 [0.19.2]: https://github.com/kmoneil/jr/releases/tag/v0.19.2
 [0.19.1]: https://github.com/kmoneil/jr/releases/tag/v0.19.1
 [0.19.0]: https://github.com/kmoneil/jr/releases/tag/v0.19.0
