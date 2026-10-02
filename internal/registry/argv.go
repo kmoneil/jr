@@ -191,6 +191,21 @@ func (c *Command) usageError(format string, args ...any) *errs.Error {
 		WithRemedy("run `%s %s --help`", buildinfo.App, c.UseLine())
 }
 
+// GlobalFlagInStep is the refusal of a global flag inside an argv ParseArgv
+// reads.
+const GlobalFlagInStep = "GLOBAL_FLAG_IN_STEP"
+
+// unknownLongFlag reads the flag name out of pflag's refusal of one it does
+// not have. pflag reports `--name=value` by name alone, and no global flag has
+// a short form, so the long spelling is the only one to find.
+func unknownLongFlag(msg string) string {
+	_, after, ok := strings.Cut(msg, "unknown flag: --")
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(after)
+}
+
 // describeArity renders an argument count for an error message.
 func describeArity(minArgs, maxArgs int) string {
 	switch {
@@ -212,14 +227,23 @@ func describeArity(minArgs, maxArgs int) string {
 // calls, then the same required, enum and arity checks. It returns the flags
 // and the positional arguments.
 //
-// The global flags are not declared, so an argv carrying one is refused as an
-// unknown flag. That is deliberate for its one caller, a step of a sequence,
-// which runs in the context and against the site of the sequence around it.
+// The global flags are not declared, so an argv carrying one is refused, as
+// GlobalFlagInStep rather than as an unknown flag: it is a flag jr has, in a
+// place it does not belong. That is deliberate for the one caller, a step of a
+// sequence, which runs in the context and against the site of the sequence
+// around it.
 func (c *Command) ParseArgv(argv []string) (Flags, []string, error) {
 	fs := pflag.NewFlagSet(c.UseLine(), pflag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	DeclareFlags(fs, c)
 	if err := fs.Parse(argv); err != nil {
+		if name := unknownLongFlag(err.Error()); name != "" {
+			if _, global := GlobalFlag(name); global {
+				return Flags{}, nil, errs.Usage(GlobalFlagInStep,
+					"--%s is a global flag, and a step carries only %s's own", name, c.UseLine()).
+					WithRemedy("give --%s to the command running the steps", name)
+			}
+		}
 		return Flags{}, nil, c.usageError("%s", err.Error())
 	}
 	if err := CheckFlags(fs, c); err != nil {
