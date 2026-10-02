@@ -349,10 +349,11 @@ feed that exits 3 is not the same answer as an empty feed that exits 0.`),
 		}, "\n"),
 		Flags: []registry.Flag{{
 			Name: sinceFlag, Type: registry.TypeString,
-			Usage: "only events at or after this date or offset, e.g. -7d; " +
-				"required, and it bounds the issues searched as well as the " +
-				"events reported; a date function like startOfWeek() is " +
-				"refused here, because this command compares dates itself",
+			Usage: "only events at or after this date, offset, or RFC 3339 " +
+				"instant, e.g. -7d; required, and it bounds the issues searched " +
+				"as well as the events reported; a date function like " +
+				"startOfWeek() is refused here, because this command compares " +
+				"dates itself",
 			Required: true,
 		}, {
 			Name: untilFlag, Type: registry.TypeString,
@@ -500,7 +501,7 @@ func activityQuery(inv *registry.Invocation) QueryOptions {
 	return QueryOptions{
 		Project:      activityProject(inv),
 		JQL:          inv.Flags.String("jql"),
-		UpdatedAfter: inv.Flags.String(sinceFlag),
+		UpdatedAfter: resolvedDate(inv, sinceFlag),
 	}
 }
 
@@ -538,9 +539,11 @@ func needsAccountZone(ends []activityEnd) (bool, error) {
 			// An absolute literal is a wall clock, and Jira reads it in the
 			// account's zone. Only this form needs the request.
 			zoned = true
-		case jql.DateRelative, jql.DateInvalid:
+		case jql.DateRelative, jql.DateInstant, jql.DateInvalid:
 			// An offset names an instant, which is the same in every zone, so
-			// this form costs no request. DateInvalid cannot arrive: ParseDate
+			// this form costs no request, and an instant is one already; the
+			// query's copy of an instant --since is resolveInstants' to read
+			// the zone for, not the filter's. DateInvalid cannot arrive: ParseDate
 			// refused it above, and ActivityCutoff reports it rather than
 			// guessing.
 		}
@@ -568,11 +571,12 @@ func resolveActivityWindow(ctx context.Context, inv *registry.Invocation) error 
 	if err != nil {
 		return err
 	}
+	zone := zoneOnce(ctx, inv)
 	var loc *time.Location
 	if zoned {
 		// Once, however many ends are wall clocks: they are all read in the
 		// same account's zone.
-		if loc, err = accountLocation(ctx, inv); err != nil {
+		if loc, err = zone(sinceFlag); err != nil {
 			return err
 		}
 	}
@@ -591,23 +595,27 @@ func resolveActivityWindow(ctx context.Context, inv *registry.Invocation) error 
 		}
 	}
 	inv.SetValue(activitySinceKey, ends[0].instant)
-	if len(ends) == 1 {
-		return nil
+	if len(ends) == 2 {
+		// Both are RFC 3339 in UTC to the second, so they order as strings,
+		// and a window ending where it starts holds no instant: --until is
+		// exclusive.
+		since, until := ends[0].instant, ends[1].instant
+		if until <= since {
+			return errs.Usage("EMPTY_WINDOW",
+				"--%s has to be after --%s", untilFlag, sinceFlag).
+				WithDetail("--%s resolved to %s and --%s to %s",
+					sinceFlag, since, untilFlag, until).
+				WithRemedy("--since starts the window and --until ends it, " +
+					"before its own instant; check which way round the two go")
+		}
+		inv.SetValue(activityUntilKey, until)
 	}
 
-	// Both are RFC 3339 in UTC to the second, so they order as strings, and a
-	// window ending where it starts holds no instant: --until is exclusive.
-	since, until := ends[0].instant, ends[1].instant
-	if until <= since {
-		return errs.Usage("EMPTY_WINDOW",
-			"--%s has to be after --%s", untilFlag, sinceFlag).
-			WithDetail("--%s resolved to %s and --%s to %s",
-				sinceFlag, since, untilFlag, until).
-			WithRemedy("--since starts the window and --until ends it, before " +
-				"its own instant; check which way round the two go")
-	}
-	inv.SetValue(activityUntilKey, until)
-	return nil
+	// The query carries --since, and an instant there has to become a minute
+	// JQL can read. Nothing it moves is reported: the minute only widens the
+	// candidate search, and each event is still compared to the instant typed.
+	_, err = resolveInstants(inv, activityDateBounds, zone)
+	return err
 }
 
 // accountLocation reads the timezone Jira evaluates this caller's dates in.
@@ -616,11 +624,11 @@ func resolveActivityWindow(ctx context.Context, inv *registry.Invocation) error 
 // have been recorded sending a zone, so an account without one is a refusal
 // rather than a fallback.
 func accountLocation(
-	ctx context.Context, inv *registry.Invocation,
+	ctx context.Context, inv *registry.Invocation, flag string,
 ) (*time.Location, error) {
 	if inv.Jira == nil {
 		return nil, errs.Runtime("NO_SESSION",
-			"--%s cannot be resolved without a connection to Jira", sinceFlag)
+			"--%s cannot be resolved without a connection to Jira", flag)
 	}
 	meta, err := inv.Jira.Metadata(ctx)
 	if err != nil {

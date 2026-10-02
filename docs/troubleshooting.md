@@ -756,19 +756,49 @@ midnight. For an account on `America/Chicago` in August, `startOfDay()` is
 The same applies to a bare literal: `--created-after "2026-08-10 00:00"` is
 midnight _there_, not here.
 
-To mean your own day, convert it and send an absolute literal:
+To mean your own day, send your midnight as an RFC 3339 instant with your own
+offset on it. `jr` converts it into the account's zone, so you do not need to
+know what that zone is:
 
 ```console
-# midnight where you are, expressed in the account's zone
-$ start=$(TZ=Pacific/Auckland date -d "today 00:00" +%s)
-$ jr issue list --created-after "$(TZ=America/Chicago date -d @$start '+%Y-%m-%d %H:%M')"
+# midnight where you are, as an instant
+$ jr issue list --created-after "$(TZ=Pacific/Auckland date -d 'today 00:00' -Iseconds)"
 ```
+
+A timestamp `jr` printed works the same way, pasted straight back into any date
+flag: `--updated-after 2026-05-12T09:00:30Z`.
 
 `startOfWeek()` and friends are passed through rather than computed here on
 purpose — they carry Jira's own notion of when a week begins, which a converted
 instant does not. The exception is `jr issue activity`, which compares dates
 itself and therefore refuses a function rather than passing it through: see
 `UNBOUNDABLE_DATE` below.
+
+### `DATE_ROUNDED`, a window one minute wider than asked
+
+JQL bounds a date to a minute of the Jira account's clock, and almost every
+timestamp `jr` prints carries seconds. So an instant on a date flag of
+`jr issue list` is moved outward to the minute, down for an `-after` flag and up
+for a `-before`, and the warning names exactly what was sent:
+
+```console
+$ jr issue list --updated-after 2026-05-12T09:00:30Z
+<warning v="1">
+  <code>DATE_ROUNDED</code>
+  <message>--updated-after 2026-05-12T09:00:30Z was sent as "2026-05-12 11:00" in Europe/Berlin, which is 2026-05-12T09:00:00Z, 30s earlier: JQL bounds a date to a minute of the account's clock</message>
+</warning>
+key	status	assignee	updated	summary
+```
+
+Nothing is refused and the exit is 0. The answer holds every issue the instant
+asked for, plus any updated in the thirty seconds before it, and those carry
+their own `updated` if you need to drop them. An instant already on the minute,
+`2026-05-12T09:00:00Z`, is sent exactly and nothing is said.
+
+On the night the account's clock goes back, a minute in the repeated hour names
+two instants, and the bound moves on to one that does not, up to two hours
+further; the message says so. `jr issue activity` never writes this warning: it
+holds each event to the instant itself, so nothing in its answer moves.
 
 ## Refusals that look like bugs
 

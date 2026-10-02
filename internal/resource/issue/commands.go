@@ -332,7 +332,9 @@ to status and everything else has to be asked for.`),
 				Name: "created-after", Type: registry.TypeString,
 				Usage: "only issues created on or after this date or offset, e.g. -7d; " +
 					"every date on this command is evaluated in the Jira " +
-					"account's timezone, which " + buildinfo.App + " user me reports",
+					"account's timezone, which " + buildinfo.App + " user me reports; " +
+					"an RFC 3339 instant like 2026-05-12T09:00:00Z is converted " +
+					"to it, widened to the minute",
 			},
 			{
 				Name: "created-before", Type: registry.TypeString,
@@ -649,6 +651,10 @@ func validateList(ctx context.Context, inv *registry.Invocation) error {
 	if err := validateDateGranularity(ctx, inv); err != nil {
 		return err
 	}
+	moved, err := resolveInstants(inv, listDateBounds, zoneOnce(ctx, inv))
+	if err != nil {
+		return err
+	}
 	if err := validateUserFilters(ctx, inv); err != nil {
 		return err
 	}
@@ -663,9 +669,9 @@ func validateList(ctx context.Context, inv *registry.Invocation) error {
 		return err
 	}
 
-	// The two warnings go last, after every refusal above them. Neither can
-	// fail the command, so an invocation that was going to be refused is
-	// refused without paying for a diagnostic nobody will read.
+	// The warnings go last, after every refusal above them. None can fail the
+	// command, so an invocation that was going to be refused is refused
+	// without paying for a diagnostic nobody will read.
 	//
 	// The scope one is built from listQuery rather than from the flags, so it
 	// asks about the query that will actually be sent: --all-projects arrives
@@ -674,6 +680,7 @@ func validateList(ctx context.Context, inv *registry.Invocation) error {
 	opt := listQuery(inv)
 	warnScopeMismatch(inv, opt.Project, opt.JQL)
 	warnUnknownLabels(ctx, inv)
+	warnMovedDates(inv, moved)
 	return nil
 }
 
@@ -1091,14 +1098,14 @@ func listQuery(inv *registry.Invocation) QueryOptions {
 		ChangedBy:     resolvedUser(inv, "changed-by"),
 		ChangedField:  inv.Flags.String("changed-field"),
 
-		CreatedAfter:  inv.Flags.String("created-after"),
-		CreatedBefore: inv.Flags.String("created-before"),
-		UpdatedAfter:  inv.Flags.String("updated-after"),
-		UpdatedBefore: inv.Flags.String("updated-before"),
-		ChangedAfter:  inv.Flags.String("changed-after"),
-		ChangedBefore: inv.Flags.String("changed-before"),
-		WorklogAfter:  inv.Flags.String("worklog-after"),
-		WorklogBefore: inv.Flags.String("worklog-before"),
+		CreatedAfter:  resolvedDate(inv, "created-after"),
+		CreatedBefore: resolvedDate(inv, "created-before"),
+		UpdatedAfter:  resolvedDate(inv, "updated-after"),
+		UpdatedBefore: resolvedDate(inv, "updated-before"),
+		ChangedAfter:  resolvedDate(inv, "changed-after"),
+		ChangedBefore: resolvedDate(inv, "changed-before"),
+		WorklogAfter:  resolvedDate(inv, "worklog-after"),
+		WorklogBefore: resolvedDate(inv, "worklog-before"),
 
 		Sort:  inv.Flags.String("sort"),
 		Order: inv.Flags.String("order"),

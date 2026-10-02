@@ -50,6 +50,40 @@ var dateLayouts = []struct {
 	{"2006/01/02", false},
 }
 
+// minuteLayout is the one of dateLayouts that MinuteBound renders, because it
+// is the spelling this package documents first and the one both deployments
+// were measured accepting.
+const minuteLayout = "2006-01-02 15:04"
+
+// instantLayouts are the RFC 3339 forms an instant is accepted in: the one this
+// tool prints, `2026-05-12T09:00:00Z`, and the same without seconds, which
+// ISO 8601 allows and issue 213 found refused beside it. time.Parse takes a
+// fraction of a second after the seconds without the layout naming one, which
+// is wanted: `2026-05-12T09:00:00.000Z` is what a JavaScript caller's
+// toISOString hands over.
+//
+// **JQL takes none of these.** RFC 3339 is refused on both deployments (the
+// comment on dateLayouts), so an instant is never sent as typed. A command
+// turns it into a minute of the account's clock with MinuteBound before the
+// query goes out, and ParseDate accepting one means only that it is a date.
+var instantLayouts = []string{
+	"2006-01-02T15:04:05Z07:00",
+	"2006-01-02T15:04Z07:00",
+}
+
+// instantPattern is the shape instantLayouts are tried on. time.Parse is more
+// lenient than RFC 3339 about the hour, taking `T9:00`, and an instant is the
+// one form whose text this package rewrites rather than passes on, so what it
+// accepts is stated here: two digits everywhere, `T` and `Z` in capitals, and
+// an offset with its colon. A clock with no offset is a wall clock, and the
+// form for one of those is in dateLayouts.
+var instantPattern = regexp.MustCompile(
+	`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$`)
+
+// instantShape is anything that starts like an instant, so dateHint can say
+// what an instant needs rather than calling it a word.
+var instantShape = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}[Tt ]\d{1,2}:\d{2}`)
+
 // dateValueUnits are the units Jira accepts in a period on a date field, and
 // the duration each one names.
 //
@@ -208,6 +242,11 @@ const (
 	// settles whether the name and the arguments are real, so that a bad
 	// function is still refused as a bad function rather than as a bad date.
 	DateFunction
+	// DateInstant is an RFC 3339 instant, `2026-05-12T09:00:00Z` or with a
+	// numeric offset. It names the same instant in every zone, as an offset
+	// does, and JQL cannot carry it, so a command converts it with
+	// MinuteBound before sending it.
+	DateInstant
 )
 
 // ClassifyDate reports which of the three forms an input takes.
@@ -215,7 +254,7 @@ const (
 // This is the single enumeration of what a date may be. ParseDate branches on
 // it and so does ResolveDate, which is what stops the two from drifting: a
 // layout added here is accepted and resolvable in the same commit, and
-// `TestEveryAcceptedDateIsBoundedOrRefused` fails if a command can be handed a
+// `TestEveryAcceptedSinceIsBoundedOrRefused` fails if a command can be handed a
 // form it cannot apply.
 func ClassifyDate(input string) DateKind {
 	s := strings.TrimSpace(input)
@@ -232,7 +271,24 @@ func ClassifyDate(input string) DateKind {
 			return DateAbsolute
 		}
 	}
+	if _, ok := parseInstant(s); ok {
+		return DateInstant
+	}
 	return DateInvalid
+}
+
+// parseInstant reads an RFC 3339 instant in one of instantLayouts. time.Parse
+// is what checks the ranges, so `T25:00Z` is refused here rather than sent.
+func parseInstant(s string) (time.Time, bool) {
+	if !instantPattern.MatchString(s) {
+		return time.Time{}, false
+	}
+	for _, layout := range instantLayouts {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
 }
 
 // DateHasTimeOfDay reports whether a date names a time as well as a day.
@@ -248,9 +304,9 @@ func ClassifyDate(input string) DateKind {
 // in a sense a field can refuse: an offset is arithmetic on the server's clock,
 // and Data Center accepts `-5d` on `worklogDate` in the same breath as it
 // refuses `2026-08-10 00:00`.
-// The layouts answer the question on their own: nothing else this package
-// accepts parses as one, so an offset and a function fall through to the same
-// false as a word does.
+//
+// True for an instant, which always reaches Jira as a minute of the account's
+// clock, so it carries a time of day wherever it is sent.
 func DateHasTimeOfDay(input string) bool {
 	s := strings.TrimSpace(input)
 	for _, l := range dateLayouts {
@@ -258,7 +314,8 @@ func DateHasTimeOfDay(input string) bool {
 			return l.hasTime
 		}
 	}
-	return false
+	_, ok := parseInstant(s)
+	return ok
 }
 
 // ResolveDate resolves a date into the instant it names, for a caller that must
@@ -276,6 +333,9 @@ func DateHasTimeOfDay(input string) bool {
 // offset — silently, and in the direction that drops events on any account east
 // of UTC.
 //
+// An instant needs neither loc nor now: it names itself, to the nanosecond it
+// was written with.
+//
 // Reports false for a function, for an unparseable input, and for an absolute
 // literal with no zone to read it in. A false is never a reason to fall back to
 // an unbounded filter; the caller refuses.
@@ -286,6 +346,8 @@ func ResolveDate(input string, loc *time.Location, now time.Time) (time.Time, bo
 		if d, ok := relativeOffset(s); ok {
 			return now.Add(d), true
 		}
+	case DateInstant:
+		return parseInstant(s)
 	case DateAbsolute:
 		if loc == nil {
 			return time.Time{}, false
@@ -389,31 +451,41 @@ func toLowerASCII(b byte) byte {
 	return b
 }
 
+// dateRemedy names every form a date flag takes, for the refusals of one that
+// is none of them.
+const dateRemedy = "use YYYY-MM-DD, YYYY-MM-DD HH:MM, an RFC 3339 instant like " +
+	"2026-05-12T09:00:00Z, a relative offset like -7d or -4w 2d, " +
+	"or a function like startOfWeek()"
+
 // ParseDate resolves a user-supplied date into a JQL value.
 //
-// It accepts an absolute date, a relative offset, or a date function. Anything
-// else is a usage error naming what was wrong — never a literal passed through
-// to Jira, which is how the incumbent turns a typo into an empty result set.
+// It accepts an absolute date, an RFC 3339 instant, a relative offset, or a
+// date function. Anything else is a usage error naming what was wrong. It is
+// never passed through to Jira as a literal, which is how the incumbent turns a
+// typo into an empty result set.
+//
+// An instant comes back as typed, which JQL refuses. That is for an
+// explanation, which makes no request and so cannot learn the zone a minute is
+// read in, and names the flag as unresolved instead; a command sending a query
+// converts the instant with MinuteBound first.
 func ParseDate(input string) (Value, error) {
 	s := strings.TrimSpace(input)
 	if s == "" {
 		return nil, errs.Usage("INVALID_DATE", "date is empty").
-			WithRemedy("use YYYY-MM-DD, a relative offset like -7d or -4w 2d, " +
-				"or a function like startOfWeek()")
+			WithRemedy(dateRemedy)
 	}
 
 	switch ClassifyDate(s) {
 	case DateFunction:
 		// A function call: startOfWeek(), endOfDay(-1).
 		return parseDateFunction(s)
-	case DateRelative, DateAbsolute:
+	case DateRelative, DateAbsolute, DateInstant:
 		return Text(s), nil
 	case DateInvalid:
 	}
 
 	e := errs.Usage("INVALID_DATE", "%q is not a date", input).
-		WithRemedy("use YYYY-MM-DD, YYYY-MM-DD HH:MM, a relative offset like " +
-			"-7d or -4w 2d, or a function like startOfWeek()")
+		WithRemedy(dateRemedy)
 	if hint := dateHint(s); hint != "" {
 		return nil, e.WithDetail("%s", hint)
 	}
@@ -423,6 +495,14 @@ func ParseDate(input string) (Value, error) {
 // dateHint explains a near-miss, so an off-by-one month is not reported the
 // same way as a word.
 func dateHint(s string) string {
+	if instantShape.MatchString(s) {
+		// Most often Jira's own spelling, `+0000` with no colon, or a clock
+		// with no zone at all. Either way the fix is the same sentence.
+		return "an instant is RFC 3339 with Z or an offset, as in " +
+			"2026-05-12T09:00:00Z or 2026-05-12T11:00:00+02:00; a clock with " +
+			"no offset is read in the Jira account's timezone and is written " +
+			"2026-05-12 11:00"
+	}
 	if !datePattern.MatchString(s) {
 		return ""
 	}

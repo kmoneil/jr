@@ -428,6 +428,35 @@ func TestTheFeedSendsOneAbsoluteBoundForEveryPage(t *testing.T) {
 	}
 }
 
+// TestAnInstantOpensTheFeedExactly is issue 213 on issue changes. An instant
+// typed as --since is the window's lower bound to the second; the search is
+// bounded at the account's minute below it, because that is all JQL reads, and
+// the save in that minute from before the instant is still left out.
+func TestAnInstantOpensTheFeedExactly(t *testing.T) {
+	server := &feedServer{issues: []string{
+		feedIssue("ENG-1", 2,
+			feedSave("500", "2026-08-17T13:30:10.000+0000", "status", "To Do", "Doing"),
+			feedSave("501", "2026-08-17T13:31:00.000+0000", "status", "Doing", "Done")),
+	}}
+
+	doc, _ := runFeed(t, server, render.TSV, everyRow, func(f registry.Flags) {
+		f.SetString("since", "2026-08-17T13:30:30Z")
+	})
+	if server.searches == 0 {
+		t.Fatal("no search was made")
+	}
+	// 13:30:30Z is 08:30:30 in America/Chicago, the stub account's zone.
+	if query := server.queries[0]; !strings.Contains(query, `updated >= "2026-08-17 08:30"`) {
+		t.Errorf("query = %q, want the account's minute at or below the instant", query)
+	}
+	if !strings.Contains(doc, "2026-08-17T13:31:00Z") {
+		t.Errorf("the save after the instant is missing:\n%s", doc)
+	}
+	if strings.Contains(doc, "2026-08-17T13:30:10Z") {
+		t.Errorf("the save before the instant was reported:\n%s", doc)
+	}
+}
+
 // TestTheFeedRefusesACursorFromTheOtherDeployment. Two sites are two changelogs
 // and two clocks, so replaying one's cursor against the other would report a
 // window of somebody else's history as this site's.

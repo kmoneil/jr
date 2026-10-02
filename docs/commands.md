@@ -999,7 +999,7 @@ jr issue activity --since -1d --kind transition --format json
 
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
-| `--since` | `string` | — | only events at or after this date or offset, e.g. -7d; required, and it bounds the issues searched as well as the events reported; a date function like startOfWeek() is refused here, because this command compares dates itself (required) |
+| `--since` | `string` | — | only events at or after this date, offset, or RFC 3339 instant, e.g. -7d; required, and it bounds the issues searched as well as the events reported; a date function like startOfWeek() is refused here, because this command compares dates itself (required) |
 | `--until` | `string` | — | only events before this date or offset, e.g. -1h; ends the window --since starts, and bounds the events reported but not the issues searched, so it does not make a sweep cheaper; a date function is refused, as on --since |
 | `--user` | `string` | — | only events by this person, by display name, email, or id; the word currentUser resolves to the caller |
 | `--kind` | `string` | — | only events of this kind: comment, transition, field, or worklog; repeat for several (repeatable) |
@@ -2171,7 +2171,7 @@ jr issue list --changed-by currentUser --changed-after -1w
 | `--was-assignee` | `string` | — | who the issue was assigned to at any point, whoever holds it now |
 | `--changed-by` | `string` | — | who changed --changed-field |
 | `--changed-field` | `string` | `status` | the field --changed-by and --changed-after apply to; JQL cannot ask whether any field changed, only a named one |
-| `--created-after` | `string` | — | only issues created on or after this date or offset, e.g. -7d; every date on this command is evaluated in the Jira account's timezone, which jr user me reports |
+| `--created-after` | `string` | — | only issues created on or after this date or offset, e.g. -7d; every date on this command is evaluated in the Jira account's timezone, which jr user me reports; an RFC 3339 instant like 2026-05-12T09:00:00Z is converted to it, widened to the minute |
 | `--created-before` | `string` | — | only issues created on or before this date or offset |
 | `--updated-after` | `string` | — | only issues updated on or after this date or offset; updated by anyone, which is not the same as updated by you |
 | `--updated-before` | `string` | — | only issues updated on or before this date or offset |
