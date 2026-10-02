@@ -31,6 +31,8 @@ import (
 type fakeJira struct {
 	mu     sync.Mutex
 	routes map[string]string
+	// status overrides the 200 a route answers with.
+	status map[string]int
 	seen   []string
 }
 
@@ -58,6 +60,20 @@ func newFakeJira() *fakeJira {
 			`"emailAddress":"ada@example.invalid","active":true}`,
 		"GET /rest/api/2/user/assignable/search": `[{"name":"ada","key":"ada","active":true}]`,
 		"GET /rest/agile/1.0/sprint/7":           `{"id":7,"state":"active","name":"Sprint 7","originBoardId":1}`,
+		// The writes every step type sends, so an apply has somewhere to land.
+		"POST /rest/api/2/issue/ENG-1/comment":     `{"id":"10100","body":"x"}`,
+		"PUT /rest/api/2/issue/ENG-1":              ``,
+		"PUT /rest/api/2/issue/ENG-1/assignee":     ``,
+		"POST /rest/api/2/issueLink":               ``,
+		"POST /rest/agile/1.0/sprint/7/issue":      ``,
+		"POST /rest/api/2/issue/ENG-1/transitions": ``,
+	}, status: map[string]int{
+		"POST /rest/api/2/issue/ENG-1/comment":     http.StatusCreated,
+		"PUT /rest/api/2/issue/ENG-1":              http.StatusNoContent,
+		"PUT /rest/api/2/issue/ENG-1/assignee":     http.StatusNoContent,
+		"POST /rest/api/2/issueLink":               http.StatusCreated,
+		"POST /rest/agile/1.0/sprint/7/issue":      http.StatusNoContent,
+		"POST /rest/api/2/issue/ENG-1/transitions": http.StatusNoContent,
 	}}
 }
 
@@ -66,6 +82,7 @@ func (f *fakeJira) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	f.seen = append(f.seen, route+"?"+r.URL.RawQuery)
 	body, ok := f.routes[route]
+	status := f.status[route]
 	f.mu.Unlock()
 	w.Header().Set("Content-Type", "application/json")
 	if !ok {
@@ -73,7 +90,21 @@ func (f *fakeJira) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, `{"errorMessages":["no route in the fake for `+route+`"],"errors":{}}`)
 		return
 	}
+	if status != 0 {
+		w.WriteHeader(status)
+	}
 	_, _ = io.WriteString(w, body)
+}
+
+// writes is every request that reached the fake and was not a read.
+func (f *fakeJira) writes() []string {
+	var out []string
+	for _, r := range f.requests() {
+		if !strings.HasPrefix(r, "GET ") {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 func (f *fakeJira) requests() []string {
@@ -85,7 +116,8 @@ func (f *fakeJira) requests() []string {
 // seqSession is a registry.Session over the fake, with metadata that reads
 // through the same connection, as the steps' own Validate expects.
 type seqSession struct {
-	conn *transport.Client
+	conn   *transport.Client
+	ledger *idem.Ledger
 }
 
 func (s *seqSession) info() site.Info { return site.Info{Kind: site.DataCenter} }
@@ -99,7 +131,7 @@ func (s *seqSession) Metadata(context.Context) (*site.Metadata, error) {
 }
 
 func (s *seqSession) Site() string                    { return "https://sequence.invalid" }
-func (s *seqSession) Idempotency() *idem.Ledger       { return nil }
+func (s *seqSession) Idempotency() *idem.Ledger       { return s.ledger }
 func (s *seqSession) Project() string                 { return "ENG" }
 func (s *seqSession) Board() string                   { return "" }
 func (s *seqSession) CheckWritable(string) error      { return nil }

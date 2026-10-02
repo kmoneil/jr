@@ -1,0 +1,30 @@
+      <element name="sequence">
+        <attributes count="8">
+          <attribute name="key" type="string" optional="false"/>
+          <attribute name="plan-id" type="string" optional="false"/>
+          <attribute name="baseline" type="string" optional="false" enum="compared,re-checked"/>
+          <attribute name="requested" type="int" optional="false"/>
+          <attribute name="applied" type="int" optional="false"/>
+          <attribute name="skipped" type="int" optional="false"/>
+          <attribute name="failed" type="int" optional="false"/>
+          <attribute name="not-attempted" type="int" optional="false"/>
+        </attributes>
+        <elements count="1">
+          <element name="steps" list-of="step" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="step" optional="true" repeated="true">
+                <attributes count="4">
+                  <attribute name="number" type="int" optional="false"/>
+                  <attribute name="command" type="string" optional="false"/>
+                  <attribute name="outcome" type="string" optional="false" enum="applied,skipped,failed,not-attempted"/>
+                  <attribute name="code" type="string" optional="true"/>
+                </attributes>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>

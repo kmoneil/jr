@@ -378,6 +378,21 @@ do not catch, add the test in the same change and cite it here.
   plans every step type against a fake that records each request, and refuses
   any that is not a GET; with the flag dropped it sees the comment POST first.
   **Enforced by:** `TestAPlanSendsNothingAndHoldsWhatEachStepWouldSend`.
+- **Nothing is sent from a sequence plan file.** The plan records each step's
+  requests for the reader; `--apply` rebuilds every one through the step's own
+  command and refuses the plan if any rebuilt request differs from the
+  recorded one. A plan whose requests were sent as written would make any file
+  executable input carrying the caller's credential. The test edits a recorded
+  request to another path and requires the refusal and no write; a transition
+  whose id moved since planning is refused the same way.
+  **Enforced by:** `TestNothingIsSentFromThePlanFile`.
+- **A sequence stops at its first failure, and a re-run resumes.** The steps
+  are one change to one issue in an order the plan chose, so nothing after a
+  failed step is sent; the same file applied again sends only the steps not
+  done. A step whose outcome is unknown keeps its claim, so the resume refuses
+  it rather than doing it twice.
+  **Enforced by:** `TestAnApplyStopsAtTheFirstFailure`, `TestReapplyingThePlanResumes`,
+  `TestAStepJiraMayHaveAppliedIsNotSentTwice`.
 - **A date bound JQL cannot carry exactly moves outward, never inward, and never
   to a minute that names two instants.** JQL bounds a date to a minute of the
   account's clock. Rounding the start of a window up, or its end down, drops

@@ -2343,7 +2343,7 @@ Plan several changes to one issue, to apply in order
 - **build tags** — needs `write`
 
 ```
-jr issue sequence <key> [flags]
+jr issue sequence [key] [flags]
 ```
 
 Examples:
@@ -2351,22 +2351,26 @@ Examples:
 ```console
 jr issue sequence ENG-101 --steps-file close.json --plan-out close.xml
 jr issue sequence ENG-101 --steps '[["issue","comment","add","ENG-101","Done."]]' --plan-out p.xml
+jr issue sequence --apply close.xml --dry-run
+jr issue sequence --apply close.xml
 ```
 
 | Argument | Required | Description |
 | --- | --- | --- |
-| `key` | yes | the issue every step changes, e.g. ENG-101 |
+| `key` | no | the issue every step changes, e.g. ENG-101; --apply takes none |
 
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--steps` | `string` | — | the steps as JSON: an array of steps, each an array of the words of a command line without the binary's name |
 | `--steps-file` | `string` | — | read the steps from this file, or from stdin given - |
 | `--plan-out` | `string` | — | check every step, write the plan to this file, and send nothing |
-| `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
+| `--apply` | `string` | — | run the plan in this file: every step rebuilt, checked and compared with the plan before the first is sent; takes no key and no steps |
+| `--dry-run` | `bool` | — | with --apply, print every request the plan would send, and send nothing |
 
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.sequence.plan` | v1 | always |
+| `issue.sequence` | v1 | --apply is given |
 | `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
@@ -2394,6 +2398,17 @@ readable, the sprint open. A plan with a step that cannot run is refused, with
 nothing written, naming every such step. The plan shows the exact request each
 step resolved to, as evidence for the reader: nothing is ever sent from the
 file as written.
+
+--apply runs a plan. It sends nothing it reads from the file: every step is
+rebuilt through its own command and checked again, and a plan whose rebuilt
+requests are not the ones it recorded is refused as PLAN_DRIFTED before the
+first step. The issue's baseline is compared first, so an issue changed since
+planning is refused as STALE_WRITE with nothing sent. Steps then run in order,
+and the first that fails stops the run: the steps before it are reported
+applied, it is reported failed with its own code, and the rest not-attempted,
+and the exit is its code. Re-running the same file resumes, sending only the
+steps not yet done. --dry-run beside --apply prints every request the apply
+would send, after the same checks, and sends nothing.
 
 --steps takes the JSON inline, for a caller with no file to write;
 --steps-file reads it from a file, or from stdin given -. A step carries no

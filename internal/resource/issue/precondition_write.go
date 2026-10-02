@@ -219,6 +219,14 @@ func checkUnchanged(
 	return true, nil
 }
 
+// CompareUnchanged is compareUnchanged for a caller outside this package: the
+// apply of an `issue sequence` plan, which lives in internal/workflow and
+// compares its one baseline before its first step. The same comparison, for
+// the reason given below.
+func CompareUnchanged(ctx context.Context, c *Client, key, encoded string) error {
+	return compareUnchanged(ctx, c, key, encoded)
+}
+
 // compareUnchanged is the check itself, with the token supplied rather than
 // read from a flag.
 //
