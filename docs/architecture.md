@@ -161,6 +161,15 @@ onto the cobra root, which meant they were bound, accepted and printed in
 activity` reported seven flags and the binary took eight, and the eighth was
 `--project`, which filters that command's result set.
 
+It also holds the one mapping from a declaration to a parser. `DeclareFlags`,
+`HarvestFlags` and `CheckFlags` take a pflag set: `internal/cli` hands them the
+set cobra parses, and `Command.ParseArgv` builds its own for an argv that never
+reached a shell, a step of a sequence written as the command it would have
+been. It was in `internal/cli` until 2026-10-02, where nothing below the CLI
+could reach it, and a second parser written for the sequence would have been a
+second answer to what an argv means. MCP does not use it: a tool call arrives as
+a JSON object, not as words.
+
 `Command.ScopedBy` is the other half. A global is inherited by every command and
 means something different on each, so a command declares which globals reach its
 *result set*; `jr schema` renders that as an `affects` attribute per inherited

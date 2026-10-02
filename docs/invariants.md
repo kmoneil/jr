@@ -384,6 +384,17 @@ do not catch, add the test in the same change and cite it here.
 
 ## Flags and commands
 
+- **An argv means the same thing however it arrives.** `Command.ParseArgv` reads
+  a command's own argv for a caller with no shell, and the command line reads
+  the same words through cobra; both go through `registry.DeclareFlags`, and the
+  sweep holds the two to one answer for every registered command, with every
+  declared flag given, long and short spellings alternating, repeatable flags
+  given twice, and positional arguments before and after the flags. A parser
+  that stopped reading flags at the first argument fails it on seventeen
+  commands.
+  **Enforced by:** `TestEveryCommandParsesAnArgvAsTheCommandLineDoes`,
+  `TestParseArgvRefusesWhatTheCommandLineRefuses`.
+
 - **No `--reverse`.** Sorting is `--sort <field>` plus `--order asc|desc`.
   **Enforced by:** `TestNoBannedFlags`.
 - **No single-letter flag whose letter is not in its own name**, and no letter
