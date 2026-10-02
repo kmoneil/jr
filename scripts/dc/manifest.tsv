@@ -60,6 +60,7 @@ internal/resource/epic datacenter	internal/resource/epic/testdata/epic-recorded.
 internal/workflow datacenter	internal/workflow/testdata/sprintadd-recorded.datacenter.json	sprint add 1 ENG-2
 internal/workflow datacenter	internal/workflow/testdata/epicadd-recorded.datacenter.json	epic add ENG-1 ENG-3
 internal/workflow datacenter	internal/workflow/testdata/epicremove-recorded.datacenter.json	epic remove ENG-3
+internal/workflow datacenter	internal/workflow/testdata/sequence-plan-recorded.datacenter.json	issue sequence ENG-3 --steps '[["issue","comment","add","ENG-3","Shipped in 1.4."],["issue","edit","ENG-3","--add-label","shipped"],["issue","assign","ENG-3","grace"],["issue","link","add","ENG-3","blocks","ENG-2"],["sprint","add","1","ENG-3"],["issue","move","ENG-3","In Progress"]]' --plan-out /tmp/jr-sequence-plan.xml
 
 # The refusal is version-specific and credential-specific: an 11.x instance,
 # and a basic credential, which no seeded profile holds because the seeded one

@@ -118,9 +118,16 @@ func (f *fakeJira) requests() []string {
 type seqSession struct {
 	conn   *transport.Client
 	ledger *idem.Ledger
+	// kind is the deployment, Data Center unless a test says otherwise.
+	kind site.Kind
 }
 
-func (s *seqSession) info() site.Info { return site.Info{Kind: site.DataCenter} }
+func (s *seqSession) info() site.Info {
+	if s.kind == "" {
+		return site.Info{Kind: site.DataCenter}
+	}
+	return site.Info{Kind: s.kind}
+}
 
 func (s *seqSession) Connect(context.Context) (*transport.Client, site.Info, error) {
 	return s.conn, s.info(), nil

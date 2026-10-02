@@ -1317,10 +1317,46 @@ checked.
 ### `CONFLICTING_PLAN_FLAGS` (exit 2)
 
 Two plan flags that cannot go together. `--plan-out` writes a plan and
-`--apply` runs one, so they are two invocations. `--dry-run` goes with neither:
-beside `--plan-out` both send nothing, and beside `--apply` the plan you
-already wrote is the preview. To see what an apply will do, read the plan
-file, then run `--apply <file>` on its own.
+`--apply` runs one, so they are two invocations. On the bulk verbs `--dry-run`
+goes with neither: beside `--plan-out` both send nothing, and beside `--apply`
+the plan you already wrote is the preview. To see what an apply will do, read
+the plan file, then run `--apply <file>` on its own.
+
+`jr issue sequence` is the one exception: `--apply <file> --dry-run` is its
+preview, because its apply rebuilds every step and so has real requests to
+show before sending any.
+
+### `PLAN_DRIFTED` (exit 7)
+
+`jr issue sequence --apply` rebuilt a step through its own command and it
+would send something other than what the plan recorded, so nothing ran. Either
+something the issue's baseline does not cover moved since planning (a custom
+field's id, the link type, the assignee's account, a transition's id), or the
+plan file was edited. The detail shows both requests. Plan again, read the new
+plan, and apply that:
+
+```console
+$ jr issue sequence ENG-101 --steps-file close.json --plan-out close.xml
+$ jr issue sequence --apply close.xml
+```
+
+### `TRANSITION_NOT_LAST`, `STEP_NOT_ALLOWED`, `STEP_NAMES_ANOTHER_ISSUE` (exit 2)
+
+Refusals of a sequence's steps, decided from the text before anything reads
+the issue. A sequence carries one `issue move`, as its last step: a transition
+is resolved against the status the issue is in now, and a step after it would
+run against a status nothing checked. Plan up to the move, apply it, then plan
+the rest. A step is one of `issue edit`, `issue assign`, `issue comment add`,
+`issue link add`, `sprint add` and `issue move`, written without the binary's
+name, and it changes the sequence's issue and no other; only a link's far end
+may be another issue.
+
+### `FIELD_NOT_ON_SCREEN` (exit 2)
+
+An edit step in a sequence sets a field the issue's edit screen does not hold.
+Jira would refuse it at that step, after the steps before it had run, so the
+plan is refused instead. `jr issue get <key> --format xml` shows the issue's
+fields; an administrator adds a field to the screen.
 
 ### Setting a field `jr` has no flag for
 
