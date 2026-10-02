@@ -1877,6 +1877,62 @@ duplicate.
 | `CONFLICTING_PLAN_FLAGS`   | 2    | `--plan-out` with `--apply`, `--plan-out` with `--dry-run`, or `--apply` with `--dry-run`. The first pair writes a plan and runs one; the second both send nothing and each names a different document, and a command emits one; the third asks to preview a plan by running it, when the plan file is the preview.                                                                              |
 | `UNKNOWN_ISSUE`            | 5    | A key given to `--plan-out` is not an issue this credential can read. Refused while planning rather than recorded, because a plan is what you read *instead* of finding out at apply time.                                                                                        |
 
+### Sequences
+
+`issue sequence` is the other axis: several changes to one issue, planned
+together. `--plan-out <file>` writes `issue.sequence.plan` v1 and sends
+nothing. Each step is written as the command it would have been, JSON argv,
+and read by that command's own flags through the parser the command line
+uses, so a step accepts exactly what the command accepts. A step is one of
+`issue edit`, `issue assign`, `issue comment add`, `issue link add`,
+`sprint add` and `issue move`, on the sequence's issue (a link's far end
+excepted), with at most one move, last.
+
+```console
+$ jr issue sequence ENG-101 --steps-file close.json --plan-out close.xml
+```
+
+**Planning dry-runs every step as its own command**, under the gate and the
+command's own `Validate`, so a step resolves what its command resolves and is
+refused where its command would be. Then it checks what the commands leave to
+Jira: the permission each step needs (one `mypermissions`), every edited field
+on the edit screen, the assignee assignable on this issue (matched exactly,
+because Data Center's search is by prefix), a link's other issue readable, and
+the sprint not closed. A plan with any step that cannot run is refused with
+nothing written; the code and exit are the first blocked step's own, and the
+detail names every blocked step, so one fix cycle finds them all.
+
+**The plan carries each step's resolved requests as evidence, never as
+instructions.** They are what the reader checks: the transition id, the field
+ids, the assignee's account. Nothing is ever sent from the file as written,
+for the reason a bulk plan carries intent only: a plan of requests would make
+any file executable input carrying the caller's credential. The argv is the
+intent, held to the six commands and their validation. Every step has its own
+idempotency key, derived from a plan id minted at `--plan-out`, so the file is
+the unit of at-most-once.
+
+| Code                       | Exit | Means |
+| -------------------------- | ---- | ----- |
+| `SEQUENCE_NEEDS_A_PLAN`    | 2    | No `--plan-out`. There is no direct mode: the convenient spelling would give up the reviewed document. |
+| `NO_STEPS`                 | 2    | Neither `--steps` nor `--steps-file`. |
+| `STEPS_AND_STEPS_FILE`     | 2    | Both. |
+| `INVALID_STEPS`            | 2    | The steps are not a JSON array of arrays of strings, or there are none. |
+| `TOO_MANY_STEPS`           | 2    | More than 20. A sequence is read once and then runs unattended. |
+| `STEP_NOT_ALLOWED`         | 2    | A step is not one of the six, or starts with no command at all. A destructive command never is: `--yes` confirms one command at a time. |
+| `GLOBAL_FLAG_IN_STEP`      | 2    | A step carries a global flag. The steps run in the sequence's context, against its site. |
+| `STEP_TAKES_NO_PLAN_FLAG`  | 2    | A step carries `--dry-run`, `--plan-out`, `--apply`, `--if-unchanged` or `--idempotency-key`, which the sequence decides for all of them. |
+| `STEP_NAMES_ANOTHER_ISSUE` | 2    | A step names an issue that is not the sequence's, or a link joins two others. |
+| `STEP_READS_STDIN`         | 2    | A step reads `--description-file -`. |
+| `TRANSITION_NOT_LAST`      | 2    | More than one `issue move`, or one before the last step. A transition is resolved against the status the issue is in now, and a step after it would run against a status nothing checked. |
+| `FIELD_NOT_ON_SCREEN`      | 2    | An edit step sets a field the issue's edit screen does not hold. |
+| `USER_NOT_ASSIGNABLE`      | 2    | An assign step names somebody this issue cannot be assigned to. |
+| `PERMISSION_DENIED`        | 6    | A step needs a permission this account does not have on the issue. |
+| `PERMISSION_NOT_REPORTED`  | 9    | Jira did not say whether the account has a permission a step needs, so the plan cannot claim it was checked. |
+
+A step's own refusal keeps its code and exit (`UNKNOWN_TRANSITION`,
+`SPRINT_CLOSED`, `INVALID_USAGE` for a flag the command does not have), with
+the step's number in front of its message.
+
 ### The sprint lifecycle
 
 A sprint is created, started, and closed, and the three verbs are gated

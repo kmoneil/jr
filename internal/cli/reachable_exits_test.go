@@ -149,6 +149,8 @@ func exitProbes() []exitProbe {
 			"issue.link.add": "refuses on its own arguments before a session is built",
 			"epic.add":       "refuses on its own arguments before a session is built",
 			"sprint.add":     "refuses on its own arguments before a session is built",
+			"issue.sequence": "refuses on its own arguments before a session is built: " +
+				"it needs its steps and --plan-out",
 		},
 	}}
 }

@@ -44,7 +44,7 @@ as it was. No script downstream will ever mistake that page for the whole result
 set, and the same is true of every command, in every format, on every path.
 
 > **Status: released, and pinnable.** The command surface is complete and
-> tested: 68 commands in the full build, 46 in the reader. Every output kind
+> tested: 69 commands in the full build, 46 in the reader. Every output kind
 > also carries its own schema version, and those move independently of the
 > release, so a consumer pins `kind` and `v` from the document it parses rather
 > than the version it installed. See
@@ -292,13 +292,13 @@ one, can be its own project, consuming jr's output like any other caller.
 
 ## What works today
 
-Everything below is built, tested, and asserted by the suite: 68 commands in
+Everything below is built, tested, and asserted by the suite: 69 commands in
 the full build, 46 in the reader.
 
 ```
 jr auth      login logout status token
 jr context   create edit list use show delete
-jr issue     list get create edit move assign delete clone watch
+jr issue     list get create edit move assign delete clone watch sequence
 jr issue     history activity changes
 jr issue     comment list add edit delete
 jr issue     link list add remove | worklog list add delete
@@ -350,7 +350,7 @@ never gated anything: they came from the spec's tag table, written before any
 code was, and no build ever carried a feature behind them. A tag that names a
 capability no build can perform is the one thing this tool promises not to do.
 
-Everything else described in this README is built. 68 commands in the full
+Everything else described in this README is built. 69 commands in the full
 build, and `internal/lint` asserts that number against the binaries rather than
 against this sentence. Every tag the build declares now gates real code, and
 `internal/lint/tags_test.go` fails the day one stops.
