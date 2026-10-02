@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -256,23 +255,14 @@ const leafHelpTemplate = `{{with .Short}}{{. | trimTrailingWhitespaces}}
 
 // checkArity holds a call to the argument count the command declared.
 func (a *app) checkArity(rc *registry.Command) func(*cobra.Command, []string) error {
-	return func(cmd *cobra.Command, args []string) error {
+	return func(_ *cobra.Command, args []string) error {
 		// --describe asks what this command needs. Requiring the caller to
 		// already supply it would make the question unanswerable for exactly
 		// the commands someone would ask it about.
 		if a.describe {
 			return nil
 		}
-		minArgs, maxArgs := rc.ArgBounds()
-		switch {
-		case len(args) < minArgs:
-			return usageError(cmd, "%s requires %s", rc.UseLine(), describeArity(minArgs, maxArgs)).
-				WithDetail("got %d positional argument(s)", len(args))
-		case maxArgs >= 0 && len(args) > maxArgs:
-			return usageError(cmd, "%s accepts %s", rc.UseLine(), describeArity(minArgs, maxArgs)).
-				WithDetail("got %d positional argument(s): %s", len(args), strings.Join(args, " "))
-		}
-		return nil
+		return rc.CheckArity(args)
 	}
 }
 
@@ -500,22 +490,6 @@ func (a *app) newInvocation(
 	}
 	inv.Format = format
 	return inv, nil
-}
-
-// describeArity renders an argument count for an error message.
-func describeArity(minArgs, maxArgs int) string {
-	switch {
-	case maxArgs < 0 && minArgs == 0:
-		return "any number of arguments"
-	case maxArgs < 0:
-		return fmt.Sprintf("at least %d argument(s)", minArgs)
-	case minArgs == maxArgs:
-		return fmt.Sprintf("exactly %d argument(s)", minArgs)
-	case minArgs == 0:
-		return fmt.Sprintf("at most %d argument(s)", maxArgs)
-	default:
-		return fmt.Sprintf("between %d and %d arguments", minArgs, maxArgs)
-	}
 }
 
 // formatUsage describes --format, and names markdown as the one for reading
