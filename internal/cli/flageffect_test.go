@@ -540,33 +540,35 @@ var probeAltByFlag = map[string]string{
 	"kind":              "worklog",
 	"jql":               "labels = second",
 	"match":             "ops",
-	"sort":              "created",
-	"created-after":     "-8d",
-	"created-before":    "-2d",
-	"updated-after":     "-8d",
-	"updated-before":    "-2d",
-	"changed-after":     "-8d",
-	"changed-before":    "-2d",
-	"worklog-after":     "-8d",
-	"worklog-before":    "-2d",
-	"started":           "2026-03-01T00:00:00Z",
-	"start-date":        "2026-03-01T00:00:00Z",
-	"end-date":          "2026-04-01T00:00:00Z",
-	"parent":            "ENG-3",
-	"epic":              "ENG-3",
-	"assignee":          "currentUser",
-	"reporter":          "currentUser",
-	"creator":           "currentUser",
-	"involving":         "currentUser",
-	"watcher":           "currentUser",
-	"voter":             "currentUser",
-	"worklog-author":    "currentUser",
-	"was-assignee":      "currentUser",
-	"changed-by":        "currentUser",
-	"time-spent":        "2h",
-	"board":             "2",
-	"sprint":            "2",
-	"page-size":         "25",
+	// The other canned category, so the two probes keep different projects.
+	"category":       "support",
+	"sort":           "created",
+	"created-after":  "-8d",
+	"created-before": "-2d",
+	"updated-after":  "-8d",
+	"updated-before": "-2d",
+	"changed-after":  "-8d",
+	"changed-before": "-2d",
+	"worklog-after":  "-8d",
+	"worklog-before": "-2d",
+	"started":        "2026-03-01T00:00:00Z",
+	"start-date":     "2026-03-01T00:00:00Z",
+	"end-date":       "2026-04-01T00:00:00Z",
+	"parent":         "ENG-3",
+	"epic":           "ENG-3",
+	"assignee":       "currentUser",
+	"reporter":       "currentUser",
+	"creator":        "currentUser",
+	"involving":      "currentUser",
+	"watcher":        "currentUser",
+	"voter":          "currentUser",
+	"worklog-author": "currentUser",
+	"was-assignee":   "currentUser",
+	"changed-by":     "currentUser",
+	"time-spent":     "2h",
+	"board":          "2",
+	"sprint":         "2",
+	"page-size":      "25",
 	// Before every event in the fixture, which are all at 2026-01-01, so the
 	// window holds none of them. An offset would do it only until the clock
 	// moved past the fixture's own dates, so this is a date.
@@ -580,11 +582,14 @@ var probeByFlag = map[string]string{
 	// timestamps. `issue activity` filters events by this as well as bounding
 	// the query with it, so a window that excludes the fixture leaves the feed
 	// empty and every other flag on the command reads as dead.
-	"since":          "-3650d",
-	"until":          "-1d",
-	"kind":           "comment",
-	"jql":            "labels = probe",
-	"match":          "eng",
+	"since": "-3650d",
+	"until": "-1d",
+	"kind":  "comment",
+	"jql":   "labels = probe",
+	"match": "eng",
+	// Lower-cased against the fixture's "Platform", so the probe also proves
+	// the match ignores case.
+	"category":       "platform",
 	"sort":           "updated",
 	"created-after":  "-7d",
 	"created-before": "-1d",
@@ -899,14 +904,14 @@ func sweepResponse(path string, kind site.Kind) string {
 		return sweepPage(`"values"`, sweepHistory("10001", "In Progress"),
 			sweepHistory("10002", "Done"))
 	case strings.Contains(path, "/project/search"):
-		return sweepPage(`"values"`, sweepProject("ENG", "Engineering"),
-			sweepProject("OPS", "Operations"))
+		return sweepPage(`"values"`, sweepProject("ENG", "Engineering", "Platform"),
+			sweepProject("OPS", "Operations", "Support"))
 	// Data Center lists projects as a bare array at /project, where Cloud
 	// pages them at /project/search. Without this the sweep drove project
 	// list on Data Center into a refusal, so neither sweep saw it work there.
 	case strings.HasSuffix(path, "/rest/api/2/project"):
-		return `[` + sweepProject("ENG", "Engineering") + `,` +
-			sweepProject("OPS", "Operations") + `]`
+		return `[` + sweepProject("ENG", "Engineering", "Platform") + `,` +
+			sweepProject("OPS", "Operations", "Support") + `]`
 	case strings.Contains(path, "/search"):
 		return `{"startAt":0,"maxResults":50,"total":2,"isLast":true,"issues":[` +
 			sweepIssueKeyed(kind, "1", "ENG-2") + `,` +
@@ -1015,9 +1020,10 @@ func sweepUser(id, display string) string {
 		"emailAddress":"probe@example.invalid","active":true}`
 }
 
-func sweepProject(key, name string) string {
+func sweepProject(key, name, category string) string {
 	return `{"id":"1","key":"` + key + `","name":"` + name + `","projectTypeKey":"software",
-		"style":"classic","lead":{"accountId":"1","displayName":"Probe"}}`
+		"style":"classic","lead":{"accountId":"1","displayName":"Probe"},
+		"projectCategory":{"id":"1","name":"` + category + `"}}`
 }
 
 func sweepSprint(id int, state string) string {

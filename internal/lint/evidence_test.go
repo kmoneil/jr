@@ -45,6 +45,11 @@ var recordedFixtures = map[string][]string{
 	"internal/resource/project": {
 		"projects.cloud.json", "project.cloud.json", "statuses.cloud.json",
 		"versions-empty.cloud.json", "components-empty.cloud.json",
+		// The category pair. The claims worth evidence are that the field
+		// arrives with no expand and is absent, not null, on a project
+		// without one; the listing recording holds both cases side by side.
+		"projects-category-recorded.cloud.json",
+		"project-get-category-recorded.cloud.json",
 	},
 	"internal/resource/user": {"search.cloud.json", "me.cloud.json", "user.cloud.json"},
 	"internal/resource/jql": {

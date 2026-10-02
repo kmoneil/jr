@@ -2492,7 +2492,7 @@ attributes were unconditional until 2026-08-11 and printed a default instead:
 | Kind                                | Field        | Absent when                                                                    |
 | ----------------------------------- | ------------ | ------------------------------------------------------------------------------ |
 | `meta.transitions` v3               | `has-screen` | The server sent no `hasScreen`, which on Data Center is every transition        |
-| `project.list` v2, `project.get` v2 | `private`    | The server sent no `isPrivate`, which on Data Center is every project           |
+| `project.list` v3, `project.get` v3 | `private`    | The server sent no `isPrivate`, which on Data Center is every project           |
 
 Both rendered `false` there, on the strength of a field the response does not
 contain. A consumer branching on `has-screen="false"` skipped a form Jira would
@@ -2520,6 +2520,35 @@ The columns stay in the default sets on both deployments, so `project` on
 Center rather than missing columns. A TSV whose columns move between sites is
 one no script can `cut` a field out of, and TSV has no way to say "absent"
 anyway. To tell absent from empty, read a format with an envelope.
+
+### A project's category is reported, and only where one is filed
+
+`project.list` v3 and `project.get` v3 carry an optional `<category>` element,
+the server's name for it in the text and its id in the `id` attribute:
+
+```xml
+<project key="ENG" id="10002">
+  <name>Engineering</name>
+  <category id="10001">Platform</category>
+</project>
+```
+
+It is absent, not empty, on a project with none: both deployments omit the
+field entirely then, and an empty element would turn "none" into a name. The
+shape is the same on Cloud and Data Center, with no `expand` needed, measured
+on both.
+
+`project list --category <name>` keeps the projects filed under that exact
+name, ignoring case. It is not a substring search, unlike `--match`: a
+category is a closed set an administrator curates, so a fragment matches
+nothing rather than guessing. The filter is applied client-side on both
+deployments, because Cloud's search can filter by `categoryId` where Data
+Center's listing silently ignores that parameter, and a rule only one server
+applies is one this tool cannot hold to the same answer on the other. A blank
+value is refused as `EMPTY_QUERY`.
+
+The default table keeps its four columns; `--with-category` appends a
+`category` column, filled where a project is filed and empty where it is not.
 
 **The schema is checked on every document this tool writes.** That is the only
 reason to trust it. `render.Write` validates before it emits a byte, so a

@@ -1,0 +1,33 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/project/AGL"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=349;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "350"
+          ],
+          "X-Ratelimit-Remaining": [
+            "349"
+          ]
+        },
+        "body": "{\"expand\":\"description,lead,issueTypes,url,projectKeys,permissions,insight\",\"self\":\"https://recorded.invalid/rest/api/3/project/10002\",\"id\":\"10002\",\"key\":\"AGL\",\"description\":\"\",\"lead\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000:00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true},\"components\":[{\"self\":\"https://recorded.invalid/rest/api/3/component/10001\",\"id\":\"10001\",\"name\":\"probe plain\",\"isAssigneeTypeValid\":false},{\"self\":\"https://recorded.invalid/rest/api/3/component/10000\",\"id\":\"10000\",\"name\":\"probe, comma\",\"isAssigneeTypeValid\":false}],\"issueTypes\":[{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10013\",\"id\":\"10013\",\"description\":\"A small piece of work that's part of a larger task.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Sub-task\",\"subtask\":true,\"avatarId\":10316,\"hierarchyLevel\":-1},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10000\",\"id\":\"10000\",\"description\":\"A big user story that needs to be broken down. Created by Jira Software - do not edit or delete.\",\"iconUrl\":\"https://recorded.invalid/images/icons/issuetypes/epic.svg\",\"name\":\"Epic\",\"subtask\":false,\"hierarchyLevel\":1},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10014\",\"id\":\"10014\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Task\",\"subtask\":false,\"avatarId\":10318,\"hierarchyLevel\":0},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10005\",\"id\":\"10005\",\"description\":\"Stories track functionality or features expressed as user goals.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Story\",\"subtask\":false,\"avatarId\":10300,\"hierarchyLevel\":0},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10015\",\"id\":\"10015\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Feature\",\"subtask\":false,\"avatarId\":10314,\"hierarchyLevel\":0},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10016\",\"id\":\"10016\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Bug\",\"subtask\":false,\"avatarId\":10303,\"hierarchyLevel\":0}],\"assigneeType\":\"UNASSIGNED\",\"versions\":[{\"self\":\"https://recorded.invalid/rest/api/3/version/10000\",\"id\":\"10000\",\"name\":\"probe 1.0, beta\",\"archived\":false,\"released\":false,\"projectId\":10002},{\"self\":\"https://recorded.invalid/rest/api/3/version/10001\",\"id\":\"10001\",\"name\":\"probe 2.0\",\"archived\":false,\"released\":false,\"projectId\":10002}],\"name\":\"Agile fixtures\",\"roles\":{\"atlassian-addons-project-access\":\"https://recorded.invalid/rest/api/3/project/10002/role/10003\",\"jira-guest-member\":\"https://recorded.invalid/rest/api/3/project/10002/role/10014\",\"Administrators\":\"https://recorded.invalid/rest/api/3/project/10002/role/10002\"},\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"projectCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/projectCategory/10001\",\"id\":\"10001\",\"name\":\"Platform\",\"description\":\"The platform teams\"},\"projectTypeKey\":\"software\",\"simplified\":false,\"style\":\"classic\",\"isPrivate\":false,\"properties\":{},\"entityId\":\"00000000-0000-0000-0000-000000000000\",\"uuid\":\"00000000-0000-0000-0000-000000000000\"}"
+      }
+    }
+  ]
+}
