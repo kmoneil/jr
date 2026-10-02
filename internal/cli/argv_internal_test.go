@@ -71,7 +71,9 @@ func TestEveryCommandParsesAnArgvAsTheCommandLineDoes(t *testing.T) {
 
 // TestParseArgvRefusesWhatTheCommandLineRefuses is the other half: an argv the
 // command line turns away is turned away here too, with the code it gets
-// there.
+// there. The global flags are the one deliberate difference. The command line
+// takes them, and a step refuses them by name, because it runs in the context
+// and against the site of the sequence around it.
 func TestParseArgvRefusesWhatTheCommandLineRefuses(t *testing.T) {
 	a := &app{}
 	a.reg = a.buildRegistry(registry.Default)
@@ -85,7 +87,8 @@ func TestParseArgvRefusesWhatTheCommandLineRefuses(t *testing.T) {
 		code string
 	}{
 		{"an unknown flag", []string{"--no-such-flag"}, "INVALID_USAGE"},
-		{"a global flag, which belongs to the root", []string{"--context", "work"}, "INVALID_USAGE"},
+		{"a global flag, which belongs to the root", []string{"--context", "work"}, "GLOBAL_FLAG_IN_STEP"},
+		{"a global flag with its value attached", []string{"--site=x.invalid"}, "GLOBAL_FLAG_IN_STEP"},
 		{"a missing value", []string{"--status"}, "INVALID_USAGE"},
 		{"an int that is not one", []string{"--page-size", "many"}, "INVALID_USAGE"},
 		{"an argument the command takes none of", []string{"ENG-1"}, "INVALID_USAGE"},
