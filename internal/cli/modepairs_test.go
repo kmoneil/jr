@@ -135,6 +135,9 @@ var modePairs = map[string]modePair{
 		means: "the preview compares, and a stale one is refused as the move would be",
 	},
 	"issue.move --dry-run --plan-out": {refused: "CONFLICTING_PLAN_FLAGS"},
+	// --plan-out already dry-runs every step, so a --dry-run beside it would
+	// name a second preview of the same nothing.
+	"issue.sequence --dry-run --plan-out": {refused: "CONFLICTING_PLAN_FLAGS"},
 	"issue.move --idempotency-key --if-unchanged": {
 		open:  "the-tests-could-not-fail-the-way-the-code-did",
 		means: "claimed, compared, then sent; a stale refusal frees the key",

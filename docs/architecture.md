@@ -45,7 +45,11 @@ work and what lets a new resource be added without touching an existing one.
 
 `workflow` holds `sprint add`, `epic add`, and `epic remove`, all behind the
 `write` tag. Each moves issues into or out of a container, so each touches the
-issue resource and the container's, and neither could live in either one. What
+issue resource and the container's, and neither could live in either one.
+`issue sequence` lives here for the same reason one step removed: its steps
+include `sprint add`, which a resource may not import, so the sequence comes
+to it. It runs each step as its registered command, through the registry, and
+never calls a step's code directly. What
 they need from `resource/issue` is `ParseKey`: a local copy would be another
 reimplementation of the one function this project has an invariant about, and
 the first one nobody would think to keep in step. `internal/lint` allows a

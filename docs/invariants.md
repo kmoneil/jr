@@ -371,6 +371,13 @@ do not catch, add the test in the same change and cite it here.
   nobody checked. What reaches the query is classified, so a new form that is
   accepted and not converted fails here.
   **Enforced by:** `TestEveryDateFormIsSentAsSomethingJQLReads`.
+- **Planning a sequence sends nothing but reads.** `issue sequence --plan-out`
+  runs every step as its own command with `--dry-run` set, and the steps'
+  commands are the ones that write. A sequence that lost the flag on its way
+  into a step would apply the steps while claiming to plan them. The test
+  plans every step type against a fake that records each request, and refuses
+  any that is not a GET; with the flag dropped it sees the comment POST first.
+  **Enforced by:** `TestAPlanSendsNothingAndHoldsWhatEachStepWouldSend`.
 - **A date bound JQL cannot carry exactly moves outward, never inward, and never
   to a minute that names two instants.** JQL bounds a date to a minute of the
   account's clock. Rounding the start of a window up, or its end down, drops

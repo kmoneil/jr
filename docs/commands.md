@@ -61,7 +61,7 @@ The flags themselves:
 - **[doctor](#doctor)** — [`doctor`](#jr-doctor)
 - **[epic](#epic)** — [`epic add`](#jr-epic-add), [`epic get`](#jr-epic-get), [`epic list`](#jr-epic-list), [`epic remove`](#jr-epic-remove)
 - **[field](#field)** — [`field list`](#jr-field-list)
-- **[issue](#issue)** — [`issue activity`](#jr-issue-activity), [`issue assign`](#jr-issue-assign), [`issue attachment download`](#jr-issue-attachment-download), [`issue attachment list`](#jr-issue-attachment-list), [`issue attachment upload`](#jr-issue-attachment-upload), [`issue changes`](#jr-issue-changes), [`issue clone`](#jr-issue-clone), [`issue comment add`](#jr-issue-comment-add), [`issue comment delete`](#jr-issue-comment-delete), [`issue comment edit`](#jr-issue-comment-edit), [`issue comment list`](#jr-issue-comment-list), [`issue create`](#jr-issue-create), [`issue delete`](#jr-issue-delete), [`issue edit`](#jr-issue-edit), [`issue get`](#jr-issue-get), [`issue history`](#jr-issue-history), [`issue link add`](#jr-issue-link-add), [`issue link list`](#jr-issue-link-list), [`issue link remove`](#jr-issue-link-remove), [`issue list`](#jr-issue-list), [`issue move`](#jr-issue-move), [`issue watch`](#jr-issue-watch), [`issue worklog add`](#jr-issue-worklog-add), [`issue worklog delete`](#jr-issue-worklog-delete), [`issue worklog list`](#jr-issue-worklog-list)
+- **[issue](#issue)** — [`issue activity`](#jr-issue-activity), [`issue assign`](#jr-issue-assign), [`issue attachment download`](#jr-issue-attachment-download), [`issue attachment list`](#jr-issue-attachment-list), [`issue attachment upload`](#jr-issue-attachment-upload), [`issue changes`](#jr-issue-changes), [`issue clone`](#jr-issue-clone), [`issue comment add`](#jr-issue-comment-add), [`issue comment delete`](#jr-issue-comment-delete), [`issue comment edit`](#jr-issue-comment-edit), [`issue comment list`](#jr-issue-comment-list), [`issue create`](#jr-issue-create), [`issue delete`](#jr-issue-delete), [`issue edit`](#jr-issue-edit), [`issue get`](#jr-issue-get), [`issue history`](#jr-issue-history), [`issue link add`](#jr-issue-link-add), [`issue link list`](#jr-issue-link-list), [`issue link remove`](#jr-issue-link-remove), [`issue list`](#jr-issue-list), [`issue move`](#jr-issue-move), [`issue sequence`](#jr-issue-sequence), [`issue watch`](#jr-issue-watch), [`issue worklog add`](#jr-issue-worklog-add), [`issue worklog delete`](#jr-issue-worklog-delete), [`issue worklog list`](#jr-issue-worklog-list)
 - **[jql](#jql)** — [`jql explain`](#jr-jql-explain), [`jql validate`](#jr-jql-validate)
 - **[mcp](#mcp)** — [`mcp serve`](#jr-mcp-serve)
 - **[meta](#meta)** — [`meta createmeta`](#jr-meta-createmeta), [`meta transitions`](#jr-meta-transitions)
@@ -2334,6 +2334,71 @@ for the same issue and the same transition; anything else is refused rather
 than answered with another request's result.
 
 --dry-run prints the exact request, body included, and sends nothing.
+
+### `jr issue sequence`
+
+Plan several changes to one issue, to apply in order
+
+- **mutating** — changes Jira; accepts `--dry-run`, refused in read-only mode
+- **build tags** — needs `write`
+
+```
+jr issue sequence <key> [flags]
+```
+
+Examples:
+
+```console
+jr issue sequence ENG-101 --steps-file close.json --plan-out close.xml
+jr issue sequence ENG-101 --steps '[["issue","comment","add","ENG-101","Done."]]' --plan-out p.xml
+```
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `key` | yes | the issue every step changes, e.g. ENG-101 |
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--steps` | `string` | — | the steps as JSON: an array of steps, each an array of the words of a command line without the binary's name |
+| `--steps-file` | `string` | — | read the steps from this file, or from stdin given - |
+| `--plan-out` | `string` | — | check every step, write the plan to this file, and send nothing |
+| `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
+
+| Emits | Schema | When |
+| --- | --- | --- |
+| `issue.sequence.plan` | v1 | always |
+| `dry-run` | v2 | --dry-run is given |
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
+
+Plans several changes to one issue as one document: a comment, a field and a
+transition, which is how a team closes a ticket, or a sprint, a link and a
+move. Each step is written as the command it would have been, as JSON, one
+array of words per step, and is read by that command's own flags:
+
+  [["issue", "comment", "add", "ENG-101", "Shipped in 1.4."],
+   ["issue", "edit", "ENG-101", "--field", "Story Points=1"],
+   ["issue", "move", "ENG-101", "Done", "--resolution", "Done"]]
+
+A step is issue edit, issue assign, issue comment add, issue link add,
+sprint add, or issue move, on this issue and no other (a link's far end
+excepted). At most one move, as the last step: a transition is resolved
+against the status the issue is in now, and a step after one would run against
+a status nothing checked.
+
+--plan-out writes the plan and sends nothing. Every step is dry-run as its own
+command, which resolves what that command resolves, and then checked for what
+the commands leave to Jira: the permission each step needs, every edited field
+on the issue's edit screen, the assignee assignable here, a link's other issue
+readable, the sprint open. A plan with a step that cannot run is refused, with
+nothing written, naming every such step. The plan shows the exact request each
+step resolved to, as evidence for the reader: nothing is ever sent from the
+file as written.
+
+--steps takes the JSON inline, for a caller with no file to write;
+--steps-file reads it from a file, or from stdin given -. A step carries no
+global flag, no --dry-run, --plan-out, --if-unchanged or --idempotency-key:
+the sequence runs in one context, against one site, under one baseline.
 
 ### `jr issue watch`
 

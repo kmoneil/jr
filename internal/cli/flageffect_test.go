@@ -406,6 +406,15 @@ var flagWithNoObservableEffect = map[string]string{
 		"TestEveryWriteVerbIsSafeByConstruction covers the declaration",
 	"issue.move/--idempotency-key": "same ledger, and the claim comes before " +
 		"the transitions are read; TestMoveRunsAsARegisteredCommand",
+	// A sequence reads its steps only beside --plan-out, and this sweep turns
+	// on one flag at a time, so each of these is measured against the same
+	// SEQUENCE_NEEDS_A_PLAN refusal with and without it.
+	"issue.sequence/--steps": "read only beside --plan-out; " +
+		"TestAPlanSendsNothingAndHoldsWhatEachStepWouldSend plans from it",
+	"issue.sequence/--steps-file": "read only beside --plan-out; " +
+		"TestTheStepsCanComeFromAFile plans from one",
+	"issue.sequence/--dry-run": "refused beside --plan-out, the only mode " +
+		"there is until --apply; TestASequenceRefusesWhatItCannotPlanBeforeReadingAnything",
 }
 
 // commandNotSwept names every command carrying flags this sweep never drives,
@@ -433,6 +442,7 @@ var commandNotSwept = map[string]string{
 	"auth.token": "prints the credential; TestAuthStatusNeverRevealsTheToken " +
 		"and TestTokenIsNotAcceptedOnTheCommandLine",
 	"context.create": "writes config.toml; TestContextLifecycle",
+
 	// Both are paginated and neither reaches Jira, so their one flag is
 	// --limit and a recorded request cannot show it working. Both prove it
 	// end to end instead, through cli.Main, which is the stronger form: the

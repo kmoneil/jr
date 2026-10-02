@@ -145,7 +145,7 @@ read. That work is carded and not built.
 
 | Tag      | Intends to gate                                   | Gates today                 |
 | -------- | ------------------------------------------------- | --------------------------- |
-| `write`  | All mutating commands                             | the 21 mutating verbs       |
+| `write`  | All mutating commands                             | the 22 mutating verbs       |
 | `mcp`    | `jr mcp serve`                                    | `jr mcp serve`              |
 | `prompt` | Interactive prompts, the setup wizard, completion | `jr completion`. Also the no-echo token prompt inside `auth login`, which is in every build and only asks here |
 | `admin`  | Project, board, and sprint administration         | `jr sprint close`           |
@@ -281,8 +281,8 @@ document that nothing checks eventually becomes.
 
 | Profile  | Commands | Not present                           |
 | -------- | -------- | ------------------------------------- |
-| `full`   | 68       | none                                  |
-| `agent`  | 66       | `completion`, `sprint close`          |
+| `full`   | 69       | none                                  |
+| `agent`  | 67       | `completion`, `sprint close`          |
 | `reader` | 46       | the above, plus the 20 mutating verbs |
 | `ci`     | 45       | the above, plus `mcp serve`           |
 

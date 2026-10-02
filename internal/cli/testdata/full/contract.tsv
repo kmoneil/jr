@@ -7,7 +7,7 @@ context.get	2	context.create,context.delete,context.edit,context.show,context.us
 context.list	2	context.list
 contract	4	contract
 doctor	2	doctor
-dry-run	2	epic.add,epic.remove,issue.assign,issue.attachment.upload,issue.clone,issue.comment.add,issue.comment.delete,issue.comment.edit,issue.create,issue.delete,issue.edit,issue.link.add,issue.link.remove,issue.move,issue.watch,issue.worklog.add,issue.worklog.delete,sprint.add,sprint.close,sprint.create,sprint.start
+dry-run	2	epic.add,epic.remove,issue.assign,issue.attachment.upload,issue.clone,issue.comment.add,issue.comment.delete,issue.comment.edit,issue.create,issue.delete,issue.edit,issue.link.add,issue.link.remove,issue.move,issue.sequence,issue.watch,issue.worklog.add,issue.worklog.delete,sprint.add,sprint.close,sprint.create,sprint.start
 epic.add	2	epic.add
 epic.get	1	epic.get
 epic.list	1	epic.list
@@ -36,6 +36,7 @@ issue.link.remove	1	issue.link.remove
 issue.list	10	issue.list
 issue.move	3	issue.move
 issue.plan	2	issue.assign,issue.edit,issue.move
+issue.sequence.plan	1	issue.sequence
 issue.watch	1	issue.watch
 issue.worklog.add	2	issue.worklog.add
 issue.worklog.delete	1	issue.worklog.delete

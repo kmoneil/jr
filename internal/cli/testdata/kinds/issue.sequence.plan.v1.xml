@@ -1,0 +1,86 @@
+      <element name="sequence">
+        <attributes count="3">
+          <attribute name="key" type="string" optional="false"/>
+          <attribute name="plan-id" type="string" optional="false"/>
+          <attribute name="precondition" type="string" optional="false"/>
+        </attributes>
+        <elements count="1">
+          <element name="steps" list-of="step" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="step" optional="true" repeated="true">
+                <attributes count="3">
+                  <attribute name="number" type="int" optional="false"/>
+                  <attribute name="command" type="string" optional="false"/>
+                  <attribute name="idempotency-key" type="string" optional="false"/>
+                </attributes>
+                <elements count="3">
+                  <element name="argv" list-of="arg" optional="false" repeated="false">
+                    <attributes count="1">
+                      <attribute name="count" type="int" optional="false"/>
+                    </attributes>
+                    <elements count="1">
+                      <element name="arg" optional="true" repeated="true">
+                        <attributes count="0"/>
+                        <text name="text" type="string" optional="false"/>
+                        <elements count="0"/>
+                      </element>
+                    </elements>
+                  </element>
+                  <element name="checks" list-of="check" optional="false" repeated="false">
+                    <attributes count="1">
+                      <attribute name="count" type="int" optional="false"/>
+                    </attributes>
+                    <elements count="1">
+                      <element name="check" optional="true" repeated="true">
+                        <attributes count="0"/>
+                        <text name="text" type="string" optional="false"/>
+                        <elements count="0"/>
+                      </element>
+                    </elements>
+                  </element>
+                  <element name="requests" list-of="request" optional="false" repeated="false">
+                    <attributes count="1">
+                      <attribute name="count" type="int" optional="false"/>
+                    </attributes>
+                    <elements count="1">
+                      <element name="request" optional="true" repeated="true">
+                        <attributes count="3">
+                          <attribute name="command" type="string" optional="false"/>
+                          <attribute name="method" type="string" optional="false"/>
+                          <attribute name="path" type="string" optional="false"/>
+                        </attributes>
+                        <elements count="2">
+                          <element name="query" list-of="param" optional="true" repeated="false">
+                            <attributes count="1">
+                              <attribute name="count" type="int" optional="false"/>
+                            </attributes>
+                            <elements count="1">
+                              <element name="param" optional="true" repeated="true">
+                                <attributes count="1">
+                                  <attribute name="name" type="string" optional="false"/>
+                                </attributes>
+                                <text name="text" type="string" optional="false"/>
+                                <elements count="0"/>
+                              </element>
+                            </elements>
+                          </element>
+                          <element name="body" optional="true" repeated="false">
+                            <attributes count="1">
+                              <attribute name="content-type" type="string" optional="false"/>
+                            </attributes>
+                            <text name="text" type="string" optional="false"/>
+                            <elements count="0"/>
+                          </element>
+                        </elements>
+                      </element>
+                    </elements>
+                  </element>
+                </elements>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>
