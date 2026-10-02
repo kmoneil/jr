@@ -138,6 +138,13 @@ var modePairs = map[string]modePair{
 	// --plan-out already dry-runs every step, so a --dry-run beside it would
 	// name a second preview of the same nothing.
 	"issue.sequence --dry-run --plan-out": {refused: "CONFLICTING_PLAN_FLAGS"},
+	"issue.sequence --apply --plan-out":   {refused: "CONFLICTING_PLAN_FLAGS"},
+	// The opposite of the bulk verbs, deliberately: a sequence's apply
+	// rebuilds every step, so its preview is a real one, built once here.
+	"issue.sequence --apply --dry-run": {
+		test:  "TestADryRunOfAnApplySendsNothing",
+		means: "every request the apply would send, rebuilt and checked, and nothing sent",
+	},
 	"issue.move --idempotency-key --if-unchanged": {
 		open:  "the-tests-could-not-fail-the-way-the-code-did",
 		means: "claimed, compared, then sent; a stale refusal frees the key",

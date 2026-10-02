@@ -413,8 +413,9 @@ var flagWithNoObservableEffect = map[string]string{
 		"TestAPlanSendsNothingAndHoldsWhatEachStepWouldSend plans from it",
 	"issue.sequence/--steps-file": "read only beside --plan-out; " +
 		"TestTheStepsCanComeFromAFile plans from one",
-	"issue.sequence/--dry-run": "refused beside --plan-out, the only mode " +
-		"there is until --apply; TestASequenceRefusesWhatItCannotPlanBeforeReadingAnything",
+	"issue.sequence/--dry-run": "means something only beside --apply, which " +
+		"needs a plan file this sweep has no way to write; " +
+		"TestADryRunOfAnApplySendsNothing previews a real one",
 }
 
 // commandNotSwept names every command carrying flags this sweep never drives,

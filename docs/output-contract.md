@@ -1911,6 +1911,44 @@ intent, held to the six commands and their validation. Every step has its own
 idempotency key, derived from a plan id minted at `--plan-out`, so the file is
 the unit of at-most-once.
 
+`--apply <file>` runs a plan and emits `issue.sequence` v1. The file is input
+somebody could have edited, so it is read as strictly as it was written: the
+kind and version, a key per step derived from the plan id, and every step's
+argv through every rule a typed sequence meets. Then, before anything is sent:
+
+1. **The baseline is compared**, as `--if-unchanged` compares it. An issue
+   changed since planning is `STALE_WRITE` and nothing runs.
+2. **Every step is rebuilt through its own command** and checked again, as at
+   planning, and its rebuilt requests are held byte for byte to the ones the
+   plan recorded. Any difference is `PLAN_DRIFTED` and nothing runs: something
+   the baseline does not see moved (a field's id, the link type, the
+   assignee's account), or the file was edited. What is sent is what was
+   rebuilt, and only once it is known to be what the reader saw.
+
+Steps then run in order, each claiming its key in the ledger, and **the first
+failure stops the run**: the steps before it are `applied`, it is `failed` with
+its own `code`, and the rest are `not-attempted`. This is the opposite of a
+bulk apply, deliberately: a bulk plan is independent edits sharing a change,
+and a sequence is one change to one issue in an order the plan chose, so a
+step after a failed one would run against an issue nobody described. The
+document reaches stdout and the exit is the failing step's code.
+
+**Re-running the same file resumes.** A step the ledger has as done is
+`skipped` and sends nothing. The plan's own completed steps moved the issue,
+so a resume cannot compare the baseline: the document says `baseline=
+"re-checked"`, and every step still to run is rebuilt and checked again
+instead. A step Jira refused outright, with a 4xx, gives up its claim so the
+fixed plan can be applied again at once; a step whose outcome is unknown, a
+503 after Jira may have done the work, keeps it, and a re-run meets
+`IDEMPOTENT_IN_FLIGHT` rather than doing the step twice. That 4xx release is
+sharper than the other writers', which keep a claim after any answer.
+
+`--dry-run` beside `--apply` is the preview: every request the apply would
+send, rebuilt and checked, as a `dry-run` document, and nothing sent or
+claimed. That is the opposite of the bulk verbs, which refuse the pair,
+because a sequence's apply rebuilds every request and so has a real preview to
+give.
+
 | Code                       | Exit | Means |
 | -------------------------- | ---- | ----- |
 | `SEQUENCE_NEEDS_A_PLAN`    | 2    | No `--plan-out`. There is no direct mode: the convenient spelling would give up the reviewed document. |
@@ -1928,6 +1966,10 @@ the unit of at-most-once.
 | `USER_NOT_ASSIGNABLE`      | 2    | An assign step names somebody this issue cannot be assigned to. |
 | `PERMISSION_DENIED`        | 6    | A step needs a permission this account does not have on the issue. |
 | `PERMISSION_NOT_REPORTED`  | 9    | Jira did not say whether the account has a permission a step needs, so the plan cannot claim it was checked. |
+| `PLAN_DRIFTED`             | 7    | `--apply` rebuilt a step and it would send something other than the plan recorded. Nothing ran. Plan again and read the new plan. |
+| `PLAN_TAKES_NO_KEYS`       | 2    | `--apply` was given an issue key as well. The plan names its issue. |
+| `PLAN_CARRIES_THE_CHANGE`  | 2    | `--apply` was given `--steps` or `--steps-file` as well. The plan carries the steps. |
+| `INVALID_PLAN`             | 2    | The file is not a sequence plan this build wrote: another kind or version, a step numbered out of order, an idempotency key that is not this plan's, or a step with no recorded request. |
 
 A step's own refusal keeps its code and exit (`UNKNOWN_TRANSITION`,
 `SPRINT_CLOSED`, `INVALID_USAGE` for a flag the command does not have), with

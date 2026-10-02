@@ -114,9 +114,10 @@ func TestTheReplaySweepCanFail(t *testing.T) {
 // replayApplyCoveredBy names, for every command that declares --apply, the
 // test that applies a row Jira answered 503 after doing.
 var replayApplyCoveredBy = map[string]string{
-	"issue.edit":   "TestAnApplyRowJiraMayHaveAppliedIsNotSentTwice",
-	"issue.move":   "TestAnApplyRowJiraMayHaveAppliedIsNotSentTwice",
-	"issue.assign": "TestAnApplyRowJiraMayHaveAppliedIsNotSentTwice",
+	"issue.edit":     "TestAnApplyRowJiraMayHaveAppliedIsNotSentTwice",
+	"issue.move":     "TestAnApplyRowJiraMayHaveAppliedIsNotSentTwice",
+	"issue.assign":   "TestAnApplyRowJiraMayHaveAppliedIsNotSentTwice",
+	"issue.sequence": "TestAStepJiraMayHaveAppliedIsNotSentTwice",
 }
 
 // replayNotSwept names every mutating command this harness cannot drive, with

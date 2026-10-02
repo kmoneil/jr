@@ -41,6 +41,7 @@ const (
 	stepsFlag      = "steps"
 	stepsFileFlag  = "steps-file"
 	seqPlanOutFlag = "plan-out"
+	seqApplyFlag   = "apply"
 	// sequenceStepsKey is where Validate leaves the parsed steps for the body.
 	sequenceStepsKey = "workflow.sequence.steps"
 	// sequenceOperation names the sequence to the idempotency ledger, beside
@@ -52,6 +53,7 @@ const (
 func init() {
 	registry.Register(sequenceCommand())
 	render.RegisterSchema(KindSequencePlan, SequencePlanSchema())
+	render.RegisterSchema(KindSequenceApply, SequenceApplySchema())
 }
 
 // SequencePlanSchema is the shape of a sequence plan.
@@ -129,6 +131,17 @@ nothing written, naming every such step. The plan shows the exact request each
 step resolved to, as evidence for the reader: nothing is ever sent from the
 file as written.
 
+--apply runs a plan. It sends nothing it reads from the file: every step is
+rebuilt through its own command and checked again, and a plan whose rebuilt
+requests are not the ones it recorded is refused as PLAN_DRIFTED before the
+first step. The issue's baseline is compared first, so an issue changed since
+planning is refused as STALE_WRITE with nothing sent. Steps then run in order,
+and the first that fails stops the run: the steps before it are reported
+applied, it is reported failed with its own code, and the rest not-attempted,
+and the exit is its code. Re-running the same file resumes, sending only the
+steps not yet done. --dry-run beside --apply prints every request the apply
+would send, after the same checks, and sends nothing.
+
 --steps takes the JSON inline, for a caller with no file to write;
 --steps-file reads it from a file, or from stdin given -. A step carries no
 global flag, no --dry-run, --plan-out, --if-unchanged or --idempotency-key:
@@ -136,9 +149,11 @@ the sequence runs in one context, against one site, under one baseline.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue sequence ENG-101 --steps-file close.json --plan-out close.xml",
 			buildinfo.App + ` issue sequence ENG-101 --steps '[["issue","comment","add","ENG-101","Done."]]' --plan-out p.xml`,
+			buildinfo.App + " issue sequence --apply close.xml --dry-run",
+			buildinfo.App + " issue sequence --apply close.xml",
 		}, "\n"),
 		Args: []registry.Arg{
-			{Name: "key", Usage: "the issue every step changes, e.g. ENG-101", Required: true},
+			{Name: "key", Usage: "the issue every step changes, e.g. ENG-101; --apply takes none"},
 		},
 		Flags: []registry.Flag{
 			{
@@ -154,13 +169,22 @@ the sequence runs in one context, against one site, under one baseline.`),
 				Name: seqPlanOutFlag, Type: registry.TypeString,
 				Usage: "check every step, write the plan to this file, and send nothing",
 			},
-			dryRunFlag(),
+			{
+				Name: seqApplyFlag, Type: registry.TypeString,
+				Usage: "run the plan in this file: every step rebuilt, checked and compared " +
+					"with the plan before the first is sent; takes no key and no steps",
+			},
+			{
+				Name: "dry-run", Type: registry.TypeBool,
+				Usage: "with --apply, print every request the plan would send, and send nothing",
+			},
 		},
 		Mutating:     true,
 		NeedsJira:    true,
 		RequiresTags: []string{"write"},
 		Outputs: []registry.Output{
 			{Kind: KindSequencePlan, Version: VersionSequencePlan},
+			{Kind: KindSequenceApply, Version: VersionSequenceApply, When: "--apply is given"},
 			registry.DryRunOutput(),
 		},
 		ExitCodes: writeExits(),
@@ -175,6 +199,9 @@ the sequence runs in one context, against one site, under one baseline.`),
 // The key comes first, because a malformed identifier is refused by name
 // before anything else is said about the invocation.
 func validateSequence(_ context.Context, inv *registry.Invocation) error {
+	if inv.Flags.String(seqApplyFlag) != "" {
+		return validateSequenceApply(inv)
+	}
 	if len(inv.Args) != 1 {
 		return errs.Usage("NO_ISSUES", "a sequence is on exactly one issue, and %d were given",
 			len(inv.Args)).
@@ -200,19 +227,31 @@ func validateSequence(_ context.Context, inv *registry.Invocation) error {
 	if err != nil {
 		return err
 	}
-	steps, err := ParseSequenceSteps(registry.Default, raw, key.String())
+	steps, err := parseStepsReadingNoStdin(raw, key.String())
 	if err != nil {
 		return err
 	}
+	inv.SetValue(sequenceStepsKey, steps)
+	return nil
+}
+
+// parseStepsReadingNoStdin is ParseSequenceSteps, and the one refusal that
+// depends on where the steps run rather than on what they say: a step cannot
+// read stdin, which the sequence may already be reading for its steps, and an
+// apply has none to read.
+func parseStepsReadingNoStdin(raw []byte, key string) ([]SequenceStep, error) {
+	steps, err := ParseSequenceSteps(registry.Default, raw, key)
+	if err != nil {
+		return nil, err
+	}
 	for _, s := range steps {
 		if _, has := s.Command.Flag("description-file"); has && s.Flags.String("description-file") == "-" {
-			return errs.Usage("STEP_READS_STDIN",
+			return nil, errs.Usage("STEP_READS_STDIN",
 				"step %d reads its description from stdin, which a step cannot", s.Number).
 				WithRemedy("name a file for --description-file, or give --description")
 		}
 	}
-	inv.SetValue(sequenceStepsKey, steps)
-	return nil
+	return steps, nil
 }
 
 // readSteps is the JSON from --steps or --steps-file, exactly one of them.
@@ -267,6 +306,9 @@ func (p *stepPlan) block(err error) {
 // runSequence writes the plan: the issue read for its baseline, every step
 // dry-run and checked, and a refusal if any step cannot run.
 func runSequence(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) {
+	if inv.Flags.String(seqApplyFlag) != "" {
+		return runSequenceApply(ctx, inv)
+	}
 	steps, _ := inv.Value(sequenceStepsKey).([]SequenceStep)
 	if inv.Jira == nil || len(steps) == 0 {
 		return nil, errs.Runtime("NO_SESSION", "issue sequence has no connection to Jira")

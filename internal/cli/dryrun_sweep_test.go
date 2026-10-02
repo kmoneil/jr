@@ -134,6 +134,8 @@ var dryRunApplyCoveredBy = map[string]string{
 	"issue.edit":   "TestADryRunOfAnApplySendsNothing",
 	"issue.move":   "TestADryRunOfAnApplySendsNothing",
 	"issue.assign": "TestADryRunOfAnApplySendsNothing",
+	// The sequence's own test of the same name, in internal/workflow.
+	"issue.sequence": "TestADryRunOfAnApplySendsNothing",
 }
 
 // dryRunNotSwept names every mutating command this harness cannot drive, with
