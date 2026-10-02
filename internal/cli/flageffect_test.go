@@ -917,6 +917,13 @@ func sweepResponse(path string, kind site.Kind) string {
 	case strings.HasSuffix(path, "/worklog"):
 		return `{"startAt":0,"maxResults":50,"total":2,"worklogs":[` +
 			sweepWorklog("10000", kind) + `,` + sweepWorklog("10001", kind) + `]}`
+	// A bare array, which is what the endpoint serves on both deployments.
+	// Two rows so --limit has something to cut.
+	case strings.HasSuffix(path, "/remotelink"):
+		return `[{"id":10001,"object":{"url":"https://probe.invalid/a",` +
+			`"title":"First probe link"}},` +
+			`{"id":10002,"object":{"url":"https://probe.invalid/b",` +
+			`"title":"Second probe link"}}]`
 	case strings.Contains(path, "/issueLinkType"):
 		return `{"issueLinkTypes":[{"id":"10000","name":"Blocks",
 			"inward":"is blocked by","outward":"blocks"},

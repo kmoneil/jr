@@ -57,11 +57,12 @@ var truncationProofs = map[string]string{
 	"issue.history": "internal/resource/issue/history_test.go:TestHistoryTruncatesAndSaysSo",
 	// Clipped inside a row rather than short of rows: a Cloud comment thread
 	// the projection capped, which no page token would resume.
-	"issue.activity":     "internal/resource/issue/activity_test.go:TestActivityTruncatesAndSaysSo",
-	"issue.changes":      "internal/resource/issue/feed_test.go:TestTheFeedIssuesNoCursorWhenItWasCutShort",
-	"issue.comment.list": "internal/resource/issue/comment_test.go:TestCommentListTruncatesAndSaysSo",
-	"issue.link.list":    "internal/resource/issue/link_worklog_test.go:TestLinkListTruncatesAndSaysSo",
-	"issue.worklog.list": "internal/resource/issue/link_worklog_test.go:TestWorklogListTruncatesAndSaysSo",
+	"issue.activity":        "internal/resource/issue/activity_test.go:TestActivityTruncatesAndSaysSo",
+	"issue.changes":         "internal/resource/issue/feed_test.go:TestTheFeedIssuesNoCursorWhenItWasCutShort",
+	"issue.comment.list":    "internal/resource/issue/comment_test.go:TestCommentListTruncatesAndSaysSo",
+	"issue.link.list":       "internal/resource/issue/link_worklog_test.go:TestLinkListTruncatesAndSaysSo",
+	"issue.remotelink.list": "internal/resource/issue/remotelink_test.go:TestRemoteLinkListTruncatesAndSaysSo",
+	"issue.worklog.list":    "internal/resource/issue/link_worklog_test.go:TestWorklogListTruncatesAndSaysSo",
 
 	"issue.attachment.list": "internal/resource/issue/attachment_test.go:TestAttachmentListTruncatesAndSaysSo",
 	"project.components":    "internal/resource/project/project_test.go:TestProjectPartsTruncateAndSaySo",

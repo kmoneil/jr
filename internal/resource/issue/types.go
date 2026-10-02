@@ -24,7 +24,7 @@ const (
 	KindList    = "issue.list"
 	VersionList = 10
 	KindGet     = "issue.get"
-	VersionGet  = 11
+	VersionGet  = 12
 )
 
 // Body formats a description can arrive in.

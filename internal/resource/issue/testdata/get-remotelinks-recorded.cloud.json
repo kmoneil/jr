@@ -1,0 +1,61 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/AGL-2",
+        "query": "fields=summary%2Cstatus%2Cassignee%2Creporter%2Cpriority%2Cissuetype%2Cproject%2Ccreated%2Cupdated%2Clabels%2Cdescription%2Cresolution%2Cparent%2Ccomponents%2CfixVersions"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=398;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=150;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "400"
+          ],
+          "X-Ratelimit-Remaining": [
+            "398"
+          ]
+        },
+        "body": "{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10019\",\"self\":\"https://recorded.invalid/rest/api/3/issue/10019\",\"key\":\"AGL-2\",\"fields\":{\"summary\":\"First story, retitled\",\"issuetype\":{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10005\",\"id\":\"10005\",\"description\":\"Stories track functionality or features expressed as user goals.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Story\",\"subtask\":false,\"avatarId\":10300,\"hierarchyLevel\":0},\"components\":[],\"created\":\"2026-08-10T08:47:03.511-0500\",\"description\":null,\"project\":{\"self\":\"https://recorded.invalid/rest/api/3/project/10002\",\"id\":\"10002\",\"key\":\"AGL\",\"name\":\"Agile fixtures\",\"projectTypeKey\":\"software\",\"simplified\":false,\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"}},\"reporter\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"fixVersions\":[],\"priority\":{\"self\":\"https://recorded.invalid/rest/api/3/priority/2\",\"iconUrl\":\"https://recorded.invalid/images/icons/priorities/high_new.svg\",\"name\":\"High\",\"id\":\"2\"},\"resolution\":null,\"labels\":[],\"assignee\":null,\"updated\":\"2026-10-02T11:49:01.681-0500\",\"status\":{\"self\":\"https://recorded.invalid/rest/api/3/status/10008\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"To Do\",\"id\":\"10008\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"blue-gray\",\"name\":\"To Do\"}}}}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/AGL-2/remotelink"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=349;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "350"
+          ],
+          "X-Ratelimit-Remaining": [
+            "349"
+          ]
+        },
+        "body": "[{\"id\":10001,\"self\":\"https://recorded.invalid/rest/api/3/issue/AGL-2/remotelink/10001\",\"globalId\":\"system=https://ci.example.test/browse\u0026id=PIPE-7\",\"application\":{\"type\":\"com.example.ci\",\"name\":\"Example CI\"},\"relationship\":\"mentioned in\",\"object\":{\"url\":\"https://ci.example.test/browse/PIPE-7\",\"title\":\"Full link with application\",\"summary\":\"A pipeline run\",\"icon\":{\"url16x16\":\"https://ci.example.test/icon16.png\",\"title\":\"CI\"},\"status\":{\"resolved\":true,\"icon\":{\"url16x16\":\"https://ci.example.test/ok16.png\",\"title\":\"done\",\"link\":\"https://ci.example.test/browse/PIPE-7\"}}}},{\"id\":10000,\"self\":\"https://recorded.invalid/rest/api/3/issue/AGL-2/remotelink/10000\",\"application\":{},\"object\":{\"url\":\"https://example.com/doc/42\",\"title\":\"Minimal link, no application\",\"icon\":{},\"status\":{\"icon\":{}}}}]"
+      }
+    }
+  ]
+}

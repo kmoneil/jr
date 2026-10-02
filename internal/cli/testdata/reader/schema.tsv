@@ -25,6 +25,7 @@ issue.get	Fetch one issue in full	false	false	issue.get
 issue.history	List what changed on an issue, and who changed it	false	false	issue.history
 issue.link.list	List the issues linked to one issue	false	false	issue.link.list
 issue.list	List issues matching a query	false	false	issue.list
+issue.remotelink.list	List an issue's links to things outside Jira	false	false	issue.remotelink.list
 issue.worklog.list	List the work logged against an issue	false	false	issue.worklog.list
 jql.explain	Show the query this tool would send	false	false	jql.explain
 jql.validate	Ask Jira whether a query parses, without running it	false	false	jql.validate

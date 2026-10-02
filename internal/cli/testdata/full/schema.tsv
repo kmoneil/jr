@@ -40,6 +40,7 @@ issue.link.list	List the issues linked to one issue	false	false	issue.link.list
 issue.link.remove	Remove a link between two issues	true	true	issue.link.remove
 issue.list	List issues matching a query	false	false	issue.list
 issue.move	Transition an issue to another status	true	false	issue.move
+issue.remotelink.list	List an issue's links to things outside Jira	false	false	issue.remotelink.list
 issue.sequence	Plan several changes to one issue, to apply in order	true	false	issue.sequence.plan
 issue.watch	Start or stop watching an issue	true	false	issue.watch
 issue.worklog.add	Log work against an issue	true	false	issue.worklog.add

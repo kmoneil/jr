@@ -195,6 +195,32 @@ was published `complete="true"` at exit 0. A required attribute left the tool no
 way to say it did not know, so removing the requirement was the fix rather than
 choosing a better default.
 
+### Remote links arrive whole, and a hand-added one has no application
+
+`issue remotelink list` (kind `issue.remotelink.list` v1) returns an issue's
+links to things outside Jira: the web links a person pastes in, and the links
+an integration writes. `issue get --with-remote-links` folds the same set into
+the record: `issue.get` v12 carries an optional `<remotelinks>` container.
+Unlike the comment thread, the container has no `complete` attribute. The
+endpoint serves the whole set in one response on both deployments, with no
+paging, so partial is not a state it can be in; `--limit` still bounds the
+listing, and a cut list reports itself at exit 3 like any other.
+
+Two normalizations, both measured on both deployments:
+
+- A link a person added arrives from Jira as an empty `application` object,
+  where one an integration wrote names its application. Empty-object and
+  absent state the same fact, so both are reported by absence: a
+  `<remotelink>` with no `<application>` is a hand-added web link.
+- Jira sends the id as a JSON number, unlike most of its ids. It is published
+  as a string, like every other id in this contract.
+
+The `id` attribute is the value the changelog names: the activity item for an
+added link (field `RemoteIssueLink` on Data Center, `RemoteWorkItemLink` on
+Cloud) carries it in `to`, and the item for a removed one carries it in
+`from`. After a removal that id resolves to nothing, so an investigation that
+needs the URL has to read the links while they exist.
+
 ### `markdown` is presentation, and carries no promise
 
 A build with the `render` tag has a fifth format, `markdown`. **It is not part
@@ -1031,7 +1057,7 @@ container's `count` is derived from its children and cannot disagree with them.
 
 ### The reporter is reported
 
-`issue.list` v10 and `issue.get` v11 carry a `reporter` element, on the same terms
+`issue.list` v10 and `issue.get` v12 carry a `reporter` element, on the same terms
 as `assignee`: always present, and empty when the server discloses nobody.
 
 It was asked for on every request from the first version of this tool — it is in
@@ -1685,7 +1711,7 @@ accepted the token and never compared it, so a preview said "would send" for a
 write the real run refused, and a plan was built over a change the caller never
 saw, with fresh baselines from its own search.
 
-`issue.get` v11 carries a `precondition` attribute, which is what the flag takes.
+`issue.get` v12 carries a `precondition` attribute, which is what the flag takes.
 It is opaque: what it holds is the millisecond timestamp Jira served, and the
 `updated` element is RFC 3339 to the second, so conditioning on the published
 value would leave a whole second in which another edit is invisible. It also
@@ -2417,7 +2443,7 @@ applies to this issue, which `jr meta createmeta` answers properly.
 **An open shape can still be structured, and then it says that too.** Most
 requested fields are a scalar and render as text. A Data Center sprint field is
 not: Jira sends it as an array of Greenhopper's Java `toString`, so
-`issue.get` v11 and `issue.list` v10 render it as a list of sprints instead.
+`issue.get` v12 and `issue.list` v10 render it as a list of sprints instead.
 
 ```xml
 <customfield_10109 count="2">

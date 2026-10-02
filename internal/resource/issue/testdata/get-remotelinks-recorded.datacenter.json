@@ -1,0 +1,37 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/issue/ENG-2",
+        "query": "fields=summary%2Cstatus%2Cassignee%2Creporter%2Cpriority%2Cissuetype%2Cproject%2Ccreated%2Cupdated%2Clabels%2Cdescription%2Cresolution%2Cparent%2Ccomponents%2CfixVersions"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10001\",\"self\":\"http://recorded.invalid/rest/api/2/issue/10001\",\"key\":\"ENG-2\",\"fields\":{\"summary\":\"Page a search by keyset\",\"issuetype\":{\"self\":\"http://recorded.invalid/rest/api/2/issuetype/10001\",\"id\":\"10001\",\"description\":\"Created by Jira Software - do not edit or delete. Issue type for a user story.\",\"iconUrl\":\"http://recorded.invalid/images/icons/issuetypes/story.svg\",\"name\":\"Story\",\"subtask\":false},\"components\":[],\"created\":\"2026-10-02T18:04:28.368+0000\",\"description\":null,\"project\":{\"self\":\"http://recorded.invalid/rest/api/2/project/10000\",\"id\":\"10000\",\"key\":\"ENG\",\"name\":\"Engineering\",\"projectTypeKey\":\"software\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"}},\"reporter\":{\"self\":\"http://recorded.invalid/rest/api/2/user?username=ada\",\"name\":\"ada\",\"key\":\"JIRAUSER10000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"Etc/UTC\"},\"fixVersions\":[],\"priority\":{\"self\":\"http://recorded.invalid/rest/api/2/priority/3\",\"iconUrl\":\"http://recorded.invalid/images/icons/priorities/medium.svg\",\"name\":\"Medium\",\"id\":\"3\"},\"resolution\":null,\"labels\":[\"pagination\"],\"assignee\":{\"self\":\"http://recorded.invalid/rest/api/2/user?username=ada\",\"name\":\"ada\",\"key\":\"JIRAUSER10000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"Etc/UTC\"},\"updated\":\"2026-10-02T18:04:29.301+0000\",\"status\":{\"self\":\"http://recorded.invalid/rest/api/2/status/10000\",\"description\":\"\",\"iconUrl\":\"http://recorded.invalid/\",\"name\":\"To Do\",\"id\":\"10000\",\"statusCategory\":{\"self\":\"http://recorded.invalid/rest/api/2/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"default\",\"name\":\"To Do\"}}},\"renderedFields\":null}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/issue/ENG-2/remotelink"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "[{\"id\":10001,\"self\":\"http://recorded.invalid/rest/api/2/issue/ENG-2/remotelink/10001\",\"globalId\":\"system=https://ci.recorded.invalid/pipelines\u0026id=42\",\"application\":{\"type\":\"com.recorded.ci\",\"name\":\"Recorded CI\"},\"relationship\":\"mentioned in\",\"object\":{\"url\":\"https://ci.recorded.invalid/pipelines/42\",\"title\":\"Pipeline 42\",\"summary\":\"The build that mentions this issue\",\"icon\":{},\"status\":{\"resolved\":true,\"icon\":{}}}},{\"id\":10000,\"self\":\"http://recorded.invalid/rest/api/2/issue/ENG-2/remotelink/10000\",\"application\":{},\"object\":{\"url\":\"https://wiki.recorded.invalid/runbook\",\"title\":\"Deploy runbook\",\"icon\":{},\"status\":{\"icon\":{}}}}]"
+      }
+    }
+  ]
+}
