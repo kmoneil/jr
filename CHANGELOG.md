@@ -20,6 +20,67 @@ accident.
 
 Nothing yet.
 
+## [0.19.4] - 2026-10-02
+
+**Take this one if you make several changes to one issue at a time.** Closing a
+ticket the way a team expects is a comment, a field and a transition: three
+commands, and a failure at the second leaves the issue half done with nothing
+saying so. `jr issue sequence` plans them as one document and applies them in
+order (issue 157). Each step is written as the command it would have been, as
+JSON, and read by that command's own flags:
+
+```console
+$ jr issue sequence ENG-101 --steps-file close.json --plan-out close.xml
+$ jr issue sequence --apply close.xml --dry-run
+$ jr issue sequence --apply close.xml
+```
+
+- **Planning sends nothing.** Every step is dry-run as its own command, so it is
+  refused where that command would be, and then checked for what the commands
+  leave to Jira: the permission each step needs, every edited field on the edit
+  screen, the assignee assignable, a linked issue readable, the sprint open. A
+  plan with any step that cannot run is not written, and the refusal names
+  every such step.
+- **Applying sends nothing from the file.** The issue's baseline is compared,
+  and every step is rebuilt through its own command and held byte for byte to
+  what the plan recorded, so an issue changed since planning (`STALE_WRITE`) or
+  a plan that drifted or was edited (`PLAN_DRIFTED`) runs nothing.
+- **The first failure stops the run**, and the document says which steps were
+  applied, which failed with what code, and which were not attempted; the exit
+  is the failing step's. Applying the same file again resumes.
+- A step is `issue edit`, `issue assign`, `issue comment add`, `issue link add`,
+  `sprint add` or `issue move`, on the sequence's issue, with at most one move,
+  last. Create stays its own call.
+
+### Documentation
+
+- docs/recipes.md closes a ticket as one sequence; docs/troubleshooting.md
+  gains the sequence's refusals; the skill's workflows reference teaches it.
+
+### Internal
+
+- Parsing a command's flags moved from the CLI into the registry, so a step
+  parses exactly as the same words do at a prompt; a sweep holds the two to one
+  answer for every command.
+- A plan of six steps is recorded on each deployment and replayed, so every
+  read the pre-flight makes was answered by a real server.
+
+### Output contract
+
+- New command: `issue sequence`.
+- New kinds: `issue.sequence.plan` v1, what `--plan-out` writes, and
+  `issue.sequence` v1, what `--apply` reports.
+- New error codes, all exit 2 unless noted: `SEQUENCE_NEEDS_A_PLAN`,
+  `NO_STEPS`, `STEPS_AND_STEPS_FILE`, `INVALID_STEPS`, `TOO_MANY_STEPS`,
+  `STEP_NOT_ALLOWED`, `GLOBAL_FLAG_IN_STEP`, `STEP_TAKES_NO_PLAN_FLAG`,
+  `STEP_NAMES_ANOTHER_ISSUE`, `STEP_READS_STDIN`, `TRANSITION_NOT_LAST`,
+  `FIELD_NOT_ON_SCREEN`, `USER_NOT_ASSIGNABLE`, `PERMISSION_DENIED` (exit 6),
+  `PERMISSION_NOT_REPORTED` (exit 9), `PLAN_DRIFTED` (exit 7).
+- **Priced a patch.** A new command and two new kinds only it emits are
+  additive by the stability policy; no existing kind moved, nothing that ran
+  before is refused or answered differently.
+- No exit code changed meaning.
+
 ## [0.19.3] - 2026-10-02
 
 **Take this one if you paste a timestamp `jr` printed back into a date flag.**
@@ -3169,7 +3230,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.19.3...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.19.4...main
+[0.19.4]: https://github.com/kmoneil/jr/releases/tag/v0.19.4
 [0.19.3]: https://github.com/kmoneil/jr/releases/tag/v0.19.3
 [0.19.2]: https://github.com/kmoneil/jr/releases/tag/v0.19.2
 [0.19.1]: https://github.com/kmoneil/jr/releases/tag/v0.19.1
