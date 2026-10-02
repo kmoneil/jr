@@ -46,12 +46,13 @@ func rawFieldOwnsStdout(inv *registry.Invocation) bool {
 func validateRawField(ctx context.Context, inv *registry.Invocation) error {
 	if len(inv.Flags.StringSlice("field")) > 0 || inv.Flags.Bool(noContextFieldsFlag) ||
 		inv.Flags.Bool("raw-body") || inv.Flags.Bool(urlFlagName) ||
-		inv.Flags.Bool(ageFlagName) || inv.Flags.Bool(withCommentsFlag) {
+		inv.Flags.Bool(ageFlagName) || inv.Flags.Bool(withCommentsFlag) ||
+		inv.Flags.Bool(withRemoteLinksFlag) {
 		return errs.Usage("RAW_FIELD_ALONE",
 			"--raw-field writes one value with no document, so a flag that "+
 				"shapes the document has nothing to act on").
 			WithDetail("refused beside --raw-field: --field, --no-context-fields, " +
-				"--raw-body, --url, --age, --with-comments").
+				"--raw-body, --url, --age, --with-comments, --with-remote-links").
 			WithRemedy("drop the other flags, or drop --raw-field and read the document")
 	}
 	if inv.FormatFromFlag {

@@ -219,6 +219,30 @@ JSON
 	say "issues created"
 fi
 
+# 4c. Two remote links on ENG-2, so `issue remotelink list` and `issue get
+#     --with-remote-links` record both shapes the endpoint serves: a link an
+#     application wrote, carrying a globalId and the remote side's resolved
+#     status, and a plain web link a person added, which Jira hands back as an
+#     empty application object.
+if api GET "/rest/api/2/issue/${SEED_REMOTELINK_ISSUE:-ENG-2}/remotelink" |
+	grep -q '"url"'; then
+	say "remote links exist"
+else
+	api POST "/rest/api/2/issue/${SEED_REMOTELINK_ISSUE:-ENG-2}/remotelink" \
+		'{"object":{"url":"https://wiki.recorded.invalid/runbook","title":"Deploy runbook"}}' >/dev/null
+	api POST "/rest/api/2/issue/${SEED_REMOTELINK_ISSUE:-ENG-2}/remotelink" "$(
+		cat <<'JSON'
+{"globalId":"system=https://ci.recorded.invalid/pipelines&id=42",
+ "application":{"type":"com.recorded.ci","name":"Recorded CI"},
+ "relationship":"mentioned in",
+ "object":{"url":"https://ci.recorded.invalid/pipelines/42",
+  "title":"Pipeline 42","summary":"The build that mentions this issue",
+  "status":{"resolved":true}}}
+JSON
+	)" >/dev/null
+	say "remote links added to ${SEED_REMOTELINK_ISSUE:-ENG-2}"
+fi
+
 # 4b. An attachment, because it is the one thing that makes the server hand
 #     back a URL this tool then has to follow. `issue attachment download`
 #     resolves the `content` link through transport.Relative, which is the only

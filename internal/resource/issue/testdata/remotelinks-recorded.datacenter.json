@@ -1,0 +1,21 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/issue/ENG-2/remotelink"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "[{\"id\":10001,\"self\":\"http://recorded.invalid/rest/api/2/issue/ENG-2/remotelink/10001\",\"globalId\":\"system=https://ci.recorded.invalid/pipelines\u0026id=42\",\"application\":{\"type\":\"com.recorded.ci\",\"name\":\"Recorded CI\"},\"relationship\":\"mentioned in\",\"object\":{\"url\":\"https://ci.recorded.invalid/pipelines/42\",\"title\":\"Pipeline 42\",\"summary\":\"The build that mentions this issue\",\"icon\":{},\"status\":{\"resolved\":true,\"icon\":{}}}},{\"id\":10000,\"self\":\"http://recorded.invalid/rest/api/2/issue/ENG-2/remotelink/10000\",\"application\":{},\"object\":{\"url\":\"https://wiki.recorded.invalid/runbook\",\"title\":\"Deploy runbook\",\"icon\":{},\"status\":{\"icon\":{}}}}]"
+      }
+    }
+  ]
+}

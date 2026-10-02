@@ -1,0 +1,38 @@
+      <element name="remotelink">
+        <attributes count="2">
+          <attribute name="id" type="string" optional="false"/>
+          <attribute name="global-id" type="string" optional="true"/>
+        </attributes>
+        <elements count="6">
+          <element name="application" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="relationship" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="title" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="url" optional="false" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="summary" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="string" optional="false"/>
+            <elements count="0"/>
+          </element>
+          <element name="resolved" optional="true" repeated="false">
+            <attributes count="0"/>
+            <text name="text" type="bool" optional="false"/>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

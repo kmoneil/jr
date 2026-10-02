@@ -1,0 +1,33 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/AGL-2/remotelink"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=348;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "350"
+          ],
+          "X-Ratelimit-Remaining": [
+            "348"
+          ]
+        },
+        "body": "[{\"id\":10001,\"self\":\"https://recorded.invalid/rest/api/3/issue/AGL-2/remotelink/10001\",\"globalId\":\"system=https://ci.example.test/browse\u0026id=PIPE-7\",\"application\":{\"type\":\"com.example.ci\",\"name\":\"Example CI\"},\"relationship\":\"mentioned in\",\"object\":{\"url\":\"https://ci.example.test/browse/PIPE-7\",\"title\":\"Full link with application\",\"summary\":\"A pipeline run\",\"icon\":{\"url16x16\":\"https://ci.example.test/icon16.png\",\"title\":\"CI\"},\"status\":{\"resolved\":true,\"icon\":{\"url16x16\":\"https://ci.example.test/ok16.png\",\"title\":\"done\",\"link\":\"https://ci.example.test/browse/PIPE-7\"}}}},{\"id\":10000,\"self\":\"https://recorded.invalid/rest/api/3/issue/AGL-2/remotelink/10000\",\"application\":{},\"object\":{\"url\":\"https://example.com/doc/42\",\"title\":\"Minimal link, no application\",\"icon\":{},\"status\":{\"icon\":{}}}}]"
+      }
+    }
+  ]
+}

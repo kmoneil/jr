@@ -61,7 +61,7 @@ The flags themselves:
 - **[doctor](#doctor)** — [`doctor`](#jr-doctor)
 - **[epic](#epic)** — [`epic add`](#jr-epic-add), [`epic get`](#jr-epic-get), [`epic list`](#jr-epic-list), [`epic remove`](#jr-epic-remove)
 - **[field](#field)** — [`field list`](#jr-field-list)
-- **[issue](#issue)** — [`issue activity`](#jr-issue-activity), [`issue assign`](#jr-issue-assign), [`issue attachment download`](#jr-issue-attachment-download), [`issue attachment list`](#jr-issue-attachment-list), [`issue attachment upload`](#jr-issue-attachment-upload), [`issue changes`](#jr-issue-changes), [`issue clone`](#jr-issue-clone), [`issue comment add`](#jr-issue-comment-add), [`issue comment delete`](#jr-issue-comment-delete), [`issue comment edit`](#jr-issue-comment-edit), [`issue comment list`](#jr-issue-comment-list), [`issue create`](#jr-issue-create), [`issue delete`](#jr-issue-delete), [`issue edit`](#jr-issue-edit), [`issue get`](#jr-issue-get), [`issue history`](#jr-issue-history), [`issue link add`](#jr-issue-link-add), [`issue link list`](#jr-issue-link-list), [`issue link remove`](#jr-issue-link-remove), [`issue list`](#jr-issue-list), [`issue move`](#jr-issue-move), [`issue sequence`](#jr-issue-sequence), [`issue watch`](#jr-issue-watch), [`issue worklog add`](#jr-issue-worklog-add), [`issue worklog delete`](#jr-issue-worklog-delete), [`issue worklog list`](#jr-issue-worklog-list)
+- **[issue](#issue)** — [`issue activity`](#jr-issue-activity), [`issue assign`](#jr-issue-assign), [`issue attachment download`](#jr-issue-attachment-download), [`issue attachment list`](#jr-issue-attachment-list), [`issue attachment upload`](#jr-issue-attachment-upload), [`issue changes`](#jr-issue-changes), [`issue clone`](#jr-issue-clone), [`issue comment add`](#jr-issue-comment-add), [`issue comment delete`](#jr-issue-comment-delete), [`issue comment edit`](#jr-issue-comment-edit), [`issue comment list`](#jr-issue-comment-list), [`issue create`](#jr-issue-create), [`issue delete`](#jr-issue-delete), [`issue edit`](#jr-issue-edit), [`issue get`](#jr-issue-get), [`issue history`](#jr-issue-history), [`issue link add`](#jr-issue-link-add), [`issue link list`](#jr-issue-link-list), [`issue link remove`](#jr-issue-link-remove), [`issue list`](#jr-issue-list), [`issue move`](#jr-issue-move), [`issue remotelink list`](#jr-issue-remotelink-list), [`issue sequence`](#jr-issue-sequence), [`issue watch`](#jr-issue-watch), [`issue worklog add`](#jr-issue-worklog-add), [`issue worklog delete`](#jr-issue-worklog-delete), [`issue worklog list`](#jr-issue-worklog-list)
 - **[jql](#jql)** — [`jql explain`](#jr-jql-explain), [`jql validate`](#jr-jql-validate)
 - **[mcp](#mcp)** — [`mcp serve`](#jr-mcp-serve)
 - **[meta](#meta)** — [`meta createmeta`](#jr-meta-createmeta), [`meta transitions`](#jr-meta-transitions)
@@ -1892,10 +1892,11 @@ jr issue get ENG-101 --url
 | `--url` | `bool` | — | include the browse URL, built from the site's own base URL; a bare URL, which most terminals make clickable |
 | `--age` | `bool` | — | include an age column: how long since the issue was last updated, coarsely, e.g. 3 hours or 14 days |
 | `--with-comments` | `bool` | — | include the comment thread, oldest first; costs a second request, and a thread longer than 50 is reported incomplete with exit 3 |
+| `--with-remote-links` | `bool` | — | include the remote links: web links, and the links an application wrote; costs a second request |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.get` | v11 | --raw-field is not given |
+| `issue.get` | v12 | --raw-field is not given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
@@ -2334,6 +2335,51 @@ for the same issue and the same transition; anything else is refused rather
 than answered with another request's result.
 
 --dry-run prints the exact request, body included, and sends nothing.
+
+### `jr issue remotelink list`
+
+List an issue's links to things outside Jira
+
+- **paginated** — bounded by `--limit`; a truncated result exits 3
+
+```
+jr issue remotelink list <key> [flags]
+```
+
+Examples:
+
+```console
+jr issue remotelink list ENG-101
+jr issue remotelink list ENG-101 --format json
+```
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `key` | yes | issue key, e.g. ENG-101 |
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
+
+| Emits | Schema | When |
+| --- | --- | --- |
+| `issue.remotelink.list` | v1 | always |
+
+Default TSV columns: `id`, `application`, `relationship`, `title`, `url`
+
+Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
+
+Returns every remote link on an issue: the web links a person pastes into it,
+and the links an integration writes to a commit, a build, a document.
+
+A link an application wrote names that application and may carry the remote
+side's own resolved state. One a person added arrives with neither, and the
+absent application is how the two are told apart. The id is the value an
+activity item names when a link is added or removed.
+
+Remote links live at their own endpoint, so this costs one request, and the
+set arrives whole: the server neither pages nor truncates it. These are links
+to things outside Jira; for the issue-to-issue kind, see issue link list.
 
 ### `jr issue sequence`
 

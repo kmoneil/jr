@@ -21,7 +21,7 @@ func init() {
 	registry.Register(getCommand())
 
 	render.RegisterSchema(KindList, Schema())
-	render.RegisterSchema(KindGet, Schema())
+	render.RegisterSchema(KindGet, getSchema())
 }
 
 // Schema is the shape of an issue, as `jr contract` reports it and as
@@ -144,6 +144,21 @@ func Schema() *render.Schema {
 			Attrs:      extraFieldAttrs(),
 		},
 	}
+}
+
+// getSchema is the record `issue get` emits: the shared issue shape plus the
+// containers only a fetched issue carries.
+//
+// Remote links stay get-only where the comment thread moved to the shared
+// schema: a listed row gets its thread as a projection inside the search
+// response, and remote links have no projection to arrive by, so a row cannot
+// carry them and declaring that it could would be the lie `make golden`
+// catches.
+func getSchema() *render.Schema {
+	s := Schema()
+	s.Children = append(s.Children,
+		render.Child{Schema: remoteLinksSchema(), Optional: true})
+	return s
 }
 
 // commentsSchema is the thread an issue carries with --with-comments.
@@ -1530,6 +1545,11 @@ parses both identically. It simply has more of it filled in.`),
 					"request, and a thread longer than " +
 					strconv.Itoa(commentCap) + " is reported incomplete with exit 3",
 			},
+			{
+				Name: withRemoteLinksFlag, Type: registry.TypeBool,
+				Usage: "include the remote links: web links, and the links an " +
+					"application wrote; costs a second request",
+			},
 		},
 		NeedsJira: true,
 		// Only when --raw-field is writing bytes. Every other invocation
@@ -1631,6 +1651,13 @@ func runGet(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) 
 		// subresource with their own endpoint and their own paging, not a
 		// field, so they cannot arrive with the issue.
 		if err := attachComments(ctx, client, doc, inv.Args[0]); err != nil {
+			return nil, err
+		}
+	}
+	if inv.Flags.Bool(withRemoteLinksFlag) {
+		// A second request for the same reason as the thread above. Unlike the
+		// thread the set arrives whole, so this container is never partial.
+		if err := attachRemoteLinks(ctx, client, doc, inv.Args[0]); err != nil {
 			return nil, err
 		}
 	}

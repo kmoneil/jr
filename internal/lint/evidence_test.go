@@ -72,6 +72,13 @@ var recordedFixtures = map[string][]string{
 		// recording because the flag narrows the request as well as the output.
 		"activity-recorded.cloud.json",
 		"activity-comments-recorded.cloud.json",
+		// Remote links, both verbs that read them. The claims worth evidence
+		// are that the endpoint serves a bare unpaged array and that a
+		// hand-added link arrives as an empty application object; a
+		// constructed cassette would just restate the belief the measurement
+		// existed to check.
+		"remotelinks-recorded.cloud.json",
+		"get-remotelinks-recorded.cloud.json",
 		// The same two requests against both project styles. The symmetry is
 		// the claim — that the parent field needs no branch on style — so one
 		// of these quietly becoming hand-written would leave the claim

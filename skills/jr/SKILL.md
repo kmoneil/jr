@@ -281,7 +281,7 @@ Generated from the registry of the binary that printed this, so it is the truth
 about that binary and not about the project. A reader build lists no mutating
 commands because it contains none.
 
-69 commands, profile `full`, tags `prompt, render, mcp, write, admin`.
+70 commands, profile `full`, tags `prompt, render, mcp, write, admin`.
 
 | Command | | Does |
 | --- | --- | --- |
@@ -326,6 +326,7 @@ commands because it contains none.
 | `issue link remove` | `M D` | Remove a link between two issues |
 | `issue list` |  | List issues matching a query |
 | `issue move` | `M` | Transition an issue to another status |
+| `issue remotelink list` |  | List an issue's links to things outside Jira |
 | `issue sequence` | `M` | Plan several changes to one issue, to apply in order |
 | `issue watch` | `M` | Start or stop watching an issue |
 | `issue worklog add` | `M` | Log work against an issue |
