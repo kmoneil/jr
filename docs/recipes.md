@@ -668,6 +668,45 @@ $ jr issue comment add ENG-101 'Fixed by the retry rework'
 A transition the issue does not offer _right now_ is refused with the list of
 the ones it does, each with its id and destination.
 
+### Several changes to one issue, as one
+
+Closing a ticket the way a team expects is usually a comment, a field and a
+transition: three commands, and a failure at the second leaves the issue half
+done. `jr issue sequence` plans them together. Write the steps as the commands
+you would have run, one array of words each:
+
+```json
+[["issue", "comment", "add", "ENG-101", "Shipped in 1.4."],
+ ["issue", "edit", "ENG-101", "--field", "Story Points=1"],
+ ["issue", "move", "ENG-101", "Done"]]
+```
+
+Plan, read the plan, preview it, then apply:
+
+```console
+$ jr issue sequence ENG-101 --steps-file close.json --plan-out close.xml
+$ jr issue sequence --apply close.xml --dry-run
+$ jr issue sequence --apply close.xml
+```
+
+Planning sends nothing. Each step is dry-run as its own command, so it is
+refused where that command would be, and then checked for what the commands
+leave to Jira: the permission it needs, every edited field on the edit screen,
+the assignee assignable, a linked issue readable, a sprint still open. A plan
+with any step that cannot run is not written at all, and the refusal names
+every such step.
+
+Applying compares the issue's baseline first and rebuilds every step, so an
+issue changed since planning, or a plan file somebody edited, runs nothing.
+The first step that fails stops the run, and the document says which steps
+landed, which failed with what code, and which were not attempted. Run the
+same `--apply` again once the cause is fixed and it sends only the steps not
+yet done.
+
+A sequence carries at most one `issue move`, as its last step, and changes
+only its own issue (a link's far end excepted). Create stays its own call:
+`jr issue create`, then a sequence for the sprint, the link and the move.
+
 Assigning is its own verb:
 
 ```console

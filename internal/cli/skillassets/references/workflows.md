@@ -9,6 +9,7 @@ failure that makes the sequence necessary.
 - [Resuming an interrupted run](#resuming-an-interrupted-run)
 - [Bulk changes across a query](#bulk-changes-across-a-query)
 - [Transitioning an issue](#transitioning-an-issue)
+- [Several changes to one issue](#several-changes-to-one-issue)
 - [Running a sprint](#running-a-sprint)
 - [Filing an issue safely](#filing-an-issue-safely)
 - [Editing something you read first](#editing-something-you-read-first)
@@ -136,6 +137,33 @@ case or by id, and the site's spelling is what is sent. `UNKNOWN_RESOLUTION`
 lists what the screen offers. `TRANSITION_TAKES_NO_RESOLUTION` means the
 transition has no resolution field, which on a default workflow is true of
 every transition: move it without one.
+
+## Several changes to one issue
+
+A comment, a field and a transition are three commands, and a failure at the
+second leaves the issue half done with nothing saying so. Plan them as one
+sequence instead: each step is the command line it would have been, as JSON.
+
+```console
+jr issue sequence ENG-101 --plan-out close.xml --steps \
+  '[["issue","comment","add","ENG-101","Shipped."],["issue","edit","ENG-101","--field","Story Points=1"],["issue","move","ENG-101","Done"]]'
+jr issue sequence --apply close.xml --dry-run   # what will be sent; sends nothing
+jr issue sequence --apply close.xml
+```
+
+- **Read the plan before applying it.** Planning dry-runs every step and checks
+  permissions, the edit screen, the assignee and the sprint; a plan that could
+  not run is refused naming every bad step, and no file is written.
+- **A partial apply exits with the failing step's code** and its document, on
+  stdout, says which steps were `applied`, which `failed`, and which were
+  `not-attempted`. Report that, not "it failed". Re-running the same
+  `--apply` resumes: steps already done are `skipped`.
+- `STALE_WRITE` or `PLAN_DRIFTED` from `--apply` means the issue or the site
+  moved since planning. Plan again; never edit the plan file.
+- One `issue move` at most, last. No global flags, `--dry-run` or
+  `--if-unchanged` inside a step: the sequence decides those. Steps change only
+  the sequence's issue. Over MCP there is no stdin, so give `--steps` inline or
+  `--steps-file` a path, never `--steps-file -`.
 
 ## Running a sprint
 
