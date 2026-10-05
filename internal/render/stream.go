@@ -334,10 +334,9 @@ func (s *Stream) flush() error {
 // Truncation is everything the warning needs about a streamed collection that
 // stopped early.
 //
-// It is a struct rather than a parameter list because four of its five fields
-// would be strings and ints in a row, and the two that decide the remedy sit in
-// the middle of them. Close makes the same argument one type up for two values,
-// and this is five.
+// It is a struct rather than a parameter list because most of its fields would
+// be strings and ints in a row, and the two that decide the remedy sit in the
+// middle of them. Close makes the same argument one type up for two values.
 type Truncation struct {
 	// Kind is the collection's kind, for the warning to name.
 	Kind string
@@ -361,6 +360,9 @@ type Truncation struct {
 	// the command knows: it held the whole answer, or the server counted it.
 	// Zero means unknown and writes nothing.
 	Total int
+	// Boundary is where a sorted walk stopped, on a command that ordered by a
+	// field the caller named. The zero value is unknown and writes nothing.
+	Boundary Boundary
 }
 
 // WriteStreamTruncation emits the warning that accompanies exit 3 for a
@@ -383,5 +385,5 @@ func truncationNodeFor(t Truncation) *Node {
 			Items:         make([]*Node, t.Count),
 			NextPageToken: t.NextPageToken,
 		},
-	}, t.PartialElement, t.StoppedBy, t.Total)
+	}, t)
 }

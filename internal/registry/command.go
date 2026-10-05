@@ -264,6 +264,29 @@ type StreamResult struct {
 	// which is every other case: a truncated result holds at least one row
 	// more than it wrote, so zero is never a real total.
 	Total int
+	// Boundary is where a walk ordered by a field the caller named stopped,
+	// for the warning to say how far down the order the rows reached. The
+	// zero value is unknown and writes nothing.
+	Boundary render.Boundary
+}
+
+// Truncation is what the warning needs from this result, for a collection of
+// kind that wrote count rows.
+//
+// It is the one place a result becomes a warning. The CLI and the MCP server
+// each built their own copy field by field, and when Total was added only the
+// CLI's copy learned it, so a cut list told a terminal how many rows it was cut
+// from and told a model nothing.
+func (r StreamResult) Truncation(kind string, count int) render.Truncation {
+	return render.Truncation{
+		Kind:           kind,
+		Count:          count,
+		NextPageToken:  r.NextPageToken,
+		PartialElement: r.PartialElement,
+		StoppedBy:      r.StoppedBy,
+		Total:          r.Total,
+		Boundary:       r.Boundary,
+	}
 }
 
 // Progress reports how far a long operation has got.

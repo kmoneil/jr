@@ -475,6 +475,11 @@ func runList(
 	// the per-row `count` against `total` says which rows to look at.
 	var clipped bool
 
+	// The sort field's value on the last row written, which is where a cut
+	// walk stopped in the order the caller asked for.
+	sortedBy := sortField(inv)
+	var reached string
+
 	result, err := client.ListStream(ctx, ListOptions{
 		Query:        query,
 		Limit:        inv.Limit,
@@ -482,9 +487,13 @@ func runList(
 		PageToken:    inv.Flags.String("page-token"),
 		Fields:       RequestedFields(resolvedFields(inv)),
 		WithComments: inv.Flags.Bool(withCommentsFlag),
+		SortField:    sortedBy,
 	}, func(page []Issue, total int) error {
 		if anyThreadClipped(page) {
 			clipped = true
+		}
+		if len(page) > 0 {
+			reached = page[len(page)-1].sortValue
 		}
 		if err := stampPage(inv, info, page); err != nil {
 			return err
@@ -521,7 +530,8 @@ func runList(
 		// Data Center's search counts the walk's own query and Cloud's sends
 		// no count, so a list cut short on Cloud cannot say what it was cut
 		// from.
-		Total: beyond(result.Owed, out.Count()),
+		Total:    beyond(result.Owed, out.Count()),
+		Boundary: listBoundary(inv, sortedBy, reached),
 	}, nil
 }
 
@@ -683,6 +693,10 @@ func validateList(ctx context.Context, inv *registry.Invocation) error {
 	if err := refuseQueryJiraDoesNotUnderstand(ctx, inv); err != nil {
 		return err
 	}
+	// After every refusal, because it can cost the catalogue request and can
+	// refuse nothing: a sort it cannot resolve has no boundary, and that is
+	// all.
+	resolveSortField(ctx, inv)
 
 	// The warnings go last, after every refusal above them. None can fail the
 	// command, so an invocation that was going to be refused is refused

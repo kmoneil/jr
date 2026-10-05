@@ -652,6 +652,50 @@ absent is additive under the stability policy, so the patch position moves.
 The warning is not a kind and has no shape golden, and its `v` has stayed `1`
 through the optional fields added before this one.
 
+**A cut sorted list says where it stopped.** `issue list --sort` orders by a
+field the caller named, and a list cut short in that order is often answered by
+how far down it got: "updated down to 2026-05-09T14:20:00Z" is the coverage a
+caller has to state, and the rows show the sort field only when it happens to be
+a column. The warning carries it as three leaves after `total`:
+
+```
+code             RESULT_TRUNCATED
+kind             issue.list
+count            100
+total            5000
+sort             updated
+order            desc
+reached          2026-05-09T14:20:00Z
+next-page-token  …
+remedy           resume with --page-token, or raise --limit
+```
+
+- `sort` is the field id the walk was ordered by, as the rows key it: `updated`,
+  or `customfield_10042` for `--sort 'Story Points'`. A JQL clause name is
+  resolved against the field catalogue, the request `--field` makes, except for
+  the key and the fields every row already carries, which cost nothing.
+- `order` is `asc` or `desc` as resolved. A named field ascends unless `--order`
+  says otherwise, and `reached` reads the opposite way in each.
+- `reached` is that field's value on the last row written, exactly as the row
+  carries it: `updated` in UTC to the second, `project` as its key, a person as
+  the display name, any other field as the text its element holds under
+  `--field`. The field is fetched for this whether or not a column shows it, and
+  is not added to the rows.
+
+**Ties straddle the cut.** Every row Jira ordered before the last row written
+was written. Rows sharing its value can sit on either side of the cut, so a walk
+resumed from the token can begin on `reached` again: "covered down to `reached`"
+is true of every row ordered before it, and not of every row carrying it.
+
+The three are written together or not at all, and their absence means the
+boundary is unknown: no `--sort`, where the key ordering's position is the
+resume token; a list-valued sort field (labels, a multi-select, a sprint field),
+which has no single value to report; a sort the catalogue cannot name; a last
+row with no value for it; and a clipped element's warning. A `--jql` fragment
+cannot order its own results (`JQL_HAS_ORDER_BY`), so `--sort` is the only
+ordering there is to report. Adding the three is additive, as `total` was: the
+patch position moves and the warning's `v` stays `1`.
+
 **A walk can also fail rather than truncate.** Truncation says the answer stops
 where a bound put it. When a paged walk stops on its own while holding fewer
 rows than Jira counted for the query it started from, that reading is not
@@ -686,7 +730,7 @@ about the answer cannot be read off the answer itself.
 
 | Code               | Emitted by                                      | What it says                                                                                                                                                                                                                        |
 | ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RESULT_TRUNCATED` | any collection                                  | The result is not exhaustive. It accompanies exit 3 and `complete="false"`, carries the resume token where one exists, and carries `total` where the command knows how many rows the whole answer held.                             |
+| `RESULT_TRUNCATED` | any collection                                  | The result is not exhaustive. It accompanies exit 3 and `complete="false"`, carries the resume token where one exists, carries `total` where the command knows how many rows the whole answer held, and on a cut `issue list --sort` carries `sort`, `order` and `reached`, where in that order the rows stopped. |
 | `POSSIBLE_DUPLICATE` | `issue create`, `issue clone`                 | An identical request succeeded within the last 60 seconds and this one carried no idempotency key.                                                                                                                                   |
 | `UNKNOWN_LABEL`    | `issue list`, from `--label` and `--not-label`   | No issue on this site carries that label. The query still runs and still exits 0.                                                                                                                                                    |
 | `SCOPE_MISMATCH`   | `issue list`, `issue activity`, `issue changes` | A raw `--jql` selects a project the effective scope excludes, so those rows cannot come back. The query still runs and still exits 0.                                                                                                 |

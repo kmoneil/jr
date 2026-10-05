@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -121,6 +122,12 @@ type ListOptions struct {
 	// response size, and the two deployments bound that differently — see
 	// Issue.ThreadStartAt.
 	WithComments bool
+	// SortField is the field id the query is ordered by, when the caller named
+	// one, so the last row's value can say where a cut walk stopped. It is
+	// fetched beside Fields and never added to them, for the reason `comment`
+	// is not: Fields is what becomes elements, and the caller did not ask for
+	// this one to be shown.
+	SortField string
 }
 
 // ListResult is a page-spanning result plus everything needed to say honestly
@@ -500,7 +507,7 @@ func (c *Client) readPage(
 	out.Requests++
 
 	issues, err := decodeIssues(page.Issues, ExtraFieldNames(opt.Fields), c.FieldNames,
-		c.Body, opt.projections())
+		c.Body, opt.projections(), opt.SortField)
 	if err != nil {
 		return pageRead{}, err
 	}
@@ -813,6 +820,11 @@ func requestFields(opt ListOptions) []string {
 			out = append(append([]string{}, out...), p.name)
 		}
 	}
+	// The key is on every issue without being a field, and a field already in
+	// the list is already asked for.
+	if s := opt.SortField; s != "" && s != SortKey && !slices.Contains(out, s) {
+		out = append(append([]string{}, out...), s)
+	}
 	return out
 }
 
@@ -932,7 +944,7 @@ func (c *Client) Get(ctx context.Context, key string, fields []string) (Issue, e
 	}
 
 	issues, err := decodeIssues([]json.RawMessage{resp.Body}, ExtraFieldNames(fields),
-		c.FieldNames, c.Body, Projections{})
+		c.FieldNames, c.Body, Projections{}, "")
 	if err != nil {
 		return Issue{}, err
 	}

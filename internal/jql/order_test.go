@@ -130,3 +130,28 @@ func TestSortsByKeyIsTheKeysetPrecondition(t *testing.T) {
 		}
 	}
 }
+
+// TestSortDirectionIsWhatTheQueryOrders keeps the direction a truncation
+// warning reports the same as the one AppendOrder sends. A named field ascends
+// when --order is absent, and a boundary reported as descending over an
+// ascending walk reads every row it describes backwards.
+func TestSortDirectionIsWhatTheQueryOrders(t *testing.T) {
+	for _, tc := range []struct {
+		sort, order string
+		want        jql.Direction
+	}{
+		{"", "", jql.Desc},
+		{"updated", "", jql.Asc},
+		{"updated", "DESC", jql.Desc},
+		{"updated", "asc", jql.Asc},
+	} {
+		got, err := jql.SortDirection(tc.sort, tc.order)
+		if err != nil || got != tc.want {
+			t.Errorf("SortDirection(%q, %q) = %q, %v; want %q",
+				tc.sort, tc.order, got, err, tc.want)
+		}
+	}
+	if _, err := jql.SortDirection("updated", "sideways"); err == nil {
+		t.Error("an order AppendOrder refuses was given a direction to report")
+	}
+}
