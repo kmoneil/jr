@@ -20,6 +20,50 @@ accident.
 
 Nothing yet.
 
+## [0.19.6] - 2026-10-05
+
+**Take this one if you sort a list and cut it short, or read jr through its MCP
+server.** A list cut short under `--sort` now says how far down that order it
+got (issue 217), and the MCP server's truncation warning now carries the
+`total` the command line has carried since 0.19.2.
+
+```console
+$ jr issue list --updated-after -3d --sort updated --order desc --limit 100
+# stderr: RESULT_TRUNCATED, count: 100, sort: updated, order: desc,
+#         reached: 2026-05-09T14:20:00Z, remedy: resume with --page-token, ...
+```
+
+- `reached` is the sort field's value on the last row written, as the row
+  renders it, so "every issue updated after 14:20" is a statement the warning
+  supports. Rows sharing that value can sit on either side of the cut: a walk
+  resumed from the token may begin on it again.
+- `sort` names the field id and `order` the resolved direction. A named field
+  ascends unless `--order` says otherwise, and `reached` reads the opposite way
+  in each.
+- The sort field is fetched for this whether or not a column shows it, and is
+  not added to the rows. A `--sort` naming a field outside the default set
+  (`due`, `'Story Points'`) is resolved through the field catalogue, the cached
+  request `--field` makes; sorting by the key or a default field costs nothing
+  more.
+- The three are absent where the boundary is unknown: a list-valued sort field
+  (labels, a multi-select, a sprint field), a sort the catalogue cannot name,
+  and an empty value on the last row.
+
+The MCP server built its own copy of the truncation warning and never learned
+`total` when 0.19.2 added it to the command line, so a model was told
+"truncated" where a terminal was told "100 of 104". Both now come from one
+conversion.
+
+### Output contract
+
+- The `RESULT_TRUNCATED` warning gains optional `sort`, `order` and `reached`
+  leaves on a cut `issue list --sort`. The warning's `v` stays 1, and no kind
+  changed.
+- Over MCP, the same warning now carries `total` wherever the command knows it,
+  as the command line's has since 0.19.2.
+- **Priced a patch.** Optional leaves on a warning, populated where they used
+  to be absent; nothing a consumer reads today reads differently.
+
 ## [0.19.5] - 2026-10-02
 
 **Take this one if your issues link outward, or your projects are filed under
@@ -3296,7 +3340,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.19.4...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.19.6...main
+[0.19.6]: https://github.com/kmoneil/jr/releases/tag/v0.19.6
 [0.19.5]: https://github.com/kmoneil/jr/releases/tag/v0.19.5
 [0.19.4]: https://github.com/kmoneil/jr/releases/tag/v0.19.4
 [0.19.3]: https://github.com/kmoneil/jr/releases/tag/v0.19.3
