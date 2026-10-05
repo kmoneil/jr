@@ -25,7 +25,7 @@
 # is a different claim from "no test notices" and is why they are written down
 # rather than left as a number somebody will try to lower.
 #
-#   date.go:367:12   `total > maxDuration-component`, boundary. The two forms
+#   date.go:429:12   `total > maxDuration-component`, boundary. The two forms
 #                    differ only when the sum lands exactly on MaxInt64
 #                    nanoseconds. Every unit in dateValueUnits is a whole number
 #                    of minutes, so every total is a multiple of 60e9, and
@@ -40,6 +40,30 @@
 #                    only by an index-out-of-range panic when cap == len, and a
 #                    test that arranged that would be asserting Go's size
 #                    classes rather than this tokenizer.
+#
+# `internal/jql` went 3 to 4 on 2026-10-05, and no test stopped noticing
+# anything: the new survivor is equivalent. `946cbba` (PR 233) added
+# `MinuteBound` in minute.go, and the next weekly sweep found six (issue 244).
+# One was not new, because the same commit moved date.go's mutant above from
+# line 367 to 429. Two were the boundaries of the year guard, `wall.Year() < 1`
+# and `> 9999`, whose refusing side was tested and whose accepting side was
+# not; TestMinuteBoundSpellsTheFirstAndLastYearALiteralCan kills both. The
+# third is equivalent:
+#
+#   minute.go:89:36  `near <= 48*time.Hour`, boundary. `<` drops the last of
+#                    onlyInstantAt's offset samples, the one at +48h. An offset
+#                    is only used if it is in force at an instant that reads as
+#                    the wall clock, which is within 16 hours of it, and the
+#                    samples are three hours apart, so an offset in force there
+#                    for three hours or more is already found by a nearer one.
+#                    Measured 2026-10-05 over the 598 zones in Go's
+#                    zoneinfo.zip and the 599 in macOS's tzdata, the shortest
+#                    any offset has stayed in force is 95h40m (Africa/Freetown,
+#                    September 1939), and the largest offset is 15h56m
+#                    (Asia/Manila's local mean time). A test that killed it
+#                    would build a zone whose offset holds for under three
+#                    hours and happens to recur at +48h, and would be
+#                    asserting that coincidence.
 #
 # If one of those is ever killed honestly, delete its paragraph and lower the
 # count in the same change. The ledger only shrinks.
@@ -106,6 +130,6 @@
 # indistinguishable from a gate that is still broken, and the distinguishing
 # command took one minute. Issue 57 said exactly the right thing, "no conclusion
 # about the tests follows from this run", and was closed without one.
-internal/jql	3	the only place a value is quoted; an unexercised branch is an injection
+internal/jql	4	the only place a value is quoted; an unexercised branch is an injection
 internal/render	12	the output contract itself, and the escaping rules under it
 internal/site	34	deployment detection, field and user resolution, the cache
