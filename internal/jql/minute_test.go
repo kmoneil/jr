@@ -242,6 +242,25 @@ func TestMinuteBoundRefusesAMinuteNoLiteralCanSpell(t *testing.T) {
 	}
 }
 
+// TestMinuteBoundSpellsTheFirstAndLastYearALiteralCan is the other side of
+// that edge. Years 1 and 9999 are four digits, so their minutes are sent; a
+// refusal one year inside the range is a bound the caller loses for nothing.
+func TestMinuteBoundSpellsTheFirstAndLastYearALiteralCan(t *testing.T) {
+	for _, tc := range []struct {
+		in   time.Time
+		dir  jql.Rounding
+		want string
+	}{
+		{time.Date(1, 1, 1, 0, 0, 30, 0, time.UTC), jql.RoundDown, "0001-01-01 00:00"},
+		{time.Date(9999, 12, 31, 23, 58, 30, 0, time.UTC), jql.RoundUp, "9999-12-31 23:59"},
+	} {
+		literal, _, ok := jql.MinuteBound(tc.in, time.UTC, tc.dir)
+		if !ok || literal != tc.want {
+			t.Errorf("%s gave %q, %v; want %q", tc.in.Format(time.RFC3339), literal, ok, tc.want)
+		}
+	}
+}
+
 // TestMinuteBoundGivesNoBoundRatherThanAGuess is a zone in which no minute
 // names exactly one instant: its offset swings between UTC and UTC+3 every
 // hour, so each even hour of its clock happens twice and each odd hour never.
