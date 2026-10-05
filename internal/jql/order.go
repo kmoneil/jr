@@ -62,6 +62,12 @@ func AppendOrder(b *Builder, sort, order string) error {
 	return nil
 }
 
+// SortDirection is the direction AppendOrder orders a --sort and --order pair
+// in, for a caller that has to report it rather than send it.
+func SortDirection(sort, order string) (Direction, error) {
+	return direction(sort, order)
+}
+
 // direction resolves --order for whatever is being ordered.
 //
 // An unset direction is two defaults and not one, and which applies depends on

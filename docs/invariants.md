@@ -283,6 +283,19 @@ do not catch, add the test in the same change and cite it here.
   `TestACutListKnowsWhatItWasCutFrom`, `TestALimitCutWarningStatesTheTotal`,
   `TestAnUnknownTotalIsNotWritten`, `TestABudgetCutFeedStatesNoTotal`,
   `TestAClippedElementKeepsItsTotal`.
+- **A cut sorted list names where it stopped only where it read it.** `sort`,
+  `order` and `reached` go in the warning together, from the sort field's value
+  on the last row written, fetched for the purpose and not added to the rows. A
+  list-valued field, a sort the catalogue cannot name, and a last row with no
+  value write none, because a joined list or a guessed id reads like a bound
+  and is not one. Both surfaces build the warning from one conversion,
+  `StreamResult.Truncation`: the MCP server kept its own copy, and when `total`
+  was added on 2026-10-01 only the CLI's copy learned it, so a model was told
+  nothing a terminal was told.
+  **Enforced by:** `TestACutSortedListSaysWhereItStopped`,
+  `TestASortedBoundaryReadsAFieldTheRowsDoNotShow`,
+  `TestNoBoundaryIsWrittenWhereNoneIsKnown`,
+  `TestTruncationSurvivesIntoTheReply`.
 - **A change to a list is the elements that moved, and a split is made only
   where it is exact.** Jira records Component and Fix Version one element per
   item and labels and Sprint as both whole lists, so one save of a long-lived

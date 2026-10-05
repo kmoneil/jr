@@ -71,16 +71,44 @@ func errorNode(e *errs.Error) *Node {
 	return n
 }
 
+// Boundary is where a cut sorted walk stopped: the field it was ordered by, the
+// direction, and that field's value on the last row written.
+//
+// A sorted list cut at a hundred rows is often answered by this alone. "Updated
+// down to 2026-05-09T14:20:00Z" is the coverage a caller has to state, and
+// without it the only source is the last row, which carries the field only when
+// the caller happened to fetch it and only in formats that show it.
+//
+// Reached is the value exactly as the row carries it, so it compares with the
+// rows already written. It promises what an ordering can: every row the server
+// ordered before the last one was written. Rows sharing the last row's value
+// can sit on either side of the cut, so a caller who resumes may meet that
+// value again. An empty Reached is unknown and writes nothing.
+type Boundary struct {
+	// Field is the field id the walk was ordered by, as the rows key it.
+	Field string
+	// Order is asc or desc, as resolved: a named field ascends unless told
+	// otherwise, and Reached reads the opposite way in each.
+	Order string
+	// Reached is Field's value on the last row written.
+	Reached string
+}
+
 // truncationNode builds the <warning> envelope that accompanies exit 3. It is
 // emitted for every format, not only TSV: the XML and JSON envelopes also carry
 // complete="false", but the exit code and the stderr warning are what a script
 // checks.
-func truncationNode(d *Doc, partialElement string, stop Stop, total int) *Node {
+//
+// The document supplies the kind, the rows and the resume token; t supplies
+// what only the command that ran knows, so a buffered document passes an empty
+// one. t's own Kind, Count and NextPageToken are not read here.
+func truncationNode(d *Doc, t Truncation) *Node {
 	if d.Collection == nil {
 		return recordTruncationNode(d)
 	}
 	c := d.Collection
 	partial := incompleteItem(c.Items)
+	partialElement, total := t.PartialElement, t.Total
 	n := El("warning").Attr("v", strconv.Itoa(diagnosticVersion)).
 		Leaf("code", TruncatedCode).
 		Leaf("message", "result set was truncated before it was exhausted").
@@ -94,6 +122,12 @@ func truncationNode(d *Doc, partialElement string, stop Stop, total int) *Node {
 	// name would be a guess.
 	if total > 0 && partial == nil && partialElement == "" {
 		n.Leaf("total", strconv.Itoa(total))
+	}
+	// The boundary on the same terms as the total: it describes rows that ran
+	// out against a bound, and a clipped element's warning is about something
+	// inside a row instead.
+	if b := t.Boundary; b.Reached != "" && partial == nil && partialElement == "" {
+		n.Leaf("sort", b.Field).Leaf("order", b.Order).Leaf("reached", b.Reached)
 	}
 	n.LeafIf("next-page-token", c.NextPageToken)
 
@@ -125,7 +159,7 @@ func truncationNode(d *Doc, partialElement string, stop Stop, total int) *Node {
 		return n
 	}
 
-	n.Leaf("remedy", truncationRemedy(stop, c.NextPageToken))
+	n.Leaf("remedy", truncationRemedy(t.StoppedBy, c.NextPageToken))
 	return n
 }
 

@@ -78,7 +78,10 @@ func testRegistry(t *testing.T) *registry.Registry {
 			if complete {
 				return registry.StreamResult{Complete: true}, nil
 			}
-			return registry.StreamResult{NextPageToken: "MORE"}, nil
+			return registry.StreamResult{
+				NextPageToken: "MORE", Total: 3,
+				Boundary: render.Boundary{Field: "updated", Order: "desc", Reached: "K-B"},
+			}, nil
 		},
 	})
 
@@ -352,6 +355,13 @@ func TestTruncationSurvivesIntoTheReply(t *testing.T) {
 	}
 	if !strings.Contains(text, "MORE") {
 		t.Errorf("the resume token was dropped:\n%s", text)
+	}
+	// What the rows were cut from and where the order stopped, which the
+	// server's own copy of the warning dropped while the CLI's carried it.
+	for _, want := range []string{"total\t3", "sort\tupdated", "order\tdesc", "reached\tK-B"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("the warning lost %q on its way into the reply:\n%s", want, text)
+		}
 	}
 	// The rows are still there: the caller gets the data and the caveat.
 	if !strings.Contains(text, "K-A") {

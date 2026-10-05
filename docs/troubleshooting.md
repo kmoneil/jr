@@ -647,6 +647,19 @@ to narrow. A warning with no `total` means the number is not known: `issue list`
 on Cloud, whose search counts nothing, `user list`, `issue history` on Cloud,
 and a feed the request budget stopped.
 
+Under `--sort`, `issue list` also says where in that order it stopped: `sort`,
+`order`, and `reached`, the sort field's value on the last row written.
+
+```console
+$ jr issue list --updated-after -3d --sort updated --order desc --limit 100
+# stderr: RESULT_TRUNCATED, count: 100, sort: updated, order: desc,
+#         reached: 2026-05-09T14:20:00Z, remedy: resume with --page-token, ...
+```
+
+Every issue updated after that second was written, and issues updated within it
+may continue on the next page. Report the window the rows cover, not the one the
+command asked for, or resume with the token to cover the rest.
+
 If a script inherited a failure from this, it is checking `$?` without treating
 3 as a success — see [recipes.md](recipes.md#scripting-and-ci).
 

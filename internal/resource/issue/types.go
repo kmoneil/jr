@@ -188,6 +188,12 @@ type Issue struct {
 	// Unexported because it is an input to EncodePrecondition and not a field
 	// of the output contract.
 	updatedRaw string
+
+	// sortValue is this row's value for the field a sorted walk is ordered
+	// by, read only off the last row written, for the truncation warning.
+	// Unexported for the reason updatedRaw is: the field is fetched to be
+	// reported once, in the warning, and is not an element of the row.
+	sortValue string
 }
 
 // ExtraField is one field requested by id and reduced to a scalar.
@@ -466,11 +472,12 @@ func decodeDescription(raw json.RawMessage, mode BodyMode) (text, format string,
 }
 
 // decodeIssues converts a page of raw issues. extras names the fields the
-// caller asked for beyond the default set, and thread says whether the caller
-// asked for the comment projection.
+// caller asked for beyond the default set, want says which projections the
+// request asked for, and sortField is the field id a walk is ordered by, empty
+// when nothing needs to read it.
 func decodeIssues(
 	raw []json.RawMessage, extras []string, labels map[string]string,
-	mode BodyMode, want Projections,
+	mode BodyMode, want Projections, sortField string,
 ) ([]Issue, error) {
 	out := make([]Issue, 0, len(raw))
 	for i, data := range raw {
@@ -486,6 +493,9 @@ func decodeIssues(
 			return nil, err
 		}
 		issue.Extra = extraFields(data, extras, labels)
+		if sortField != "" {
+			issue.sortValue = boundaryValue(issue, data, sortField)
+		}
 		if err := attachProjections(&issue, data, mode, want); err != nil {
 			return nil, err
 		}

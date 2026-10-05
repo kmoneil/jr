@@ -481,13 +481,8 @@ func streamInto(ctx context.Context, out *strings.Builder, cmd *registry.Command
 	// content. A truncated result that looked complete is the one failure this
 	// whole format exists to prevent.
 	var warning strings.Builder
-	if err := render.WriteStreamTruncation(&warning, render.Truncation{
-		Kind:           cmd.Kind(),
-		Count:          stream.Count(),
-		NextPageToken:  result.NextPageToken,
-		PartialElement: result.PartialElement,
-		StoppedBy:      result.StoppedBy,
-	}, format); err != nil {
+	if err := render.WriteStreamTruncation(&warning,
+		result.Truncation(cmd.Kind(), stream.Count()), format); err != nil {
 		return err
 	}
 	out.WriteString("\n")
