@@ -254,6 +254,39 @@ func TestACollectionOfDocumentsRendersAsSections(t *testing.T) {
 	}
 }
 
+// TestABoundedDocumentStaysInATable is the exception to the rule above. A body
+// cut to a length the caller chose is short by construction, so the row is the
+// short row a table assumes; `issue activity --body-chars` gave every event a
+// section of its own, and fifty of them were hundreds of lines of headers. One
+// unbounded document among them still turns the whole collection to sections,
+// because a table could not hold that one.
+func TestABoundedDocumentStaysInATable(t *testing.T) {
+	item := func(id string, bounded bool) *render.Node {
+		body := render.El("body").SetCDATA("Reproduced on 9.4.\n\n```\nGET")
+		body.Bounded = bounded
+		return render.El("comment").Attr("id", id).Child(body)
+	}
+	doc := func(items ...*render.Node) *render.Doc {
+		return render.List("issue.comment.list", 1, &render.Collection{
+			Name: "comments", Complete: true, Items: items,
+			Columns: []render.Column{{Header: "id", Path: "@id"}, {Header: "body", Path: "body"}},
+		})
+	}
+
+	got := markdownOf(t, doc(item("1", true), item("2", true)))
+	if !strings.Contains(got, "| id | body |") || strings.Contains(got, "## comment") {
+		t.Errorf("bounded documents did not stay a table:\n%s", got)
+	}
+	if !strings.Contains(got, "Reproduced on 9.4.<br><br>") {
+		t.Errorf("the bounded body is not in its cell:\n%s", got)
+	}
+
+	mixed := markdownOf(t, doc(item("1", true), item("2", false)))
+	if !strings.Contains(mixed, "## comment 2") {
+		t.Errorf("an unbounded document among bounded ones stayed in a table:\n%s", mixed)
+	}
+}
+
 // TestACollectionWithoutDocumentsStaysATable is the direction that would break
 // quietly. A rule that turned every collection into sections would pass the
 // test above and make `issue list` unreadable for the opposite reason.

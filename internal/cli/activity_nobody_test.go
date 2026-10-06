@@ -25,6 +25,12 @@ const fixtureSince = "2026-09-21"
 // has an event that carries a body and an event that does not.
 func activityJira(t *testing.T) string {
 	t.Helper()
+	return activityJiraWith(t, bulkyComment)
+}
+
+// activityJiraWith is activityJira with the comment's body chosen.
+func activityJiraWith(t *testing.T, comment string) string {
+	t.Helper()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -36,7 +42,7 @@ func activityJira(t *testing.T) string {
 			_, _ = w.Write([]byte(`{"version":"9.12.0","deploymentType":"Server",` +
 				`"serverTime":"2026-09-22T12:00:00.000+0000"}`))
 		default:
-			body, _ := jsonQuote(bulkyComment)
+			body, _ := jsonQuote(comment)
 			_, _ = fmt.Fprintf(w, `{"startAt":0,"maxResults":50,"total":1,"issues":[
 			{"id":"1","key":"ENG-1","fields":{
 			  "summary":"an issue somebody worked on",

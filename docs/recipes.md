@@ -333,6 +333,17 @@ in it is mostly comment. Note this saves output and not requests: Jira sends
 comments inline with the issues they belong to, so the bytes are already on the
 wire by the time they are dropped.
 
+When the first line of each comment is what decides which issue to open next,
+keep that much and no more:
+
+```console
+$ jr issue activity --since -1d --body-chars 120
+```
+
+A body longer than 120 characters is cut there, and its row says how long it
+was in a `body-length` column, so the pasted log excerpts stop dominating the
+feed and the two-line status comments survive whole.
+
 `--kind` cannot cut a *field*, though: `Rank`, `Sprint`, and `assignee` are all
 `kind=field`, and on a groomed backlog `Rank` is most of the feed by row count
 while carrying nothing you can act on. That is what the field filter is for:

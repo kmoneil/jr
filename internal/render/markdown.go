@@ -136,6 +136,12 @@ func writeMarkdownCollection(w *writer, d *Doc) {
 // with the markdown verbatim. So the two paths disagreed about the same node
 // shape, and this is which one wins.
 //
+// A bounded child does not count. It is cut to a length the caller chose, so
+// the row is short by construction, which is the assumption the paragraph
+// above found false of a whole thread. `issue activity --body-chars` is the
+// case: fifty events as sections was several hundred lines of repeated table
+// headers, for a caller who asked for the first line of each body.
+//
 // It reads the data rather than a list of command names, and that is deliberate.
 // `issue list` rows carry no CDATA today — `DefaultFields()` has no description,
 // and `--field description` adds nothing because ExtraFieldNames drops what the
@@ -145,7 +151,7 @@ func writeMarkdownCollection(w *writer, d *Doc) {
 func holdsDocuments(c *Collection) bool {
 	for _, item := range c.Items {
 		for _, child := range item.Children {
-			if child.CDATA {
+			if child.CDATA && !child.Bounded {
 				return true
 			}
 		}

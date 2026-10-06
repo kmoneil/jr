@@ -31,6 +31,12 @@ type Node struct {
 	// CDATA marks Text as mixed content: newlines, quotes, and fenced code
 	// blocks are emitted verbatim inside a CDATA section rather than escaped.
 	CDATA bool
+	// Bounded marks CDATA text cut to a length the caller chose. The markdown
+	// writer gives each item a section of its own when its items carry
+	// documents, because a document's length is unknown and a table cell
+	// cannot hold one; a bounded one's is known, and a table can. No other
+	// writer reads it.
+	Bounded bool
 	// ListOf names the child element this node is a homogeneous list of. It
 	// makes JSON and YAML emit an array unconditionally — an empty list is
 	// [], never an absent field — so a consumer never has to distinguish

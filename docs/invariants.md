@@ -583,6 +583,17 @@ do not catch, add the test in the same change and cite it here.
   is refused with `INVALID_ENCODING`, not replaced with U+FFFD. The same rule
   applies anywhere else a lossy conversion is possible.
   **Enforced by:** `TestInvalidUTF8IsRefusedNotReplaced`, `TestInvalidUTF8IsRefusedNotSubstituted`.
+- **A body cut to a bound the caller chose says so, in every format, and is
+  cut at a character.** `issue activity --body-chars N` keeps a comment's or a
+  worklog note's first N code points; a cut body carries `truncated="true"`
+  and the whole `length`, and TSV, which has no attributes, a `body-length`
+  column. A byte bound would split a character and emit a body that is not
+  UTF-8. A body within the bound carries neither mark, and one exactly at it
+  is not cut. Cutting an ADF document is refused, because the result is not
+  one.
+  **Enforced by:** `TestBodyCharsCutsALongBodyAndSaysSo`,
+  `TestBodyCharsCountsCharacters`, `TestBodyCharsLeavesAShortBodyWhole`,
+  `TestBodyCharsAddsALengthColumnInTSV`, `TestBodyCharsRefusesWhatItCannotHonor`.
 - **A field the server did not send is absent, not defaulted.** A `bool` cannot
   hold "not said", so `hasScreen` and `isPrivate` are `*bool` and the attribute
   is written only when the server sent one. An absence needs a documented

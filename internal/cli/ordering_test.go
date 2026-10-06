@@ -132,6 +132,9 @@ func TestAPagingFlagIsBoundedBeforeTheProbe(t *testing.T) {
 	bad := map[string][]string{
 		"page-size":  {"101", "0", "-1"},
 		"page-token": {"not-a-token-this-tool-issued"},
+		// Not a paging flag, and here for requireEveryIntFlagIsDriven: a zero
+		// bound is --no-body spelled another way, so it is refused.
+		"body-chars": {"0", "-1"},
 	}
 
 	var checked int
@@ -176,10 +179,10 @@ func TestAPagingFlagIsBoundedBeforeTheProbe(t *testing.T) {
 		}
 	}
 
-	// Six commands declare --page-size and one declares --page-token, in
-	// every profile: none of them is behind a tag.
-	if checked != 7 {
-		t.Errorf("checked %d paging flags, want 7; the declarations moved and "+
+	// Six commands declare --page-size, one declares --page-token, and one
+	// --body-chars, in every profile: none of them is behind a tag.
+	if checked != 8 {
+		t.Errorf("checked %d bounded flags, want 8; the declarations moved and "+
 			"this test is now asserting something else", checked)
 	}
 
@@ -188,11 +191,11 @@ func TestAPagingFlagIsBoundedBeforeTheProbe(t *testing.T) {
 
 // zeroIsNotAnInput names the int flags whose zero needs no refusal, and why.
 //
-// Empty today, and that is the finding rather than an oversight: --page-size is
-// the only registry.TypeInt flag in the tree. The two int flags on the root —
-// --max-requests and --retries — are bound straight onto the app with IntVar
-// and never reach registry.Flags, and both document zero as a meaning rather
-// than an absence ("0 means no cap").
+// Empty today, and that is the finding rather than an oversight: --page-size and
+// --body-chars are the only registry.TypeInt flags in the tree, and both refuse
+// zero. The two int flags on the root (--max-requests and --retries) are bound
+// straight onto the app with IntVar and never reach registry.Flags, and both
+// document zero as a meaning rather than an absence ("0 means no cap").
 var zeroIsNotAnInput = map[string]string{}
 
 // requireEveryIntFlagIsDriven closes the general form of this card.

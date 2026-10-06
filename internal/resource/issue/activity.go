@@ -19,8 +19,10 @@ import (
 
 // Kinds the activity command emits.
 const (
-	KindActivity    = "issue.activity"
-	VersionActivity = 1
+	KindActivity = "issue.activity"
+	// v2 adds `truncated` and `length` to an event's body, written when
+	// --body-chars cut it.
+	VersionActivity = 2
 )
 
 // Event kinds. Closed, and extendable only by a schema bump, because branching
@@ -65,7 +67,7 @@ func EventSchema() *render.Schema {
 			{Schema: authorSchema()},
 			{Schema: valueSchema("from"), Optional: true},
 			{Schema: valueSchema("to"), Optional: true},
-			{Schema: bodySchema("body"), Optional: true},
+			{Schema: eventBodySchema(), Optional: true},
 			{Schema: &render.Schema{
 				// A worklog's duration, as the server's own words and as the
 				// seconds it resolved them to. "2h" is what somebody typed and
@@ -99,6 +101,11 @@ type Event struct {
 	// Body is a comment's text and BodyFormat the markup it is in.
 	Body       string
 	BodyFormat string
+	// BodyLength is the whole body's length in characters when --body-chars
+	// cut it, and zero when Body is the whole body. BodyBounded records that
+	// --body-chars was in effect at all, cut or not.
+	BodyLength  int
+	BodyBounded bool
 
 	// TimeSpent is a worklog's duration as the server words it, and Seconds
 	// the same duration resolved.
@@ -125,7 +132,7 @@ func (e Event) Node() *render.Node {
 		n.Child(render.El("to").AttrIf("id", e.ToID).SetText(e.To))
 	}
 	if e.Body != "" {
-		n.Child(render.El("body").Attr("format", e.BodyFormat).SetCDATA(e.Body))
+		n.Child(e.bodyNode())
 	}
 	if e.TimeSpent != "" {
 		n.Child(render.El("time-spent").
@@ -158,7 +165,8 @@ func ActivityColumns() []render.Column {
 // noBodyFlag drops the text of a comment or a worklog note.
 const noBodyFlag = "no-body"
 
-// activityColumnsFor drops the body column when --no-body is given.
+// activityColumnsFor drops the body column when --no-body is given, and adds
+// body-length after it when --body-chars is.
 //
 // The column has to go as well as the element, or TSV would carry a header for
 // something no row can fill: the writer builds a row per column, so a column
@@ -167,6 +175,9 @@ const noBodyFlag = "no-body"
 // nativeColumns existed, arrived at from the other direction.
 func activityColumnsFor(inv *registry.Invocation) []render.Column {
 	cols := ActivityColumns()
+	if inv.Flags.WasSet(bodyCharsFlag) {
+		return append(cols, bodyLengthColumn)
+	}
 	if !inv.Flags.Bool(noBodyFlag) {
 		return cols
 	}
@@ -389,6 +400,11 @@ feed that exits 3 is not the same answer as an empty feed that exits 0.`),
 				"events themselves; the body is the only unbounded column and " +
 				"is pure cost when the question is what was touched and when",
 		}, {
+			Name: bodyCharsFlag, Type: registry.TypeInt,
+			Usage: "cut each comment and worklog body to its first N characters, " +
+				"marking a cut body with its whole length; between the whole " +
+				"text and --no-body",
+		}, {
 			Name: allProjectsFlag, Type: registry.TypeBool,
 			Usage: "search every project the credential can see, ignoring " +
 				"the context's; --since still bounds the sweep in time",
@@ -439,13 +455,11 @@ func validateActivity(ctx context.Context, inv *registry.Invocation) error {
 				WithRemedy("pass one of them, or drop --kind for all four")
 		}
 	}
-	if _, err := jql.ParseDate(inv.Flags.String(sinceFlag)); err != nil {
+	if err := validateActivityDates(inv); err != nil {
 		return err
 	}
-	if until := inv.Flags.String(untilFlag); until != "" {
-		if _, err := jql.ParseDate(until); err != nil {
-			return err
-		}
+	if err := validateBodyChars(inv); err != nil {
+		return err
 	}
 	if err := resolveActivityWindow(ctx, inv); err != nil {
 		return err
@@ -841,6 +855,9 @@ func (w activityWant) selected(i Issue) []Event {
 		if w.noBody {
 			e.Body, e.BodyFormat = "", ""
 		}
+		if w.bodyChars > 0 {
+			e = e.boundBody(w.bodyChars)
+		}
 		out = append(out, e)
 	}
 	return out
@@ -885,6 +902,9 @@ type activityWant struct {
 	// are rendered, so no format carries it and `--format json` cannot
 	// reintroduce what TSV was asked to leave out.
 	noBody bool
+	// bodyChars cuts a body to its first N characters, zero meaning whole. It
+	// is applied where noBody is and for the same reason.
+	bodyChars int
 	// fields is the shared --changed-field / --not-changed-field filter, the
 	// same one issue history uses, so the two commands cannot disagree about
 	// what a field name matches. Nil when neither flag was given.
@@ -934,9 +954,24 @@ func activityFilter(inv *registry.Invocation) activityWant {
 	until, _ := inv.Value(activityUntilKey).(string)
 	return activityWant{
 		kinds: kinds, user: user, since: since, until: until,
-		noBody: inv.Flags.Bool(noBodyFlag),
-		fields: newHistoryFilter(inv),
+		noBody:    inv.Flags.Bool(noBodyFlag),
+		bodyChars: inv.Flags.Int(bodyCharsFlag),
+		fields:    newHistoryFilter(inv),
 	}
+}
+
+// validateActivityDates parses --since and --until, so a malformed one is
+// refused before either is resolved against the account's clock.
+func validateActivityDates(inv *registry.Invocation) error {
+	if _, err := jql.ParseDate(inv.Flags.String(sinceFlag)); err != nil {
+		return err
+	}
+	if until := inv.Flags.String(untilFlag); until != "" {
+		if _, err := jql.ParseDate(until); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // activitySinceKey is where the resolved --since instant is left for the body.
