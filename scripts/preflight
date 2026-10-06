@@ -16,13 +16,13 @@
 # cost twenty minutes to repeat. Each is under a second against the packages
 # that changed.
 #
-# What it runs: gofumpt; go vet and go fix under all four shipped tag sets;
-# staticcheck's U1000 with no tags; golangci-lint; and the changed packages'
-# tests at the full tag set, plus all of internal/lint, whose drift checks
-# (the command reference, the skill, the complexity gate, the error-code
-# tables) read the whole tree whatever changed. What it leaves to `make ci`:
-# the race detector, the vulnerability scan, the other tag sets' tests, and
-# the builds.
+# What it runs: gofumpt; go vet and go fix under all four shipped tag sets,
+# and staticcheck's U1000 with no tags, each over the changed packages that
+# tag set compiles; golangci-lint; and the changed packages' tests at the full
+# tag set, plus all of internal/lint, whose drift checks (the command
+# reference, the skill, the complexity gate, the error-code tables) read the
+# whole tree whatever changed. What it leaves to `make ci`: the race detector,
+# the vulnerability scan, the other tag sets' tests, and the builds.
 #
 # PREFLIGHT_BASE overrides the revision changes are measured from; the
 # default is the merge base with origin/main, or with main.
@@ -153,10 +153,48 @@ step_gofumpt() {
 	return 1
 }
 
+# compiled sets compiled_pkgs to the changed packages the tag set in $1
+# compiles at least one file of, test files counted. A package a set
+# constrains out entirely is an error when it is named, where ./... passes
+# over it without a word: internal/mcp is all //go:build mcp, and naming it
+# under no tags failed vet, fix and unused on a tree CI passed. So each set
+# checks what ./... would, of what changed. Test files count because
+# internal/lint has nothing else, and a filter on GoFiles alone drops it from
+# every set in silence.
+#
+# go list answers in import paths, mapped back to the ./dir names the rest of
+# this script uses through the module path rather than the directory, which go
+# may spell differently through a symlink.
+compiled_pkgs=()
+compiled() {
+	local out mod ip rel
+	compiled_pkgs=()
+	if [ "${pkgs[*]-}" = "./..." ]; then
+		compiled_pkgs=(./...)
+		return 0
+	fi
+	out=$(go list -e -tags "$1" \
+		-f '{{if or .GoFiles .CgoFiles .TestGoFiles .XTestGoFiles}}{{.Module.Path}} {{.ImportPath}}{{end}}' \
+		"${pkgs[@]}") || {
+		printf '%s\n' "(go list, under tags=${1:-none})"
+		return 1
+	}
+	while read -r mod ip; do
+		[ -n "$ip" ] || continue
+		rel=${ip#"$mod"}
+		if [ -z "$rel" ]; then compiled_pkgs+=(.); else compiled_pkgs+=(".$rel"); fi
+	done <<<"$out"
+}
+
+# A set that compiles none of what changed is skipped rather than handed an
+# empty list, because every one of these tools reads no packages as the
+# current directory.
 step_vet() {
 	local tags
 	for tags in "${tag_sets[@]}"; do
-		go vet -tags "$tags" "${pkgs[@]}" || {
+		compiled "$tags" || return 1
+		[ ${#compiled_pkgs[@]} -gt 0 ] || continue
+		go vet -tags "$tags" "${compiled_pkgs[@]}" || {
 			printf '%s\n' "(under tags=${tags:-none})"
 			return 1
 		}
@@ -166,8 +204,10 @@ step_vet() {
 step_fix() {
 	local tags out status
 	for tags in "${tag_sets[@]}"; do
+		compiled "$tags" || return 1
+		[ ${#compiled_pkgs[@]} -gt 0 ] || continue
 		status=0
-		out=$(go fix -diff -tags "$tags" "${pkgs[@]}" 2>&1) || status=$?
+		out=$(go fix -diff -tags "$tags" "${compiled_pkgs[@]}" 2>&1) || status=$?
 		if [ $status -ne 0 ] || [ -n "$out" ]; then
 			printf '%s\n' "$out" "(under tags=${tags:-none}; see the fix-check note in the Makefile)"
 			return 1
@@ -177,7 +217,9 @@ step_fix() {
 
 step_unused() {
 	need staticcheck || return 1
-	staticcheck -checks=U1000 "${pkgs[@]}"
+	compiled "" || return 1
+	[ ${#compiled_pkgs[@]} -gt 0 ] || return 0
+	staticcheck -checks=U1000 "${compiled_pkgs[@]}"
 }
 
 step_lint() {

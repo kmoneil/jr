@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -31,9 +32,14 @@ esac
 exit 0
 `
 
-// preflightModule is a repository with two packages and a lint package,
-// committed on main with a feature branch checked out, which is the shape
-// preflight measures from.
+// taggedBase is a package only some tag sets compile, the way internal/mcp is
+// all //go:build mcp: of the module's four sets, pfa is in two.
+const taggedBase = "//go:build pfa\n\n// Package tagged builds only under pfa.\npackage tagged\n\n" +
+	"// T is what the tagged cases change.\nfunc T() int { return 3 }\n"
+
+// preflightModule is a repository with two packages, a tagged one, and a lint
+// package, committed on main with a feature branch checked out, which is the
+// shape preflight measures from.
 func preflightModule(t *testing.T) string {
 	t.Helper()
 	goLine := regexp.MustCompile(`(?m)^go [0-9.]+$`).FindString(readFile(t, filepath.Join(repoRoot, "go.mod")))
@@ -50,6 +56,7 @@ func preflightModule(t *testing.T) string {
 		"a/a.go":                     "package a\n\n// A is untouched by every case.\nfunc A() int { return 1 }\n",
 		"b/b.go":                     "package b\n\n// B is what the cases change.\nfunc B() int { return 2 }\n",
 		"b/b_test.go":                "package b\n\nimport \"testing\"\n\nfunc TestB(t *testing.T) {\n\tif B() != 2 {\n\t\tt.Fatal(\"B\")\n\t}\n}\n",
+		"tagged/tagged.go":           taggedBase,
 		"internal/lint/lint_test.go": "package lint_test\n\nimport \"testing\"\n\nfunc TestDrift(t *testing.T) {}\n",
 		"docs/guide.md":              "A guide.\n",
 	})
@@ -275,6 +282,96 @@ func TestEveryPreflightStepCanFail(t *testing.T) {
 				}
 				if strings.Contains(calls, "./a") {
 					t.Errorf("an unchanged package was checked:\n%s", calls)
+				}
+			}
+		})
+	}
+}
+
+// TestPreflightChecksATaggedPackageWhereItBuilds is a package one tag set
+// compiles and another does not. Named explicitly to a set that excludes
+// every file, go vet, go fix and staticcheck each refuse it, where ./...
+// passes over it: preflight failed three steps on any change to internal/mcp,
+// on a tree CI passed. So each set checks the changed packages it compiles,
+// and the cases with a finding hold the filter to that, rather than to
+// dropping whatever is tagged or whatever has only test files.
+func TestPreflightChecksATaggedPackageWhereItBuilds(t *testing.T) {
+	const (
+		taggedClean = "//go:build pfa\n\n// Package tagged builds only under pfa.\npackage tagged\n\n" +
+			"// T is what the tagged cases change, and this one did.\nfunc T() int { return 3 }\n"
+		bClean = "package b\n\n// B is what the cases change, and this one did.\nfunc B() int { return 2 }\n"
+	)
+	for _, tc := range []struct {
+		name  string
+		step  string // the step that must fail, or empty for none
+		files map[string]string
+		calls []string // stub calls that must appear, whole lines
+		never string   // a prefix no stub call may start with
+	}{
+		{
+			name:  "beside an untagged package",
+			files: map[string]string{"tagged/tagged.go": taggedClean, "b/b.go": bClean},
+			calls: []string{"staticcheck -checks=U1000 ./b", "golangci-lint run ./b ./tagged"},
+		},
+		// Under no tags nothing changed compiles, and a tool handed an
+		// empty list checks the current directory instead.
+		{
+			name:  "alone",
+			files: map[string]string{"tagged/tagged.go": taggedClean},
+			calls: []string{"golangci-lint run ./tagged"},
+			never: "staticcheck ",
+		},
+		{
+			name: "with a vet finding",
+			step: "vet",
+			files: map[string]string{"tagged/tagged.go": "//go:build pfa\n\n// Package tagged builds only under pfa.\npackage tagged\n\n" +
+				"// T is tagged badly.\ntype T struct {\n\tX int `json:\"x\",omitempty`\n}\n"},
+		},
+		{
+			name: "with a fix finding",
+			step: "fix",
+			files: map[string]string{"tagged/tagged.go": "//go:build pfa\n\n// Package tagged builds only under pfa.\npackage tagged\n\n" +
+				"import \"strings\"\n\n// T counts.\nfunc T() int {\n\tn := 0\n" +
+				"\tfor _, s := range strings.Split(\"x,y\", \",\") {\n\t\tn += len(s)\n\t}\n\treturn n\n}\n"},
+		},
+		// internal/lint is nothing but test files, so a filter that reads
+		// only GoFiles would drop it from every set, silently.
+		{
+			name: "a package of test files with a vet finding",
+			step: "vet",
+			files: map[string]string{"internal/lint/lint_test.go": "package lint_test\n\nimport \"testing\"\n\n" +
+				"type row struct {\n\tX int `json:\"x\",omitempty`\n}\n\nfunc TestDrift(t *testing.T) { _ = row{} }\n"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dir := preflightModule(t)
+			writeTree(t, dir, tc.files)
+
+			code, out, calls := runPreflight(t, dir, nil, allTools)
+			var failing []string
+			for _, m := range regexp.MustCompile(`(?m)^  FAIL  (\S+)`).FindAllStringSubmatch(out, -1) {
+				failing = append(failing, m[1])
+			}
+			want := []string{}
+			if tc.step != "" {
+				want = []string{tc.step}
+			}
+			if strings.Join(failing, " ") != strings.Join(want, " ") {
+				t.Errorf("failing steps = %v, want %v:\n%s", failing, want, out)
+			}
+			if (code == 0) != (tc.step == "") {
+				t.Errorf("exit %d with failing steps %v:\n%s", code, failing, out)
+			}
+			lines := strings.Split(calls, "\n")
+			for _, want := range tc.calls {
+				if !slices.Contains(lines, want) {
+					t.Errorf("no call %q; the stubs saw:\n%s", want, calls)
+				}
+			}
+			for _, line := range lines {
+				if tc.never != "" && strings.HasPrefix(line, tc.never) {
+					t.Errorf("a call %q, want none starting %q", line, tc.never)
 				}
 			}
 		})
