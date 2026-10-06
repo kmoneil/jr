@@ -20,6 +20,67 @@ accident.
 
 Nothing yet.
 
+## [0.19.7] - 2026-10-06
+
+**Take this one if you work against more than one Jira site, or read
+comment-heavy activity feeds.** Logging in to a second site now makes its
+context (issue 206), and `issue activity --body-chars` keeps the first part of
+each body rather than all of it or none of it (issue 219).
+
+```console
+$ printf '%s' "$TOKEN" | jr auth login --site other-company.atlassian.net \
+      --email you@company.com --token-stdin
+$ jr --context other-company issue list --assignee currentUser
+```
+
+- With a context already defined, a login to a site no context named stored
+  the credential, reported `authenticated="true"`, and made nothing, so
+  `--context` answered `UNKNOWN_CONTEXT`. It now makes a context named for the
+  host's first label and reports it in `context`. The current context never
+  changes.
+- A context already naming the site is left alone. Naming it means the same
+  host in any case, with the scheme and a trailing slash ignored and the path
+  exact, so a Data Center site under `/jira` and the root of its host are two
+  sites.
+- The first label of a Data Center host is usually `jira`, so a second one
+  often finds that name taken. Then nothing is made, the credential is still
+  stored, and the warning `CONTEXT_NOT_CREATED` names the context holding the
+  name and both ways out. `--context-name` names the context yourself; a name
+  another site's context holds is refused as `CONTEXT_NAME_TAKEN`, exit 2,
+  before the credential is checked or stored, because making it would replace
+  that context.
+
+```console
+$ jr issue activity --since -1d --body-chars 120
+```
+
+- `--body-chars N` keeps the first N characters of each comment and worklog
+  body, counted in code points so a cut never splits one. A cut body carries
+  `truncated="true"` and the whole body's `length`; TSV gains a `body-length`
+  column after `body`, filled only where the body was cut.
+- A cut body does not make the result incomplete. Every event is there, and
+  the exit stays 0.
+- Refused before any request beside `--no-body` (`BODY_CHARS_AND_NO_BODY`),
+  beside `--raw-body` (`BODY_CHARS_AND_RAW_BODY`, since an ADF document cut
+  short is not a document), and below 1 (`INVALID_BODY_CHARS`).
+- In markdown, a bounded feed stays one table instead of a section per event.
+
+### Output contract
+
+- `issue.activity` **v2**: optional `truncated` and `length` on an event's
+  `body`, written only when `--body-chars` cut it. No other kind carrying a
+  body moved.
+- `auth.status`: `context` is now populated on a second site's login, where it
+  used to be absent. The kind did not move.
+- New warning `CONTEXT_NOT_CREATED`, from `auth login`.
+- New error codes, each only on an invocation using one of the new flags:
+  `CONTEXT_NAME_TAKEN`, `INVALID_BODY_CHARS`, `BODY_CHARS_AND_NO_BODY`,
+  `BODY_CHARS_AND_RAW_BODY`.
+- **Priced a patch.** Two new flags, a new warning code, new optional
+  attributes, and an optional attribute populated where it was absent are each
+  additive. The new refusals refuse only invocations that use a new flag, so
+  nothing that worked before is refused.
+
 ## [0.19.6] - 2026-10-05
 
 **Take this one if you sort a list and cut it short, or read jr through its MCP
@@ -3340,7 +3401,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.19.6...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.19.7...main
+[0.19.7]: https://github.com/kmoneil/jr/releases/tag/v0.19.7
 [0.19.6]: https://github.com/kmoneil/jr/releases/tag/v0.19.6
 [0.19.5]: https://github.com/kmoneil/jr/releases/tag/v0.19.5
 [0.19.4]: https://github.com/kmoneil/jr/releases/tag/v0.19.4
