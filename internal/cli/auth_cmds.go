@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -27,6 +29,10 @@ const (
 	versionAuthStatus = 2
 	versionAuthToken  = 1
 )
+
+// contextNotCreatedCode is the warning a login writes when the name it would
+// give a site's context already belongs to another site's.
+const contextNotCreatedCode = "CONTEXT_NOT_CREATED"
 
 func (a *app) authCommands() []*registry.Command {
 	return []*registry.Command{
@@ -86,15 +92,25 @@ context path, or a bad token is refused here rather than surfacing two commands
 later as something that looks unrelated. --no-verify skips the check, for
 preparing a configuration offline.
 
-If no context exists yet, one is created for this site so the next command has
-somewhere to point. If contexts already exist, none are touched: the caller has
-a setup, and guessing which one this credential belongs to would be worse than
-doing nothing.`),
+If no context names this site, one is made for it so --context can reach it,
+named by --context-name or for the host's first label (jira.corp.com makes
+"jira"), and the result's context attribute says which. A context that already
+names the site is left as it is. The current context never changes: the first
+context ever made becomes current, and after that "` + buildinfo.App + ` context use"
+is how one is chosen, because a login that quietly moved every command to
+another site would be worse than none.
+
+A derived name that already belongs to another site's context is not replaced
+and not suffixed. Nothing is made, and a CONTEXT_NOT_CREATED warning names the
+two ways out. A --context-name another site's context holds is refused before
+anything is checked or stored, since making it would replace that context.`),
 		Example: strings.Join([]string{
 			"printf '%s' \"$TOKEN\" | " + buildinfo.App +
 				" auth login --site your-site.atlassian.net --email ada@example.com --token-stdin",
 			"printf '%s' \"$PAT\" | " + buildinfo.App +
 				" auth login --site jira.acme.internal --token-stdin",
+			"printf '%s' \"$PAT\" | " + buildinfo.App +
+				" auth login --site jira.acme.example/jira --context-name acme --token-stdin",
 		}, "\n"),
 		Flags: []registry.Flag{
 			{
@@ -119,14 +135,49 @@ doing nothing.`),
 				Name: "no-verify", Type: registry.TypeBool,
 				Usage: "store the credential without checking it against the site",
 			},
+			{
+				Name: "context-name", Type: registry.TypeString,
+				Usage: "name the context made for this site; defaults to the host's first label",
+			},
 		},
 		LocalState: true,
 		Outputs:    []registry.Output{{Kind: kindAuthStatus, Version: versionAuthStatus}},
 		ExitCodes: []exitcode.Code{
 			exitcode.Auth, exitcode.NotFound, exitcode.Permission, exitcode.Remote,
 		},
-		Run: a.runAuthLogin,
+		Validate: a.validateAuthLogin,
+		Run:      a.runAuthLogin,
 	}
+}
+
+// validateAuthLogin refuses a --context-name the login could not honor, before
+// the credential is checked or stored. Config.Set adds or replaces, so a name
+// another site's context holds would replace that context, and storing the
+// credential while refusing its name would be half a login.
+func (a *app) validateAuthLogin(_ context.Context, inv *registry.Invocation) error {
+	name := inv.Flags.String("context-name")
+	if name == "" {
+		return nil
+	}
+	if err := jctx.ValidateName(name); err != nil {
+		return err
+	}
+	siteURL, err := jctx.NormalizeSite(inv.Flags.String("site"))
+	if err != nil {
+		// Run refuses it, and decorates the refusal with the site.
+		return nil //nolint:nilerr // the site's refusal is Run's to make.
+	}
+	cfg, err := a.config()
+	if err != nil {
+		return err
+	}
+	if held, ok := cfg.Get(name); ok && !jctx.SameSite(held.Site, siteURL) {
+		return errs.Usage("CONTEXT_NAME_TAKEN",
+			"context %q already names %s", name, held.Site).
+			WithRemedy("pass a --context-name no context holds; `%s context list` shows them",
+				buildinfo.App)
+	}
+	return nil
 }
 
 func (a *app) runAuthLogin(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) {
@@ -170,12 +221,9 @@ func (a *app) runAuthLogin(ctx context.Context, inv *registry.Invocation) (*rend
 	}
 
 	// Storing a credential for a site and then having the next command report
-	// "no Jira site configured" is the tool accepting input and behaving as
-	// though it never heard it. When there is no context at all the choice is
-	// unambiguous, so make one; when there already are contexts the caller has
-	// a setup, and guessing which one this belongs to would be worse than
-	// doing nothing.
-	created, err := a.ensureContextFor(siteURL)
+	// "no Jira site configured", or answer --context with UNKNOWN_CONTEXT, is
+	// the tool accepting input and behaving as though it never heard it.
+	created, err := a.ensureContextFor(inv, siteURL)
 	if err != nil {
 		return nil, err
 	}
@@ -232,18 +280,37 @@ func (a *app) credentialFrom(inv *registry.Invocation) (auth.Credential, error) 
 	return cred, nil
 }
 
-// ensureContextFor creates the first context when a credential is stored and
-// none exists. It returns the name it created, or empty if it created nothing.
-func (a *app) ensureContextFor(site string) (string, error) {
+// ensureContextFor makes a context for a site a credential was just stored
+// for, when none names it, and returns the name it made, or empty.
+//
+// A site no context names is unambiguous whether or not other contexts exist:
+// making its context guesses nothing and changes nothing already there. One
+// that a context names already reaches the credential, so it is left alone and
+// nothing is said. Config.Set makes a context current only when none is, so
+// this never moves the commands already pointed somewhere.
+//
+// --context-name asks for a context of that name on this site, and makes one
+// even beside another that names the site; validateAuthLogin has refused it
+// if another site's context holds it. A derived name another site's context
+// holds is neither replaced nor suffixed: nothing is made, and a warning says
+// so and names the ways out.
+func (a *app) ensureContextFor(inv *registry.Invocation, site string) (string, error) {
 	cfg, err := a.config()
 	if err != nil {
 		return "", err
 	}
-	if len(cfg.Names()) > 0 {
+	requested := inv.Flags.String("context-name")
+	if requested == "" && anyContextNames(cfg, site) {
 		return "", nil
 	}
 
-	name := contextNameFor(site)
+	name := cmp.Or(requested, contextNameFor(site))
+	if held, ok := cfg.Get(name); ok {
+		if !jctx.SameSite(held.Site, site) {
+			warnContextNotCreated(inv, site, name, held.Site)
+		}
+		return "", nil
+	}
 	if err := cfg.Set(name, jctx.Context{Site: site}); err != nil {
 		return "", err
 	}
@@ -251,6 +318,28 @@ func (a *app) ensureContextFor(site string) (string, error) {
 		return "", err
 	}
 	return name, nil
+}
+
+// anyContextNames reports whether some context already names site.
+func anyContextNames(cfg *jctx.Config, site string) bool {
+	return slices.ContainsFunc(cfg.Names(), func(name string) bool {
+		ctx, _ := cfg.Get(name)
+		return jctx.SameSite(ctx.Site, site)
+	})
+}
+
+// warnContextNotCreated says that a login stored its credential and made no
+// context, because the name it derived is another site's. The credential is
+// reachable with --site alone, which nobody would think to try after a login
+// that reported success.
+func warnContextNotCreated(inv *registry.Invocation, site, name, heldBy string) {
+	if inv.Stderr == nil {
+		return
+	}
+	_ = render.WriteWarning(inv.Stderr, contextNotCreatedCode, fmt.Sprintf(
+		"no context was made for %s, because %q already names %s; log in again "+
+			"with --context-name <name>, or run `%s context create <name> --site %s`",
+		site, name, heldBy, buildinfo.App, site), inv.Format)
 }
 
 // contextNameFor derives a context name from a site's first label, so

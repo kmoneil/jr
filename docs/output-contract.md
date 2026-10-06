@@ -725,7 +725,7 @@ fire on a change below the walk, because nothing it has already read moved.
 
 A warning is a structured document on stderr carrying a `code` and a `message`,
 in whatever format the invocation asked for. It never changes the exit code and
-never reaches stdout. There are eight, and each exists because something true
+never reaches stdout. There are nine, and each exists because something true
 about the answer cannot be read off the answer itself.
 
 | Code               | Emitted by                                      | What it says                                                                                                                                                                                                                        |
@@ -738,6 +738,7 @@ about the answer cannot be read off the answer itself.
 | `EMPTY_RESULT`     | any collection, when it is complete and holds no rows | The bounds the zero-row answer was computed over: the row count, the context scope or `scope=none`, and any bound the command resolved rather than the caller typed. Still exits 0.                                                    |
 | `DATE_ROUNDED`     | `issue list`, from a date flag given an RFC 3339 instant | JQL bounds a date to a minute of the account's clock, so the instant was moved outward to one: down for an `-after` flag, up for a `-before`. It names the instant typed, the literal sent, the zone, the instant that literal is, and how far it moved. The query still runs and still exits 0. |
 | `AMBIGUOUS_WIKI_MARKUP` | any write carrying a body, on Data Center only | A construct in the body has more than one reading, so how it renders cannot be predicted here. The write still happens and the exit stays 0: nothing is known to be wrong. Never emitted on Cloud, where a body becomes an ADF document and a brace is a brace. |
+| `CONTEXT_NOT_CREATED` | `auth login` | The credential was stored and no context was made for the site, because the name it would have had belongs to another site's context. It names that context and its site, and the two ways out: `--context-name` on a login, or `context create`. Still exits 0, and the result carries no `context` attribute. |
 
 `UNKNOWN_LABEL` exists because an empty answer to a mistyped label and an empty
 answer to a correct one are the same bytes: `--label retyr` returns a header, no

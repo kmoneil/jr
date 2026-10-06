@@ -1,6 +1,7 @@
 package cli_test
 
 import (
+	"html"
 	"io"
 	"maps"
 	"net/http"
@@ -685,10 +686,13 @@ func TestLoginCreatesTheFirstContext(t *testing.T) {
 	}
 }
 
-// TestLoginDoesNotTouchExistingContexts is the other half of the rule. With a
-// setup already in place, guessing which context a new credential belongs to
-// would be worse than doing nothing.
-func TestLoginDoesNotTouchExistingContexts(t *testing.T) {
+// TestLoginGivesANewSiteItsOwnContext is issue 206. With a context already
+// defined, a login to a site none of them names stored the credential, said
+// authenticated="true", and made nothing a --context could reach. A context
+// for a site nobody named guesses nothing and changes nothing that exists, so
+// it is made; the current one is left alone, because a login that moved every
+// bare command to another site would be worse than the gap.
+func TestLoginGivesANewSiteItsOwnContext(t *testing.T) {
 	env := session(t)
 	mustRun(t, env, "context", "create", "work",
 		"--site", "acme.atlassian.invalid", "--project", "ENG")
@@ -698,17 +702,181 @@ func TestLoginDoesNotTouchExistingContexts(t *testing.T) {
 	if got.exit != exitcode.OK {
 		t.Fatalf("login: exit = %v\nstderr: %s", got.exit, got.stderr)
 	}
-	if strings.Contains(got.stdout, "context=") {
-		t.Errorf("login created a context despite one existing:\n%s", got.stdout)
+	if !strings.Contains(got.stdout, `context="other"`) {
+		t.Errorf("login did not report the context it created:\n%s", got.stdout)
+	}
+	if got.stderr != "" {
+		t.Errorf("a login that made its context warned:\n%s", got.stderr)
 	}
 
-	list := mustRun(t, env, "context", "list")
-	if strings.Contains(list.stdout, "other.atlassian.invalid") {
-		t.Errorf("login added a context:\n%s", list.stdout)
+	reached := mustRun(t, env, "--context", "other", "context", "show")
+	if !strings.Contains(reached.stdout, `site="https://other.atlassian.invalid"`) {
+		t.Errorf("the new context does not name the site:\n%s", reached.stdout)
 	}
 	show := mustRun(t, env, "context", "show")
-	if !strings.Contains(show.stdout, `project="ENG"`) {
+	if !strings.Contains(show.stdout, `name="work"`) || !strings.Contains(show.stdout, `project="ENG"`) {
 		t.Errorf("the current context changed:\n%s", show.stdout)
+	}
+}
+
+// TestLoginLeavesASiteThatHasAContextAlone is the half of the old rule that
+// stands: a context already naming the site reaches the credential, so there
+// is nothing to make and nothing to say. Naming is the host without regard to
+// case, with the scheme and a trailing slash ignored, and the path exact.
+func TestLoginLeavesASiteThatHasAContextAlone(t *testing.T) {
+	for _, site := range []string{
+		"acme.atlassian.invalid",
+		"ACME.Atlassian.invalid/",
+		"http://acme.atlassian.invalid",
+	} {
+		t.Run(site, func(t *testing.T) {
+			env := session(t)
+			mustRun(t, env, "context", "create", "work", "--site", "acme.atlassian.invalid")
+
+			got := runWithStdin(t, env, strings.NewReader(theToken),
+				"auth", "login", "--no-verify", "--site", site, "--token-stdin")
+			if got.exit != exitcode.OK {
+				t.Fatalf("login: exit = %v\nstderr: %s", got.exit, got.stderr)
+			}
+			if strings.Contains(got.stdout, "context=") || got.stderr != "" {
+				t.Errorf("login acted on a site a context names:\nstdout: %s\nstderr: %s",
+					got.stdout, got.stderr)
+			}
+			list := mustRun(t, env, "context", "list", "--format", "tsv")
+			if n := strings.Count(list.stdout, "\n") - 1; n != 1 {
+				t.Errorf("%d contexts after login, want 1:\n%s", n, list.stdout)
+			}
+		})
+	}
+}
+
+// TestLoginSaysWhenTheNameIsTaken is the collision, and it is the common case:
+// the name is the host's first label, and Data Center hosts start with jira.
+// The context holding it names another site, here the same host under a
+// different path, so it is neither this site's context nor one to replace.
+// Nothing is made, and the warning says why and names both ways out.
+func TestLoginSaysWhenTheNameIsTaken(t *testing.T) {
+	for _, site := range []string{"jira.beta.invalid", "jira.alpha.invalid"} {
+		t.Run(site, func(t *testing.T) {
+			env := session(t)
+			mustRun(t, env, "context", "create", "jira", "--site", "jira.alpha.invalid/jira")
+
+			got := runWithStdin(t, env, strings.NewReader(theToken),
+				"auth", "login", "--no-verify", "--site", site, "--token-stdin")
+			if got.exit != exitcode.OK {
+				t.Fatalf("login: exit = %v\nstderr: %s", got.exit, got.stderr)
+			}
+			if strings.Contains(got.stdout, "context=") {
+				t.Errorf("login reported a context it could not have made:\n%s", got.stdout)
+			}
+			// The warning is XML, so the placeholder arrives as &lt;name&gt;.
+			warning := html.UnescapeString(got.stderr)
+			for _, want := range []string{
+				"CONTEXT_NOT_CREATED", `"jira"`, "https://jira.alpha.invalid/jira",
+				"--context-name", "context create <name> --site https://" + site,
+			} {
+				if !strings.Contains(warning, want) {
+					t.Errorf("the warning does not say %q:\n%s", want, got.stderr)
+				}
+			}
+
+			kept := mustRun(t, env, "context", "show", "jira")
+			if !strings.Contains(kept.stdout, `site="https://jira.alpha.invalid/jira"`) {
+				t.Errorf("the context holding the name was changed:\n%s", kept.stdout)
+			}
+		})
+	}
+}
+
+// TestLoginContextNameNamesTheContext is the way out of the collision, and it
+// holds wherever a derived name would have been used.
+func TestLoginContextNameNamesTheContext(t *testing.T) {
+	t.Run("beside a context holding the derived name", func(t *testing.T) {
+		env := session(t)
+		mustRun(t, env, "context", "create", "jira", "--site", "jira.alpha.invalid")
+
+		got := runWithStdin(t, env, strings.NewReader(theToken), "auth", "login", "--no-verify",
+			"--site", "jira.beta.invalid", "--context-name", "beta", "--token-stdin")
+		if got.exit != exitcode.OK {
+			t.Fatalf("login: exit = %v\nstderr: %s", got.exit, got.stderr)
+		}
+		if !strings.Contains(got.stdout, `context="beta"`) || got.stderr != "" {
+			t.Errorf("login did not make the named context, quietly:\nstdout: %s\nstderr: %s",
+				got.stdout, got.stderr)
+		}
+		show := mustRun(t, env, "context", "show")
+		if !strings.Contains(show.stdout, `name="jira"`) {
+			t.Errorf("the current context changed:\n%s", show.stdout)
+		}
+	})
+	t.Run("as the first context", func(t *testing.T) {
+		env := session(t)
+		got := runWithStdin(t, env, strings.NewReader(theToken), "auth", "login", "--no-verify",
+			"--site", "jira.beta.invalid", "--context-name", "beta", "--token-stdin")
+		if got.exit != exitcode.OK || !strings.Contains(got.stdout, `context="beta"`) {
+			t.Fatalf("login: exit = %v\nstdout: %s\nstderr: %s", got.exit, got.stdout, got.stderr)
+		}
+		show := mustRun(t, env, "context", "show")
+		if !strings.Contains(show.stdout, `name="beta"`) {
+			t.Errorf("the first context is not the named one:\n%s", show.stdout)
+		}
+	})
+	// A name asked for is made even where another context names the site: two
+	// contexts on one site is how a site is used in two modes.
+	t.Run("beside another context on the same site", func(t *testing.T) {
+		env := session(t)
+		mustRun(t, env, "context", "create", "work", "--site", "jira.beta.invalid")
+		got := runWithStdin(t, env, strings.NewReader(theToken), "auth", "login", "--no-verify",
+			"--site", "jira.beta.invalid", "--context-name", "audit", "--token-stdin")
+		if got.exit != exitcode.OK || !strings.Contains(got.stdout, `context="audit"`) {
+			t.Fatalf("login: exit = %v\nstdout: %s\nstderr: %s", got.exit, got.stdout, got.stderr)
+		}
+	})
+	// The name already belongs to this site, so what was asked for exists.
+	t.Run("naming this site's own context", func(t *testing.T) {
+		env := session(t)
+		mustRun(t, env, "context", "create", "beta", "--site", "jira.beta.invalid", "--project", "ENG")
+		got := runWithStdin(t, env, strings.NewReader(theToken), "auth", "login", "--no-verify",
+			"--site", "jira.beta.invalid", "--context-name", "beta", "--token-stdin")
+		if got.exit != exitcode.OK || got.stderr != "" {
+			t.Fatalf("login: exit = %v\nstderr: %s", got.exit, got.stderr)
+		}
+		kept := mustRun(t, env, "context", "show", "beta")
+		if !strings.Contains(kept.stdout, `project="ENG"`) {
+			t.Errorf("the context was replaced:\n%s", kept.stdout)
+		}
+	})
+}
+
+// TestLoginRefusesAContextNameThatCannotBeHonored refuses before anything is
+// verified or stored. A name another site's context holds would replace that
+// context if it reached Config.Set, and storing the credential while refusing
+// the name would be half a login.
+func TestLoginRefusesAContextNameThatCannotBeHonored(t *testing.T) {
+	for _, tc := range []struct {
+		name, code string
+	}{
+		{name: "jira", code: "CONTEXT_NAME_TAKEN"},
+		{name: "Bad Name", code: "INVALID_CONTEXT_NAME"},
+	} {
+		t.Run(tc.code, func(t *testing.T) {
+			env := session(t)
+			mustRun(t, env, "context", "create", "jira", "--site", "jira.alpha.invalid")
+
+			got := runWithStdin(t, env, strings.NewReader(theToken), "auth", "login", "--no-verify",
+				"--site", "jira.beta.invalid", "--context-name", tc.name, "--token-stdin")
+			if got.exit != exitcode.Usage || !strings.Contains(got.stderr, tc.code) {
+				t.Fatalf("exit = %v, want %v with %s\nstderr: %s", got.exit, exitcode.Usage, tc.code, got.stderr)
+			}
+			status := run(t, env, "auth", "status", "--site", "jira.beta.invalid")
+			if !strings.Contains(status.stdout, `authenticated="false"`) {
+				t.Errorf("the credential was stored by a refused login:\n%s", status.stdout)
+			}
+			kept := mustRun(t, env, "context", "show", "jira")
+			if !strings.Contains(kept.stdout, `site="https://jira.alpha.invalid"`) {
+				t.Errorf("the context holding the name was changed:\n%s", kept.stdout)
+			}
+		})
 	}
 }
 

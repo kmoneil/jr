@@ -1047,11 +1047,17 @@ do not catch, add the test in the same change and cite it here.
   `--token-stdin`, `--token-file`, and the environment always work.
   **Enforced by:** `TestLoginPromptsOnATerminal`, `TestTokenStdinAtATerminalAlsoPrompts`.
 - **Input a command accepted is never quietly forgotten.** `auth login --site X`
-  creates the first context, because storing a credential for a site and then
-  reporting "no site configured" is the tool ignoring what it was told. Act only
-  when the choice is unambiguous, meaning zero contexts, and leave an existing
-  setup alone.
-  **Enforced by:** `TestLoginCreatesTheFirstContext`.
+  makes a context for a site no context names, because storing a credential for
+  a site and then answering "no site configured", or `UNKNOWN_CONTEXT`, is the
+  tool ignoring what it was told. Until issue 206 that was zero contexts only,
+  and a login to a second site reported `authenticated="true"` and made
+  nothing a `--context` could reach. It never changes the current context and
+  never replaces one: a derived name another site's context holds makes nothing
+  and warns `CONTEXT_NOT_CREATED`, and a `--context-name` another site's
+  context holds is refused before anything is checked or stored.
+  **Enforced by:** `TestLoginCreatesTheFirstContext`,
+  `TestLoginGivesANewSiteItsOwnContext`, `TestLoginSaysWhenTheNameIsTaken`,
+  `TestLoginRefusesAContextNameThatCannotBeHonored`.
 - **Read-only is a one-way latch, within an invocation.** `jctx.Resolve` ORs
   `--readonly`, `JIRA_READONLY`, and the context's own flag, so
   `JIRA_READONLY=0` does not clear it; to write, use a context that permits it.

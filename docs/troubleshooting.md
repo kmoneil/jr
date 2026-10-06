@@ -285,6 +285,31 @@ $ jr context create work --site your-company.atlassian.net
 If a credential is in the store but no context points at it, the error says so
 and names the host it already knows about.
 
+### `CONTEXT_NOT_CREATED` / `CONTEXT_NAME_TAKEN`: a second site has no context
+
+Logging in to a site that no context names makes a context for it, named for
+the host's first label, and leaves the current context where it was:
+
+```console
+$ printf '%s' "$TOKEN" | jr auth login --site other-company.atlassian.net \
+      --email you@company.com --token-stdin
+$ jr --context other-company issue list --assignee currentUser
+```
+
+The first label of a Data Center host is often `jira`, so a second one can
+find that name taken by the first. The credential is still stored, no context
+is made, and the warning `CONTEXT_NOT_CREATED` names the context holding the
+name. Make one under a name of your own, which needs no second login:
+
+```console
+$ jr context create second --site jira.second-company.example
+```
+
+Or name it at login with `--context-name second`. A `--context-name` that
+another site's context already holds is refused with `CONTEXT_NAME_TAKEN`,
+exit 2, before the credential is checked or stored, because making it would
+replace that context. `jr context list` shows the names in use.
+
 ### `NO_CREDENTIALS` — nothing to authenticate with
 
 The `detail` lists every place that was looked in. The order is environment,
