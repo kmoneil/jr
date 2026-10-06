@@ -89,6 +89,7 @@ Examples:
 ```console
 printf '%s' "$TOKEN" | jr auth login --site your-site.atlassian.net --email ada@example.com --token-stdin
 printf '%s' "$PAT" | jr auth login --site jira.acme.internal --token-stdin
+printf '%s' "$PAT" | jr auth login --site jira.acme.example/jira --context-name acme --token-stdin
 ```
 
 | Flag | Type | Default | Description |
@@ -100,6 +101,7 @@ printf '%s' "$PAT" | jr auth login --site jira.acme.internal --token-stdin
 | `--token-file` | `string` | — | read the token from this file; - means stdin |
 | `--scheme` | `basic\|bearer` | — | authentication scheme; inferred from whether a user was given |
 | `--no-verify` | `bool` | — | store the credential without checking it against the site |
+| `--context-name` | `string` | — | name the context made for this site; defaults to the host's first label |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -151,10 +153,18 @@ context path, or a bad token is refused here rather than surfacing two commands
 later as something that looks unrelated. --no-verify skips the check, for
 preparing a configuration offline.
 
-If no context exists yet, one is created for this site so the next command has
-somewhere to point. If contexts already exist, none are touched: the caller has
-a setup, and guessing which one this credential belongs to would be worse than
-doing nothing.
+If no context names this site, one is made for it so --context can reach it,
+named by --context-name or for the host's first label (jira.corp.com makes
+"jira"), and the result's context attribute says which. A context that already
+names the site is left as it is. The current context never changes: the first
+context ever made becomes current, and after that "jr context use"
+is how one is chosen, because a login that quietly moved every command to
+another site would be worse than none.
+
+A derived name that already belongs to another site's context is not replaced
+and not suffixed. Nothing is made, and a CONTEXT_NOT_CREATED warning names the
+two ways out. A --context-name another site's context holds is refused before
+anything is checked or stored, since making it would replace that context.
 
 ### `jr auth logout`
 

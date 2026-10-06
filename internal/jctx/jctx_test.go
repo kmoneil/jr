@@ -265,6 +265,30 @@ func TestNormalizeSite(t *testing.T) {
 	}
 }
 
+// TestSameSite is what a login asks before making a context: whether one
+// already names the site it was given.
+func TestSameSite(t *testing.T) {
+	for _, tc := range []struct {
+		a, b string
+		want bool
+	}{
+		{"acme.atlassian.invalid", "https://acme.atlassian.invalid", true},
+		{"acme.atlassian.invalid", "ACME.Atlassian.invalid/", true},
+		{"http://acme.atlassian.invalid", "https://acme.atlassian.invalid", true},
+		{"jira.corp.invalid/jira", "https://jira.corp.invalid/jira/", true},
+		{"jira.corp.invalid:8443/jira", "jira.corp.invalid:8443/jira", true},
+		{"jira.corp.invalid/jira", "jira.corp.invalid", false},
+		{"jira.corp.invalid/jira", "jira.corp.invalid/Jira", false},
+		{"jira.corp.invalid:8443", "jira.corp.invalid", false},
+		{"jira.alpha.invalid", "jira.beta.invalid", false},
+		{"ftp://jira.corp.invalid", "ftp://jira.corp.invalid", false},
+	} {
+		if got := jctx.SameSite(tc.a, tc.b); got != tc.want {
+			t.Errorf("SameSite(%q, %q) = %v, want %v", tc.a, tc.b, got, tc.want)
+		}
+	}
+}
+
 func TestValidateName(t *testing.T) {
 	for _, name := range []string{"work", "a", "team-1", "my.context", "a_b", "x1"} {
 		if err := jctx.ValidateName(name); err != nil {

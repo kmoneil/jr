@@ -161,6 +161,30 @@ func (c Context) Host() string {
 	return host
 }
 
+// SameSite reports whether two sites are one Jira: the same host, without
+// regard to case, under the same path. The scheme is not compared, since a
+// credential is keyed by host and both schemes reach the same one. The path
+// is compared exactly, since a Data Center instance under /jira and the root
+// of the same host are two base URLs, and a path is the server's to read.
+// A site that does not normalize is the same as nothing.
+func SameSite(a, b string) bool {
+	hostA, pathA, okA := splitSite(a)
+	hostB, pathB, okB := splitSite(b)
+	return okA && okB && strings.EqualFold(hostA, hostB) && pathA == pathB
+}
+
+// splitSite separates a site's host from its path, past the scheme.
+func splitSite(site string) (host, path string, ok bool) {
+	normalized, err := NormalizeSite(site)
+	if err != nil {
+		return "", "", false
+	}
+	normalized = strings.TrimPrefix(normalized, "https://")
+	normalized = strings.TrimPrefix(normalized, "http://")
+	host, path, _ = strings.Cut(normalized, "/")
+	return host, path, true
+}
+
 // CredentialRef returns the key this context's credential is stored under.
 func (c Context) CredentialRef() string {
 	if c.Credential != "" {

@@ -212,7 +212,10 @@ A project is always a **default, never a requirement** — any command takes
 `--project` to override it for one invocation.
 
 You can have as many contexts as you like, which is how you work against two
-sites, or against one site in two modes:
+sites, or against one site in two modes. `auth login` on a second site makes
+that site's context too, named for its host, and leaves the current context
+where it was: reach it with `--context`, or switch with `context use`. For
+anything else, make your own:
 
 ```console
 $ jr context create audit --site your-company.atlassian.net --readonly
