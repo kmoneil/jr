@@ -843,6 +843,18 @@ holds each event to the instant itself, so nothing in its answer moves.
 Most of these are the tool declining to guess. The pattern is the same
 throughout: if a request cannot be honored exactly, it fails.
 
+### `INVALID_BODY_CHARS` / `BODY_CHARS_AND_NO_BODY` / `BODY_CHARS_AND_RAW_BODY`
+
+`issue activity --body-chars N` keeps the first N characters of each body, so
+N has to be at least 1; to drop bodies altogether, `--no-body` is the flag.
+The two together are two answers to one question, and the command will not
+pick one. `--raw-body` is refused beside it on both deployments, because an
+ADF document cut short is not a document. Bound the markdown instead:
+
+```console
+$ jr issue activity --since -1d --body-chars 120
+```
+
 ### `UNKNOWN_FIELD` / `AMBIGUOUS_FIELD`
 
 The name is resolved against your site's field catalogue before the request is

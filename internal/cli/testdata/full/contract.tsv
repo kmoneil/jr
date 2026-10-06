@@ -13,7 +13,7 @@ epic.get	1	epic.get
 epic.list	1	epic.list
 epic.remove	2	epic.remove
 field.list	2	field.list
-issue.activity	1	issue.activity
+issue.activity	2	issue.activity
 issue.apply	2	issue.assign,issue.edit,issue.move
 issue.assign	2	issue.assign
 issue.attachment.download	1	issue.attachment.download

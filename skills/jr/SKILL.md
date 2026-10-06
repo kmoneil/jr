@@ -200,6 +200,10 @@ Feeding results to a model is the common case and format choice dominates it.
   The body is the feed's only unbounded column, and a day with a few long
   comments in it is mostly comment. The events all survive; only their text
   goes, in every format.
+- **`issue activity --body-chars N`** when the first line of each comment is
+  what decides where to look next. A body past N characters is cut there and
+  says so (`truncated`, and its whole `length`; a `body-length` column in
+  TSV), so read a cut body as a prefix, not as the comment.
 - **`issue history` without `--changed-field` is the most expensive read in the
   tool.** A changelog carries every description edit as a full before-and-after
   body on one row. `--changed-field status` is "who moved this, and when", and

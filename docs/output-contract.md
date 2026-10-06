@@ -928,6 +928,32 @@ output; it cannot then hand you a value with the writer's own framing attached.
 A literal `]]>` inside the text is split across two CDATA sections
 (`]]]]><![CDATA[>`), which is the only way to carry that sequence.
 
+### A bounded body says it was cut
+
+`issue activity --body-chars N` keeps the first N characters of each comment
+and worklog body, between the whole text and `--no-body`. Characters are
+Unicode code points, never bytes, so a cut never splits one. A body longer
+than N says so on the element, with the whole body's length in the same unit:
+
+```xml
+<body format="wiki" truncated="true" length="1834"><![CDATA[Rolled the runner back; the ]]></body>
+```
+
+A body within the bound is untouched and carries neither attribute, so an
+absent `truncated` means the text is all there is. TSV has no attributes, so
+the flag adds one column after `body`, `body-length`, filled only on a row
+whose body was cut. Without the flag the columns are the ones they always were.
+
+**A cut body does not make the result incomplete.** `complete` and exit 3 are
+about rows, and every event is in the result: the caller set the bound, and
+each cut body carries it, the way `--no-body` drops whole bodies at exit 0.
+
+The flag is refused with `--no-body` (`BODY_CHARS_AND_NO_BODY`), with
+`--raw-body` (`BODY_CHARS_AND_RAW_BODY`: an ADF document cut short is not a
+document, whatever `format` says), and below 1 (`INVALID_BODY_CHARS`), all
+exit 2 and before any request. `truncated` and `length` arrived with
+`issue.activity` v2; the other kinds carrying a body did not move.
+
 ### Carriage returns in XML
 
 A carriage return is written as `&#13;`, in element text and in attributes

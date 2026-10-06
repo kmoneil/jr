@@ -1018,13 +1018,14 @@ jr issue activity --since -1d --kind transition --format json
 | `--not-changed-field` | `string` | — | drop events about this field, e.g. Rank on a groomed backlog; a comment and a worklog move no field and so are never dropped; wins over --changed-field (repeatable) |
 | `--raw-body` | `bool` | — | emit a Cloud body as the Atlassian Document Format document Jira sent it as, rather than converting it to markdown |
 | `--no-body` | `bool` | — | drop comment and worklog text from the feed, keeping the events themselves; the body is the only unbounded column and is pure cost when the question is what was touched and when |
+| `--body-chars` | `int` | — | cut each comment and worklog body to its first N characters, marking a cut body with its whole length; between the whole text and --no-body |
 | `--all-projects` | `bool` | — | search every project the credential can see, ignoring the context's; --since still bounds the sweep in time |
 | `--page-size` | `int` | — | issues per HTTP request, 1 to 100; transport tuning only |
 | `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.activity` | v1 | always |
+| `issue.activity` | v2 | always |
 | `jql.explain` | v2 | --explain is given |
 
 Default TSV columns: `at`, `issue`, `kind`, `author`, `field`, `time-spent`, `from`, `to`, `body`
