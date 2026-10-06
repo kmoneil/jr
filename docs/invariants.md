@@ -791,9 +791,14 @@ do not catch, add the test in the same change and cite it here.
   red staged for each of the six steps is reported by that step alone, and the
   packages it selects are the ones a fixture, an untracked file or `go.mod`
   says changed. A tool that is not installed fails its step rather than
-  skipping it.
+  skipping it. Each tag set checks the changed packages it compiles: one it
+  constrains out entirely is passed over, as `./...` passes over it, rather
+  than named and refused, which failed three steps on every change to
+  `internal/mcp`. The filter keeps a package of nothing but test files, and a
+  tagged package's findings under the sets that build it.
   **Enforced by:** `TestEveryPreflightStepCanFail`,
-  `TestPreflightChecksThePackagesThatChanged`.
+  `TestPreflightChecksThePackagesThatChanged`,
+  `TestPreflightChecksATaggedPackageWhereItBuilds`.
 - **`scripts/land` merges exactly the commit it waited on, and moves no branch
   it did not switch to.** It asked GitHub for the pull request's head straight
   after pushing a rebase, before GitHub had registered the push, so it waited on
