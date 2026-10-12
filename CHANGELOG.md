@@ -20,6 +20,96 @@ accident.
 
 Nothing yet.
 
+## [0.20.0] - 2026-10-12
+
+**Take this one if you ask about more than one project, and read it first if
+anything you run passes `--project` twice.** `--project` now repeats where the
+answer is a union over projects, and is refused where it is not (issue 216).
+Through 0.19.8 a second `--project` was accepted on every command and the last
+one won, without a word about the others.
+
+```console
+$ jr issue list --project OPS --project NET --project DO --updated-after -3d
+```
+
+- `issue list`, `issue activity`, `issue changes` and `jql explain` take
+  several, and search `project IN ("OPS", "NET", "DO")` with every key quoted. A
+  key that is a reserved JQL word, as `DO` is, needs nothing from you. The
+  spelling this replaces, `--all-projects --jql 'project in (...)'`, still
+  works, and still leaves the quoting and the scope to the caller.
+- The result names the set. The envelope carries `projects="OPS NET DO"`, a
+  list in JSON and YAML, and no `project`. One project is written as `project`,
+  exactly as before, so check for either when you need to know an answer was
+  scoped. `EMPTY_RESULT` says `projects=OPS NET DO`, and `SCOPE_MISMATCH`
+  compares a `--jql` against the whole set.
+- A key Jira does not know is refused, `UNKNOWN_PROJECT` at exit 5, in Jira's
+  own words. Jira Cloud's search leaves an unknown key out of `project in
+  (...)` and answers with the rest, so a mistyped key would have shortened the
+  answer and said nothing. The check costs one request, and only when there are
+  two or more keys.
+- **Every other command refuses a second `--project`**, as `PROJECT_REPEATED`
+  at exit 2, before any request. `jr board list --project OPS --project NET`
+  used to list NET's boards and say nothing about OPS. Run such a command once
+  per project. `jr schema <command>` reports `repeatable` on `--project` per
+  command, so a caller can ask before it sends.
+- A member of a repeated `--project` has to be a project key
+  (`INVALID_PROJECT_KEY` otherwise), and a key given twice is one key. One
+  `--project` is still passed to Jira as typed. `JIRA_PROJECT` and a context's
+  `project` still hold one key each.
+- `jr mcp serve` started with several projects follows the same rule: a tool
+  call for a command that reads one project is refused.
+
+**`auth login` reports the credential it stored as site-scoped.** Its result
+said `site-scoped="false"` for a credential it had just stored keyed by the
+site's host, where `auth status` for the same site said `true`. Only the
+login's own result was wrong. How a credential is found and where it is sent
+did not change.
+
+### Documentation
+
+- docs/output-contract.md: `repeatable` on `--project` is per command, the
+  envelope's `projects`, the three codes a repeated `--project` can meet, and
+  `jql.explain` v3. The stability policy's row for an answer that contradicted
+  the command's own account now covers a value as well as rows.
+- docs/troubleshooting.md: entries for `PROJECT_REPEATED` and for
+  `UNKNOWN_PROJECT` on a set, and the reserved-word section teaches repeating
+  `--project` instead of hand-written `project in (...)`.
+- The skill tells an agent to repeat `--project` rather than write the JQL.
+
+### Internal
+
+- A registry sweep holds every command's declaration that it takes several
+  projects to the accessor the command calls, with a negative control. A
+  command that declared the set and read one project would be handed nothing
+  and answer for the whole site.
+- Three recordings: a two-project listing on Cloud whose third page crosses
+  from one project to the other, and the refusal of an unknown key on Cloud and
+  on Data Center 10.4.0. On Data Center a set of projects is walked by offset
+  and never by issue key, because a key bound does not compare across
+  projects: measured there, over two projects, to the last row.
+
+### Output contract
+
+- `jql.explain` **v3**: an optional `projects` list, written in place of
+  `project` when the scope is several projects.
+- The envelope gains an optional `projects` attribute, written in place of
+  `project` for a set. It moves no kind's version: the envelope is outside
+  every kind's shape.
+- New error code `PROJECT_REPEATED`, exit 2. `UNKNOWN_PROJECT`, exit 5, and
+  `INVALID_PROJECT_KEY`, exit 2, are also reached by a repeated `--project`.
+- `auth.status`: `site-scoped` on a login's result is `true` where it was
+  `false`. The kind did not move.
+- **Priced a minor, on one row.** A second `--project` on a command that reads
+  one project was accepted, the last key winning, and now exits 2 with
+  `PROJECT_REPEATED`: refusing an input that used to be accepted. The rest is
+  additive. On the four commands that take a set, the same input now answers
+  for every key and not the last, and a set holding an unknown key is an error
+  where it was an answer about fewer projects than were named: both are a
+  wrong answer corrected, with nothing on a command line to edit. So is the
+  login's `site-scoped`, under the row this release widens from rows to a
+  value.
+- No exit code changed meaning.
+
 ## [0.19.8] - 2026-10-12
 
 **Take this one whichever commands you use.** Nothing `jr` does changes: no
@@ -3449,7 +3539,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.19.8...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.20.0...main
+[0.20.0]: https://github.com/kmoneil/jr/releases/tag/v0.20.0
 [0.19.8]: https://github.com/kmoneil/jr/releases/tag/v0.19.8
 [0.19.7]: https://github.com/kmoneil/jr/releases/tag/v0.19.7
 [0.19.6]: https://github.com/kmoneil/jr/releases/tag/v0.19.6
