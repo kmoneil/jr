@@ -212,7 +212,11 @@ func (a *app) runAuthLogin(ctx context.Context, inv *registry.Invocation) (*rend
 		return nil, err
 	}
 
+	// What the store just did to it, said here because the credential was
+	// built from flags and never looked up: Save keyed it by this site's host,
+	// and that is what `auth status` reports when it reads it back.
 	cred.Source = store.Path
+	cred.SiteScoped = true
 	doc := authStatusDoc(siteURL, cred, true, nil)
 	if account != nil {
 		doc.Record.
