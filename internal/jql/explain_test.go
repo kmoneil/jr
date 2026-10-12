@@ -16,7 +16,7 @@ import (
 // means "in ENG and open, or closed anywhere": an OR that escapes the project
 // scope and returns issues from projects the caller never named.
 func TestExplainParenthesizesTheRawFragment(t *testing.T) {
-	got, err := jql.Explain("status = Open OR status = Closed", "ENG", "", "")
+	got, err := jql.Explain("status = Open OR status = Closed", []string{"ENG"}, "", "")
 	if err != nil {
 		t.Fatalf("explain: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestExplainShowsTheOrderByThatIsAlwaysThere(t *testing.T) {
 		{"updated", "", "ORDER BY updated ASC, issuekey DESC"},
 		{"updated", "desc", "ORDER BY updated DESC, issuekey DESC"},
 	} {
-		got, err := jql.Explain("labels = retry", "", tc.sort, tc.order)
+		got, err := jql.Explain("labels = retry", nil, tc.sort, tc.order)
 		if err != nil {
 			t.Fatalf("sort=%q: %v", tc.sort, err)
 		}
@@ -62,7 +62,7 @@ func TestExplainShowsTheOrderByThatIsAlwaysThere(t *testing.T) {
 // equivalent reads `summary ~ "project = FOO"` as a project scope and then
 // drops the one it thought was already there.
 func TestExplainReportsFieldsByTokenizing(t *testing.T) {
-	got, err := jql.Explain(`summary ~ "project = FOO" AND labels = retry`, "", "", "")
+	got, err := jql.Explain(`summary ~ "project = FOO" AND labels = retry`, nil, "", "")
 	if err != nil {
 		t.Fatalf("explain: %v", err)
 	}
@@ -101,7 +101,11 @@ func TestExplainRefusesWhatItCannotCompose(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := jql.Explain(tc.fragment, tc.project, tc.sort, tc.order)
+			var scope []string
+			if tc.project != "" {
+				scope = []string{tc.project}
+			}
+			_, err := jql.Explain(tc.fragment, scope, tc.sort, tc.order)
 			if err == nil {
 				t.Fatal("the input composed")
 			}
@@ -109,5 +113,30 @@ func TestExplainRefusesWhatItCannotCompose(t *testing.T) {
 				t.Errorf("code = %q, want %q", code, tc.code)
 			}
 		})
+	}
+}
+
+// TestExplainScopesToEveryProjectGiven is the query a repeated --project
+// builds, holding the key that sent issue 216's reporter to hand-written JQL.
+// DO is a reserved word, and Jira refuses `project in (OPS, NET, DO)` for it.
+// Every key goes through the quoter here, so a caller never has to know which
+// of theirs is one, and the OR in the fragment still cannot reach outside the
+// set.
+func TestExplainScopesToEveryProjectGiven(t *testing.T) {
+	got, err := jql.Explain("status = Open OR status = Closed",
+		[]string{"OPS", "NET", "DO"}, "", "")
+	if err != nil {
+		t.Fatalf("explain: %v", err)
+	}
+	want := `project IN ("OPS", "NET", "DO") AND (status = Open OR status = Closed) ` +
+		`ORDER BY issuekey DESC`
+	if got.Query != want {
+		t.Errorf("query  = %s\nwanted = %s", got.Query, want)
+	}
+	if got.Project != "" {
+		t.Errorf("a set of projects was also reported as the one project %q", got.Project)
+	}
+	if strings.Join(got.Projects, " ") != "OPS NET DO" {
+		t.Errorf("Projects = %q, want the three given", got.Projects)
 	}
 }

@@ -96,7 +96,9 @@ func (siteSession) Connect(context.Context) (*transport.Client, site.Info, error
 func (siteSession) Metadata(context.Context) (*site.Metadata, error) {
 	return nil, errUnreachable
 }
-func (siteSession) Project() string                 { return "" }
+func (siteSession) Project() string { return "" }
+
+func (siteSession) Projects() []string              { return nil }
 func (siteSession) RequireProject() (string, error) { return "", errUnreachable }
 func (siteSession) Board() string                   { return "" }
 func (siteSession) RequireBoard() (string, error)   { return "", errUnreachable }

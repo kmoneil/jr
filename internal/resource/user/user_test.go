@@ -309,8 +309,10 @@ func (s *stubSession) Metadata(context.Context) (*site.Metadata, error) {
 	return &site.Metadata{Info: site.Info{Kind: s.kind}}, nil
 }
 
-func (s *stubSession) Idempotency() *idem.Ledger       { return nil }
-func (s *stubSession) Project() string                 { return "ENG" }
+func (s *stubSession) Idempotency() *idem.Ledger { return nil }
+func (s *stubSession) Project() string           { return "ENG" }
+
+func (s *stubSession) Projects() []string              { return []string{"ENG"} }
 func (s *stubSession) RequireProject() (string, error) { return "ENG", nil }
 func (s *stubSession) Board() string                   { return "" }
 

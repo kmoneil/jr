@@ -81,6 +81,13 @@ func docValue(d *Doc) map[string]any {
 	if d.Project != "" {
 		out["project"] = d.Project
 	}
+	if len(d.Projects) > 0 {
+		projects := make([]any, 0, len(d.Projects))
+		for _, p := range d.Projects {
+			projects = append(projects, p)
+		}
+		out["projects"] = projects
+	}
 	if d.Board != "" {
 		out["board"] = d.Board
 	}

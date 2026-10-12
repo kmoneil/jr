@@ -69,6 +69,9 @@ func (s *session) Site() string {
 // Project implements registry.Session.
 func (s *session) Project() string { return s.resolved.Project }
 
+// Projects implements registry.Session.
+func (s *session) Projects() []string { return slices.Clone(s.resolved.Projects) }
+
 // Board implements registry.Session.
 func (s *session) Board() string { return s.resolved.Board }
 

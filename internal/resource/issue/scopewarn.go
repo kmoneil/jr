@@ -1,6 +1,7 @@
 package issue
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/kmoneil/jr/internal/jql"
@@ -51,12 +52,12 @@ const ScopeMismatchCode = "SCOPE_MISMATCH"
 // repository's README, docs, skill assets, and command examples, one warns
 // against a scope of ENG, and it is `key = OPS-1`, which genuinely cannot match.
 // Zero false positives on the worked examples this project publishes.
-func warnScopeMismatch(inv *registry.Invocation, project, fragment string) {
-	excluded := scopeMismatch(project, fragment)
+func warnScopeMismatch(inv *registry.Invocation, scope []string, fragment string) {
+	excluded := scopeMismatch(scope, fragment)
 	if len(excluded) == 0 {
 		return
 	}
-	warn(inv, ScopeMismatchCode, scopeMismatchMessage(project, excluded))
+	warn(inv, ScopeMismatchCode, scopeMismatchMessage(scope, excluded))
 }
 
 // scopeMismatch returns the projects the fragment selects that the scope
@@ -72,8 +73,12 @@ func warnScopeMismatch(inv *registry.Invocation, project, fragment string) {
 //     is about to be rejected would be noise in front of the real answer.
 //   - A fragment that names no project positively selects every project the
 //     scope allows, which is the ordinary case and must stay free.
-func scopeMismatch(project, fragment string) []string {
-	if project == "" || strings.TrimSpace(fragment) == "" {
+//
+// The scope is a set: one project from the context or a single --project, or
+// several from a repeated one. A fragment naming any project outside it is
+// naming rows the scope clause removes, however many the scope holds.
+func scopeMismatch(scope []string, fragment string) []string {
+	if len(scope) == 0 || strings.TrimSpace(fragment) == "" {
 		return nil
 	}
 	selected, err := jql.ProjectsSelected(fragment)
@@ -81,10 +86,11 @@ func scopeMismatch(project, fragment string) []string {
 		return nil
 	}
 
-	scope := strings.ToUpper(project)
 	var excluded []string
 	for _, p := range selected {
-		if p != scope {
+		if !slices.ContainsFunc(scope, func(s string) bool {
+			return strings.EqualFold(s, p)
+		}) {
 			excluded = append(excluded, p)
 		}
 	}
@@ -95,12 +101,13 @@ func scopeMismatch(project, fragment string) []string {
 // one alone sends the reader to the wrong place: the scope alone reads as a
 // complaint about the context, and the excluded projects alone read as a
 // complaint about the query.
-func scopeMismatchMessage(project string, excluded []string) string {
+func scopeMismatchMessage(scope, excluded []string) string {
 	subject := "project " + excluded[0]
 	if len(excluded) > 1 {
 		subject = "projects " + strings.Join(excluded, ", ")
 	}
-	return "--jql selects " + subject + ", and the scope is " + project +
+	return "--jql selects " + subject + ", and the scope is " +
+		strings.Join(scope, ", ") +
 		", so those rows cannot be returned; use --all-projects or --project " +
 		"to widen it"
 }

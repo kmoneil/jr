@@ -1,6 +1,8 @@
 package render
 
 import (
+	"slices"
+
 	"github.com/kmoneil/jr/internal/errs"
 )
 
@@ -51,10 +53,51 @@ type Doc struct {
 	// no site.
 	Project string
 	Board   string
+	// Projects is the project scope when the answer was computed over several,
+	// from a repeated --project. Project is empty then: one attribute holding
+	// either a key or a list of them would be misread by every consumer that
+	// was written when it could only hold a key, so the set has a name of its
+	// own and the two are never both written.
+	Projects []string
 
 	// Exactly one of Collection and Record is set.
 	Collection *Collection
 	Record     *Node
+}
+
+// Scope is the context scope an answer was computed over, as the envelope
+// reports it.
+type Scope struct {
+	// Project is the project, when there was exactly one.
+	Project string
+	// Projects is every project, when there were several. Never set beside
+	// Project.
+	Projects []string
+	Board    string
+}
+
+// ScopeOf builds a Scope from the projects a command read. One is a project,
+// several are a set, and the two are spelled differently so neither can be
+// mistaken for the other.
+func ScopeOf(projects []string, board string) Scope {
+	switch len(projects) {
+	case 0:
+		return Scope{Board: board}
+	case 1:
+		return Scope{Project: projects[0], Board: board}
+	default:
+		return Scope{Projects: slices.Clone(projects), Board: board}
+	}
+}
+
+// Empty reports whether no scope was read at all.
+func (s Scope) Empty() bool {
+	return s.Project == "" && len(s.Projects) == 0 && s.Board == ""
+}
+
+// SetScope stamps the scope onto the envelope.
+func (d *Doc) SetScope(s Scope) {
+	d.Project, d.Projects, d.Board = s.Project, s.Projects, s.Board
 }
 
 // Collection is a rectangular result: a homogeneous list of items plus the

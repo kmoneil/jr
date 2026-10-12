@@ -57,7 +57,7 @@ func (a *app) resolve(cfg *jctx.Config) (*jctx.Resolved, error) {
 	return jctx.Resolve(cfg, jctx.Overrides{
 		Context:    a.contextName,
 		Site:       a.site,
-		Project:    a.project,
+		Projects:   a.projects,
 		Board:      a.board,
 		APIVersion: a.apiVersion,
 		ReadOnly:   a.readOnly,

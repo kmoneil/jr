@@ -84,6 +84,14 @@ var recordedFixtures = map[string][]string{
 		// existed to check.
 		"remotelinks-recorded.cloud.json",
 		"get-remotelinks-recorded.cloud.json",
+		// A scope of several projects, and the refusal of one the server does
+		// not know. The claims are about what Cloud accepts and says: that it
+		// takes `project IN (...)` with every key quoted, pages across the
+		// boundary between two projects, and names an unknown key at the parse
+		// endpoint while its search says nothing. The last is a measurement,
+		// and a constructed cassette would restate it rather than hold it.
+		"list-projects-recorded.cloud.json",
+		"unknown-project-recorded.cloud.json",
 		// The same two requests against both project styles. The symmetry is
 		// the claim — that the parent field needs no branch on style — so one
 		// of these quietly becoming hand-written would leave the claim

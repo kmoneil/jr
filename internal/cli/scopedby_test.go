@@ -188,6 +188,17 @@ func union(sets ...[]string) []string {
 func driveOnceForScope(t *testing.T, c *registry.Command, withOptionalArgs bool) []string {
 	t.Helper()
 
+	got := slices.Clone(driveOnce(t, c, withOptionalArgs).read)
+	sort.Strings(got)
+	return slices.Compact(got)
+}
+
+// driveOnce runs one command against a recording session and hands back the
+// recorder, for a caller that needs to know how the scope was read as well as
+// whether it was.
+func driveOnce(t *testing.T, c *registry.Command, withOptionalArgs bool) *scopeRecorder {
+	t.Helper()
+
 	rt := &recordingTransport{kind: site.DataCenter}
 	session := &scopeRecorder{inner: sweepSession{rt: rt, kind: site.DataCenter}}
 
@@ -230,10 +241,7 @@ func driveOnceForScope(t *testing.T, c *registry.Command, withOptionalArgs bool)
 
 	var out strings.Builder
 	_ = runFor(t.Context(), c, inv, &out)
-
-	got := slices.Clone(session.read)
-	sort.Strings(got)
-	return slices.Compact(got)
+	return session
 }
 
 // scopeRecorder wraps the sweep's session and notes which context scopes were
@@ -246,17 +254,34 @@ func driveOnceForScope(t *testing.T, c *registry.Command, withOptionalArgs bool)
 type scopeRecorder struct {
 	inner sweepSession
 	read  []string
+	// asOne and asSet say which accessor the project scope was read through:
+	// the one that answers with a single key, or the one that answers with
+	// every --project given.
+	asOne, asSet bool
 }
 
 func (s *scopeRecorder) note(name string) { s.read = append(s.read, name) }
 
+// Unwatched is what registry.ScopeWatcher has, for the same caller: Gate asks
+// how many projects were given from underneath the watcher, because that
+// question is about the invocation and is not a read of the scope.
+func (s *scopeRecorder) Unwatched() registry.Session { return s.inner }
+
 func (s *scopeRecorder) Project() string {
 	s.note(registry.GlobalProject)
+	s.asOne = true
 	return s.inner.Project()
+}
+
+func (s *scopeRecorder) Projects() []string {
+	s.note(registry.GlobalProject)
+	s.asSet = true
+	return s.inner.Projects()
 }
 
 func (s *scopeRecorder) RequireProject() (string, error) {
 	s.note(registry.GlobalProject)
+	s.asOne = true
 	return s.inner.RequireProject()
 }
 
@@ -336,5 +361,90 @@ func TestAScopeThatIsGivenAValueIsNotRefused(t *testing.T) {
 	if strings.Contains(got.stderr, "EMPTY_SCOPE") {
 		t.Errorf("an empty JIRA_PROJECT was refused; the guard reads the "+
 			"flag, not the environment:\n%s", got.stderr)
+	}
+}
+
+// TestSeveralProjectsMatchesWhatTheCommandReads holds each command's
+// SeveralProjects declaration to the accessor it actually calls.
+//
+// The declaration is what admits a repeated --project: Gate refuses one on
+// every command that does not set it. So a declaration that is wrong fails in
+// the worst available way. A command that declares it and still asks for one
+// project is handed nothing when there are several, because Project answers
+// with the empty string for a set, and it runs with no scope and answers for
+// the whole site. The other direction refuses a repeat the command could have
+// answered, and reports --project as not repeatable in `jr schema`.
+func TestSeveralProjectsMatchesWhatTheCommandReads(t *testing.T) {
+	requireNothingIsWritten(t)
+
+	var unions int
+	for _, c := range cli.Registry().All() {
+		if commandNotDriven(c) != "" {
+			continue
+		}
+		if c.SeveralProjects {
+			unions++
+		}
+		t.Run(c.Name(), func(t *testing.T) {
+			var asOne, asSet bool
+			for _, withOptionalArgs := range []bool{true, false} {
+				s := driveOnce(t, c, withOptionalArgs)
+				asOne, asSet = asOne || s.asOne, asSet || s.asSet
+			}
+			switch {
+			case c.SeveralProjects && asOne:
+				t.Errorf("%s declares SeveralProjects and reads the scope through "+
+					"Project or RequireProject.\n"+
+					"Those answer with nothing for a set, so a repeated --project "+
+					"reaches this command as no scope at all and it answers for the "+
+					"whole site.\nRead it through Projects.", c.Name())
+			case c.SeveralProjects && !asSet:
+				t.Errorf("%s declares SeveralProjects and never asks the session "+
+					"for the set, so `jr schema %s` reports --project repeatable "+
+					"on a command a second key cannot change.", c.Name(), c.Name())
+			case !c.SeveralProjects && asSet:
+				t.Errorf("%s reads the set of projects and does not declare "+
+					"SeveralProjects, so Gate refuses the repeat it could answer.\n"+
+					"Declare it, or read one project.", c.Name())
+			}
+		})
+	}
+
+	// issue list, issue activity, issue changes and jql explain. A sweep that
+	// found fewer has stopped seeing the declaration it is here to check.
+	if unions < 4 {
+		t.Fatalf("only %d command(s) declare SeveralProjects; this build cannot "+
+			"show the rule holding", unions)
+	}
+}
+
+// TestTheSeveralProjectsSweepCanFail is the same question TestTheScopeSweepCanFail
+// asks, about the two accessors: a recorder that could not tell them apart
+// would pass every declaration, including the wrong ones.
+func TestTheSeveralProjectsSweepCanFail(t *testing.T) {
+	requireNothingIsWritten(t)
+
+	probe := func(read func(registry.Session)) *registry.Command {
+		return &registry.Command{
+			Path:      []string{"probe", "scope"},
+			Summary:   "A command that asks its session for the project scope",
+			NeedsJira: true,
+			Outputs:   []registry.Output{{Kind: "probe.scope", Version: 1}},
+			Run: func(_ context.Context, inv *registry.Invocation) (*render.Doc, error) {
+				read(inv.Jira)
+				return render.Record("probe.scope", 1, render.El("probe")), nil
+			},
+		}
+	}
+
+	one := driveOnce(t, probe(func(s registry.Session) { _ = s.Project() }), true)
+	if !one.asOne || one.asSet {
+		t.Errorf("a command that calls Project() was observed as one=%v set=%v",
+			one.asOne, one.asSet)
+	}
+	set := driveOnce(t, probe(func(s registry.Session) { _ = s.Projects() }), true)
+	if set.asOne || !set.asSet {
+		t.Errorf("a command that calls Projects() was observed as one=%v set=%v",
+			set.asOne, set.asSet)
 	}
 }

@@ -42,3 +42,10 @@ func SentinelFilterFlagsForTest() []string {
 func SuggestCurrentUserForTest(err error, input string) error {
 	return suggestCurrentUser(err, input)
 }
+
+// CanKeysetForTest exposes the decision between paging by issue key and paging
+// by offset. It is made before any request, and what is worth pinning is the
+// decision: a walk that pages by key across projects reports the first project
+// alone as the complete answer, so the cases where it may not are an invariant
+// rather than a tuning choice.
+func CanKeysetForTest(c *Client, opt ListOptions) bool { return c.canKeyset(opt) }

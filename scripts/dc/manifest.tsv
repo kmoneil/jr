@@ -39,6 +39,13 @@ internal/resource/issue datacenter	internal/resource/issue/testdata/issue-record
 # what the server does, and nothing had asked it.
 internal/resource/issue datacenter	internal/resource/issue/testdata/unknown-status-recorded.datacenter.json	issue list --project ENG --status NOSUCHSTATUS
 internal/resource/issue datacenter	internal/resource/issue/testdata/comma-label-recorded.datacenter.json	issue list --project ENG --label 'a,b'
+# A set of projects holding a key the server does not know (issue 216). The
+# check that refuses it is one validating search, and Data Center answers that
+# with a 400 naming the key, where Cloud's parse endpoint names it at 200
+# beside a search that would have dropped it silently. A set that walks two
+# projects is not here: the seed holds one, and it was measured against a
+# second made for the purpose and removed, 2026-10-12, 10.4.0.
+internal/resource/issue datacenter	internal/resource/issue/testdata/unknown-project-recorded.datacenter.json	issue list --project ENG --project NOPE
 
 # The label check, both verdicts, so the second is a control on the first. The
 # unknown one above spends two lookups, the label and then a check that the

@@ -1,5 +1,21 @@
 package site
 
+import (
+	"github.com/kmoneil/jr/internal/buildinfo"
+	"github.com/kmoneil/jr/internal/errs"
+)
+
+// InvalidProjectKey is the refusal for a value ValidProjectKey turns down. It
+// is beside the rule so the two callers that refuse on it, the `project`
+// commands and a repeated --project, say the same thing under the same code.
+func InvalidProjectKey(key string) *errs.Error {
+	return errs.Usage("INVALID_PROJECT_KEY", "%q is not a project key", key).
+		WithDetail("a project key starts with a letter and continues with " +
+			"letters, digits, or underscores").
+		WithRemedy("see `" + buildinfo.App + " project list` for the keys this " +
+			"credential can reach")
+}
+
 // ValidProjectKey reports whether s can be a Jira project key.
 //
 // Jira's default pattern is two or more uppercase letters. A site can widen it,

@@ -38,11 +38,12 @@ func explainChanges(inv *registry.Invocation) (*render.Doc, error) {
 		unresolved = append(unresolved,
 			jql.UnresolvedFilter{Flag: sinceFlag, Value: since})
 	}
-	return explainQuery(QueryOptions{
-		Project:      feedProject(inv),
+	opt := QueryOptions{
 		JQL:          inv.Flags.String("jql"),
 		UpdatedAfter: since,
-	}, unresolved)
+	}
+	opt.Project, opt.Projects = projectScope(feedScope(inv))
+	return explainQuery(opt, unresolved)
 }
 
 // unresolvedUserFilters names the user-valued filters whose values are
@@ -87,7 +88,8 @@ func explainQuery(
 		return nil, err
 	}
 	e := jql.Explanation{
-		Fragment: opt.JQL, Query: query, Project: opt.Project,
+		Fragment: opt.JQL, Query: query,
+		Project: opt.Project, Projects: opt.Projects,
 		Fields: fields, Parenthesized: true, Unresolved: unresolved,
 	}
 	return render.Record(jql.KindExplain, jql.VersionExplain, e.Node()), nil

@@ -1,0 +1,35 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/3/jql/parse",
+        "query": "validation=warn",
+        "body": "{\"queries\":[\"project IN (\\\"AGL\\\", \\\"NOPE\\\")\"]}"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=199;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "200"
+          ],
+          "X-Ratelimit-Remaining": [
+            "199"
+          ]
+        },
+        "body": "{\"queries\":[{\"query\":\"project IN (\\\"AGL\\\", \\\"NOPE\\\")\",\"structure\":{\"where\":{\"field\":{\"name\":\"project\",\"encodedName\":\"project\"},\"operator\":\"in\",\"operand\":{\"values\":[{\"value\":\"AGL\",\"encodedValue\":\"AGL\"},{\"value\":\"NOPE\",\"encodedValue\":\"NOPE\"}],\"encodedOperand\":\"(AGL, NOPE)\"}}},\"errors\":[\"The value 'NOPE' does not exist for the field 'project'.\"]}]}"
+      }
+    }
+  ]
+}

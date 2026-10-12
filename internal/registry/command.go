@@ -168,6 +168,17 @@ type Command struct {
 	// command actually asks the session for, in both directions, so a
 	// declaration that is wrong fails rather than misinforming.
 	ScopedBy []string
+	// SeveralProjects marks a command whose result is the union over every
+	// --project given, so the flag may be repeated on it.
+	//
+	// It is declared, like ScopedBy, because it cannot be derived: a command
+	// that reads the project scope may hand it to an endpoint that takes one
+	// key, and `board list` does. Gate refuses a repeated --project on every
+	// command that does not set this, before Validate and before any request,
+	// so the choice between the first key, the last, and one run per key is
+	// never made silently. TestSeveralProjectsMatchesWhatTheCommandReads holds
+	// the declaration to the accessor the command actually calls.
+	SeveralProjects bool
 	// NeedsJira marks a command that talks to the configured site. The CLI
 	// layer builds a Session for it; a command without this never resolves a
 	// credential and never probes the deployment.
@@ -338,8 +349,12 @@ type Session interface {
 	// same day make one request between them, not two.
 	Metadata(ctx context.Context) (*site.Metadata, error)
 	// Project is the resolved default project. It may be empty: project is
-	// never mandatory.
+	// never mandatory. It is also empty when --project named several, which a
+	// command reading this accessor never sees: Gate refuses the repeat first.
 	Project() string
+	// Projects is the whole project scope, for a command that declares
+	// SeveralProjects: every --project given, or the one default, or nothing.
+	Projects() []string
 	// RequireProject returns the project or a usage error naming the flag, for
 	// the few commands that genuinely cannot proceed without one.
 	RequireProject() (string, error)

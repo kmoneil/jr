@@ -96,8 +96,12 @@ func GlobalFlags() []Flag {
 			Usage: "Jira site, overriding the context's",
 		},
 		{
-			Name: GlobalProject, Type: TypeString,
-			Usage: "project key, overriding the context's",
+			// Repeatable is the flag's own property and not every command's:
+			// InheritedGlobals reports it per command, and Gate refuses a
+			// repeat on a command that reads one project.
+			Name: GlobalProject, Type: TypeString, Repeatable: true,
+			Usage: "project key, overriding the context's; " +
+				"repeat it on a command that searches several",
 		},
 		{
 			Name: GlobalBoard, Type: TypeString,
@@ -154,12 +158,21 @@ func GlobalFlag(name string) (Flag, bool) {
 // collision in the tree today and this is not a workaround for it — describing
 // an inherited flag the binary routes somewhere else would be the same lie as
 // not describing it at all, told the other way round.
+//
+// --project is repeatable here only on a command that declares
+// SeveralProjects. The flag parses a repeat everywhere, because it is bound
+// once on the root, and Gate refuses one everywhere else, so `repeatable` in
+// `jr schema` is what the command does with a second value and not what the
+// parser tolerates.
 func (c *Command) InheritedGlobals() []Flag {
 	declared := c.AllFlags()
 	out := make([]Flag, 0, len(GlobalFlags()))
 	for _, g := range GlobalFlags() {
 		if slices.ContainsFunc(declared, func(f Flag) bool { return f.Name == g.Name }) {
 			continue
+		}
+		if g.Name == GlobalProject {
+			g.Repeatable = c.SeveralProjects
 		}
 		out = append(out, g)
 	}

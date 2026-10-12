@@ -137,9 +137,11 @@ func (s *seqSession) Metadata(context.Context) (*site.Metadata, error) {
 	return &site.Metadata{Client: s.conn, Info: s.info()}, nil
 }
 
-func (s *seqSession) Site() string                    { return "https://sequence.invalid" }
-func (s *seqSession) Idempotency() *idem.Ledger       { return s.ledger }
-func (s *seqSession) Project() string                 { return "ENG" }
+func (s *seqSession) Site() string              { return "https://sequence.invalid" }
+func (s *seqSession) Idempotency() *idem.Ledger { return s.ledger }
+func (s *seqSession) Project() string           { return "ENG" }
+
+func (s *seqSession) Projects() []string              { return []string{"ENG"} }
 func (s *seqSession) Board() string                   { return "" }
 func (s *seqSession) CheckWritable(string) error      { return nil }
 func (s *seqSession) RequireProject() (string, error) { return "ENG", nil }

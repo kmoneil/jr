@@ -40,7 +40,7 @@ The flags themselves:
 | `--explain` | `bool` | — | print the query this command would send instead of running it |
 | `--context` | `string` | — | use this context for one invocation, without selecting it |
 | `--site` | `string` | — | Jira site, overriding the context's |
-| `--project` | `string` | — | project key, overriding the context's |
+| `--project` | `string` | — | project key, overriding the context's; repeat it on a command that searches several |
 | `--board` | `string` | — | board id, overriding the context's |
 | `--api-version` | `string` | — | force the REST version, 2 or 3, and skip the deployment probe |
 | `--ca-bundle` | `string` | — | PEM file of certificates to trust in addition to the system roots |
@@ -1026,7 +1026,7 @@ jr issue activity --since -1d --kind transition --format json
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.activity` | v2 | always |
-| `jql.explain` | v2 | --explain is given |
+| `jql.explain` | v3 | --explain is given |
 
 Default TSV columns: `at`, `issue`, `kind`, `author`, `field`, `time-spent`, `from`, `to`, `body`
 
@@ -1064,7 +1064,8 @@ updated after --since is still read, and --until makes the answer exact without
 making the sweep cheaper.
 
 The context's project scopes the candidate search, exactly as it does on
-`issue list`, and --all-projects lifts it. That matters more here than it does
+`issue list`, and --all-projects lifts it. Repeating --project scopes it to
+several, as it does there. The scope matters more here than it does
 there. This is the command somebody points at "what did I do today", and scoped
 to one project it answers a narrower question in bytes identical to the wider
 one: a complete, empty, exit-0 feed.
@@ -1351,7 +1352,7 @@ jr issue changes --since -1d --jql "project = ENG" --format json
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.changes` | v1 | always |
-| `jql.explain` | v2 | --explain is given |
+| `jql.explain` | v3 | --explain is given |
 
 Default TSV columns: `created`, `issue`, `author`, `field`, `from`, `to`
 
@@ -2160,6 +2161,7 @@ jr issue list --project ENG --status 'In Progress'
 jr issue list --jql 'labels IN (retry, transport)' --limit all
 jr issue list --assignee currentUser --sort updated --order desc
 jr issue list --not-status Done --not-status Closed --updated-after -1d
+jr issue list --project OPS --project NET --updated-after -3d
 jr issue list --involving currentUser --updated-after -7d
 jr issue list --changed-by currentUser --changed-after -1w
 ```
@@ -2207,7 +2209,7 @@ jr issue list --changed-by currentUser --changed-after -1w
 | Emits | Schema | When |
 | --- | --- | --- |
 | `issue.list` | v10 | always |
-| `jql.explain` | v2 | --explain is given |
+| `jql.explain` | v3 | --explain is given |
 
 Default TSV columns: `key`, `status`, `assignee`, `updated`, `summary`
 
@@ -2238,6 +2240,11 @@ the set and never orders it, so "everything touched today, newest first" is
 Every list filter has both directions: --status and --not-status, --type and
 --not-type, --label and --not-label. Each repeats, so --not-status Done
 --not-status Closed sends status NOT IN (Done, Closed).
+
+--project repeats too, here and on issue activity and issue changes: --project
+OPS --project NET searches both, with every key quoted, and the result names
+the set. A key Jira does not know is refused as UNKNOWN_PROJECT rather than
+left out of the answer, which costs one request when there are several.
 
 None of them splits on commas. --label a,b asks for one label whose name
 contains a comma, which Jira genuinely stores, so splitting it would make that
@@ -2678,7 +2685,7 @@ jr jql explain --jql 'labels = retry' --sort updated --order desc
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `jql.explain` | v2 | always |
+| `jql.explain` | v3 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND
 

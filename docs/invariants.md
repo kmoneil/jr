@@ -491,6 +491,59 @@ do not catch, add the test in the same change and cite it here.
   would be stamped with a scope its rows did not come from.
   **Enforced by:** `TestTheEnvelopeNamesTheScopeTheAnswerWasComputedOver`,
   `TestTheScopeAttributeMatchesTheQueryThatWasSent`.
+- **A repeated `--project` is the union of its keys or a refusal, and never one
+  of them.** The flag is global and bound once, so the parser takes a second
+  one on every command, and through 0.19.8 the last key won silently on all of
+  them (issue 216). Only a command declaring `SeveralProjects` answers for the
+  set, as `project IN (...)` with every key quoted; `registry.Gate` refuses a
+  repeat on the rest as `PROJECT_REPEATED`, before Validate and before any
+  request, which is what covers a tool call, and the command line refuses it
+  once more ahead of `--explain` and for a command with no session. The gate
+  asks how many projects were given from under the scope watcher, so the
+  question is not a read and stamps no scope on an answer. `jr schema` reports
+  `--project` repeatable per command from the same declaration, and each
+  declaration is held to the accessor the command calls: one that declared the
+  set and read one project would be handed nothing and answer for the whole
+  site.
+  **Enforced by:** `TestGateRefusesARepeatedProjectWhereOneIsRead`,
+  `TestGateAsksAboutTheScopeWithoutReadingIt`,
+  `TestARepeatedProjectIsRefusedByEveryCommandThatReadsOne`,
+  `TestAToolCallRefusesAScopeOfSeveralProjectsWhereOneIsRead`,
+  `TestSeveralProjectsMatchesWhatTheCommandReads`,
+  `TestTheSeveralProjectsSweepCanFail`,
+  `TestRepeatableIsWhatTheCommandDoesWithASecondProject`,
+  `TestARepeatedProjectIsASetAndOneKeyIsAProject`.
+- **One project and a set of projects are spelled apart, everywhere a scope is
+  written.** The envelope's `project` holds one key and is absent for a set,
+  which is `projects`; `jql.explain` follows the same rule with a leaf and a
+  list; `EMPTY_RESULT` says `project=` or `projects=`. A consumer written when
+  the attribute could only hold a key reads a set as an absent attribute,
+  which it already handles, rather than as a key with spaces in it. A member of
+  a set has to be a project key, which is what lets the attribute be split one
+  way.
+  **Enforced by:** `TestTheEnvelopeSpellsASetOfProjectsUnderItsOwnName`,
+  `TestTheWatcherReportsOneProjectAndASetApart`,
+  `TestASetOfProjectsIsOneScopeFromTheFlagToTheEnvelope`,
+  `TestExplanationNodeNamesASetOfProjectsApartFromOne`,
+  `TestASetOfProjectsHoldsOnlyProjectKeys`,
+  `TestASetOfProjectsIsHeldToProjectKeysBeforeExplain`.
+- **A set of projects is never paged by issue key.** `issuekey <` does not
+  compare across projects, so a keyset bound taken from the last row of a page
+  selects inside that row's project and the walk reports the first project
+  alone as complete. The query options carry one project and a set in two
+  fields, and the walk pages by key only when the single one is set.
+  **Enforced by:** `TestASetOfProjectsIsNeverPagedByKey`,
+  `TestTheRecordedSetOfProjectsIsCheckedAndThenPagedToTheEnd`.
+- **A set holding a project Jira does not know is refused, not searched.**
+  Cloud's search drops the unknown key and answers with the rest at HTTP 200
+  (measured 2026-10-12), so the union would be short by a project and say
+  nothing. The scope clause is checked first, on `issue list`, `issue
+  activity` and `issue changes`, and refused as `UNKNOWN_PROJECT` in Jira's
+  own words. Data Center 10.4.0 refuses the search itself with a 400, and the
+  check is what gives the two deployments one code for one mistake. One
+  project pays nothing for it.
+  **Enforced by:** `TestAnUnknownProjectInASetIsRefused`,
+  `TestTheRecordedUnknownProjectIsRefusedInJirasWords`.
 - **A query whose `--jql` names a project the scope excludes says so.** The
   fragment and the context scope are ANDed into a query that cannot match by
   construction, and the answer is a complete, empty, exit-0 result that is the

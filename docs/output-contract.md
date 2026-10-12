@@ -767,8 +767,8 @@ it, and nothing in the result says so.
 carries an `affects` attribute for **that command**:
 
 ```xml
-<global-flag name="project" type="string" required="false" repeatable="false" affects="result">
-  <usage>project key, overriding the context's</usage>
+<global-flag name="project" type="string" required="false" repeatable="true" affects="result">
+  <usage>project key, overriding the context's; repeat it on a command that searches several</usage>
 </global-flag>
 <global-flag name="format" type="enum" required="false" repeatable="false" affects="invocation">
   ...
@@ -793,6 +793,21 @@ appears among the command's own `<flags>` where it belongs.
 whether its result set was computed over the whole site. Today the only two
 flags that ever carry it are `--project` and `--board`.
 
+**`repeatable` on `--project` is per command too, and it is what the command
+does with a second key, not what the parser tolerates.** The flag is bound once
+on the root, so every command parses `--project OPS --project NET`. Only the
+commands whose answer is a union over projects take it: `issue list`, `issue
+activity`, `issue changes` and `jql explain`, which report `repeatable="true"`
+and search `project IN ("OPS", "NET")` with every key quoted. Every other
+command reports `repeatable="false"` and refuses a repeat as
+[`PROJECT_REPEATED`](#errors-about-scope), before any request, because the
+first key, the last, and one run per key are three different answers and none
+of them is what was typed. A key given twice, in either case, is one key.
+
+A set comes from the flag and from nowhere else. `JIRA_PROJECT` and a context's
+`project` each hold one key, because a set there would be a default every later
+command inherits without anybody having typed it.
+
 ### The envelope says which scope was used
 
 `jr schema` says a flag *can* narrow this command. The envelope says whether it
@@ -813,11 +828,27 @@ A command that never consults the context emits neither attribute. `jr version`
 and `jr issue get ENG-1` name no scope: the first has no Jira and the second was
 told exactly which issue.
 
+**Several projects are `projects`, and `project` is absent.**
+
+```xml
+<result kind="issue.list" v="10" site="https://jira.example/jira" projects="OPS NET DO">
+```
+
+`project` holds one key and always has. A list in it would be read as one key
+with spaces by every consumer written when it could hold nothing else, so the
+set has a name of its own and the two are never both written: one project is
+`project`, two or more are `projects`. The XML attribute separates keys with a
+single space, which splits one way because a member of a set has to be a
+project key (`INVALID_PROJECT_KEY` otherwise), and JSON and YAML carry
+`"projects": ["OPS", "NET", "DO"]`. The order is the order the keys were given.
+A consumer that needs to know whether an answer was scoped at all checks for
+either.
+
 **TSV carries no envelope and so carries neither**, exactly as it carries no
 `site`. That is the same limitation `complete` has there, and the reason
 truncation becomes a stderr warning plus exit 3 in that format.
 
-Neither attribute moves any kind's schema version. The envelope is written
+None of the three moves any kind's schema version. The envelope is written
 outside every registered kind shape — `jr contract` describes payloads — which
 `make golden` confirms by not moving a byte of `testdata/kinds`.
 
@@ -839,7 +870,9 @@ Three kinds of note, and the rule for what earns one is whether `jr` chose it:
 
 - **the count**, always, as `0 <collection>`;
 - **the scope**, read through the same watcher the envelope uses, so the warning
-  and the document cannot disagree. A command that lifted the scope with
+  and the document cannot disagree: `project=ENG` for one project and
+  `projects=OPS NET DO` for several, spelled as the envelope spells them. A
+  command that lifted the scope with
   `--all-projects` reports `scope=none` rather than omitting the note, because
   an unscoped sweep and a sweep whose scope nobody reported are opposite answers
   and a missing key cannot tell them apart;
@@ -1446,7 +1479,10 @@ already have applied, which a second attempt could apply twice (see
 
 | Code          | Exit | Meaning                                                                                                                                                                                                                                                     |
 | ------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `EMPTY_SCOPE` | 2    | `--project ""` or `--board ""`. An empty scope does not lift the scope: it falls back to the context's, so the query runs against a project the caller did not name and returns a complete, empty, exit-0 result. Refused rather than silently reinterpreted. |
+| `EMPTY_SCOPE` | 2    | `--project ""` or `--board ""`. An empty scope does not lift the scope: it falls back to the context's, so the query runs against a project the caller did not name and returns a complete, empty, exit-0 result. Refused rather than silently reinterpreted. One empty value among a repeated `--project` is refused the same way. |
+| `PROJECT_REPEATED` | 2 | `--project` was given more than once to a command that reads one project. Only the commands `jr schema` marks `repeatable="true"` for it answer for several. It used to be accepted everywhere and the last key won, without a word about the others. Refused before any request, on the command line and on a tool call alike. |
+| `INVALID_PROJECT_KEY` | 2 | A member of a repeated `--project` is not a project key. One `--project` is passed to Jira as typed, and may be a name; a set is also written on the envelope as a list, so each member is held to the key grammar. |
+| `UNKNOWN_PROJECT` | 5 | A repeated `--project` names a project that does not exist, or that this credential cannot see. `detail` is Jira's own sentence and names the key. Cloud's search drops an unknown key from `project IN (...)` and answers with the rest at HTTP 200, so a set is checked first, with the request a raw `--jql` is checked with: one extra request, and only when there are two or more keys. Data Center refuses such a search itself, and the check makes that the same code rather than `BAD_REQUEST`. One unknown `--project` is not checked: on Cloud it answers empty with `EMPTY_RESULT` naming it, and on Data Center it is `BAD_REQUEST`. |
 
 It is raised on the **flag** and never on the environment. An empty
 `JIRA_PROJECT` is a shell that has the variable exported and unset, which is a
@@ -1477,7 +1513,7 @@ one with `BAD_REQUEST`.
 | `AMBIGUOUS_ISSUE_TYPE` | 2    | Several types share that name; pass the id.                                                                                                                                                                                                      |
 | `UNKNOWN_USER`         | 2    | No user with that display name, email, or id. `detail` lists the plausible near misses with their ids, and is absent where the search returned nothing that shares a word with what was typed. A partial match is a near miss, not a resolution. |
 | `AMBIGUOUS_USER`       | 2    | Several users share that display name. `detail` lists every candidate with its id, whether the account is inactive, and whether it is an app rather than a person.                                                                               |
-| `UNKNOWN_PROJECT`      | 5    | The project does not exist, or this credential may not create in it. Reported for either status the createmeta route answers an unaddressable project with, a 10.3 Data Center says 400, and 404 is equally plausible elsewhere.                 |
+| `UNKNOWN_PROJECT`      | 5    | The project does not exist, or this credential may not create in it. Reported for either status the createmeta route answers an unaddressable project with, a 10.3 Data Center says 400, and 404 is equally plausible elsewhere. Also what a repeated `--project` holding an unknown key is refused with: see [Errors about scope](#errors-about-scope). |
 | `FIELD_NOT_KV`         | 2    | `--field` or `--field-json` on a write was given something that is not `id=value`. On a write `--field` sets a field; on `issue get` and `issue list` it selects a column, and only the second takes a bare name.                                |
 | `FIELD_HAS_A_FLAG`     | 2    | The field resolved and a typed flag already writes it. `message` names the flag. Two spellings of one write is a silent last-one-wins, so it is refused rather than resolved.                                                                    |
 | `FIELD_TYPE_UNSUPPORTED` | 2  | The field resolved and `--field` will not guess at its schema type. `message` carries the type, `detail` carries Jira's own type key where the site reported one, and `remedy` names `--field-json`.                                            |
@@ -1583,8 +1619,25 @@ an RFC 3339 instant on a date flag becomes a minute of the account's clock;
 resolving any of them here would cost the request this flag exists not to make.
 The explained query carries what was typed, and an `unresolved` list names
 each such filter with its flag, so a consumer can tell a literal query from
-one with substitutions pending. `jql.explain` is v2 for that element, which
-is optional and absent when everything is literal.
+one with substitutions pending. `jql.explain` moved to v2 for that element,
+which is optional and absent when everything is literal.
+
+It is v3 for the scope. One project is the `project` leaf, as it was. Several,
+from a repeated `--project`, are a `projects` list of `project` elements and no
+`project` leaf, on the rule the envelope follows and for its reason:
+
+```xml
+<explanation parenthesized="true">
+  <fragment/>
+  <query>project IN ("OPS", "NET", "DO") ORDER BY issuekey DESC</query>
+  <projects count="3">
+    <project>OPS</project>
+    <project>NET</project>
+    <project>DO</project>
+  </projects>
+  <fields count="0"/>
+</explanation>
+```
 
 A command that composes no query refuses the flag with `INVALID_USAGE`
 rather than running as if it had not been given. `--describe` beside
