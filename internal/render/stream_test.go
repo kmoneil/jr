@@ -263,3 +263,50 @@ func TestAClippedElementKeepsItsTotal(t *testing.T) {
 		t.Errorf("a clipped-element warning carries a collection total:\n%s", out.String())
 	}
 }
+
+// TestACutWalkStatesItsTotalAndWhereItStopped is the accepting side of the two
+// guards whose refusing side the tests around it hold: rows that ran out
+// against a bound write the total they were cut from beside the count, and the
+// boundary after it, in the order docs/output-contract.md shows them.
+//
+// Nothing in this package asserted either one. The commands that know a total
+// or a boundary are tested where they live, in internal/cli, and a mutation
+// sweep runs a package against its own tests: a guard here that let neither
+// through went unnoticed by all of them (issue 252).
+func TestACutWalkStatesItsTotalAndWhereItStopped(t *testing.T) {
+	var out strings.Builder
+	err := render.WriteStreamTruncation(&out, render.Truncation{
+		Kind: "issue.list", Count: 2, Total: 5, NextPageToken: "eyJvIjoyfQ",
+		Boundary: render.Boundary{Field: "updated", Order: "desc", Reached: "2026-05-09T14:20:00Z"},
+	}, render.TSV)
+	if err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	want := "count\t2\ntotal\t5\nsort\tupdated\norder\tdesc\n" +
+		"reached\t2026-05-09T14:20:00Z\nnext-page-token\teyJvIjoyfQ\n"
+	if !strings.Contains(out.String(), want) {
+		t.Errorf("the warning does not say how far the walk got:\n%s\nwant it to hold:\n%s",
+			out.String(), want)
+	}
+}
+
+// TestAClippedElementSaysNothingOfTheSort holds the boundary to the same terms
+// as the total. It describes rows that ran out against a bound, and a clipped
+// element's warning is about something inside a row: every row is there, so
+// `reached` beside the element's name would say the walk stopped where it did
+// not.
+func TestAClippedElementSaysNothingOfTheSort(t *testing.T) {
+	var out strings.Builder
+	err := render.WriteStreamTruncation(&out, render.Truncation{
+		Kind: "issue.list", Count: 2, PartialElement: "comments",
+		Boundary: render.Boundary{Field: "updated", Order: "desc", Reached: "2026-05-09T14:20:00Z"},
+	}, render.TSV)
+	if err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	for _, leaf := range []string{"sort", "order", "reached"} {
+		if strings.Contains(out.String(), "\n"+leaf+"\t") {
+			t.Errorf("a clipped-element warning carries the boundary's %q:\n%s", leaf, out.String())
+		}
+	}
+}

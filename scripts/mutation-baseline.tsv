@@ -98,6 +98,36 @@
 # mutator, and the kill was confirmed by hand: negate node.go:65 and the three
 # golden cases above go red.
 #
+# `internal/render` went 12 to 14 on 2026-10-12 (issue 252) and is 11 now. No
+# test stopped noticing anything on the way up. `0127896` (PR 246) gave the
+# truncation warning a sort boundary behind the guard its total already had,
+# and both of that guard's negations lived:
+#
+#   diagnostic.go:129:49  `partial == nil`
+#   diagnostic.go:129:74  `partialElement == ""`
+#
+# The boundary's tests are in internal/cli, where the command that knows one
+# lives, and a sweep runs a package against its own tests. Nothing in this
+# package wrote a boundary at all. TestACutWalkStatesItsTotalAndWhereItStopped
+# kills both. TestAClippedElementSaysNothingOfTheSort holds the refusing side,
+# which the sweep does not ask about: the second conjunct deleted rather than
+# negated.
+#
+# The third to die is why this says 11 and not 12, and no sweep ever reported
+# it. `6b23645` (PR 198) had added the total behind the same guard with the
+# same gap, so `partial == nil` on it, diagnostic.go:123:26 today, has lived
+# since. The sweep of 2026-09-28 still said 12 against 12, because that
+# commit's TestAClippedElementKeepsItsTotal was the first test here to write a
+# streamed warning at all, and it killed `item == nil` in incompleteItem,
+# which the twelve of 2026-09-21 had held. One arrived, one died, the count
+# stood, and a ratchet on a count calls that `ok`. From that day the 12 below
+# counted a different twelve.
+#
+# Taken twice here: the same eleven by file, line, and mutator both times,
+# and they are the runner's fourteen less these three. Each of the three was
+# applied by hand and fails the first test on the answer, and so does the
+# deleted conjunct against the second.
+#
 # Where these numbers come from, which this file could not tell you until
 # 2026-08-20 and now can.
 #
@@ -131,5 +161,5 @@
 # command took one minute. Issue 57 said exactly the right thing, "no conclusion
 # about the tests follows from this run", and was closed without one.
 internal/jql	4	the only place a value is quoted; an unexercised branch is an injection
-internal/render	12	the output contract itself, and the escaping rules under it
+internal/render	11	the output contract itself, and the escaping rules under it
 internal/site	34	deployment detection, field and user resolution, the cache
