@@ -20,6 +20,54 @@ accident.
 
 Nothing yet.
 
+## [0.19.8] - 2026-10-12
+
+**Take this one whichever commands you use.** Nothing `jr` does changes: no
+flag, no output, no exit code. The binaries are built with Go 1.26.9, where
+0.19.7 and every release back to 0.13.3 were built with 1.26.8, and 1.26.9
+fixes nine advisories in the standard library that `govulncheck` reports
+reachable from this code:
+
+- `GO-2026-6603`, `net/http`: HTTP/2 server memory exhaustion due to Trailer
+  headers.
+- `GO-2026-6605`, `net/http`: HTTP/1 client connection desynchronization after
+  CONNECT rejection.
+- `GO-2026-6607`, `crypto/tls`: reject malformed ECH outer extension
+  references.
+- `GO-2026-6608`, `net/textproto`: memory limit bypass when parsing MIME
+  headers.
+- `GO-2026-6610`, `net/http`: HTTP/2 transport accepts malformed
+  framing-related headers.
+- `GO-2026-6611`, `net/http`: excessive CPU consumption from repeated initial
+  window changes.
+- `GO-2026-6612`, `net/http`: double flow control refund on HTTP/2 server
+  streams.
+- `GO-2026-6613`, `net/http`: HTTP/1 server connection desynchronization after
+  a 2xx CONNECT response.
+- `GO-2026-6617`, `net/http`: HTTP/2 server crash due to an HPACK encoder race.
+
+Those are the advisories' own titles. "Reachable" is the scanner's word and
+means the call graph gets there. Nobody has judged here which of the nine a
+Jira server, or a proxy in front of one, could use against `jr`. What the
+titles do say: four name an HTTP server (6603, 6612, 6613, 6617), and `jr`
+listens on no socket in any profile. Two name the client (6605, 6610), and
+three do not say whose side they are on.
+
+### Internal
+
+- `internal/render` gains the two tests the weekly mutation sweep asked for
+  (issue 252). The truncation warning's `total`, and its `sort`, `order` and
+  `reached`, were asserted only from `internal/cli`, and the sweep measures a
+  package against its own tests. The package's count of surviving mutants
+  falls from 12 to 11.
+
+### Output contract
+
+- No kind moved, no code was added, and no invocation is answered differently.
+- **Priced a patch.** A toolchain is nothing a caller sends and nothing a
+  consumer parses, so no row of the stability policy is touched and the
+  default position moves.
+
 ## [0.19.7] - 2026-10-06
 
 **Take this one if you work against more than one Jira site, or read
@@ -3401,7 +3449,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.19.7...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.19.8...main
+[0.19.8]: https://github.com/kmoneil/jr/releases/tag/v0.19.8
 [0.19.7]: https://github.com/kmoneil/jr/releases/tag/v0.19.7
 [0.19.6]: https://github.com/kmoneil/jr/releases/tag/v0.19.6
 [0.19.5]: https://github.com/kmoneil/jr/releases/tag/v0.19.5
