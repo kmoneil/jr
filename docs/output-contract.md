@@ -2384,9 +2384,9 @@ The rows:
   answer was right.** A new code for a condition that used to produce a correct
   result is refusing something that used to work, which is the breaking row
   above and not this one.
-- Correcting rows that contradicted the command's own description, with the
-  invocation and the document's shape unchanged: **additive, so the patch
-  position moves.** The previous answer was wrong by the command's own account,
+- Correcting rows, or a value, that contradicted the command's own description,
+  with the invocation and the document's shape unchanged: **additive, so the
+  patch position moves.** The previous answer was wrong by the command's own account,
   so a consumer that depended on it depended on the defect, and there is
   nothing on a command line for anybody to edit. That is the reading of the row
   above, which prices fixing a wrong answer by what a caller has to change. It
@@ -2395,7 +2395,15 @@ The rows:
   0.17.3, where `issue activity` and `issue changes` began ordering rows across
   every page, as both descriptions had always said, rather than one page at a
   time, and `--limit` began keeping the newest (or oldest) rows rather than
-  whatever page one held.
+  whatever page one held. **A value is this row on the same terms**, where it
+  contradicted the kind's own definition of the attribute holding it. It was
+  widened for 0.20.0, whose `auth login` had been reporting
+  `site-scoped="false"` for a credential it had just stored keyed by host,
+  beside an `auth status` that said `true` for the same one. The attribute, its
+  type and the kind's version did not move, and there was nothing for a caller
+  to send differently. A value that was stable and *correct* is still the text
+  row's: this one is only for a value the tool's own account of it says was
+  wrong.
 - Adding a command: **additive, so the patch position moves.** No invocation
   anybody makes changes, no document anybody parses changes shape, and
   `jr schema` grows by a leaf. The reader it matters to is looking for a
