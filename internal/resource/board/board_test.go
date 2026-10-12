@@ -444,8 +444,15 @@ func (s *stubSession) Metadata(context.Context) (*site.Metadata, error) {
 	return &site.Metadata{Info: site.Info{Kind: s.kind}}, nil
 }
 
-func (s *stubSession) Idempotency() *idem.Ledger  { return nil }
-func (s *stubSession) Project() string            { return s.project }
+func (s *stubSession) Idempotency() *idem.Ledger { return nil }
+func (s *stubSession) Project() string           { return s.project }
+
+func (s *stubSession) Projects() []string {
+	if s.project == "" {
+		return nil
+	}
+	return []string{s.project}
+}
 func (s *stubSession) Board() string              { return s.board }
 func (s *stubSession) CheckWritable(string) error { return nil }
 

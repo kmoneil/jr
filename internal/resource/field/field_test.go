@@ -237,7 +237,9 @@ func (s *stubSession) Metadata(context.Context) (*site.Metadata, error) {
 	return s.meta, nil
 }
 
-func (s *stubSession) Project() string                 { return "" }
+func (s *stubSession) Project() string { return "" }
+
+func (s *stubSession) Projects() []string              { return nil }
 func (s *stubSession) RequireProject() (string, error) { return "", nil }
 func (s *stubSession) Board() string                   { return "" }
 

@@ -654,11 +654,7 @@ func validateProject(_ context.Context, inv *registry.Invocation) error {
 	if site.ValidProjectKey(key) {
 		return nil
 	}
-	return errs.Usage("INVALID_PROJECT_KEY", "%q is not a project key", key).
-		WithDetail("a project key starts with a letter and continues with " +
-			"letters, digits, or underscores").
-		WithRemedy("see `" + buildinfo.App + " project list` for the keys this " +
-			"credential can reach")
+	return site.InvalidProjectKey(key)
 }
 
 // clientFor is the opening every command here shares.

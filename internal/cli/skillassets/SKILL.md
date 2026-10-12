@@ -85,6 +85,16 @@ envelope**, so a pipeline that needs to know its scope asks for `--format json`,
 exactly as it does for `site`. `--all-projects` lifts the scope where the
 command has it, and `jr context show` says what the scope currently is.
 
+**For several projects, repeat `--project`. Do not write `project in (...)`
+yourself.** `issue list`, `issue activity` and `issue changes` take
+`--project OPS --project NET --project DO` and search all three, with every key
+quoted, which matters because a key can be a reserved JQL word. The envelope
+then carries `projects="OPS NET DO"` and no `project`, so check for either when
+you need to know an answer was scoped. A key Jira does not know is refused as
+`UNKNOWN_PROJECT` (exit 5) rather than left out of the answer. Every other
+command refuses a second `--project` as `PROJECT_REPEATED`: run it once per
+project.
+
 **A `--jql` naming a project outside the scope warns rather than going quiet.**
 `SCOPE_MISMATCH` on stderr, exit 0, rows unchanged. It fires only on positive
 selection, so `project != OPS` says nothing, and it reads the fragment as

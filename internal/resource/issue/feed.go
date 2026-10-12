@@ -92,9 +92,10 @@ func sortFeed(rows []FeedChange) {
 
 func changesCommand() *registry.Command {
 	return &registry.Command{
-		Path:     []string{"issue", "changes"},
-		ScopedBy: []string{registry.GlobalProject},
-		Summary:  "Report what changed since the last poll, and where to resume",
+		Path:            []string{"issue", "changes"},
+		ScopedBy:        []string{registry.GlobalProject},
+		SeveralProjects: true,
+		Summary:         "Report what changed since the last poll, and where to resume",
 		Description: strings.TrimSpace(`
 An incremental feed of recorded changes: every field that moved on every issue in
 scope, oldest first, with a cursor to poll again from.
@@ -224,6 +225,11 @@ func validateChanges(ctx context.Context, inv *registry.Invocation) error {
 	if err := refuseQueryJiraDoesNotUnderstand(ctx, inv); err != nil {
 		return err
 	}
+	// A feed is where an unknown key in a set costs the most: it would be
+	// polled, and report "nothing changed" for that project on every tick.
+	if err := refuseUnknownProject(ctx, inv, feedScope(inv)); err != nil {
+		return err
+	}
 	if err := requirePageSize(inv); err != nil {
 		return err
 	}
@@ -232,17 +238,18 @@ func validateChanges(ctx context.Context, inv *registry.Invocation) error {
 	// give. It matters most here: a feed polls, so a scope that silently drops
 	// the caller's projects reports "nothing changed" on every tick rather than
 	// once.
-	warnScopeMismatch(inv, feedProject(inv), inv.Flags.String("jql"))
+	warnScopeMismatch(inv, feedScope(inv), inv.Flags.String("jql"))
 	return nil
 }
 
-// feedProject is the scope this feed's candidate query is built with, read in
-// one place so the warning cannot name a scope the query did not use.
-func feedProject(inv *registry.Invocation) string {
+// feedScope is the scope this feed's candidate query is built with, no
+// project, one, or several, read in one place so the warning cannot name a
+// scope the query did not use.
+func feedScope(inv *registry.Invocation) []string {
 	if inv.Jira == nil {
-		return ""
+		return nil
 	}
-	return inv.Jira.Project()
+	return inv.Jira.Projects()
 }
 
 func runChanges(
@@ -337,12 +344,13 @@ func feedRequest(
 	if err != nil {
 		return ListOptions{}, err
 	}
+	query := QueryOptions{
+		JQL:          inv.Flags.String("jql"),
+		UpdatedAfter: floor,
+	}
+	query.Project, query.Projects = projectScope(feedScope(inv))
 	return ListOptions{
-		Query: QueryOptions{
-			Project:      feedProject(inv),
-			JQL:          inv.Flags.String("jql"),
-			UpdatedAfter: floor,
-		},
+		Query:    query,
 		Limit:    registry.Limit{All: true},
 		PageSize: pageSize,
 		// The changelog is the whole point of the request and the fields are

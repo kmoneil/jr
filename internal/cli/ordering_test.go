@@ -347,7 +347,9 @@ func (unreachableSession) Metadata(context.Context) (*site.Metadata, error) {
 	return nil, errs.Remote("NETWORK", "the site did not answer")
 }
 
-func (unreachableSession) Project() string                 { return "ENG" }
+func (unreachableSession) Project() string { return "ENG" }
+
+func (unreachableSession) Projects() []string              { return []string{"ENG"} }
 func (unreachableSession) RequireProject() (string, error) { return "ENG", nil }
 func (unreachableSession) Board() string                   { return "1" }
 func (unreachableSession) RequireBoard() (string, error)   { return "1", nil }

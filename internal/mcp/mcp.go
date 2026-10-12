@@ -415,7 +415,7 @@ func (s *Server) run(
 		return "", err
 	}
 	doc.Site = siteOf(inv)
-	doc.Project, doc.Board = scopeOf(inv)
+	doc.SetScope(scopeOf(inv))
 	if err := render.Write(&out, doc, format); err != nil {
 		return "", err
 	}
@@ -439,13 +439,13 @@ func siteOf(inv *registry.Invocation) string {
 // It matters more here than on the command line. A caller with a shell can run
 // `jr context show`; a model gets the document and nothing else, and a scoped
 // answer is complete, exit-0, and indistinguishable from an unscoped one.
-func scopeOf(inv *registry.Invocation) (project, board string) {
+func scopeOf(inv *registry.Invocation) render.Scope {
 	if inv == nil {
-		return "", ""
+		return render.Scope{}
 	}
 	w, ok := inv.Jira.(*registry.ScopeWatcher)
 	if !ok {
-		return "", ""
+		return render.Scope{}
 	}
 	return w.Scope()
 }
@@ -461,7 +461,7 @@ func streamInto(ctx context.Context, out *strings.Builder, cmd *registry.Command
 		Name:    cmd.CollectionName,
 		Columns: columnsFor(cmd, inv),
 		Site:    siteOf(inv),
-		Scope:   func() (string, string) { return scopeOf(inv) },
+		Scope:   func() render.Scope { return scopeOf(inv) },
 	})
 	if err != nil {
 		return err

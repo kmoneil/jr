@@ -11,7 +11,7 @@ import (
 // with nothing unresolved emits no container for a consumer to misread as an
 // empty claim.
 func TestExplanationNodeSaysWhatWasNotResolved(t *testing.T) {
-	e, err := Explain("labels = retry", "ENG", "", "")
+	e, err := Explain("labels = retry", []string{"ENG"}, "", "")
 	if err != nil {
 		t.Fatalf("explain: %v", err)
 	}
@@ -41,5 +41,42 @@ func TestExplanationNodeSaysWhatWasNotResolved(t *testing.T) {
 	}
 	if f.Text != "Ada Lovelace" {
 		t.Errorf("value = %q, want the input as typed", f.Text)
+	}
+}
+
+// TestExplanationNodeNamesASetOfProjectsApartFromOne pins the v3 element both
+// ways. Several projects are a `projects` list with no `project` leaf beside
+// it, and one is the leaf with no list. A consumer written when `project`
+// could only hold a key then reads a set as an absent leaf, which it already
+// handles, rather than as one key with spaces in it.
+func TestExplanationNodeNamesASetOfProjectsApartFromOne(t *testing.T) {
+	several, err := Explain("labels = retry", []string{"OPS", "NET"}, "", "")
+	if err != nil {
+		t.Fatalf("explain: %v", err)
+	}
+	if err := render.Record(KindExplain, VersionExplain,
+		several.Node()).Validate(); err != nil {
+		t.Fatalf("an explanation scoped to a set does not validate: %v", err)
+	}
+	if _, ok := several.Node().ChildNamed("project"); ok {
+		t.Error("a set of projects was also written as the one-project leaf")
+	}
+	list, ok := several.Node().ChildNamed("projects")
+	if !ok {
+		t.Fatal("a set of projects did not reach the explanation")
+	}
+	if len(list.Children) != 2 || list.Children[0].Text != "OPS" || list.Children[1].Text != "NET" {
+		t.Errorf("projects holds %d member(s), want OPS then NET", len(list.Children))
+	}
+
+	one, err := Explain("labels = retry", []string{"ENG"}, "", "")
+	if err != nil {
+		t.Fatalf("explain: %v", err)
+	}
+	if _, ok := one.Node().ChildNamed("projects"); ok {
+		t.Error("one project was written as a list of one")
+	}
+	if p, ok := one.Node().ChildNamed("project"); !ok || p.Text != "ENG" {
+		t.Error("one project did not reach the explanation as the leaf")
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kmoneil/jr/internal/buildinfo"
 	"github.com/kmoneil/jr/internal/errs"
 )
 
@@ -31,8 +32,11 @@ type Overrides struct {
 	// Context names a one-off context, as --context does.
 	Context string
 	Site    string
-	Project string
-	Board   string
+	// Projects is every --project given, in the order given. One is the usual
+	// case. Several is a set, which only the commands that answer for a union
+	// of projects accept.
+	Projects []string
+	Board    string
 	// ReadOnly forces read-only mode on. It cannot force it off: see Resolved.
 	ReadOnly bool
 	// APIVersion forces the REST version, skipping the deployment probe.
@@ -50,11 +54,17 @@ type Overrides struct {
 type Resolved struct {
 	// Name is the context these values came from, or empty when they came
 	// only from flags and the environment.
-	Name    string
-	Site    string
+	Name string
+	Site string
+	// Project is the project, when the scope is exactly one. It is empty when
+	// there is none and when there are several: a caller that needs one asks
+	// RequireProject, which refuses a set by name rather than picking a member.
 	Project string
-	Board   string
-	Fields  []string
+	// Projects is the whole project scope: every --project given, or the one
+	// the environment or the context supplies, or nothing.
+	Projects []string
+	Board    string
+	Fields   []string
 
 	// ReadOnly is true if any source asked for it.
 	//
@@ -153,11 +163,13 @@ func Resolve(cfg *Config, over Overrides, getenv Getenv) (*Resolved, error) {
 		return nil, err
 	}
 
+	projects := resolveProjects(over.Projects, getenv(EnvProject), ctx.Project)
 	r := &Resolved{
 		Name:       name,
 		Site:       firstNonEmpty(over.Site, getenv(EnvSite), ctx.Site),
 		SiteSource: sourceOf(over.Site, getenv(EnvSite), ctx.Site),
-		Project:    firstNonEmpty(over.Project, getenv(EnvProject), ctx.Project),
+		Project:    onlyProject(projects),
+		Projects:   projects,
 		Board:      firstNonEmpty(over.Board, getenv(EnvBoard), ctx.Board),
 		// Read-only latches on from any source and never off.
 		ReadOnly:       over.ReadOnly || truthy(getenv(EnvReadOnly)) || ctx.ReadOnly,
@@ -273,6 +285,9 @@ func (r *Resolved) RequireProject() (string, error) {
 	if r != nil && r.Project != "" {
 		return r.Project, nil
 	}
+	if r != nil && len(r.Projects) > 1 {
+		return "", ProjectRepeated(len(r.Projects))
+	}
 	e := errs.Usage("NO_PROJECT", "this command needs a project and none is set")
 	if r != nil && r.Name != "" {
 		return "", e.
@@ -281,6 +296,66 @@ func (r *Resolved) RequireProject() (string, error) {
 				"to set a default", r.Name)
 	}
 	return "", e.WithRemedy("pass --project, set JIRA_PROJECT, or select a context that sets one")
+}
+
+// ProjectRepeated is the refusal for a command that reads one project and was
+// given several.
+//
+// A set is answered only by the commands whose result is a union over
+// projects. Everywhere else the choices were to take the first, take the last,
+// or run once per key, and each is a guess about what the caller meant by a
+// flag they typed more than once.
+func ProjectRepeated(n int) *errs.Error {
+	return errs.Usage("PROJECT_REPEATED",
+		"--project was given %d times, and this command reads one project", n).
+		WithRemedy("pass one --project; `%s schema <command>` marks --project "+
+			"repeatable on the commands that take several", buildinfo.App)
+}
+
+// resolveProjects is the project scope: every --project given, or else the one
+// the environment names, or else the context's.
+//
+// The flag is the only source that can name several. JIRA_PROJECT and a
+// context's project are each one key, because a set there would be a default
+// that every later command inherits without anybody having typed it.
+//
+// A key given twice is one key, compared without regard to case, which is how
+// Jira compares them.
+func resolveProjects(flags []string, env, ctx string) []string {
+	if out := DistinctProjects(flags); len(out) > 0 {
+		return out
+	}
+	if one := firstNonEmpty(env, ctx); one != "" {
+		return []string{one}
+	}
+	return nil
+}
+
+// DistinctProjects is what a list of --project values names: each key once, in
+// the order first given, compared without regard to case.
+//
+// Exported for the one caller that has to count them before a session exists,
+// which is the command line refusing a repeat on a command that reads one.
+func DistinctProjects(flags []string) []string {
+	var out []string
+	for _, p := range flags {
+		p = strings.TrimSpace(p)
+		if p == "" || slices.ContainsFunc(out, func(have string) bool {
+			return strings.EqualFold(have, p)
+		}) {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+// onlyProject is the project when there is exactly one.
+func onlyProject(projects []string) string {
+	if len(projects) == 1 {
+		return projects[0]
+	}
+	return ""
 }
 
 // RequireBoard returns the board, or a usage error naming the flag.

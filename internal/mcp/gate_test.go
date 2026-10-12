@@ -12,6 +12,7 @@ import (
 	"github.com/kmoneil/jr/internal/errs"
 	"github.com/kmoneil/jr/internal/exitcode"
 	"github.com/kmoneil/jr/internal/idem"
+	"github.com/kmoneil/jr/internal/jctx"
 	"github.com/kmoneil/jr/internal/mcp"
 	"github.com/kmoneil/jr/internal/registry"
 	"github.com/kmoneil/jr/internal/render"
@@ -29,6 +30,9 @@ import (
 type gateSession struct {
 	readOnly bool
 	connects int
+	// projects is the scope `mcp serve` was started with, when a test is
+	// about a repeated --project. Empty means the one project ENG.
+	projects []string
 }
 
 func (s *gateSession) Connect(context.Context) (*transport.Client, site.Info, error) {
@@ -51,13 +55,31 @@ func (s *gateSession) CheckWritable(command string) error {
 		"%s would change Jira, and this is read-only", command)
 }
 
-func (*gateSession) Project() string                 { return "ENG" }
-func (*gateSession) RequireProject() (string, error) { return "ENG", nil }
-func (*gateSession) Board() string                   { return "1" }
-func (*gateSession) RequireBoard() (string, error)   { return "1", nil }
-func (*gateSession) Fields() []string                { return nil }
-func (*gateSession) Idempotency() *idem.Ledger       { return nil }
-func (*gateSession) Site() string                    { return "https://gated.invalid" }
+func (s *gateSession) Project() string {
+	if len(s.projects) > 1 {
+		return ""
+	}
+	return "ENG"
+}
+
+func (s *gateSession) Projects() []string {
+	if len(s.projects) > 0 {
+		return s.projects
+	}
+	return []string{"ENG"}
+}
+
+func (s *gateSession) RequireProject() (string, error) {
+	if len(s.projects) > 1 {
+		return "", jctx.ProjectRepeated(len(s.projects))
+	}
+	return "ENG", nil
+}
+func (*gateSession) Board() string                 { return "1" }
+func (*gateSession) RequireBoard() (string, error) { return "1", nil }
+func (*gateSession) Fields() []string              { return nil }
+func (*gateSession) Idempotency() *idem.Ledger     { return nil }
+func (*gateSession) Site() string                  { return "https://gated.invalid" }
 
 // gatedRegistry registers one mutating command that records whether it ran, so
 // a test can tell "refused" from "ran and failed".
@@ -277,5 +299,31 @@ func TestANonMutatingToolCallIsNotGated(t *testing.T) {
 	result, _ := replies[0]["result"].(map[string]any)
 	if isError, _ := result["isError"].(bool); isError {
 		t.Errorf("a read was refused under read-only: %v", result)
+	}
+}
+
+// TestAToolCallRefusesAScopeOfSeveralProjectsWhereOneIsRead is the reason the
+// refusal lives in registry.Gate. `mcp serve` is started once, with whatever
+// --project it was given, and every tool call runs under that session. A
+// server started with two would otherwise hand a set to a command that reads
+// one project, which then reads none and answers for the whole site.
+func TestAToolCallRefusesAScopeOfSeveralProjectsWhereOneIsRead(t *testing.T) {
+	var ran, validated bool
+	sess := &gateSession{projects: []string{"OPS", "NET"}}
+
+	text, isError := callGatedTool(t, gatedRegistry(&ran, &validated, false), sess,
+		map[string]any{})
+
+	if !isError {
+		t.Error("a command that reads one project ran under a scope of two")
+	}
+	if !strings.Contains(text, "PROJECT_REPEATED") {
+		t.Errorf("reply does not carry the code:\n%s", text)
+	}
+	if ran || validated {
+		t.Errorf("ran = %v, validated = %v; the gate must refuse before either", ran, validated)
+	}
+	if sess.connects != 0 {
+		t.Errorf("%d attempts to reach Jira, want 0", sess.connects)
 	}
 }

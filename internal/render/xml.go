@@ -24,6 +24,10 @@ func writeXML(w *writer, d *Doc) {
 	// absent rather than empty, because an empty attribute reads as a project
 	// whose key is the empty string.
 	root.AttrIf("project", d.Project)
+	// Several projects, separated by single spaces. A project key holds no
+	// space (site.ValidProjectKey, which a repeated --project is held to), so
+	// the list splits one way.
+	root.AttrIf("projects", strings.Join(d.Projects, " "))
 	root.AttrIf("board", d.Board)
 
 	switch {

@@ -12,9 +12,11 @@ import (
 // precedent: internal/registry owns schema.commands and contract.
 const (
 	KindExplain = "jql.explain"
-	// VersionExplain is 2: v2 added the optional `unresolved` list naming
-	// the filters whose values are resolved just before sending.
-	VersionExplain = 2
+	// VersionExplain is 3. v2 added the optional `unresolved` list naming the
+	// filters whose values are resolved just before sending. v3 added the
+	// optional `projects` list, written in place of `project` when the scope
+	// is several projects.
+	VersionExplain = 3
 )
 
 func init() {
@@ -32,6 +34,8 @@ func ExplainSchema() *render.Schema {
 			{Schema: render.Leaf("fragment", render.TypeString)},
 			{Schema: render.Leaf("query", render.TypeString)},
 			{Schema: render.Leaf("project", render.TypeString), Optional: true},
+			{Schema: render.ListSchema("projects", "project",
+				render.Leaf("project", render.TypeString)), Optional: true},
 			{Schema: render.ListSchema("fields", "field",
 				render.Leaf("field", render.TypeString))},
 			{Schema: render.ListSchema("unresolved", "filter", &render.Schema{
@@ -52,8 +56,12 @@ type Explanation struct {
 	Fragment string
 	// Query is what would be sent.
 	Query string
-	// Project is the scope the fragment was combined with, or empty.
+	// Project is the scope the fragment was combined with, when it is one
+	// project, or empty.
 	Project string
+	// Projects is that scope when it is several, and is never set beside
+	// Project: the same rule, and the same reason, as the envelope's.
+	Projects []string
 	// Fields are the fields the fragment references, tokenized.
 	Fields []string
 	// Parenthesized reports whether the fragment was wrapped. It always is.
@@ -83,6 +91,14 @@ func (e Explanation) Node() *render.Node {
 		Leaf("query", e.Query).
 		LeafIf("project", e.Project)
 
+	if len(e.Projects) > 0 {
+		projects := make([]*render.Node, 0, len(e.Projects))
+		for _, p := range e.Projects {
+			projects = append(projects, render.El("project").SetText(p))
+		}
+		n = n.Child(render.ListEl("projects", "project", projects...))
+	}
+
 	fields := make([]*render.Node, 0, len(e.Fields))
 	for _, f := range e.Fields {
 		fields = append(fields, render.El("field").SetText(f))
@@ -105,7 +121,10 @@ func (e Explanation) Node() *render.Node {
 // It goes through the same builder and the same ordering policy the issue
 // commands use, so what it reports is what would be sent rather than a second
 // account of it.
-func Explain(fragment, project, sort, order string) (Explanation, error) {
+//
+// scope is the project scope: nothing, one key, or several, which the query
+// carries as `project in (...)`.
+func Explain(fragment string, scope []string, sort, order string) (Explanation, error) {
 	// Fields tokenizes, so it runs first and owns the lexing refusal;
 	// ValidateFragment then adds what tokens alone cannot show, the balance
 	// and a smuggled ORDER BY. In the other order the Fields error would be
@@ -120,9 +139,7 @@ func Explain(fragment, project, sort, order string) (Explanation, error) {
 	}
 
 	b := New()
-	if project != "" {
-		b.Project(project)
-	}
+	b.Project(scope...)
 	b.Raw(fragment)
 	if err := AppendOrder(b, sort, order); err != nil {
 		return Explanation{}, err
@@ -133,8 +150,14 @@ func Explain(fragment, project, sort, order string) (Explanation, error) {
 		return Explanation{}, err
 	}
 
-	return Explanation{
-		Fragment: fragment, Query: query, Project: project,
+	e := Explanation{
+		Fragment: fragment, Query: query,
 		Fields: fields, Parenthesized: true,
-	}, nil
+	}
+	if len(scope) == 1 {
+		e.Project = scope[0]
+	} else {
+		e.Projects = scope
+	}
+	return e, nil
 }

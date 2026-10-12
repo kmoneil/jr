@@ -1952,6 +1952,8 @@ type stubSession struct {
 	// project overrides the default scope, and unscoped removes it entirely.
 	project  string
 	unscoped bool
+	// projects is a scope of several, as a repeated --project resolves.
+	projects []string
 	// jqlVerdict is what the server says about a raw --jql, as the body its
 	// endpoint would return. Empty means a clean verdict, which is what almost
 	// every test here wants: they pass a --jql to exercise something else and
@@ -2029,12 +2031,24 @@ func (s *stubSession) Metadata(context.Context) (*site.Metadata, error) {
 // the one the unconstrained-query guard exists for.
 func (s *stubSession) Project() string {
 	switch {
-	case s.unscoped:
+	case s.unscoped, len(s.projects) > 1:
 		return ""
 	case s.project != "":
 		return s.project
 	}
 	return "ENG"
+}
+
+// Projects is the scope as a set: the several a test named, or the one
+// Project answers with, or nothing.
+func (s *stubSession) Projects() []string {
+	if len(s.projects) > 0 {
+		return s.projects
+	}
+	if p := s.Project(); p != "" {
+		return []string{p}
+	}
+	return nil
 }
 
 func (s *stubSession) RequireProject() (string, error) {

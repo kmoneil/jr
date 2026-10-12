@@ -244,9 +244,10 @@ func validateDoc(r Result) *render.Doc {
 
 func explainCommand() *registry.Command {
 	return &registry.Command{
-		Path:     []string{"jql", "explain"},
-		ScopedBy: []string{registry.GlobalProject},
-		Summary:  "Show the query this tool would send",
+		Path:            []string{"jql", "explain"},
+		ScopedBy:        []string{registry.GlobalProject},
+		SeveralProjects: true,
+		Summary:         "Show the query this tool would send",
 		Description: strings.TrimSpace(`
 Renders a query the way it would go out, and makes no request at all.
 
@@ -311,14 +312,14 @@ not a project scope, and a regular expression cannot tell the difference.`),
 }
 
 func runExplain(_ context.Context, inv *registry.Invocation) (*render.Doc, error) {
-	var project string
+	var scope []string
 	if inv.Jira != nil {
 		// A default, never a requirement: --project is global, and a query with
 		// no project scope is a legitimate thing to explain.
-		project = inv.Jira.Project()
+		scope = inv.Jira.Projects()
 	}
 
-	explained, err := jql.Explain(inv.Flags.String("jql"), project,
+	explained, err := jql.Explain(inv.Flags.String("jql"), scope,
 		inv.Flags.String("sort"), inv.Flags.String("order"))
 	if err != nil {
 		return nil, err

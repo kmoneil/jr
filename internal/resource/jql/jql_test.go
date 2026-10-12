@@ -324,7 +324,7 @@ func TestDocumentsValidate(t *testing.T) {
 		t.Fatalf("validate result: %v", err)
 	}
 
-	explained, err := jql.Explain("labels = retry", "ENG", "", "")
+	explained, err := jql.Explain("labels = retry", []string{"ENG"}, "", "")
 	if err != nil {
 		t.Fatalf("explain: %v", err)
 	}
@@ -370,8 +370,15 @@ func (s *stubSession) Metadata(context.Context) (*site.Metadata, error) {
 	return &site.Metadata{Info: site.Info{Kind: s.kind}}, nil
 }
 
-func (s *stubSession) Idempotency() *idem.Ledger  { return nil }
-func (s *stubSession) Project() string            { return s.project }
+func (s *stubSession) Idempotency() *idem.Ledger { return nil }
+func (s *stubSession) Project() string           { return s.project }
+
+func (s *stubSession) Projects() []string {
+	if s.project == "" {
+		return nil
+	}
+	return []string{s.project}
+}
 func (s *stubSession) Board() string              { return "" }
 func (s *stubSession) CheckWritable(string) error { return nil }
 

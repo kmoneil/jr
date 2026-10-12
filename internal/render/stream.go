@@ -22,7 +22,7 @@ type StreamSpec struct {
 	// command runs and the scope is something the command *reads*: asking at
 	// Close is the only point at which the answer exists. Nil is fine and means
 	// "no scope to report", which is what every non-scoped command has.
-	Scope func() (project, board string)
+	Scope func() Scope
 }
 
 // Stream emits a collection, writing rows as they arrive where the format
@@ -295,7 +295,7 @@ func (s *Stream) Close(complete bool, nextPageToken string) error {
 		// branch, and TSV, the one format that streams, has no envelope to put
 		// this in — so there is no header already on stdout to contradict.
 		if s.spec.Scope != nil {
-			doc.Project, doc.Board = s.spec.Scope()
+			doc.SetScope(s.spec.Scope())
 		}
 		return Write(s.w, doc, s.format)
 	}

@@ -268,9 +268,10 @@ const allProjectsFlag = "all-projects"
 
 func activityCommand() *registry.Command {
 	return &registry.Command{
-		Path:     []string{"issue", "activity"},
-		ScopedBy: []string{registry.GlobalProject},
-		Summary:  "List what happened across issues, as events rather than rows",
+		Path:            []string{"issue", "activity"},
+		ScopedBy:        []string{registry.GlobalProject},
+		SeveralProjects: true,
+		Summary:         "List what happened across issues, as events rather than rows",
 		Description: strings.TrimSpace(`
 Merges four sources into one time-ordered feed: comments, transitions, other
 field changes, and worklogs. Newest first.
@@ -304,7 +305,8 @@ updated after --since is still read, and --until makes the answer exact without
 making the sweep cheaper.
 
 The context's project scopes the candidate search, exactly as it does on
-` + "`issue list`" + `, and --all-projects lifts it. That matters more here than it does
+` + "`issue list`" + `, and --all-projects lifts it. Repeating --project scopes it to
+several, as it does there. The scope matters more here than it does
 there. This is the command somebody points at "what did I do today", and scoped
 to one project it answers a narrower question in bytes identical to the wider
 one: a complete, empty, exit-0 feed.
@@ -474,6 +476,9 @@ func validateActivity(ctx context.Context, inv *registry.Invocation) error {
 	if err := refuseQueryJiraDoesNotUnderstand(ctx, inv); err != nil {
 		return err
 	}
+	if err := refuseUnknownProject(ctx, inv, activityScope(inv)); err != nil {
+		return err
+	}
 	if err := requirePageSize(inv); err != nil {
 		return err
 	}
@@ -484,39 +489,41 @@ func validateActivity(ctx context.Context, inv *registry.Invocation) error {
 	}
 
 	// After every refusal, because a warning in front of a rejection is noise
-	// in front of the answer. Reading the scope through activityProject means
+	// in front of the answer. Reading the scope through activityScope means
 	// --all-projects reports no scope and so cannot mismatch one, which is the
 	// same rule the envelope follows.
-	warnScopeMismatch(inv, activityProject(inv), inv.Flags.String("jql"))
+	warnScopeMismatch(inv, activityScope(inv), inv.Flags.String("jql"))
 	return nil
 }
 
-// activityProject is the scope this command's candidate query is built with.
+// activityScope is the scope this command's candidate query is built with:
+// no project, one, or several.
 //
 // One expression, read here and in runActivity, so the warning cannot describe
 // a scope the query did not use.
 //
-// --all-projects returns the empty string without consulting the session at
+// --all-projects returns nothing without consulting the session at
 // all, which is deliberate: ScopeWatcher records what a command *read*, so
 // asking for the project and then discarding it would stamp a project onto the
 // envelope of an answer that came from every project on the site. Not asking is
 // how the answer reports no scope.
-func activityProject(inv *registry.Invocation) string {
+func activityScope(inv *registry.Invocation) []string {
 	if inv.Jira == nil || inv.Flags.Bool(allProjectsFlag) {
-		return ""
+		return nil
 	}
-	return inv.Jira.Project()
+	return inv.Jira.Projects()
 }
 
 // activityQuery is the candidate search, read by the sweep, by the count that
 // sizes it, and by --explain, so none of the three can describe a query the
 // others do not send.
 func activityQuery(inv *registry.Invocation) QueryOptions {
-	return QueryOptions{
-		Project:      activityProject(inv),
+	opt := QueryOptions{
 		JQL:          inv.Flags.String("jql"),
 		UpdatedAfter: resolvedDate(inv, sinceFlag),
 	}
+	opt.Project, opt.Projects = projectScope(activityScope(inv))
+	return opt
 }
 
 // activityEnd is one end of the window: the flag that set it, what was typed,

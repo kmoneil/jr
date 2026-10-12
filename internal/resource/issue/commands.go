@@ -197,9 +197,10 @@ func commentsSchema() *render.Schema {
 
 func listCommand() *registry.Command {
 	return &registry.Command{
-		Path:     []string{"issue", "list"},
-		ScopedBy: []string{registry.GlobalProject},
-		Summary:  "List issues matching a query",
+		Path:            []string{"issue", "list"},
+		ScopedBy:        []string{registry.GlobalProject},
+		SeveralProjects: true,
+		Summary:         "List issues matching a query",
 		Description: strings.TrimSpace(`
 Builds a JQL query from the flags, or takes one whole with --jql, and returns
 the matching issues.
@@ -226,6 +227,11 @@ the set and never orders it, so "everything touched today, newest first" is
 Every list filter has both directions: --status and --not-status, --type and
 --not-type, --label and --not-label. Each repeats, so --not-status Done
 --not-status Closed sends status NOT IN (Done, Closed).
+
+--project repeats too, here and on issue activity and issue changes: --project
+OPS --project NET searches both, with every key quoted, and the result names
+the set. A key Jira does not know is refused as UNKNOWN_PROJECT rather than
+left out of the answer, which costs one request when there are several.
 
 None of them splits on commas. --label a,b asks for one label whose name
 contains a comma, which Jira genuinely stores, so splitting it would make that
@@ -259,6 +265,7 @@ to status and everything else has to be asked for.`),
 			buildinfo.App + " issue list --jql 'labels IN (retry, transport)' --limit all",
 			buildinfo.App + " issue list --assignee currentUser --sort updated --order desc",
 			buildinfo.App + " issue list --not-status Done --not-status Closed --updated-after -1d",
+			buildinfo.App + " issue list --project OPS --project NET --updated-after -3d",
 			buildinfo.App + " issue list --involving currentUser --updated-after -7d",
 			buildinfo.App + " issue list --changed-by currentUser --changed-after -1w",
 		}, "\n"),
@@ -693,6 +700,9 @@ func validateList(ctx context.Context, inv *registry.Invocation) error {
 	if err := refuseQueryJiraDoesNotUnderstand(ctx, inv); err != nil {
 		return err
 	}
+	if err := refuseUnknownProject(ctx, inv, listQuery(inv).Projects); err != nil {
+		return err
+	}
 	// After every refusal, because it can cost the catalogue request and can
 	// refuse nothing: a sort it cannot resolve has no boundary, and that is
 	// all.
@@ -707,7 +717,7 @@ func validateList(ctx context.Context, inv *registry.Invocation) error {
 	// here as an empty Project and the check stays quiet, which is right,
 	// without this function knowing that --all-projects is what did it.
 	opt := listQuery(inv)
-	warnScopeMismatch(inv, opt.Project, opt.JQL)
+	warnScopeMismatch(inv, opt.scope(), opt.JQL)
 	warnUnknownLabels(ctx, inv)
 	warnMovedDates(inv, moved)
 	return nil
@@ -1145,9 +1155,87 @@ func listQuery(inv *registry.Invocation) QueryOptions {
 	// one — an empty --project falls back to the context rather than clearing
 	// it.
 	if inv.Jira != nil && !inv.Flags.Bool(allProjectsFlag) {
-		opt.Project = inv.Jira.Project()
+		opt.Project, opt.Projects = projectScope(inv.Jira.Projects())
 	}
 	return opt
+}
+
+// projectScope splits a resolved project scope into the two fields a query
+// carries it in. One key is Project, and it is the only shape the walk may
+// page by issue key over: see canKeyset. Several are Projects. The two are
+// never both set, so nothing has to decide which one wins.
+func projectScope(projects []string) (one string, several []string) {
+	switch len(projects) {
+	case 0:
+		return "", nil
+	case 1:
+		return projects[0], nil
+	default:
+		return "", projects
+	}
+}
+
+// scope is the project scope these options carry, as one list.
+func (o QueryOptions) scope() []string {
+	if o.Project != "" {
+		return []string{o.Project}
+	}
+	return o.Projects
+}
+
+// refuseUnknownProject asks the server about a project scope of several keys
+// before any of it is searched.
+//
+// Cloud's search answers `project in ("ENG","NOPE")` with HTTP 200, the rows
+// from ENG, and no word about NOPE (measured 2026-10-12). One unknown key is at
+// least visible, as an empty answer that names it. Among several, a mistyped
+// key contributes nothing and the result reads as the union the caller asked
+// for, which is the answer this project exists to refuse: complete, exit 0,
+// and about fewer projects than it says.
+//
+// The parse endpoint does know, and says "The value 'NOPE' does not exist for
+// the field 'project'". So the scope clause gets the check a raw --jql gets,
+// through the same call: one request, and only when there are several keys.
+// A warning refuses as an error does, for the reason
+// refuseQueryJiraDoesNotUnderstand gives.
+//
+// Data Center needs it for a different reason. 10.4.0 refuses the search
+// itself, with a 400 carrying the same sentence (measured on the rig,
+// 2026-10-12), so nothing is silently short there. Without the check that
+// arrives as BAD_REQUEST at exit 2, and the one mistake has two codes
+// depending on which Jira heard it. The check runs first on both, so both say
+// UNKNOWN_PROJECT.
+//
+// A key this account cannot see is refused on the same terms as one that does
+// not exist. Jira does not tell the two apart, and neither contributes a row.
+func refuseUnknownProject(
+	ctx context.Context, inv *registry.Invocation, projects []string,
+) error {
+	if len(projects) < 2 || inv.Jira == nil {
+		return nil
+	}
+	clause, err := jql.New().Project(projects...).Render()
+	if err != nil {
+		return err
+	}
+	meta, err := inv.Jira.Metadata(ctx)
+	if err != nil {
+		return err
+	}
+	got, err := meta.CheckJQL(ctx, clause)
+	if err != nil {
+		return err
+	}
+	if got.Valid && len(got.Warnings) == 0 {
+		return nil
+	}
+	// Jira's own words, unedited: they name the key.
+	said := append(append([]string{}, got.Errors...), got.Warnings...)
+	return errs.NotFound("UNKNOWN_PROJECT",
+		"--project names a project that does not exist, or that this credential cannot see").
+		WithDetail("%s", strings.Join(said, " ")).
+		WithRemedy("check the keys with `%s project list`; a search over the "+
+			"rest would leave this one out without saying so", buildinfo.App)
 }
 
 // Constrained reports whether these options narrow the result set at all.
@@ -1162,6 +1250,9 @@ func listQuery(inv *registry.Invocation) QueryOptions {
 // --changed-by looks at rather than narrowing anything by itself, which is
 // also why validateChangedFilter refuses it on its own.
 func (o QueryOptions) Constrained() bool {
+	if len(o.Projects) > 0 {
+		return true
+	}
 	for _, v := range []string{
 		o.Project, o.JQL,
 		o.Assignee, o.Reporter, o.Creator, o.Involving,
@@ -1180,8 +1271,14 @@ func (o QueryOptions) Constrained() bool {
 
 // QueryOptions are the filter flags, before they become JQL.
 type QueryOptions struct {
+	// Project is the scope when it is one project.
 	Project string
-	JQL     string
+	// Projects is the scope when it is several, from a repeated --project. It
+	// is never set beside Project. The split is what canKeyset reads: a walk
+	// may page by issue key only inside one project, and a set leaves Project
+	// empty, so it takes the offset walk without anything having to remember.
+	Projects []string
+	JQL      string
 	// Each list filter carries both directions. `status NOT IN (Closed, Done)`
 	// is the question a caller asks far more often than any one status they
 	// want, and writing it as a --jql fragment is the one path where a typo
@@ -1237,9 +1334,7 @@ type QueryOptions struct {
 func BuildQuery(opt QueryOptions) (string, error) {
 	b := jql.New()
 
-	if opt.Project != "" {
-		b.Project(opt.Project)
-	}
+	b.Project(opt.scope()...)
 	b.In("status", opt.Statuses...)
 	b.NotIn("status", opt.NotStatuses...)
 	b.In("labels", opt.Labels...)

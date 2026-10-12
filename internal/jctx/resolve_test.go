@@ -59,7 +59,7 @@ func TestPrecedence(t *testing.T) {
 		},
 		{
 			"flag beats env",
-			jctx.Overrides{Site: "flag.atlassian.invalid", Project: "FLAGPROJ"},
+			jctx.Overrides{Site: "flag.atlassian.invalid", Projects: []string{"FLAGPROJ"}},
 			map[string]string{
 				jctx.EnvSite: "env.atlassian.invalid", jctx.EnvProject: "ENVPROJ",
 			},
@@ -67,7 +67,7 @@ func TestPrecedence(t *testing.T) {
 		},
 		{
 			"one field overridden leaves the others alone",
-			jctx.Overrides{Project: "OTHER"},
+			jctx.Overrides{Projects: []string{"OTHER"}},
 			nil,
 			"https://ctx.atlassian.invalid", "OTHER", "1",
 		},
@@ -386,5 +386,67 @@ func TestResolveWithNilConfig(t *testing.T) {
 func TestResolveRejectsABadSite(t *testing.T) {
 	if _, err := jctx.Resolve(nil, jctx.Overrides{Site: "ftp://acme"}, nil); err == nil {
 		t.Fatal("a bad --site resolved successfully")
+	}
+}
+
+// TestARepeatedProjectIsASetAndOneKeyIsAProject pins what a list of --project
+// values resolves to, which is the split everything downstream reads. One key
+// is Project. Several are Projects with Project empty, so a command that
+// needs exactly one is refused by name rather than handed a member of the set.
+func TestARepeatedProjectIsASetAndOneKeyIsAProject(t *testing.T) {
+	cfg := configWith(t, "work", map[string]jctx.Context{
+		"work": {Site: "ctx.atlassian.invalid", Project: "CTXPROJ"},
+	})
+
+	several, err := jctx.Resolve(cfg,
+		jctx.Overrides{Projects: []string{"OPS", "NET", "DO"}}, nil)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if several.Project != "" {
+		t.Errorf("Project = %q beside a set, so a command reading one project "+
+			"would run against a member nobody chose", several.Project)
+	}
+	if got := strings.Join(several.Projects, " "); got != "OPS NET DO" {
+		t.Errorf("Projects = %q, want every key given, in order, and not the context's", got)
+	}
+	_, err = several.RequireProject()
+	if err == nil {
+		t.Fatal("RequireProject answered for a set of three")
+	}
+	if e := errs.Coerce(err); e.Code != "PROJECT_REPEATED" || e.Exit != exitcode.Usage {
+		t.Errorf("refusal = %s at exit %v, want PROJECT_REPEATED at %v",
+			e.Code, e.Exit, exitcode.Usage)
+	}
+
+	// A key given twice is one key, in either case and whatever space the
+	// shell left around it, and one key is a project.
+	one, err := jctx.Resolve(cfg,
+		jctx.Overrides{Projects: []string{"OPS", "ops", " OPS "}}, nil)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if one.Project != "OPS" || len(one.Projects) != 1 {
+		t.Errorf("Project = %q, Projects = %q, want the one key OPS",
+			one.Project, one.Projects)
+	}
+
+	// The flag is the only source of a set. With none given the environment's
+	// key beats the context's, and each is a scope of one.
+	fromEnv, err := jctx.Resolve(cfg, jctx.Overrides{},
+		env(map[string]string{jctx.EnvProject: "ENVPROJ"}))
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if got := strings.Join(fromEnv.Projects, " "); got != "ENVPROJ" {
+		t.Errorf("Projects = %q from the environment, want ENVPROJ", got)
+	}
+	fromCtx, err := jctx.Resolve(cfg, jctx.Overrides{}, nil)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if got := strings.Join(fromCtx.Projects, " "); got != "CTXPROJ" || fromCtx.Project != "CTXPROJ" {
+		t.Errorf("Projects = %q, Project = %q from the context, want CTXPROJ in both",
+			got, fromCtx.Project)
 	}
 }

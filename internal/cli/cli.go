@@ -48,7 +48,7 @@ type app struct {
 	// Global flag values, shared by every command.
 	contextName string
 	site        string
-	project     string
+	projects    []string
 	board       string
 	apiVersion  string
 	caBundle    string

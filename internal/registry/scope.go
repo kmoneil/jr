@@ -1,5 +1,11 @@
 package registry
 
+import (
+	"slices"
+
+	"github.com/kmoneil/jr/internal/render"
+)
+
 // ScopeWatcher wraps a Session and remembers the context scope a command asked
 // it for, so the envelope can report the scope the answer was actually
 // computed over.
@@ -12,12 +18,12 @@ package registry
 // command read answers both cases with one rule and needs no knowledge of which
 // flag lifts which scope.
 //
-// It is deliberately the narrowest possible wrapper. Everything but the four
+// It is deliberately the narrowest possible wrapper. Everything but the five
 // scope readers is passed straight through, and nothing here can fail.
 type ScopeWatcher struct {
 	Session
-	project string
-	board   string
+	projects []string
+	board    string
 }
 
 // WatchScope wraps a session, or returns nil for a nil one.
@@ -28,10 +34,27 @@ func WatchScope(s Session) *ScopeWatcher {
 	return &ScopeWatcher{Session: s}
 }
 
+// Unwatched is the session underneath, for the one caller that has to ask
+// about the scope without that being a read: Gate, deciding whether a repeated
+// --project may reach this command at all. A nil watcher has none.
+func (w *ScopeWatcher) Unwatched() Session {
+	if w == nil {
+		return nil
+	}
+	return w.Session
+}
+
 // Project records the read and passes it through.
 func (w *ScopeWatcher) Project() string {
-	w.project = w.Session.Project()
-	return w.project
+	p := w.Session.Project()
+	w.projects = oneProject(p)
+	return p
+}
+
+// Projects records the read and passes it through.
+func (w *ScopeWatcher) Projects() []string {
+	w.projects = slices.Clone(w.Session.Projects())
+	return slices.Clone(w.projects)
 }
 
 // RequireProject records the read and passes it through.
@@ -41,8 +64,15 @@ func (w *ScopeWatcher) Project() string {
 // to report and the empty string is the honest value.
 func (w *ScopeWatcher) RequireProject() (string, error) {
 	p, err := w.Session.RequireProject()
-	w.project = p
+	w.projects = oneProject(p)
 	return p, err
+}
+
+func oneProject(p string) []string {
+	if p == "" {
+		return nil
+	}
+	return []string{p}
 }
 
 // Board records the read and passes it through.
@@ -61,11 +91,11 @@ func (w *ScopeWatcher) RequireBoard() (string, error) {
 // Scope reports the context scope this command asked for, and whether it asked
 // for any. A command that never consulted the context reports none, which is
 // what an unscoped answer should say.
-func (w *ScopeWatcher) Scope() (project, board string) {
+func (w *ScopeWatcher) Scope() render.Scope {
 	if w == nil {
-		return "", ""
+		return render.Scope{}
 	}
-	return w.project, w.board
+	return render.ScopeOf(w.projects, w.board)
 }
 
 // Compile-time proof that the wrapper still satisfies the interface it wraps.

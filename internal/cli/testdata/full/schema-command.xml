@@ -46,7 +46,7 @@ it lists only what this build contains.]]></description>
         <usage>Jira site, overriding the context's</usage>
       </global-flag>
       <global-flag name="project" type="string" required="false" repeatable="false" affects="invocation">
-        <usage>project key, overriding the context's</usage>
+        <usage>project key, overriding the context's; repeat it on a command that searches several</usage>
       </global-flag>
       <global-flag name="board" type="string" required="false" repeatable="false" affects="invocation">
         <usage>board id, overriding the context's</usage>

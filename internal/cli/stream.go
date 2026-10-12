@@ -100,12 +100,17 @@ func (a *app) warnEmptyResult(
 	// and the document cannot disagree about what the answer covered, and
 	// --all-projects reports no project here for the same reason it reports
 	// none there.
-	if project, board := scopeOf(inv); project != "" || board != "" {
-		if project != "" {
-			notes = append(notes, "project="+project)
+	if scope := scopeOf(inv); !scope.Empty() {
+		if scope.Project != "" {
+			notes = append(notes, "project="+scope.Project)
 		}
-		if board != "" {
-			notes = append(notes, "board="+board)
+		if len(scope.Projects) > 0 {
+			// Spelled as the envelope spells the set, so the two can be
+			// compared as text.
+			notes = append(notes, "projects="+strings.Join(scope.Projects, " "))
+		}
+		if scope.Board != "" {
+			notes = append(notes, "board="+scope.Board)
 		}
 	} else if inv.Jira != nil {
 		// Said out loud rather than left to the absence of a project= note. An
@@ -189,7 +194,7 @@ func streamSpec(rc *registry.Command, inv *registry.Invocation) render.StreamSpe
 		Name:    rc.CollectionName,
 		Columns: columns,
 		Site:    siteOf(inv),
-		Scope:   func() (string, string) { return scopeOf(inv) },
+		Scope:   func() render.Scope { return scopeOf(inv) },
 	}
 }
 

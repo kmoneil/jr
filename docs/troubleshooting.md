@@ -507,7 +507,8 @@ produces the same empty feed:
 - **`project=ENG`.** Was the question meant to be about one project? `issue
   list` and `issue activity` both take `--all-projects`, and when a run used it
   the note reads `scope=none` rather than going quiet, so you can tell a lifted
-  scope from an unreported one.
+  scope from an unreported one. A run over several, from a repeated `--project`,
+  reads `projects=OPS NET DO`.
 - **`since=...Z`.** Is that the boundary you meant? A bare date is read in the
   **Jira account's** timezone, not your machine's, so `--since 2026-09-02` from
   a laptop five hours west of the account starts at 19:00 the previous evening
@@ -538,7 +539,9 @@ ANDs your fragment with the context's project, so `project = ENG AND (key =
 OPS-208)` is a query that cannot match by construction. Three ways out:
 
 - `--all-projects`, on the commands that have it, lifts the scope entirely.
-- `--project OPS` names the scope you meant for one invocation.
+- `--project OPS` names the scope you meant for one invocation, and
+  `--project ENG --project OPS` names both. The warning then compares against
+  the whole set.
 - `jr context edit <name> --project OPS`, or `--unset project`, changes it for
   good.
 
@@ -609,6 +612,56 @@ works whatever the key is called:
 $ jr jql explain --jql 'status is not EMPTY' --project GO
 query   project = "GO" AND (status is not EMPTY) ORDER BY issuekey DESC
 ```
+
+**Several projects do not need a hand-written `project in (...)` at all.**
+Repeat `--project` on `issue list`, `issue activity` or `issue changes`, and the
+set is built and quoted for you:
+
+```console
+$ jr issue list --project OPS --project NET --project GO --updated-after -3d
+$ jr jql explain --jql 'status is not EMPTY' --project OPS --project GO
+query   project IN ("OPS", "GO") AND (status is not EMPTY) ORDER BY issuekey DESC
+```
+
+The envelope then names the set (`projects="OPS NET GO"`), which the
+`--all-projects --jql 'project in (...)'` spelling cannot, and
+`SCOPE_MISMATCH` has a scope to compare your `--jql` against.
+
+### `PROJECT_REPEATED`: `--project` twice on a command that reads one project
+
+```console
+$ jr board list --project OPS --project NET
+# exit 2: --project was given 2 times, and this command reads one project
+```
+
+`--project` is a global flag, so every command parses a second one. Only the
+commands whose answer is a union over projects take it: `issue list`, `issue
+activity`, `issue changes` and `jql explain`. `jr schema <command>` reports
+`repeatable="true"` on `--project` for exactly those. Everywhere else a repeat
+is refused before any request. It used to be accepted and the last key won
+silently, so a command that printed one project's boards for a question about
+two looked like a complete answer. Run the command once per project, or use one
+of the four that take a set.
+
+### `UNKNOWN_PROJECT`: a repeated `--project` names a project Jira does not know
+
+```console
+$ jr issue list --project OPS --project NTE
+# exit 5
+# detail: The value 'NTE' does not exist for the field 'project'.
+```
+
+Jira Cloud's search leaves an unknown key out of `project in (...)` and answers
+with the rest, so without this check a mistyped key in a set would contribute
+nothing and the result would read as the union you asked for. `jr` asks Jira
+about the set before searching, which costs one request and only when there are
+two or more keys. A project you cannot browse is refused in the same words as
+one that does not exist, because Jira does not tell the two apart. `jr project
+list` shows the keys this credential can reach.
+
+One `--project` on its own is not checked. On Cloud an unknown one answers with
+no rows and `EMPTY_RESULT: 0 issues, project=NTE`, which at least names it. On
+Data Center Jira refuses it, as `BAD_REQUEST` with the same sentence.
 
 One thing this does not catch, on Cloud only: the operand of a `WAS`,
 `CHANGED TO`, or `CHANGED FROM` predicate. `--jql 'status was "NoSuchStatus"'`
@@ -945,7 +998,8 @@ $ jr issue get foo
 ```
 
 A project key is checked the same way, on `project get`, `project components`,
-`project versions`, and `project statuses`. A key starts with a letter and
+`project versions`, and `project statuses`, and on each member of a repeated
+`--project`. One `--project` alone is passed to Jira as typed. A key starts with a letter and
 continues with letters, digits, or underscores — which is wider than Jira's own
 default of two or more uppercase letters, deliberately: a site can widen the
 pattern, and refusing a key some site genuinely uses would be worse than the

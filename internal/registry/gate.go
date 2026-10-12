@@ -2,6 +2,7 @@ package registry
 
 import (
 	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/site"
 )
 
 // Gate refuses a command that declares itself mutating or destructive when the
@@ -39,6 +40,9 @@ func Gate(cmd *Command, inv *Invocation) error {
 	if cmd == nil || inv == nil {
 		return errs.Runtime("NO_COMMAND", "nothing to gate")
 	}
+	if err := checkProjectScope(cmd, inv.Jira); err != nil {
+		return err
+	}
 
 	// A preview is not the thing being confirmed. --yes exists to confirm an
 	// irreversible action, and refusing to *show* the request until it has been
@@ -65,4 +69,62 @@ func Gate(cmd *Command, inv *Invocation) error {
 		return nil
 	}
 	return inv.Jira.CheckWritable(cmd.UseLine())
+}
+
+// checkProjectScope holds a --project given more than once to what the
+// command does with one.
+//
+// The flag is global and bound once, so the parser accepts a repeat on every
+// command. Only the ones declaring SeveralProjects answer for the union, and
+// for the rest there is no reading of a second key that is not a guess: the
+// first, the last, and one run per key are three different answers. So a
+// repeat is refused there.
+//
+// Where a set is taken, every member has to be a project key. One --project
+// is passed to Jira as typed and may be a name or an id; a set is also written
+// on the envelope as a list, and a list of values that may hold a space has no
+// one way to be split.
+//
+// It is here for the reason the rest of Gate is. `internal/mcp` calls
+// Command.Run directly with the session `mcp serve` was started with, so a
+// refusal written into the CLI wrapper would be absent on every tool call. The
+// command line makes the same two refusals once more on its own, ahead of
+// --explain, which answers before Gate runs.
+//
+// The scope is read from under the watcher. Asking through it would record a
+// read the command never made, and stamp a project onto the envelope of a
+// command that was told exactly which issue to fetch.
+func checkProjectScope(cmd *Command, s Session) error {
+	if s == nil {
+		return nil
+	}
+	if w, ok := s.(interface{ Unwatched() Session }); ok {
+		if s = w.Unwatched(); s == nil {
+			return nil
+		}
+	}
+	projects := s.Projects()
+	if len(projects) < 2 {
+		return nil
+	}
+	if !cmd.SeveralProjects {
+		// The session's own refusal, so the code and wording have one source.
+		_, err := s.RequireProject()
+		return err
+	}
+	return ValidProjectSet(projects)
+}
+
+// ValidProjectSet refuses a set of projects holding anything that is not a
+// project key.
+func ValidProjectSet(projects []string) error {
+	for _, p := range projects {
+		if !site.ValidProjectKey(p) {
+			return site.InvalidProjectKey(p).
+				WithDetail("a repeated --project takes project keys; one --project " +
+					"alone is passed to Jira as typed. A key starts with a letter " +
+					"and continues with letters, digits, or underscores")
+		}
+	}
+	return nil
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/kmoneil/jr/internal/buildinfo"
 	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/jctx"
 	"github.com/kmoneil/jr/internal/nearest"
 	"github.com/kmoneil/jr/internal/registry"
 	"github.com/kmoneil/jr/internal/render"
@@ -87,7 +88,7 @@ and go to stderr.`),
 	bind.boolean(&a.explain, registry.GlobalExplain)
 	bind.str(&a.contextName, registry.GlobalContext)
 	bind.str(&a.site, registry.GlobalSite)
-	bind.str(&a.project, registry.GlobalProject)
+	bind.strs(&a.projects, registry.GlobalProject)
 	bind.str(&a.board, registry.GlobalBoard)
 	bind.str(&a.apiVersion, registry.GlobalAPIVersion)
 	bind.str(&a.caBundle, registry.GlobalCABundle)
@@ -279,6 +280,9 @@ func (a *app) runLeaf(
 		if err := validateFlags(cmd, rc); err != nil {
 			return err
 		}
+		if err := a.checkProjectScope(rc); err != nil {
+			return err
+		}
 
 		inv, err := a.newInvocation(cmd, rc, binder, args)
 		if err != nil {
@@ -298,6 +302,26 @@ func (a *app) runLeaf(
 		}
 		return a.runDocument(cmd.Context(), rc, inv)
 	}
+}
+
+// checkProjectScope makes registry.Gate's two refusals about a repeated
+// --project before a session exists: a repeat on a command that reads one
+// project, and a member of a set that is not a project key.
+//
+// Gate makes them from the session, which is what covers a tool call. They are
+// made here as well for the two paths Gate does not reach on the command line.
+// --explain answers before Gate runs. And a command with no session never
+// reaches it at all: `context show` would print a resolution with no project
+// in it and say nothing about the two it had been given.
+func (a *app) checkProjectScope(rc *registry.Command) error {
+	projects := jctx.DistinctProjects(a.projects)
+	if len(projects) < 2 {
+		return nil
+	}
+	if !rc.SeveralProjects {
+		return jctx.ProjectRepeated(len(projects))
+	}
+	return registry.ValidProjectSet(projects)
 }
 
 // admit runs the declaration's gates and then the command's own validation,
@@ -401,7 +425,7 @@ func (a *app) emitResult(
 			rc.Name(), doc.Kind, doc.Version)
 	}
 	doc.Site = siteOf(inv)
-	doc.Project, doc.Board = scopeOf(inv)
+	doc.SetScope(scopeOf(inv))
 	return a.emit(doc)
 }
 
@@ -431,13 +455,13 @@ func siteOf(inv *registry.Invocation) string {
 // is not a hole: newInvocation wraps every session it builds, and a caller that
 // assembles its own — a test, a future embedder — gets an envelope with no
 // scope rather than a wrong one.
-func scopeOf(inv *registry.Invocation) (project, board string) {
+func scopeOf(inv *registry.Invocation) render.Scope {
 	if inv == nil {
-		return "", ""
+		return render.Scope{}
 	}
 	w, ok := inv.Jira.(*registry.ScopeWatcher)
 	if !ok {
-		return "", ""
+		return render.Scope{}
 	}
 	return w.Scope()
 }
@@ -526,13 +550,15 @@ func (a *app) newInvocation(
 // the suite.
 func (a *app) refuseEmptyScopes(persistent *pflag.FlagSet) error {
 	for _, scope := range []struct {
-		name  string
-		value string
+		name   string
+		values []string
 	}{
-		{registry.GlobalProject, a.project},
-		{registry.GlobalBoard, a.board},
+		{registry.GlobalProject, a.projects},
+		{registry.GlobalBoard, []string{a.board}},
 	} {
-		if !persistent.Changed(scope.name) || scope.value != "" {
+		// Any one of a repeated --project being empty is the same request as
+		// the only one being empty: a value nobody means.
+		if !persistent.Changed(scope.name) || !slices.Contains(scope.values, "") {
 			continue
 		}
 		return errs.Usage("EMPTY_SCOPE",
@@ -570,6 +596,17 @@ func (b *globalBinder) declaration(name string) registry.Flag {
 func (b *globalBinder) str(p *string, name string) {
 	f := b.declaration(name)
 	b.flags.StringVar(p, f.Name, f.Default, f.Usage)
+}
+
+// strs binds a global that may be given more than once. Each occurrence is one
+// value: no comma splitting, which is how every repeatable flag a command
+// declares is bound.
+func (b *globalBinder) strs(p *[]string, name string) {
+	f := b.declaration(name)
+	if !f.Repeatable {
+		panic("cli: global flag --" + name + " is bound as a list and not declared repeatable")
+	}
+	b.flags.StringArrayVar(p, f.Name, nil, f.Usage)
 }
 
 func (b *globalBinder) boolean(p *bool, name string) {
