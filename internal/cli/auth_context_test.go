@@ -361,6 +361,37 @@ func TestAuthStatusSaysWhetherTheCredentialIsSiteScoped(t *testing.T) {
 	}
 }
 
+// TestLoginAndStatusAgreeOnWhetherTheCredentialIsSiteScoped holds the two
+// commands that render one credential to one answer about it.
+//
+// A login stores the credential keyed by the site's host, so the credential it
+// reports is the one a lookup for that site returns. It reported
+// `site-scoped="false"` and `auth status` reported `true` a moment later, for
+// the same site and the same store: a consumer reading the login result
+// believed the credential followed whatever site an invocation resolved, which
+// is the environment's behaviour and not the store's.
+//
+// Both answers are asserted, in one test, so neither can be fixed by moving the
+// other.
+func TestLoginAndStatusAgreeOnWhetherTheCredentialIsSiteScoped(t *testing.T) {
+	env := session(t)
+	login := runWithStdin(t, env, strings.NewReader("stored-token"),
+		"auth", "login", "--no-verify", "--site", "acme.atlassian.invalid", "--token-stdin")
+	if login.exit != exitcode.OK {
+		t.Fatalf("login: %v\n%s", login.exit, login.stderr)
+	}
+	status := mustRun(t, env, "auth", "status", "--site", "acme.atlassian.invalid")
+
+	const scoped = `site-scoped="true"`
+	if !strings.Contains(status.stdout, scoped) {
+		t.Fatalf("a credential from the store is not reported as site-scoped:\n%s", status.stdout)
+	}
+	if !strings.Contains(login.stdout, scoped) {
+		t.Errorf("the login reports the credential it stored differently from the status that reads it back:\n"+
+			"login:\n%s\nstatus:\n%s", login.stdout, status.stdout)
+	}
+}
+
 // TestLogoutCannotRemoveAnEnvironmentCredential stops `auth logout` reporting
 // success while the site stays authenticated.
 func TestLogoutCannotRemoveAnEnvironmentCredential(t *testing.T) {
