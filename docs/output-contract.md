@@ -2526,6 +2526,23 @@ The rows:
   to send differently. A value that was stable and *correct* is still the text
   row's: this one is only for a value the tool's own account of it says was
   wrong.
+- A command making more requests than it did for the same input, with its
+  answer unchanged: **additive, so the patch position moves**, and the count is
+  listed under **Output contract**. The reader it costs something passed
+  `--max-requests` with a budget that was exactly enough. That invocation is
+  one short now, and stops as `REQUEST_BUDGET_EXCEEDED` at exit 3 where it
+  answered, which reads like the refusal row and is not it. That row's reader
+  sent a form that is no longer taken. This one sent a ceiling on a cost that
+  already moves with the data: a listing that fit one page yesterday takes two
+  today with nothing released, and a budget that was exactly enough is refused
+  then as well. Meeting the ceiling is what it was passed for. The row was
+  written on 2026-10-13 for 0.20.1, where an empty answer over one project on
+  Jira Cloud began costing a second request, and it should have been written
+  with that change and not at the release. The practice is older than the row:
+  0.18.0 added a request to every `issue activity` run and listed it beside
+  the two rows it was priced on. **What the extra request can refuse is not
+  this row.** A check that turns an answer into an error is priced by the
+  answer it replaces.
 - Adding a command: **additive, so the patch position moves.** No invocation
   anybody makes changes, no document anybody parses changes shape, and
   `jr schema` grows by a leaf. The reader it matters to is looking for a
