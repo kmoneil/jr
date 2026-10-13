@@ -20,6 +20,136 @@ accident.
 
 Nothing yet.
 
+## [0.20.1] - 2026-10-13
+
+**Take this one if you read `jr`'s timestamps anywhere but UTC, or if a
+context or a script of yours can name a project that is gone.** `--tz` writes
+timestamps in a zone you name (issue 218). And on Jira Cloud an empty answer
+over a project Jira does not know is now refused, where through 0.20.0 it was
+reported as an empty result at exit 0.
+
+**One consequence worth knowing before you upgrade:** on Jira Cloud, a search
+over one project that reads no issue now costs a second request. A
+`--max-requests` that was exactly enough for that answer is one short, and the
+command stops at the budget, `REQUEST_BUDGET_EXCEEDED` at exit 3, where it
+answered at exit 0. `--max-requests 1` on `issue list` is the plain case: make
+it 2.
+
+**Timestamps in a zone you choose.** Every timestamp `jr` printed was UTC,
+while every date it is given is read in the Jira account's zone, so a write-up
+for people in one place meant converting each one by hand.
+
+```console
+$ jr issue get ENG-101 --tz Europe/Berlin | grep -E 'created|updated'
+  <created>2026-05-12T01:30:00+02:00</created>
+  <updated>2026-05-12T11:10:00+02:00</updated>
+```
+
+- `--tz` takes `utc` (the default, and the same bytes as before), `account`
+  (the zone on your Jira profile, for one GET to `/myself`), `local` (the
+  machine `jr` runs on), or an IANA name such as `America/Chicago`. The value
+  keeps its offset, so it is still one instant, still RFC 3339, and still goes
+  straight back into any date flag.
+- It can be asked for in three places, and the nearest wins: `--tz`, then
+  `JIRA_TZ`, then a context's `tz`, which `jr context create --tz` and `jr
+  context edit --tz` set and `--unset tz` clears. `jr context show` reports the
+  one in effect.
+- The flag exists only on a command that writes a timestamp. `jr schema
+  <command>` lists it there, and `jr version --tz local` is an unknown flag.
+  `JIRA_TZ` and a context's `tz` are ignored by a command with nothing to
+  respell.
+- Over MCP a tool call takes `tz` on the same commands, and one that names none
+  falls back to the zone `jr mcp serve` was started with.
+- The zone is settled before the command runs. A write under `--tz account`
+  that cannot learn the zone is refused before anything is sent, so it cannot
+  change Jira and then fail to say so.
+- What stays in UTC: `jr doctor`, which has no `--tz`, because under `account`
+  its zone would be a request made with the credential it is there to
+  diagnose; every instant in a warning or an error on stderr, the `reached` of
+  a walk that was cut short and the bounds in `EMPTY_RESULT` among them; and
+  `version`'s `built`. A `date` has no zone and does not move.
+- A zone that names nothing is `INVALID_TZ` at exit 2, and the message says
+  whether it was read from `--tz`, `JIRA_TZ` or the context. An empty `--tz` is
+  refused and not read as UTC. `JIRA_TZ` is checked on every command, as
+  `JIRA_FORMAT` is.
+- Sorting a timestamp column as text sorts it by time only in UTC. Under a zone
+  with daylight saving, use `--sort` or parse the values.
+- Measured against Jira Cloud. On Data Center it is covered by recorded
+  fixtures and has not been run against a live server.
+
+**An unknown project is not an empty result.** Jira Cloud answers a search over
+a project it has never heard of with HTTP 200 and no rows, which is exactly
+what it says of a real project with nothing in it, and `jr` passed both on as
+`EMPTY_RESULT` at exit 0. A context whose project had been deleted or renamed
+went on reporting that there was nothing to do.
+
+- When `issue list`, `issue activity` or `issue changes` reads no issue at all
+  over a scope of one project, it asks Jira about the project, and refuses with
+  `UNKNOWN_PROJECT` at exit 5, in Jira's own words, when Jira does not know it.
+  Nothing has reached stdout at that point, in any format, and an MCP caller
+  gets the same refusal.
+- The scope is asked about wherever it came from: `--project`, `JIRA_PROJECT`,
+  or the context.
+- A project that exists and holds nothing that matches is still an empty result
+  at exit 0.
+- The question costs one request, and only when no issue came back. An answer
+  with rows is never asked about. A poll of `issue changes` that finds nothing
+  updated pays it on every tick.
+- Jira Cloud only. Data Center refuses such a search itself, as `BAD_REQUEST`
+  at exit 2 (measured on 10.4.0), and that has not changed.
+- TSV writes its header with the first row, or at the end of a collection that
+  has none, so a command that reads an empty page and then refuses has written
+  nothing. Output from a command that succeeds is the same bytes.
+
+### Documentation
+
+- docs/output-contract.md: a section for `--tz`, with what moves and what does
+  not; `EMPTY_RESULT` says when a project is asked about and what that costs;
+  `UNKNOWN_PROJECT` covers one project as well as a set. The stability policy
+  gains a row for a command that makes more requests than it did.
+- docs/troubleshooting.md: entries for `INVALID_TZ` and for `UNKNOWN_PROJECT`
+  on one project.
+- docs/recipes.md: writing timestamps in a zone.
+- The skill tells an agent to ask for a zone and not convert by hand, and that
+  no rows over a project that does not exist is an error.
+
+### Internal
+
+- A sweep runs every command the test harness can answer under a zone, on both
+  deployments' fixtures, and fails on any timestamp left in UTC. It is the
+  check for an instant built into a field declared a string, which every other
+  check would pass. It found none.
+- Two recordings from Jira Cloud: the empty answer over a project that does not
+  exist and over one that does, which the search answers identically.
+
+### Output contract
+
+- `context.get` **v3** and `context.list` **v3**: an optional `tz` attribute,
+  absent when no zone is set.
+- `timestamp` is RFC 3339, in UTC unless a zone was asked for, and then with
+  that zone's offset in the value. No kind that holds one moved, and with no
+  zone asked for every document is the bytes it was.
+- New error code `INVALID_TZ`, exit 2. `NO_ACCOUNT_TIMEZONE` and
+  `UNKNOWN_ACCOUNT_TIMEZONE`, exit 2, are also reached by `--tz account`.
+- `UNKNOWN_PROJECT`, exit 5, is also reached by one project that answers empty
+  on Jira Cloud, where the result was `EMPTY_RESULT` at exit 0.
+- On Jira Cloud an answer with no issues over one project costs one more
+  request than it did.
+- **Priced a patch.** Each change is additive by its row. `--tz` was an unknown
+  flag and now answers: accepting an input that used to be refused. Two kinds
+  gain an optional attribute. `INVALID_TZ` is reached only through `--tz`,
+  `JIRA_TZ` or a context's `tz`, none of which `jr` read before. An unknown
+  project reported as empty was a successful answer that was wrong, and an
+  error code for that condition is additive. The extra request is priced by a
+  row this release writes: a command that makes more requests than it did is
+  additive and is listed, which is what 0.18.0 did with the request it added
+  to every `issue activity` run. The reader that row costs something is the
+  one named at the top of this section, whose budget was exactly enough.
+- `JIRA_TZ` is a name `jr` did not read before, so no setting made for `jr` is
+  refused. A shell that already exports it for something else now has it read,
+  and refused on every command if it is not a zone.
+- No exit code changed meaning.
+
 ## [0.20.0] - 2026-10-12
 
 **Take this one if you ask about more than one project, and read it first if
@@ -3539,7 +3669,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.20.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.20.1...main
+[0.20.1]: https://github.com/kmoneil/jr/releases/tag/v0.20.1
 [0.20.0]: https://github.com/kmoneil/jr/releases/tag/v0.20.0
 [0.19.8]: https://github.com/kmoneil/jr/releases/tag/v0.19.8
 [0.19.7]: https://github.com/kmoneil/jr/releases/tag/v0.19.7
