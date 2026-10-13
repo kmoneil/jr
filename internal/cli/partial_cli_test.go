@@ -103,3 +103,47 @@ func TestAnOrdinaryFailureStillWritesNothingToStdout(t *testing.T) {
 		t.Errorf("a failure that applied nothing wrote to stdout:\n%s", got.stdout)
 	}
 }
+
+// TestAHalfAppliedWriteIsWrittenInTheZoneToo is the one document that reaches
+// stdout by a third route: carried by an error, and written on the way out.
+//
+// It is the write-up case exactly. Something was applied, something was not,
+// and the timestamps on what was applied are what somebody copies into the
+// account of what happened. Written in UTC beside a command line that asked
+// for Berlin, they would be the hand conversion the flag exists to end, in the
+// one result where nobody is in a mood to do arithmetic.
+func TestAHalfAppliedWriteIsWrittenInTheZoneToo(t *testing.T) {
+	const kind = "test.half-applied.dated"
+	render.RegisterSchema(kind, &render.Schema{
+		Element: "epic",
+		Attrs: []render.Field{
+			{Name: "id", Type: render.TypeString},
+			{Name: "at", Type: render.TypeTimestamp},
+		},
+	})
+	doc := render.Record(kind, 1, render.El("epic").
+		Attr("id", "ENG-42").Attr("at", "2026-05-12T09:10:00Z"))
+	cause := errs.Permission("FORBIDDEN", "not allowed to edit that project")
+
+	r := registry.New()
+	r.Register(&registry.Command{
+		Path:      []string{"probe", "half"},
+		Summary:   "Apply some of it and stop",
+		Example:   "jr probe half",
+		Mutating:  true,
+		NeedsJira: true,
+		Outputs:   []registry.Output{{Kind: kind, Version: 1}},
+		ExitCodes: []exitcode.Code{exitcode.Blocked, exitcode.Permission},
+		Run: func(_ context.Context, _ *registry.Invocation) (*render.Doc, error) {
+			return nil, &registry.PartiallyApplied{Doc: doc, Cause: cause}
+		},
+	})
+
+	got := runGated(t, r, nil, "probe", "half", "--tz", "Europe/Berlin")
+	if got.exit != exitcode.Permission {
+		t.Errorf("exit = %v, want %v\nstderr: %s", got.exit, exitcode.Permission, got.stderr)
+	}
+	if !strings.Contains(got.stdout, `at="2026-05-12T11:10:00+02:00"`) {
+		t.Errorf("what was applied is not written in the zone asked for:\n%s", got.stdout)
+	}
+}

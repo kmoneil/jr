@@ -24,6 +24,7 @@ func Write(w io.Writer, d *Doc, f Format) error {
 	if err := d.Validate(); err != nil {
 		return err
 	}
+	d = d.inZone()
 	return encode(w, f, func(bw *writer) {
 		switch f {
 		case XML:

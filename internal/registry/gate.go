@@ -43,6 +43,9 @@ func Gate(cmd *Command, inv *Invocation) error {
 	if err := checkProjectScope(cmd, inv.Jira); err != nil {
 		return err
 	}
+	if err := checkZoneTyped(cmd, inv); err != nil {
+		return err
+	}
 
 	// A preview is not the thing being confirmed. --yes exists to confirm an
 	// irreversible action, and refusing to *show* the request until it has been

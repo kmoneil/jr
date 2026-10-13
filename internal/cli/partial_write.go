@@ -49,5 +49,8 @@ func (a *app) writeAppliedSoFar(
 	if ferr != nil {
 		return true, ferr
 	}
+	// The zone the whole result would have been written in. It was settled
+	// before the command ran, which is why it is here to use.
+	partial.Doc.Zone = inv.Zone
 	return true, render.Write(a.stdout, partial.Doc, format)
 }

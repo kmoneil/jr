@@ -296,6 +296,18 @@ func (s *Server) invocation(
 			return nil, "", err
 		}
 	}
+	// After every refusal and before the command runs, as on the command
+	// line: a write must not succeed and then fail to be written down.
+	//
+	// The call's own tz is already among its flags: the argument is derived
+	// from the command, as limit is, so only a tool that writes a timestamp
+	// advertises it and any other refuses it as unknown. The server's setting
+	// is what a call falls back to.
+	if err := registry.SettleZone(ctx, cmd, inv, registry.ZoneDefault{
+		Setting: s.opt.TZ, From: "this server's timezone setting",
+	}); err != nil {
+		return nil, "", err
+	}
 
 	format, err := resolveFormat(cmd, args)
 	if err != nil {

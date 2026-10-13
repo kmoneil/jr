@@ -1348,9 +1348,44 @@ names only the half that is missing, so being asked for `--end` alone means the
 start date is already set.
 
 `INVALID_SPRINT_DATE` means the value is not RFC 3339. A bare `2026-08-17` names
-no time and no zone, and `jr` will not pick one for you — that would decide when
-your iteration begins. An offset is fine and is normalized to UTC:
+no time and no zone, and `jr` will not pick one for you, since that would decide
+when your iteration begins. An offset is fine and is normalized to UTC:
 `2026-08-17T11:00:00+02:00` is sent, and reported, as `2026-08-17T09:00:00Z`.
+
+### `INVALID_TZ`, and timestamps in the wrong zone
+
+Every timestamp `jr` prints is UTC unless you ask otherwise. To read them in
+another zone, ask, and do not convert them by hand:
+
+```console
+$ jr issue get ENG-101 --tz Europe/Berlin
+$ jr issue activity --since -1d --tz account     # the zone on your Jira profile
+$ JIRA_TZ=America/Chicago jr issue list          # every command in this shell
+$ jr context edit work --tz account              # every command under this context
+```
+
+The value keeps its offset, `2026-05-12T11:10:00+02:00`, so it is still one
+instant and still goes back into any date flag.
+
+`INVALID_TZ` at exit 2 means the zone named is not `utc`, `account`, `local`, or
+a zone name `jr` knows. The message says where it was read from, which matters
+when it is `JIRA_TZ` or a context and you typed nothing. Names are IANA names,
+spelled exactly: `Europe/Berlin`, not `berlin` and not `CEST`. An abbreviation is
+not a zone, because `CST` is three of them.
+
+`unknown flag: --tz` means the command writes no timestamp, so there is nothing
+for the flag to change. `jr schema <command>` lists `--tz` on the commands that
+have it. `jr doctor` is the one command that prints timestamps and has no
+`--tz`: it stays in UTC so that it can still run when your account cannot be
+reached. `JIRA_TZ` and a context's `tz` never cause this. They are ignored by a
+command with nothing to respell.
+
+`NO_ACCOUNT_TIMEZONE` under `--tz account` means the site reported no zone for
+your account. Name the zone instead.
+
+If you sort rows by a timestamp column as text, do it in UTC, or use `--sort`.
+Under a zone with daylight saving the offset changes twice a year, and text
+order stops being time order across the change.
 
 ## Writes
 

@@ -91,13 +91,20 @@ real problem is that they never logged in.
 
 The deployment probe is read from its cache when a valid entry exists, and says
 which. Pass --refresh to force it. The clock is never cached, because a cached
-clock is not a clock.`),
+clock is not a clock.
+
+Its timestamps are UTC whatever JIRA_TZ or the context says, and it has no --tz.
+The account's zone is a question for the site, and this is the command that has
+to answer when the site cannot be asked.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " doctor",
 			buildinfo.App + " doctor --format json",
 			buildinfo.App + " doctor --context work --refresh",
 		}, "\n"),
 		Outputs: []registry.Output{{Kind: kindDoctor, Version: versionDoctor}},
+		// A context can set `tz = "account"`, and resolving that is a request
+		// with the credential this command exists to diagnose.
+		TimestampsStayUTC: true,
 		// No exit codes beyond the universal 0, 1, and 2. That is the contract
 		// rather than an omission: every failure this command is about is a
 		// verdict inside its document. See runDoctor.

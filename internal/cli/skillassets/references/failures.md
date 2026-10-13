@@ -160,6 +160,7 @@ Two specifics worth knowing:
 | `IDEMPOTENCY_KEY_REUSED` | 7 | The key was already used for a *different* operation. Answering one with the other's result would be worse than refusing. Use a new key |
 | `SPRINT_HAS_NO_DATES` | - | Jira will not run a sprint with no window. The refusal names only the missing half, so being asked for `--end` alone means the start is already set |
 | `INVALID_SPRINT_DATE` | - | Not RFC 3339. A bare `2026-08-17` names no time and no zone. An offset is fine and normalizes to UTC |
+| `INVALID_TZ` | 2 | `--tz`, `JIRA_TZ` or a context's `tz` is not `utc`, `account`, `local` or an IANA name spelled exactly (`Europe/Berlin`). The message says which of the three it came from. `unknown flag: --tz` is different: that command prints no timestamp |
 | `SPRINTS_REFUSED` | - | Usually a kanban board. Only scrum boards have sprints. `detail` keeps the server's own message |
 
 ## Network and server

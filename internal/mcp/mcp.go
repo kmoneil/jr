@@ -61,6 +61,12 @@ type Options struct {
 	// call rather than once, so a credential change between calls is picked up
 	// and a failure to connect fails one tool rather than the server.
 	Session func() (registry.Session, error)
+
+	// TZ is the zone a tool call's timestamps are written in when the call
+	// names none: `utc`, `account`, `local`, or an IANA name, and empty for
+	// UTC. It is the server's own setting, from the invocation that started
+	// it, and `local` means the machine the server runs on.
+	TZ string
 }
 
 // request is an incoming JSON-RPC message. ID is absent for a notification,
@@ -416,6 +422,7 @@ func (s *Server) run(
 	}
 	doc.Site = siteOf(inv)
 	doc.SetScope(scopeOf(inv))
+	doc.Zone = inv.Zone
 	if err := render.Write(&out, doc, format); err != nil {
 		return "", err
 	}
@@ -462,6 +469,7 @@ func streamInto(ctx context.Context, out *strings.Builder, cmd *registry.Command
 		Columns: columnsFor(cmd, inv),
 		Site:    siteOf(inv),
 		Scope:   func() render.Scope { return scopeOf(inv) },
+		Zone:    inv.Zone,
 	})
 	if err != nil {
 		return err

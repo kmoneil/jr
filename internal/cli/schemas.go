@@ -2,6 +2,7 @@ package cli
 
 import (
 	"github.com/kmoneil/jr/internal/auth"
+	"github.com/kmoneil/jr/internal/registry"
 	"github.com/kmoneil/jr/internal/render"
 )
 
@@ -142,6 +143,10 @@ func contextSchema(resolved bool) *render.Schema {
 			{Name: "ca-bundle", Type: render.TypeString, Optional: true},
 			{Name: "client-cert", Type: render.TypeString, Optional: true},
 			{Name: "client-key", Type: render.TypeString, Optional: true},
+			// The zone timestamps are written in, as it was asked for: one of
+			// the three words or an IANA name. Absent means nobody set one,
+			// which is UTC, and is every context made before the setting was.
+			{Name: registry.ZoneFlagName, Type: render.TypeString, Optional: true},
 		},
 		Children: []render.Child{
 			{Schema: render.ListSchema("fields", "field",

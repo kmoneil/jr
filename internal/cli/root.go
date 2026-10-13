@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -119,6 +120,12 @@ and go to stderr.`),
 			if _, err := render.ParseFormat(a.requestedFormat); err != nil {
 				return err
 			}
+		}
+		// JIRA_TZ, on every command, on the terms JIRA_FORMAT is checked: a
+		// name that is no zone should stop the shell's first command and not
+		// the first one that happens to print a timestamp.
+		if err := registry.CheckZone(registry.EnvTZ, a.getenv(registry.EnvTZ)); err != nil {
+			return err
 		}
 		return a.refuseEmptyScopes(cmd.Root().PersistentFlags())
 	}
@@ -324,22 +331,64 @@ func (a *app) checkProjectScope(rc *registry.Command) error {
 	return registry.ValidProjectSet(projects)
 }
 
+// settleZone resolves the zone this command's timestamps are written in, from
+// its --tz, then JIRA_TZ, then the context, and leaves it on the invocation.
+//
+// It is the last step of admit, and so before the command runs, for the reason
+// registry.SettleZone gives: a write must not be able to succeed and then fail
+// to say so.
+//
+// A command that takes no zone resolves no context for one. That is every
+// command without a timestamp, and `doctor`, which has to run when the context
+// is the thing that is broken.
+func (a *app) settleZone(
+	ctx context.Context, rc *registry.Command, inv *registry.Invocation,
+) error {
+	if !rc.TakesZone() {
+		return nil
+	}
+	cfg, err := a.config()
+	if err != nil {
+		return err
+	}
+	resolved, err := a.resolve(cfg)
+	if err != nil {
+		return err
+	}
+	return registry.SettleZone(ctx, rc, inv, zoneDefault(resolved))
+}
+
+// zoneDefault is the zone the environment or the context asks for, and which
+// of the two it was, for a refusal of it.
+func zoneDefault(r *jctx.Resolved) registry.ZoneDefault {
+	from := registry.EnvTZ
+	if r.TZSource == jctx.FromContext {
+		from = fmt.Sprintf("context %q", r.Name)
+	}
+	return registry.ZoneDefault{Setting: r.TZ, From: from}
+}
+
 // admit runs the declaration's gates and then the command's own validation,
 // before anything is written, which matters for a streaming command: its
 // header goes out before its body runs, so a flag rejected later would
 // arrive after output had started. Read-only and confirmation are enforced
 // from the declaration, so a resource author cannot ship a verb that forgets
-// them, and both come before Validate and before any network call.
+// them, and both come before Validate and before any network call. The zone
+// the result's timestamps are written in is settled here as well, after both.
 func (a *app) admit(
 	ctx context.Context, rc *registry.Command, inv *registry.Invocation,
 ) error {
 	if err := a.gate(rc, inv); err != nil {
 		return err
 	}
-	if rc.Validate == nil {
-		return nil
+	if rc.Validate != nil {
+		if err := rc.Validate(ctx, inv); err != nil {
+			return err
+		}
 	}
-	return rc.Validate(ctx, inv)
+	// Last, so a command that was going to be refused is refused without
+	// paying for a zone, and still before anything runs.
+	return a.settleZone(ctx, rc, inv)
 }
 
 // answerAboutTheCommand handles the flags whose answer needs no invocation:
@@ -426,6 +475,7 @@ func (a *app) emitResult(
 	}
 	doc.Site = siteOf(inv)
 	doc.SetScope(scopeOf(inv))
+	doc.Zone = inv.Zone
 	return a.emit(doc)
 }
 

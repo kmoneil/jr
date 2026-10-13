@@ -2,6 +2,7 @@ package render
 
 import (
 	"slices"
+	"time"
 
 	"github.com/kmoneil/jr/internal/errs"
 )
@@ -59,6 +60,16 @@ type Doc struct {
 	// was written when it could only hold a key, so the set has a name of its
 	// own and the two are never both written.
 	Projects []string
+
+	// Zone is the timezone every timestamp in the payload is written in, or
+	// nil for UTC, which is how a resource built them and how they are written
+	// when nobody asks for anything else.
+	//
+	// It is set by whoever owns the stream a person or an agent reads, and by
+	// nobody else. A plan written to a file is read back by `apply`, and a
+	// document compared against a recording is compared as it was built, so
+	// neither is given one. See zone.go.
+	Zone *time.Location
 
 	// Exactly one of Collection and Record is set.
 	Collection *Collection
