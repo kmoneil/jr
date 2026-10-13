@@ -416,6 +416,29 @@ var flagWithNoObservableEffect = map[string]string{
 	"issue.sequence/--dry-run": "means something only beside --apply, which " +
 		"needs a plan file this sweep has no way to write; " +
 		"TestADryRunOfAnApplySendsNothing previews a real one",
+
+	// --tz respells the timestamps in a result, and these four are driven as
+	// dry runs, whose document is the request that would be sent and has no
+	// timestamp in it. The flag is not read by any command: it is derived
+	// from the kind each one declares, settled before the command runs, and
+	// applied by the one writer every result passes through, so there is no
+	// per-command code for it to be dropped by. TestAWriteIsAnsweredInTheZone
+	// drives a real `issue comment add` through that path, and
+	// TestUnderAZoneNoTimestampIsLeftInUTC holds every command this sweep can
+	// answer to it.
+	"issue.comment.add/--tz": "driven as a dry run, which holds no timestamp; " +
+		"TestAWriteIsAnsweredInTheZone sends a real one",
+	"issue.worklog.add/--tz": "driven as a dry run, which holds no timestamp; " +
+		"the same writer and the same path as issue comment add",
+	"sprint.create/--tz": "driven as a dry run, which holds no timestamp; " +
+		"it writes the sprint shape `sprint get` writes, which is driven here",
+	"sprint.start/--tz": "driven as a dry run, which holds no timestamp; " +
+		"it writes the sprint shape `sprint get` writes, which is driven here",
+	// The fixture's board runs two active sprints, so this is refused as
+	// ambiguous before it has a sprint to write, with the flag and without.
+	"sprint.current/--tz": "refused as AMBIGUOUS_SPRINT by this fixture before " +
+		"anything is written; it writes the sprint shape `sprint get` " +
+		"writes, which is driven here",
 }
 
 // commandNotSwept names every command carrying flags this sweep never drives,
@@ -453,6 +476,9 @@ var commandNotSwept = map[string]string{
 	"schema": "describes the binary rather than a site; " +
 		"TestSchemaIsCompleteWithNoFlags drives --limit against the command list",
 	"context.delete": "writes config.toml; TestContextErrors",
+	"mcp.serve": "it owns stdout and speaks a protocol; its one flag is the " +
+		"zone its tools fall back to, and " +
+		"TestAToolCallIsWrittenInTheServersZoneUnlessItNamesOne drives it",
 	"context.edit": "writes config.toml, and every flag on it is covered one " +
 		"at a time by TestEditingOneSettingLeavesTheRestAlone, " +
 		"TestUnsetClearsWhatAnEmptyFlagCannot, and " +
@@ -522,6 +548,11 @@ var companionFlags = map[string]map[string]string{
 // probeAltByFlag is the second value, wherever "other" is not one the flag
 // accepts.
 var probeAltByFlag = map[string]string{
+	// A real zone, and one that is never at UTC's offset. The default second
+	// value, "other", is no zone at all: it would be refused at the gate, and
+	// a refusal moves the fingerprint on every command whether or not a
+	// single timestamp was respelled.
+	"tz": "Asia/Tokyo",
 	// One row against a fixture that answers with two, which is the only way a
 	// bound is observable at all: `--limit 50` and `--limit 1` against an empty
 	// collection produce the same request and the same document.
@@ -787,17 +818,27 @@ func runFor(
 			return err
 		}
 	}
+	// The zone, settled where the CLI settles it and handed to the writer the
+	// way the CLI hands it over. --tz changes nothing a command does and
+	// nothing it asks for, only how its timestamps are spelled, so a sweep
+	// that wrote the document without it would report the flag dead on every
+	// command that has it.
+	if err := registry.SettleZone(ctx, c, inv, registry.ZoneDefault{}); err != nil {
+		return err
+	}
 	if c.Stream == nil {
 		doc, err := c.Run(ctx, inv)
 		if err != nil {
 			return err
 		}
+		doc.Zone = inv.Zone
 		return render.Write(out, doc, render.XML)
 	}
 
 	stream, err := render.NewStream(out, render.XML, render.StreamSpec{
 		Kind: c.Kind(), Version: c.KindVersion(),
 		Name: c.CollectionName, Columns: columnsFor(c, inv),
+		Zone: inv.Zone,
 	})
 	if err != nil {
 		return err

@@ -473,6 +473,12 @@ saying the file was never read. Half a client certificate is
 `INVALID_CLIENT_CERT`, both refused before the request rather than at the
 handshake, where the error names the server instead of the file.
 
+`context.get` and `context.list` moved to **v3** together for one more optional
+attribute, `tz`: the zone timestamps are written in under that context, as it
+was asked for, `account` staying the word `account`. Absent means no zone was
+set, which is UTC and is every context made before the setting existed. On the
+effective form it is whichever of `JIRA_TZ` and the context won.
+
 `doctor`'s transport check reports the same three paths and the same proxy,
 and moved to **v2** on 2026-09-01 to add what a connection actually did, which
 configuration cannot say. All three are optional and present only once a
@@ -681,8 +687,9 @@ remedy           resume with --page-token, or raise --limit
   the key and the fields every row already carries, which cost nothing.
 - `order` is `asc` or `desc` as resolved. A named field ascends unless `--order`
   says otherwise, and `reached` reads the opposite way in each.
-- `reached` is that field's value on the last row written, exactly as the row
-  carries it: `updated` in UTC to the second, `project` as its key, a person as
+- `reached` is that field's value on the last row written, as the command built
+  it: `updated` in UTC to the second whatever `--tz` says, `project` as its key,
+  a person as
   the display name, any other field as the text its element holds under
   `--field`. The field is fetched for this whether or not a column shows it, and
   is not added to the rows.
@@ -1205,8 +1212,8 @@ the default field set — parsed, and then rendered in no format at all, so
 ### `--age` adds a column, and never changes one
 
 `jr issue list --age` and `jr issue get --age` append an `age` element rendering
-how long ago the issue was last updated — `3 hours`, `14 days` — beside an
-`updated` that is untouched and still RFC 3339 in UTC.
+how long ago the issue was last updated, `3 hours` or `14 days`, beside an
+`updated` that is untouched and still RFC 3339.
 
 That shape is the point. Rendering the timestamp itself as "3 hours" would break
 every consumer that parses it, silently, and for the caller who put the flag in
@@ -1232,7 +1239,8 @@ not what the column is about.
 
 ### Timestamps out are UTC; dates in are not
 
-Every timestamp this tool **emits** is RFC 3339 in UTC. That is a property of
+Every timestamp this tool **emits** is RFC 3339, and in UTC unless a zone was
+asked for, which is the next section. That is a property of
 the output and not of the server: an issue's `created` and `updated` are not RFC
 3339 on either deployment. They arrive as `2026-08-11T16:37:31.272+0000` from a
 recorded Data Center and as `2026-08-06T11:30:39.194-0500` from a recorded Cloud
@@ -1293,6 +1301,86 @@ client that computed an instant would be substituting its own. Where a caller
 means their own day rather than the account's, the way to say so is an instant
 carrying their own offset, `2026-08-10T00:00:00+12:00`, which needs no
 knowledge of the account's zone at all. `docs/recipes.md` has the shell for it.
+
+### `--tz` writes a timestamp in a zone, and never changes one
+
+Every command that writes a timestamp takes `--tz`, and writes each one in the
+zone it names, with the offset in the value:
+
+```console
+$ jr issue get ENG-101 --tz Europe/Berlin | grep -E 'created|updated'
+  <created>2026-05-12T01:30:00+02:00</created>
+  <updated>2026-05-12T11:10:00+02:00</updated>
+```
+
+Those are `2026-05-11T23:30:00Z` and `2026-05-12T09:10:00Z`, the same two
+instants, and the first of them is the next day in Berlin, which is the
+conversion somebody gets wrong doing it by hand. Each value is still RFC 3339,
+still parses in every format, and goes straight back into any date flag. The
+shape of the document does not change and no kind's version moves.
+
+It takes one of three words, or a zone's name:
+
+- **`utc`**, the default. Asking for it is the same bytes as asking for nothing.
+- **`account`**, the zone on the Jira account's profile. That is the zone Jira
+  reads every date you send in, so output in it matches input. It costs one
+  GET to `/myself`.
+- **`local`**, the zone of the machine `jr` runs on. Over MCP that is the
+  server's machine, which need not be where the reader is.
+- **An IANA name**, `Europe/Berlin` or `America/Chicago`, spelled exactly. The
+  zone database is compiled in, so the same names work on every platform.
+
+It can be asked for in three places, and the nearest wins: `--tz`, then
+`JIRA_TZ`, then the context's `tz`, which `jr context create --tz` and `jr
+context edit --tz` set and `--unset tz` clears. `jr context show` reports the
+one the environment and the context settle on.
+
+**The flag exists only where there is a timestamp to write.** It is derived
+from the kinds a command emits, as `--limit` is derived from pagination, so
+`jr schema <command>` lists it on exactly the commands it reaches and `jr
+version --tz local` is an unknown flag. A flag that was accepted there could
+only be ignored. `JIRA_TZ` and a context's `tz` are a different thing: they
+were not typed at one command, and a command with no timestamp runs under
+them untouched. A tool call over MCP takes `tz` on the same commands, and one
+that names none falls back to the zone `jr mcp serve` was started with.
+
+**What moves is what a kind declares a `timestamp`**, which `jr contract`
+shows. What does not:
+
+- A `date`. A calendar date has no zone, and a release date of the 12th is the
+  12th everywhere.
+- `version`'s `built`, a fact about the binary.
+- Cursors and tokens, which are opaque.
+- **Every instant in a warning or an error on stderr**: the bounds in
+  `EMPTY_RESULT` and `DATE_ROUNDED`, and the `reached` of a sorted walk that was
+  cut short. Those stay UTC. They are what a script compares across runs and
+  pastes into the next command, and under a zone the row beside `reached`
+  spells the same instant differently.
+
+**`doctor` is always UTC**, and has no `--tz`. Under `account` its zone would
+be a request made with the credential it exists to diagnose, and a diagnostic
+that could not be printed because the thing it diagnoses is broken fails at the
+one moment it is needed. It ignores `JIRA_TZ` and the context's `tz`.
+
+**The zone is settled before the command runs.** `account` can fail, and a
+command that had already changed Jira and then could not write its result
+would report a failure about a write that happened. So a zone that cannot be
+resolved refuses the command while it has done nothing:
+
+| Code                       | Exit | Meaning                                                                                                                                                  |
+| -------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `INVALID_TZ`               | 2    | `--tz`, `JIRA_TZ`, or a context's `tz` is not `utc`, `account`, `local`, or a zone this build can read. The message names which of the three it was read from. An empty `--tz` is refused too: it does not mean UTC, it would fall back to `JIRA_TZ` and then to the context. `JIRA_TZ` is checked on every command, as `JIRA_FORMAT` is. |
+
+`--tz account` on a site that names no zone for the account is
+`NO_ACCOUNT_TIMEZONE`, and a zone it names that no database has is
+`UNKNOWN_ACCOUNT_TIMEZONE`, the two codes a date flag meets for the same
+reason. Name the zone instead.
+
+**Text order is not time order under a zone.** In UTC every value has the same
+offset, so sorting a timestamp column as text sorts it by time. A zone that
+changes its offset inside the period the rows cover, which is every zone with
+daylight saving, breaks that at the change. Use `--sort`, which the server
+applies to the instant, or parse the values.
 
 ### A minute is not accepted on every field
 
@@ -1383,7 +1471,7 @@ query, the events were compared against nothing, and the feed reported itself
 | Code                       | Exit | Meaning                                                                                                                                                  |
 | -------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `UNBOUNDABLE_DATE`         | 2    | `--since` names no instant this process can compute: a date function, on the one command that has to compare dates itself. `remedy` names the forms that work. |
-| `NO_ACCOUNT_TIMEZONE`      | 2    | An absolute `--since`, or an RFC 3339 instant on any date flag, and the site did not report the account's zone. Both deployments send one, so this is a site breaking its own contract; reading the literal as UTC anyway would be wrong by the offset with nothing in the output to say so. |
+| `NO_ACCOUNT_TIMEZONE`      | 2    | An absolute `--since`, or an RFC 3339 instant on any date flag, or `--tz account`, and the site did not report the account's zone. Both deployments send one, so this is a site breaking its own contract; reading the literal as UTC anyway would be wrong by the offset with nothing in the output to say so. |
 | `UNKNOWN_ACCOUNT_TIMEZONE` | 2    | The site named a zone this build cannot resolve. The zone database is compiled in, so this is a name no database has.                                     |
 
 All three are exit 2 and not 9. A missing field is malformed data, which is what
@@ -2564,8 +2652,10 @@ absent or repeated; and its text, when it carries any.
 
 The types are promises about the shape of the text, not JSON types, every
 format here is textual. `int` parses as a decimal integer. `bool` is exactly
-`true` or `false`, never `yes` or `1`. `timestamp` is RFC 3339 in UTC, which is
-why Jira's own formats are normalized before they are emitted. `date` is
+`true` or `false`, never `yes` or `1`. `timestamp` is RFC 3339: in UTC, unless
+the command was asked for a zone with `--tz`, and then with that zone's offset
+in the value. Jira's own formats are normalized before they are emitted either
+way. `date` is
 `YYYY-MM-DD` with no time, because Jira stores some dates without one and
 inventing midnight in a timezone would be a value nobody set.
 

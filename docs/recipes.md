@@ -102,9 +102,10 @@ the account's zone:
 $ jr issue list --created-after "$(TZ=Pacific/Auckland date -d 'today 00:00' -Iseconds)"
 ```
 
-Timestamps coming _back_ are always RFC 3339 in UTC, whichever way the query
-went in, and any of them can go straight back into a date flag. That is how to
-ask what else happened around a moment you found:
+Timestamps coming _back_ are RFC 3339 and in UTC, whichever way the query went
+in, unless you ask for a zone with `--tz`. Either way any of them can go
+straight back into a date flag, offset and all. That is how to ask what else
+happened around a moment you found:
 
 ```console
 $ jr issue activity --since 2026-05-12T08:30:00Z --until 2026-05-12T09:30:00Z
@@ -496,8 +497,28 @@ ENG-101  In Progress  Ada Lovelace   2026-08-10T14:30:31Z  Retry drops...   3 ho
 ```
 
 Both forms are in the row, so a script keeps parsing `updated` while you read
-`age`. It is coarse — one unit, no "ago" — and it stops at days, because a month
+`age`. It is coarse, one unit and no "ago", and it stops at days, because a month
 has no fixed length and this tool will not pick one for you.
+
+`--tz` writes the timestamps themselves in a zone, for a write-up somebody will
+read in local time. Do not convert them by hand: a conversion that is off by an
+hour across a clock change looks exactly like one that is right.
+
+```console
+$ jr issue get ENG-101 --tz Europe/Berlin | grep updated
+  <updated>2026-05-12T11:10:00+02:00</updated>
+
+# In the zone on your Jira profile, which is the zone your date flags are read in
+$ jr issue activity --since -1d --tz account
+
+# For every command under one context
+$ jr context edit work --tz account
+```
+
+The offset stays in the value, so it is still one unambiguous instant and a
+script can still parse it. `utc` is the default, `local` is the machine `jr`
+runs on, and anything else is an IANA name. Warnings and errors on stderr keep
+their instants in UTC.
 
 `--url` adds a bare browse URL, on `issue get` and `issue list` alike. It is a
 plain string rather than a terminal escape sequence, so it is both clickable in

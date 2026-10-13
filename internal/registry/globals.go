@@ -171,6 +171,7 @@ func (c *Command) InheritedGlobals() []Flag {
 		if slices.ContainsFunc(declared, func(f Flag) bool { return f.Name == g.Name }) {
 			continue
 		}
+
 		if g.Name == GlobalProject {
 			g.Repeatable = c.SeveralProjects
 		}

@@ -191,6 +191,15 @@ has to remember. It was in the CLI for exactly as long as the CLI was the only
 one, and `mcp serve` ran every mutating and destructive command ungated in the
 meantime.
 
+The zone a result's timestamps are written in is split along the same line.
+`registry` decides: `--tz` is a derived flag, like `--limit`, on every command
+whose kinds declare a timestamp, and `registry.SettleZone` resolves it before
+the command runs, because `account` is a request that can fail and a write must
+not succeed and then fail to be reported. `render` applies it, to the values a
+schema declares a `timestamp`, on a copy at the moment of writing. A resource
+does neither and never sees the zone: what it builds is UTC, which is what
+cursors, preconditions and plan files compare.
+
 A command never writes to stdout. It returns a `render.Doc` (a
 format-independent tree) and `internal/cli` decides the format and writes it.
 That is what lets every command support every format without knowing any of them

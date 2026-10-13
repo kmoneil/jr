@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/kmoneil/jr/internal/exitcode"
 	"github.com/kmoneil/jr/internal/idem"
@@ -179,6 +180,15 @@ type Command struct {
 	// never made silently. TestSeveralProjectsMatchesWhatTheCommandReads holds
 	// the declaration to the accessor the command actually calls.
 	SeveralProjects bool
+	// TimestampsStayUTC marks a command whose timestamps are written in UTC
+	// whatever --tz, JIRA_TZ or the context says.
+	//
+	// It is for a command that has to answer when the account cannot be
+	// asked. `doctor` is the one: under `account` its zone is a request to the
+	// site, and a diagnostic that could not be printed because the credential
+	// it is diagnosing does not work would fail exactly when it is needed.
+	// Such a command has no --tz, and ignores JIRA_TZ and the context's.
+	TimestampsStayUTC bool
 	// NeedsJira marks a command that talks to the configured site. The CLI
 	// layer builds a Session for it; a command without this never resolves a
 	// credential and never probes the deployment.
@@ -411,6 +421,11 @@ type Invocation struct {
 	Flags Flags
 	// Limit is the caller's requested result bound.
 	Limit Limit
+	// Zone is the timezone this invocation's timestamps are written in, or
+	// nil for UTC. SettleZone leaves it here before the command runs, and
+	// whoever writes the result hands it to the renderer. A command does not
+	// read it: what a resource builds is UTC, always.
+	Zone *time.Location
 	// Format is the resolved output format, for commands that need to know
 	// (almost none should).
 	Format render.Format
@@ -542,11 +557,19 @@ func (c *Command) Flag(name string) (Flag, bool) {
 //
 // One derivation, four consumers. A flag nobody writes down twice cannot be
 // written down differently.
+//
+// --tz is the second derived flag, on the same terms: every command that
+// writes a timestamp has it, and which commands those are is read off the
+// kinds they declare. See ZoneFlag.
 func (c *Command) AllFlags() []Flag {
-	if !c.Paginated {
-		return c.Flags
+	flags := c.Flags
+	if c.Paginated {
+		flags = append(slices.Clip(flags), c.LimitFlag())
 	}
-	return append(slices.Clip(c.Flags), c.LimitFlag())
+	if c.TakesZone() {
+		flags = append(slices.Clip(flags), ZoneFlag())
+	}
+	return flags
 }
 
 // LimitFlag is the --limit flag every paginated command carries.

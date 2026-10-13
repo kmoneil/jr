@@ -32,6 +32,15 @@ type Context struct {
 	Board   string   `toml:"board,omitempty"`
 	Fields  []string `toml:"fields,omitempty"`
 
+	// TZ is the zone timestamps are written in under this context: `utc`,
+	// `account`, `local`, or an IANA name. Empty is UTC.
+	//
+	// Per context because the reader is. Somebody with a context for a team
+	// in Berlin and one for a team in Chicago wants each answer in the zone
+	// of the people it is about, and an environment variable is one zone for
+	// the whole shell.
+	TZ string `toml:"tz,omitempty"`
+
 	// ReadOnly bakes read-only mode into the context. It is a one-way latch:
 	// see Resolved.ReadOnly.
 	ReadOnly bool `toml:"readonly,omitempty"`

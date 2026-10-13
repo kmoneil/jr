@@ -420,9 +420,57 @@ do not catch, add the test in the same change and cite it here.
   a reading of the literal that does not use the code under test.
   **Enforced by:** `TestEveryMinuteBoundHoldsTheInstantAndNamesOneReading`,
   `TestAWindowFloorNeverNamesAMinuteThatHappensTwice`.
+- **A zone changes how a timestamp is spelled, never which instant it names,
+  and never the document.** `--tz` is applied by the writer, to the values a
+  kind's schema declares a `timestamp`, on a copy. What a resource builds is
+  UTC and stays UTC, because a cursor, a precondition, `--age`, the feed's
+  window and a plan read back by `apply` all compare that text. A string or a
+  date that looks like a timestamp is left alone, since nothing declared it
+  one, and with no zone nothing is walked, so the default is the bytes it
+  always was.
+  **Enforced by:** `TestAZoneRespellsEveryDeclaredTimestampAndNothingElse`,
+  `TestARespelledTimestampNamesTheSameInstant`,
+  `TestNoZoneWritesTheDocumentAsBuilt`,
+  `TestAStreamedCollectionIsWrittenInItsZone`,
+  `TestTimestampsAreWrittenInTheZoneAskedFor`,
+  `TestACollectionIsWrittenInItsZoneInEveryFormat`,
+  `TestAHalfAppliedWriteIsWrittenInTheZoneToo`,
+  `TestAToolCallIsWrittenInTheServersZoneUnlessItNamesOne`.
+- **Under a zone, no timestamp a command writes is left in UTC.** The writer
+  respells what a schema declares. An instant built into a field declared a
+  string would pass every other check, because a string may hold anything, and
+  would be the one value still in UTC beside neighbours that had moved. Every
+  command the sweep can answer is driven under a zone on both deployments, and
+  what it wrote may hold none. The writer does not look inside an open shape,
+  so no kind may declare a timestamp in one.
+  **Enforced by:** `TestUnderAZoneNoTimestampIsLeftInUTC`,
+  `TestNoOpenShapeDeclaresATimestamp`.
+- **The zone is settled before the command runs.** `--tz account` is a request
+  to the site and can fail. Resolved when the result is written, a command that
+  had changed Jira would then fail to say so, and a caller told it failed
+  would send the write again. It is resolved after the gates and the command's
+  own validation and before anything else, and a command that takes no zone
+  resolves none, whatever the environment and the context ask for.
+  **Enforced by:** `TestAWriteIsAnsweredInTheZone`,
+  `TestTheZoneIsSettledBeforeTheCommandRuns`,
+  `TestACommandThatTakesNoZoneSettlesNone`,
+  `TestTheAccountsZoneIsAskedOfTheSite`.
 
 ## Flags and commands
 
+- **`--tz` exists only on a command that writes a timestamp.** It is derived
+  from the kinds a command emits and declared by nobody, so the parser, `jr
+  schema`, the generated reference and the MCP tool list cannot disagree about
+  which commands have it, and on any other it is an unknown flag rather than
+  one that is accepted and ignored. `doctor` declares a timestamp and declines
+  the flag: it has to answer when the account cannot be asked. A command that
+  has the flag also has a session, so `account` always has somebody to ask.
+  **Enforced by:** `TestACommandHasTheZoneFlagOnlyWhereItWritesATimestamp`,
+  `TestTheZoneFlagExistsOnlyWhereThereIsATimestamp`,
+  `TestOnlyAToolThatWritesATimestampTakesAZone`,
+  `TestEveryCommandThatTakesAZoneCanAskTheAccount`,
+  `TestTheGateRefusesATypedZoneThatNamesNothing`,
+  `TestAZoneThatNamesNothingIsRefused`.
 - **An argv means the same thing however it arrives.** `Command.ParseArgv` reads
   a command's own argv for a caller with no shell, and the command line reads
   the same words through cobra; both go through `registry.DeclareFlags`, and the

@@ -444,10 +444,11 @@ jr context create audit --site your-site.atlassian.net --readonly
 | `--ca-bundle` | `string` | — | PEM file of certificates to trust in addition to the system roots, for a site behind a TLS-intercepting proxy |
 | `--client-cert` | `string` | — | PEM certificate to present when the site asks for one |
 | `--client-key` | `string` | — | key for --client-cert; both are needed or neither |
+| `--tz` | `string` | — | timezone timestamps are written in under this context: utc\|account\|local\|<IANA name>; --tz and JIRA_TZ on an invocation override it |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `context.get` | v2 | always |
+| `context.get` | v3 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND
 
@@ -497,7 +498,7 @@ jr context delete work --yes
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `context.get` | v2 | always |
+| `context.get` | v3 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND, `10` BLOCKED
 
@@ -539,11 +540,12 @@ jr context edit work --unset board --unset field
 | `--ca-bundle` | `string` | — | PEM file of certificates to trust in addition to the system roots, for a site behind a TLS-intercepting proxy |
 | `--client-cert` | `string` | — | PEM certificate to present when the site asks for one |
 | `--client-key` | `string` | — | key for --client-cert; both are needed or neither |
-| `--unset` | `project\|board\|field\|credential\|readonly\|ca-bundle\|client-cert\|client-key` | — | clear a setting; repeat for several (repeatable) |
+| `--tz` | `string` | — | timezone timestamps are written in under this context: utc\|account\|local\|<IANA name>; --tz and JIRA_TZ on an invocation override it |
+| `--unset` | `project\|board\|field\|credential\|readonly\|ca-bundle\|client-cert\|client-key\|tz` | — | clear a setting; repeat for several (repeatable) |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `context.get` | v2 | always |
+| `context.get` | v3 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND
 
@@ -599,7 +601,7 @@ jr context list
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `context.list` | v2 | always |
+| `context.list` | v3 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL
 
@@ -628,7 +630,7 @@ jr context show --project OPS
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `context.get` | v2 | always |
+| `context.get` | v3 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND
 
@@ -660,7 +662,7 @@ jr context use work
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `context.get` | v2 | always |
+| `context.get` | v3 | always |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `5` NOT_FOUND
 
@@ -760,6 +762,10 @@ real problem is that they never logged in.
 The deployment probe is read from its cache when a valid entry exists, and says
 which. Pass --refresh to force it. The clock is never cached, because a cached
 clock is not a clock.
+
+Its timestamps are UTC whatever JIRA_TZ or the context says, and it has no --tz.
+The account's zone is a question for the site, and this is the command that has
+to answer when the site cannot be asked.
 
 ## epic
 
@@ -1022,6 +1028,7 @@ jr issue activity --since -1d --kind transition --format json
 | `--all-projects` | `bool` | — | search every project the credential can see, ignoring the context's; --since still bounds the sweep in time |
 | `--page-size` | `int` | — | issues per HTTP request, 1 to 100; transport tuning only |
 | `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
+| `--tz` | `string` | — | timezone timestamps are written in: utc\|account\|local\|<IANA name>. Values keep their offset, so each is still RFC 3339. Default utc, or JIRA_TZ, or the context's |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -1253,6 +1260,7 @@ jr issue attachment list ENG-101 --format json
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
+| `--tz` | `string` | — | timezone timestamps are written in: utc\|account\|local\|<IANA name>. Values keep their offset, so each is still RFC 3339. Default utc, or JIRA_TZ, or the context's |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -1299,6 +1307,7 @@ jr issue attachment upload ENG-101 ./out.log --name run-42.log
 | --- | --- | --- | --- |
 | `--name` | `string` | — | store it under this name instead of the file's own |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
+| `--tz` | `string` | — | timezone timestamps are written in: utc\|account\|local\|<IANA name>. Values keep their offset, so each is still RFC 3339. Default utc, or JIRA_TZ, or the context's |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -1348,6 +1357,7 @@ jr issue changes --since -1d --jql "project = ENG" --format json
 | `--jql` | `string` | — | raw JQL narrowing the issues watched, combined with the window bound and always parenthesized |
 | `--page-size` | `int` | — | issues per HTTP request, 1 to 100; transport tuning only |
 | `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
+| `--tz` | `string` | — | timezone timestamps are written in: utc\|account\|local\|<IANA name>. Values keep their offset, so each is still RFC 3339. Default utc, or JIRA_TZ, or the context's |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -1486,6 +1496,7 @@ jr issue comment add ENG-101 "$(cat notes.md)" --body-format markdown
 | `--visibility` | `string` | — | restrict to a role, e.g. 'role:Administrators' |
 | `--body-format` | `text\|markdown\|adf` | `text` | how to read the body: text sends it uninterpreted, markdown converts it, adf takes a document as JSON; the last two are Cloud only |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
+| `--tz` | `string` | — | timezone timestamps are written in: utc\|account\|local\|<IANA name>. Values keep their offset, so each is still RFC 3339. Default utc, or JIRA_TZ, or the context's |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -1622,6 +1633,7 @@ jr issue comment list ENG-101 --raw-body
 | `--page-size` | `int` | — | results per HTTP request, 1 to 100; transport tuning only |
 | `--raw-body` | `bool` | — | emit a Cloud body as the Atlassian Document Format document Jira sent it as, rather than converting it to markdown |
 | `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
+| `--tz` | `string` | — | timezone timestamps are written in: utc\|account\|local\|<IANA name>. Values keep their offset, so each is still RFC 3339. Default utc, or JIRA_TZ, or the context's |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -1905,6 +1917,7 @@ jr issue get ENG-101 --url
 | `--age` | `bool` | — | include an age column: how long since the issue was last updated, coarsely, e.g. 3 hours or 14 days |
 | `--with-comments` | `bool` | — | include the comment thread, oldest first; costs a second request, and a thread longer than 50 is reported incomplete with exit 3 |
 | `--with-remote-links` | `bool` | — | include the remote links: web links, and the links an application wrote; costs a second request |
+| `--tz` | `string` | — | timezone timestamps are written in: utc\|account\|local\|<IANA name>. Values keep their offset, so each is still RFC 3339. Default utc, or JIRA_TZ, or the context's |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -1957,6 +1970,7 @@ jr issue history ENG-101 --format json --limit all
 | `--not-changed-field` | `string` | — | drop changes to this field; repeat for several, and it wins over --changed-field where both name one (repeatable) |
 | `--page-size` | `int` | — | results per HTTP request, 1 to 100; transport tuning only, and Cloud only — Data Center serves the whole changelog in one response and has nothing to page |
 | `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
+| `--tz` | `string` | — | timezone timestamps are written in: utc\|account\|local\|<IANA name>. Values keep their offset, so each is still RFC 3339. Default utc, or JIRA_TZ, or the context's |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -2205,6 +2219,7 @@ jr issue list --changed-by currentUser --changed-after -1w
 | `--page-size` | `int` | — | results per HTTP request, 1 to 100; transport tuning only |
 | `--page-token` | `string` | — | resume from a next-page-token returned by a previous run |
 | `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
+| `--tz` | `string` | — | timezone timestamps are written in: utc\|account\|local\|<IANA name>. Values keep their offset, so each is still RFC 3339. Default utc, or JIRA_TZ, or the context's |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -2553,6 +2568,7 @@ jr issue worklog add ENG-101 30m --started 2026-08-05T09:00:00Z
 | `--comment` | `string` | — | a note about the work, as plain text |
 | `--body-format` | `text\|markdown\|adf` | `text` | how to read the body: text sends it uninterpreted, markdown converts it, adf takes a document as JSON; the last two are Cloud only |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
+| `--tz` | `string` | — | timezone timestamps are written in: utc\|account\|local\|<IANA name>. Values keep their offset, so each is still RFC 3339. Default utc, or JIRA_TZ, or the context's |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -2638,6 +2654,7 @@ jr issue worklog list ENG-101 --format json --limit all
 | `--page-size` | `int` | — | results per HTTP request, 1 to 100; transport tuning only |
 | `--raw-body` | `bool` | — | emit a Cloud body as the Atlassian Document Format document Jira sent it as, rather than converting it to markdown |
 | `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
+| `--tz` | `string` | — | timezone timestamps are written in: utc\|account\|local\|<IANA name>. Values keep their offset, so each is still RFC 3339. Default utc, or JIRA_TZ, or the context's |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -2782,7 +2799,7 @@ Serve this build's commands as MCP tools over stdio
 - **build tags** — needs `mcp`
 
 ```
-jr mcp serve
+jr mcp serve [flags]
 ```
 
 Examples:
@@ -2790,6 +2807,10 @@ Examples:
 ```console
 jr mcp serve
 ```
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--tz` | `string` | — | timezone tool calls write timestamps in unless a call names its own: utc\|account\|local\|<IANA name> (default: utc). JIRA_TZ and the context set it too |
 
 Emits no result document: this command owns stdout.
 
@@ -3350,6 +3371,7 @@ jr sprint create "Sprint 14" --start 2026-08-11T09:00:00Z --end 2026-08-25T09:00
 | `--end` | `string` | — | when the sprint is due to end, RFC 3339 |
 | `--goal` | `string` | — | what the sprint is for |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
+| `--tz` | `string` | — | timezone timestamps are written in: utc\|account\|local\|<IANA name>. Values keep their offset, so each is still RFC 3339. Default utc, or JIRA_TZ, or the context's |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -3379,7 +3401,7 @@ records the intended window up front.
 Resolve the board's one active sprint
 
 ```
-jr sprint current
+jr sprint current [flags]
 ```
 
 Examples:
@@ -3388,6 +3410,10 @@ Examples:
 jr sprint current
 jr --board 3 sprint current --format json
 ```
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--tz` | `string` | — | timezone timestamps are written in: utc\|account\|local\|<IANA name>. Values keep their offset, so each is still RFC 3339. Default utc, or JIRA_TZ, or the context's |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -3414,7 +3440,7 @@ SPRINT_CLOSED either way.
 Fetch one sprint
 
 ```
-jr sprint get <id>
+jr sprint get <id> [flags]
 ```
 
 Examples:
@@ -3427,6 +3453,10 @@ jr sprint get 128 --format json
 | Argument | Required | Description |
 | --- | --- | --- |
 | `id` | yes | sprint id, from `jr sprint list` |
+
+| Flag | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--tz` | `string` | — | timezone timestamps are written in: utc\|account\|local\|<IANA name>. Values keep their offset, so each is still RFC 3339. Default utc, or JIRA_TZ, or the context's |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -3465,6 +3495,7 @@ jr sprint list --board 42 --limit all --format json
 | --- | --- | --- | --- |
 | `--state` | `future\|active\|closed` | — | only sprints in this state; repeat for several (repeatable) |
 | `--limit` | `string` | `50` | maximum results, or "all" to exhaust the result set |
+| `--tz` | `string` | — | timezone timestamps are written in: utc\|account\|local\|<IANA name>. Values keep their offset, so each is still RFC 3339. Default utc, or JIRA_TZ, or the context's |
 
 | Emits | Schema | When |
 | --- | --- | --- |
@@ -3519,6 +3550,7 @@ jr sprint start 128 --dry-run
 | `--start` | `string` | — | when the sprint begins, RFC 3339, e.g. 2026-08-11T09:00:00Z |
 | `--end` | `string` | — | when the sprint is due to end, RFC 3339 |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
+| `--tz` | `string` | — | timezone timestamps are written in: utc\|account\|local\|<IANA name>. Values keep their offset, so each is still RFC 3339. Default utc, or JIRA_TZ, or the context's |
 
 | Emits | Schema | When |
 | --- | --- | --- |

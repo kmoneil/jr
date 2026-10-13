@@ -45,7 +45,8 @@ know what that zone is:
 jr issue list --created-after "$(TZ=Pacific/Auckland date -d 'today 00:00' -Iseconds)"
 ```
 
-A timestamp `jr` printed goes straight back into any date flag the same way.
+A timestamp `jr` printed goes straight back into any date flag the same way,
+whether it was printed in UTC, the default, or in a zone under `--tz`.
 JQL reads a date to the minute, so on `issue list` an instant with seconds is
 widened to the minute, outward, and `DATE_ROUNDED` on stderr names the bound
 that was sent: the answer can hold rows up to a minute outside the instant, and

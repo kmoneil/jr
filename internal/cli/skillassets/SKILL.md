@@ -137,6 +137,15 @@ the empty success above.
   If a pipe is unavoidable, `set -o pipefail` first, or write to files and read
   the status: `jr ... >out.tsv 2>err.json; echo $?`.
 
+- **Timestamps are UTC unless you ask. Ask; do not convert by hand.** When the
+  answer is for a person in another zone, pass `--tz Europe/Berlin`, or `--tz
+  account` for the zone on the Jira profile, and quote what comes back. The
+  offset stays in the value (`2026-05-12T11:10:00+02:00`), so it is still one
+  instant and still goes into any date flag. A conversion done in your head is
+  off by an hour across a clock change and looks exactly like a right one.
+  Only commands that print a timestamp have the flag, and over MCP the same
+  tools take `tz`.
+
 An error is always shaped the same way and always carries a machine-stable
 `code`, plus `retryable` and `exit`:
 

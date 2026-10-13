@@ -48,6 +48,15 @@ and the session carries on — a request that is too big is one call failing, no
 the end of the conversation.`),
 		Example:      buildinfo.App + " mcp serve",
 		RequiresTags: []string{"mcp"},
+		Flags: []registry.Flag{{
+			// This command's own. It writes no timestamp, so it has no
+			// derived --tz, and the zone it takes is for the tools it serves.
+			Name: registry.ZoneFlagName, Type: registry.TypeString,
+			Usage: "timezone tool calls write timestamps in unless a call " +
+				"names its own: " + registry.ZoneUTC + "|" + registry.ZoneAccount +
+				"|" + registry.ZoneLocal + "|<IANA name> (default: " +
+				registry.ZoneUTC + "). " + registry.EnvTZ + " and the context set it too",
+		}},
 		// The output is the JSON-RPC stream, not a result document. Nothing
 		// else may reach stdout for the life of the process.
 		OwnsStdout: true,
@@ -56,8 +65,13 @@ the end of the conversation.`),
 	}
 }
 
-func (a *app) runMCPServe(ctx context.Context, _ *registry.Invocation) (*render.Doc, error) {
-	err := mcp.Serve(ctx, mcp.Options{
+func (a *app) runMCPServe(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) {
+	zone, err := a.serverZone(inv)
+	if err != nil {
+		return nil, err
+	}
+	err = mcp.Serve(ctx, mcp.Options{
+		TZ:       zone,
 		Registry: a.reg,
 		In:       a.stdin,
 		Out:      a.stdout,
@@ -72,4 +86,40 @@ func (a *app) runMCPServe(ctx context.Context, _ *registry.Invocation) (*render.
 	// report: everything this command had to say has already gone out as
 	// frames.
 	return nil, err
+}
+
+// serverZone is the zone setting tool calls fall back to: this command's own
+// --tz, then JIRA_TZ, then the context's, and checked before the server
+// starts so a name that is no zone stops it here and not on the first call
+// that prints a timestamp.
+//
+// It is read once. A session is rebuilt for every call so that a credential
+// changed underneath a running server is picked up, and a zone is not that
+// kind of setting: a call that wants another one names it.
+func (a *app) serverZone(inv *registry.Invocation) (string, error) {
+	if typed := strings.TrimSpace(inv.Flags.String(registry.ZoneFlagName)); typed != "" {
+		return typed, registry.CheckZone("--"+registry.ZoneFlagName, typed)
+	}
+	def := a.configuredZone()
+	return def.Setting, registry.CheckZone(def.From, def.Setting)
+}
+
+// configuredZone is the zone the environment or the context asks for, or none
+// when no context can be resolved to ask.
+//
+// A context that cannot be resolved is not this function's to report, which is
+// why it has no error to return. A server with no context is still a server,
+// for the tools that need none, and each tool call that does need one fails
+// with the reason itself. Every tool that writes a timestamp is one of those,
+// so nothing is ever written in a zone this guessed.
+func (a *app) configuredZone() registry.ZoneDefault {
+	cfg, err := a.config()
+	if err != nil {
+		return registry.ZoneDefault{}
+	}
+	resolved, err := a.resolve(cfg)
+	if err != nil {
+		return registry.ZoneDefault{}
+	}
+	return zoneDefault(resolved)
 }

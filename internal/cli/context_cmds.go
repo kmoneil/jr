@@ -23,8 +23,8 @@ const (
 	// effective form grew the proxy that was always in play and never stated.
 	// Every one of them is optional, so a consumer reading v1 reads v2
 	// unchanged, and the version moves because the shape did.
-	versionContextList = 2
-	versionContextGet  = 2
+	versionContextList = 3
+	versionContextGet  = 3
 )
 
 func (a *app) contextCommands() []*registry.Command {
@@ -100,10 +100,12 @@ Credentials are not stored here. Store one with "` + buildinfo.App + ` auth logi
 				Name: "client-key", Type: registry.TypeString,
 				Usage: "key for --client-cert; both are needed or neither",
 			},
+			contextZoneFlag(),
 		},
 		LocalState: true,
 		Outputs:    []registry.Output{{Kind: kindContextGet, Version: versionContextGet}},
 		ExitCodes:  []exitcode.Code{exitcode.NotFound},
+		Validate:   validateContextZone,
 		Run:        a.runContextCreate,
 	}
 }
@@ -125,6 +127,7 @@ func (a *app) runContextCreate(_ context.Context, inv *registry.Invocation) (*re
 		CABundle:   inv.Flags.String("ca-bundle"),
 		ClientCert: inv.Flags.String("client-cert"),
 		ClientKey:  inv.Flags.String("client-key"),
+		TZ:         strings.TrimSpace(inv.Flags.String(registry.ZoneFlagName)),
 	}
 	if err := cfg.Set(name, ctx); err != nil {
 		return nil, err
@@ -144,7 +147,28 @@ func (a *app) runContextCreate(_ context.Context, inv *registry.Invocation) (*re
 // way to say so.
 var unsettable = []string{
 	"project", "board", "field", "credential", "readonly",
-	"ca-bundle", "client-cert", "client-key",
+	"ca-bundle", "client-cert", "client-key", registry.ZoneFlagName,
+}
+
+// contextZoneFlag is --tz on the two commands that store one. It is their own
+// declaration and not the derived flag a command that writes timestamps
+// carries: here it says what the context should hold, and this command's own
+// answer has no timestamp in it for a zone to change.
+func contextZoneFlag() registry.Flag {
+	return registry.Flag{
+		Name: registry.ZoneFlagName, Type: registry.TypeString,
+		Usage: "timezone timestamps are written in under this context: " +
+			registry.ZoneUTC + "|" + registry.ZoneAccount + "|" + registry.ZoneLocal +
+			"|<IANA name>; --" + registry.ZoneFlagName + " and " + registry.EnvTZ +
+			" on an invocation override it",
+	}
+}
+
+// validateContextZone refuses to store a zone that names nothing. A context is
+// read by every command that follows, and a name that is no zone would refuse
+// each of them that prints a timestamp, long after the typo was made.
+func validateContextZone(_ context.Context, inv *registry.Invocation) error {
+	return registry.CheckZone("--"+registry.ZoneFlagName, inv.Flags.String(registry.ZoneFlagName))
 }
 
 func (a *app) contextEditCommand() *registry.Command {
@@ -217,6 +241,7 @@ where it happens rather than by deleting and re-creating it.`),
 				Name: "client-key", Type: registry.TypeString,
 				Usage: "key for --client-cert; both are needed or neither",
 			},
+			contextZoneFlag(),
 			{
 				Name: "unset", Type: registry.TypeEnum, Enum: unsettable, Repeatable: true,
 				Usage: "clear a setting; repeat for several",
@@ -230,7 +255,10 @@ where it happens rather than by deleting and re-creating it.`),
 	}
 }
 
-func validateContextEdit(_ context.Context, inv *registry.Invocation) error {
+func validateContextEdit(ctx context.Context, inv *registry.Invocation) error {
+	if err := validateContextZone(ctx, inv); err != nil {
+		return err
+	}
 	unset := inv.Flags.StringSlice("unset")
 	for _, name := range unset {
 		if !slices.Contains(unsettable, name) {
@@ -273,7 +301,7 @@ func validateContextEdit(_ context.Context, inv *registry.Invocation) error {
 func editTouchesTheContext(inv *registry.Invocation) bool {
 	for _, name := range []string{
 		"site", "project", "board", "credential",
-		"ca-bundle", "client-cert", "client-key",
+		"ca-bundle", "client-cert", "client-key", registry.ZoneFlagName,
 	} {
 		if inv.Flags.String(name) != "" {
 			return true
@@ -324,6 +352,7 @@ func applyContextEdits(ctx *jctx.Context, inv *registry.Invocation) {
 		{"ca-bundle", func(v string) { ctx.CABundle = v }},
 		{"client-cert", func(v string) { ctx.ClientCert = v }},
 		{"client-key", func(v string) { ctx.ClientKey = v }},
+		{registry.ZoneFlagName, func(v string) { ctx.TZ = strings.TrimSpace(v) }},
 	} {
 		if v := inv.Flags.String(f.name); v != "" {
 			f.set(v)
@@ -358,6 +387,8 @@ func clearContextSettings(ctx *jctx.Context, unset []string) {
 			ctx.ClientCert = ""
 		case "client-key":
 			ctx.ClientKey = ""
+		case registry.ZoneFlagName:
+			ctx.TZ = ""
 		}
 	}
 }
@@ -566,7 +597,8 @@ func contextNode(name string, ctx jctx.Context, current bool) *render.Node {
 		Attr("credential", ctx.CredentialRef()).
 		AttrIf("ca-bundle", ctx.CABundle).
 		AttrIf("client-cert", ctx.ClientCert).
-		AttrIf("client-key", ctx.ClientKey)
+		AttrIf("client-key", ctx.ClientKey).
+		AttrIf(registry.ZoneFlagName, ctx.TZ)
 
 	fields := make([]*render.Node, 0, len(ctx.Fields))
 	for _, f := range ctx.Fields {
@@ -597,6 +629,10 @@ func resolvedDoc(r *jctx.Resolved, configPath string) *render.Doc {
 		AttrIf("ca-bundle", r.CABundle).
 		AttrIf("client-cert", r.ClientCert).
 		AttrIf("client-key", r.ClientKey).
+		// The zone as asked for, by whichever of the flag, the environment
+		// and the context won. `account` stays `account`: this command reaches
+		// no site, and what the word resolves to is the site's to say.
+		AttrIf(registry.ZoneFlagName, r.TZ).
 		// What is in effect rather than what was configured, which for the
 		// proxy is the whole difference: nobody configured it here.
 		AttrIf("proxy", transport.ProxyFor(r.Site))

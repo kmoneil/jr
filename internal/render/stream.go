@@ -2,6 +2,7 @@ package render
 
 import (
 	"io"
+	"time"
 
 	"github.com/kmoneil/jr/internal/errs"
 )
@@ -23,6 +24,11 @@ type StreamSpec struct {
 	// Close is the only point at which the answer exists. Nil is fine and means
 	// "no scope to report", which is what every non-scoped command has.
 	Scope func() Scope
+	// Zone is the timezone the rows' timestamps are written in, or nil for
+	// UTC. See Doc.Zone. It is a value and not a function, unlike Scope,
+	// because it is settled before the command runs: resolving it can cost a
+	// request and can fail, and neither may happen after a row is out.
+	Zone *time.Location
 }
 
 // Stream emits a collection, writing rows as they arrive where the format
@@ -171,10 +177,22 @@ func (s *Stream) Write(items ...*Node) error {
 		if s.firstName == "" {
 			s.firstName = item.Name
 		}
-		s.out.raw(joinTSV(s.row(item)))
+		s.out.raw(joinTSV(s.row(s.inZone(item))))
 		s.count++
 	}
 	return s.out.err
+}
+
+// inZone is one row as it is written: itself when no zone was asked for, and
+// otherwise a copy with its timestamps spelled in the stream's zone. Only a
+// streamed row passes through here. A buffered one is respelled with its
+// document, at Close.
+func (s *Stream) inZone(item *Node) *Node {
+	schema, ok := SchemaFor(s.spec.Kind)
+	if s.spec.Zone == nil || !ok {
+		return item
+	}
+	return schema.inZone(item, s.spec.Zone)
 }
 
 // check refuses a row before it can reach stdout.
@@ -296,6 +314,7 @@ func (s *Stream) Close(complete bool, nextPageToken string) error {
 			Columns:        s.spec.Columns,
 		})
 		doc.Site = s.spec.Site
+		doc.Zone = s.spec.Zone
 		// Resolved now rather than when the spec was built. The spec is
 		// assembled before the command runs and the scope is something the
 		// command *reads*, so asking at Close is the only point where the

@@ -24,6 +24,8 @@ const (
 	// wants: the bundle is a property of the network the job runs on rather
 	// than of any one command.
 	EnvCABundle = "JIRA_CA_BUNDLE"
+	// EnvTZ is --tz for a whole shell: the zone timestamps are written in.
+	EnvTZ = "JIRA_TZ"
 )
 
 // Overrides are the per-invocation flag values that take precedence over the
@@ -108,6 +110,24 @@ type Resolved struct {
 	// could have supplied it. Precedence is flag, then environment, then
 	// context, and which one won is not visible anywhere else.
 	SiteSource Source
+
+	// TZ is the zone timestamps are written in when an invocation names none,
+	// as the environment or the context asked for it: `utc`, `account`,
+	// `local`, or an IANA name. Empty means neither did, which is UTC.
+	//
+	// There is no override for it here, unlike Site and Board. --tz is not a
+	// global: it exists only on a command that writes a timestamp, and is
+	// read there, over whatever this resolves to.
+	//
+	// It is the request and not a location. Whether a name is a zone, and what
+	// `account` resolves to, are settled where the zone database and the
+	// session are, which is not here: this package reads a file and the
+	// environment and reaches nothing else.
+	TZ string
+	// TZSource says where TZ came from, so a refusal of it can name the place
+	// to change. A zone that stopped resolving is far likelier to be a line in
+	// a context than something typed on this invocation.
+	TZSource Source
 }
 
 // Source names where a resolved value came from.
@@ -180,6 +200,9 @@ func Resolve(cfg *Config, over Overrides, getenv Getenv) (*Resolved, error) {
 		CABundleSource: sourceOf(over.CABundle, getenv(EnvCABundle), ctx.CABundle),
 		ClientCert:     ctx.ClientCert,
 		ClientKey:      ctx.ClientKey,
+
+		TZ:       firstNonEmpty(getenv(EnvTZ), ctx.TZ),
+		TZSource: sourceOf("", getenv(EnvTZ), ctx.TZ),
 	}
 
 	// Fields come from the context and from nowhere else at this layer.

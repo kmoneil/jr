@@ -200,6 +200,7 @@ func streamSpec(rc *registry.Command, inv *registry.Invocation) render.StreamSpe
 		Columns: columns,
 		Site:    siteOf(inv),
 		Scope:   func() render.Scope { return scopeOf(inv) },
+		Zone:    inv.Zone,
 	}
 }
 
