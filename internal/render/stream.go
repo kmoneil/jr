@@ -158,7 +158,15 @@ func (s *Stream) Write(items ...*Node) error {
 		return nil
 	}
 
-	s.writeHeader()
+	// The header goes out with the first row, and a batch of nothing is not
+	// one. A walk hands over every page it reads, the empty one included, and
+	// writing the header for it put bytes on stdout before a command that then
+	// refused the answer: an empty page is exactly when a command still has
+	// something to ask. Close writes the header of a collection that ends
+	// with no rows.
+	if len(items) > 0 {
+		s.writeHeader()
+	}
 	for _, item := range items {
 		if s.firstName == "" {
 			s.firstName = item.Name

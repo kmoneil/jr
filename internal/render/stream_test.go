@@ -140,6 +140,59 @@ func TestEmptyStreamStillHasAHeader(t *testing.T) {
 	}
 }
 
+// TestABatchOfNothingWritesNothing holds the header to the first row.
+//
+// A walk hands the stream every page it reads, and the page that says there is
+// nothing is an empty batch. Writing the header for it put bytes on stdout
+// while the command could still refuse the answer, which is what `issue list`
+// does when no rows came back over a project Jira does not know. The header of
+// a collection that ends empty is Close's to write, and it is written once
+// whichever of the two gets there first.
+func TestABatchOfNothingWritesNothing(t *testing.T) {
+	var out strings.Builder
+	s, err := render.NewStream(&out, render.TSV, streamSpec())
+	if err != nil {
+		t.Fatalf("new stream: %v", err)
+	}
+	if err := s.Write(); err != nil {
+		t.Fatalf("write of nothing: %v", err)
+	}
+	if out.Len() != 0 {
+		t.Fatalf("a batch of nothing reached stdout: %q", out.String())
+	}
+
+	// A row after it still gets its header, once.
+	if err := s.Write(sampleCollection(true).Collection.Items[0]); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if err := s.Close(true, ""); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	got := out.String()
+	if !strings.HasPrefix(got, "key\t") {
+		t.Errorf("no header preceded the first row:\n%s", got)
+	}
+	if n := strings.Count(got, "key\t"); n != 1 {
+		t.Errorf("the header was written %d times:\n%s", n, got)
+	}
+
+	// And a collection that is only ever handed nothing ends with one.
+	var empty strings.Builder
+	e, err := render.NewStream(&empty, render.TSV, streamSpec())
+	if err != nil {
+		t.Fatalf("new stream: %v", err)
+	}
+	if err := e.Write(); err != nil {
+		t.Fatalf("write of nothing: %v", err)
+	}
+	if err := e.Close(true, ""); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	if !strings.HasPrefix(empty.String(), "key\t") {
+		t.Errorf("an empty result has no header:\n%q", empty.String())
+	}
+}
+
 // TestTruncatedStreamCarriesItsToken checks the structured formats still report
 // completeness correctly when the rows arrived incrementally.
 func TestTruncatedStreamCarriesItsToken(t *testing.T) {

@@ -561,6 +561,11 @@ _specification_ emits nothing; a bad _row_ leaves partial output and a non-zero
 exit. Piping to `head` closes the pipe and the process exits 141, which is
 ordinary Unix behavior and not an error.
 
+The header is written with the first row and not before it. A command that
+fails having written no row has written nothing at all, and that includes one
+that read a page, found it empty, and then refused the answer. A collection that
+ends with no rows gets its header at the end.
+
 ## Progress
 
 A long run reports its progress on stderr **only when stderr is a terminal**.
@@ -891,6 +896,34 @@ written in every format anyway: the resolved bounds are on no envelope at all,
 and a warning that appeared under some formats and not others would be a second
 rule to learn. Exit 0 stays, because an empty answer is an honest one. Not being
 able to tell what it was empty *about* is what was missing.
+
+**An empty answer over one project is asked about before it is called empty.**
+Jira Cloud's search answers `project = "NOPE"` with HTTP 200 and no rows, which
+is exactly what it says of a real project with nothing in it, and through 0.20.0
+both went out as this warning at exit 0. So when `issue list`, `issue activity`
+or `issue changes` reads no issue at all over a scope of one project, it asks
+Jira about the project alone, with the request a raw `--jql` is checked with,
+and refuses with `UNKNOWN_PROJECT` at exit 5 when Jira does not know it. Nothing
+has reached stdout at that point, in any format: TSV writes its header with the
+first row, or at the end of a collection that has none. The scope is asked about
+wherever it came from, `--project`, `JIRA_PROJECT` or the context, and a context
+whose project has since been deleted is the likeliest source of a dead key.
+
+It costs **one request, and only when no issue came back**. An answer with rows
+is the project vouching for itself and is never asked about. For `issue
+activity` and `issue changes` what counts is the issues read and not the events
+written, so a quiet window over a busy project is not asked about either. A poll
+of `issue changes` that finds no issue updated does pay it, on every tick, and
+that is the price of a feed that cannot report "nothing changed" about a project
+that is gone. A consequence worth stating: `--max-requests 1` over a project
+that answers empty now stops at the budget, as `REQUEST_BUDGET_EXCEEDED` at
+exit 3, because the search and the question are two requests.
+
+Cloud only. Data Center refuses the search itself, as `BAD_REQUEST` at exit 2
+carrying the same sentence (measured on 10.4.0), so there is no empty answer
+over an unknown project to ask about there, and its only way of asking is that
+search again. Several projects are a different check, made before the search and
+on both deployments: see [Errors about scope](#errors-about-scope).
 
 ### `SCOPE_MISMATCH`
 
@@ -1482,7 +1515,7 @@ already have applied, which a second attempt could apply twice (see
 | `EMPTY_SCOPE` | 2    | `--project ""` or `--board ""`. An empty scope does not lift the scope: it falls back to the context's, so the query runs against a project the caller did not name and returns a complete, empty, exit-0 result. Refused rather than silently reinterpreted. One empty value among a repeated `--project` is refused the same way. |
 | `PROJECT_REPEATED` | 2 | `--project` was given more than once to a command that reads one project. Only the commands `jr schema` marks `repeatable="true"` for it answer for several. It used to be accepted everywhere and the last key won, without a word about the others. Refused before any request, on the command line and on a tool call alike. |
 | `INVALID_PROJECT_KEY` | 2 | A member of a repeated `--project` is not a project key. One `--project` is passed to Jira as typed, and may be a name; a set is also written on the envelope as a list, so each member is held to the key grammar. |
-| `UNKNOWN_PROJECT` | 5 | A repeated `--project` names a project that does not exist, or that this credential cannot see. `detail` is Jira's own sentence and names the key. Cloud's search drops an unknown key from `project IN (...)` and answers with the rest at HTTP 200, so a set is checked first, with the request a raw `--jql` is checked with: one extra request, and only when there are two or more keys. Data Center refuses such a search itself, and the check makes that the same code rather than `BAD_REQUEST`. One unknown `--project` is not checked: on Cloud it answers empty with `EMPTY_RESULT` naming it, and on Data Center it is `BAD_REQUEST`. |
+| `UNKNOWN_PROJECT` | 5 | The project scope names a project that does not exist, or that this credential cannot see. `detail` is Jira's own sentence and names the key. **Several projects** are checked before anything is searched: Cloud's search drops an unknown key from `project IN (...)` and answers with the rest at HTTP 200, so the set is asked about first, with the request a raw `--jql` is checked with. That is one extra request, and only when there are two or more keys. Data Center refuses such a search itself, and the check makes that the same code rather than `BAD_REQUEST`. **One project** is asked about only when the answer has no rows, and only on Cloud: see [`EMPTY_RESULT`](#empty_result). On Data Center one unknown project is still `BAD_REQUEST`, because the search is refused before there is an empty answer to ask about. |
 
 It is raised on the **flag** and never on the environment. An empty
 `JIRA_PROJECT` is a shell that has the variable exported and unset, which is a
@@ -1513,7 +1546,7 @@ one with `BAD_REQUEST`.
 | `AMBIGUOUS_ISSUE_TYPE` | 2    | Several types share that name; pass the id.                                                                                                                                                                                                      |
 | `UNKNOWN_USER`         | 2    | No user with that display name, email, or id. `detail` lists the plausible near misses with their ids, and is absent where the search returned nothing that shares a word with what was typed. A partial match is a near miss, not a resolution. |
 | `AMBIGUOUS_USER`       | 2    | Several users share that display name. `detail` lists every candidate with its id, whether the account is inactive, and whether it is an app rather than a person.                                                                               |
-| `UNKNOWN_PROJECT`      | 5    | The project does not exist, or this credential may not create in it. Reported for either status the createmeta route answers an unaddressable project with, a 10.3 Data Center says 400, and 404 is equally plausible elsewhere. Also what a repeated `--project` holding an unknown key is refused with: see [Errors about scope](#errors-about-scope). |
+| `UNKNOWN_PROJECT`      | 5    | The project does not exist, or this credential may not create in it. Reported for either status the createmeta route answers an unaddressable project with, a 10.3 Data Center says 400, and 404 is equally plausible elsewhere. Also what a project scope naming an unknown key is refused with, on the commands that search one: see [Errors about scope](#errors-about-scope). |
 | `FIELD_NOT_KV`         | 2    | `--field` or `--field-json` on a write was given something that is not `id=value`. On a write `--field` sets a field; on `issue get` and `issue list` it selects a column, and only the second takes a bare name.                                |
 | `FIELD_HAS_A_FLAG`     | 2    | The field resolved and a typed flag already writes it. `message` names the flag. Two spellings of one write is a silent last-one-wins, so it is refused rather than resolved.                                                                    |
 | `FIELD_TYPE_UNSUPPORTED` | 2  | The field resolved and `--field` will not guess at its schema type. `message` carries the type, `detail` carries Jira's own type key where the site reported one, and `remedy` names `--field-json`.                                            |
@@ -2198,7 +2231,8 @@ break.
 `--jql` is the one input this tool passes through rather than builds, so it is
 the one with no floor under it. Everything reached through a typed flag has one:
 `--field` resolves against the site's catalogue and every user-valued flag goes
-through the user lookup.
+through the user lookup. A project scope has one too, described under
+[Errors about scope](#errors-about-scope).
 
 Cloud's search endpoint answers a query it knows is meaningless with **HTTP 200
 and no rows**. `--jql 'nosuchfield = 1'` used to come back well-formed,

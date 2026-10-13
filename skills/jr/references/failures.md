@@ -134,7 +134,7 @@ as `BAD_REQUEST`.
 | `AMBIGUOUS_USER` | 2 | Every candidate with its id, whether the account is inactive, and whether it is an app rather than a person |
 | `UNKNOWN_LINK_TYPE` | 2 | Every link phrase this site offers |
 | `AMBIGUOUS_LINK_DIRECTION` | 2 | `"Blocks"` reads both ways. Say `blocks` or `is blocked by` |
-| `UNKNOWN_PROJECT` | 5 | The project does not exist, or this credential may not create in it. Also a repeated `--project` holding a key Jira does not know: `detail` names it, and nothing was searched |
+| `UNKNOWN_PROJECT` | 5 | The project does not exist, or this credential may not create in it. Also a repeated `--project` holding a key Jira does not know: `detail` names it, and nothing was searched. And, on Jira Cloud, `issue list`, `issue activity` or `issue changes` finding no issue over one project Jira does not know: check `--project`, `JIRA_PROJECT` and the context's project |
 | `PROJECT_REPEATED` | 2 | `--project` given twice to a command that reads one project. Only `issue list`, `issue activity`, `issue changes` and `jql explain` take several. Run the command once per project |
 | `INVALID_KEY` / `INVALID_PROJECT_KEY` | 2 | A malformed key, rejected before any request, because a 404 for a typo reads like a missing issue |
 

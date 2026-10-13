@@ -1,0 +1,63 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/search/jql",
+        "query": "fields=summary%2Cstatus%2Cassignee%2Creporter%2Cpriority%2Cissuetype%2Cproject%2Ccreated%2Cupdated%2Clabels\u0026jql=project+%3D+%22NOPE%22+ORDER+BY+issuekey+DESC\u0026maxResults=50"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=349;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "350"
+          ],
+          "X-Ratelimit-Remaining": [
+            "349"
+          ]
+        },
+        "body": "{\"issues\":[],\"isLast\":true}"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/3/jql/parse",
+        "query": "validation=warn",
+        "body": "{\"queries\":[\"project = \\\"NOPE\\\"\"]}"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=199;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "200"
+          ],
+          "X-Ratelimit-Remaining": [
+            "199"
+          ]
+        },
+        "body": "{\"queries\":[{\"query\":\"project = \\\"NOPE\\\"\",\"structure\":{\"where\":{\"field\":{\"name\":\"project\",\"encodedName\":\"project\"},\"operator\":\"=\",\"operand\":{\"value\":\"NOPE\",\"encodedValue\":\"NOPE\"}}},\"errors\":[\"The value 'NOPE' does not exist for the field 'project'.\"]}]}"
+      }
+    }
+  ]
+}

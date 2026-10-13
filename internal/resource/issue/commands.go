@@ -231,7 +231,10 @@ Every list filter has both directions: --status and --not-status, --type and
 --project repeats too, here and on issue activity and issue changes: --project
 OPS --project NET searches both, with every key quoted, and the result names
 the set. A key Jira does not know is refused as UNKNOWN_PROJECT rather than
-left out of the answer, which costs one request when there are several.
+left out of the answer, which costs one request when there are several. One
+project is asked about only when no rows come back, so on Jira Cloud a
+mistyped key is that refusal and not an empty result. Data Center refuses the
+search itself.
 
 None of them splits on commas. --label a,b asks for one label whose name
 contains a comma, which Jira genuinely stores, so splitting it would make that
@@ -505,11 +508,7 @@ func runList(
 		if err := stampPage(inv, info, page); err != nil {
 			return err
 		}
-		nodes := make([]*render.Node, 0, len(page))
-		for _, i := range page {
-			nodes = append(nodes, i.Node())
-		}
-		if err := out.Write(nodes...); err != nil {
+		if err := out.Write(issueNodes(page)...); err != nil {
 			return err
 		}
 		// The server discloses the total on the first page, so a long run can
@@ -518,6 +517,9 @@ func runList(
 		return nil
 	})
 	if err != nil {
+		return registry.StreamResult{}, err
+	}
+	if err := refuseNoRowsOverUnknownProject(ctx, inv, info, query.scope(), result); err != nil {
 		return registry.StreamResult{}, err
 	}
 
@@ -540,6 +542,15 @@ func runList(
 		Total:    beyond(result.Owed, out.Count()),
 		Boundary: listBoundary(inv, sortedBy, reached),
 	}, nil
+}
+
+// issueNodes is one page of issues as the rows a stream writes.
+func issueNodes(page []Issue) []*render.Node {
+	nodes := make([]*render.Node, 0, len(page))
+	for _, i := range page {
+		nodes = append(nodes, i.Node())
+	}
+	return nodes
 }
 
 // anyThreadClipped reports whether the server sent part of a comment thread on
@@ -734,9 +745,10 @@ func validateList(ctx context.Context, inv *registry.Invocation) error {
 // by neither Cloud's search nor, for the unknown-user class, Data Center's.
 //
 // Everything reached through a typed flag already has a floor. --field resolves
-// against the catalogue and every user-valued flag goes through ResolveUser. It
-// is --jql that had none, and --jql is what a caller reaches for when a flag
-// will not express the question.
+// against the catalogue and every user-valued flag goes through ResolveUser,
+// and the project scope is asked about by refuseUnknownProject and
+// refuseNoRowsOverUnknownProject. It is --jql that had none, and --jql is what
+// a caller reaches for when a flag will not express the question.
 //
 // A warning refuses as firmly as an error, because the warning is where Jira
 // puts the unknown-value class: `assignee = "nobody-xyz"` is valid JQL naming
@@ -1187,11 +1199,12 @@ func (o QueryOptions) scope() []string {
 // before any of it is searched.
 //
 // Cloud's search answers `project in ("ENG","NOPE")` with HTTP 200, the rows
-// from ENG, and no word about NOPE (measured 2026-10-12). One unknown key is at
-// least visible, as an empty answer that names it. Among several, a mistyped
-// key contributes nothing and the result reads as the union the caller asked
-// for, which is the answer this project exists to refuse: complete, exit 0,
-// and about fewer projects than it says.
+// from ENG, and no word about NOPE (measured 2026-10-12). One unknown key
+// answers with nothing at all, and refuseNoRowsOverUnknownProject asks about
+// that once it has. A set cannot wait for an empty answer, because it never
+// gives one: a mistyped key contributes nothing and the result reads as the
+// union the caller asked for, which is the answer this project exists to
+// refuse: complete, exit 0, and about fewer projects than it says.
 //
 // The parse endpoint does know, and says "The value 'NOPE' does not exist for
 // the field 'project'". So the scope clause gets the check a raw --jql gets,
@@ -1214,28 +1227,115 @@ func refuseUnknownProject(
 	if len(projects) < 2 || inv.Jira == nil {
 		return nil
 	}
+	said, known, err := whatJiraSaysOfProjects(ctx, inv, projects)
+	if err != nil || known {
+		return err
+	}
+	return errs.NotFound("UNKNOWN_PROJECT",
+		"--project names a project that does not exist, or that this credential cannot see").
+		WithDetail("%s", said).
+		WithRemedy("check the keys with `%s project list`; a search over the "+
+			"rest would leave this one out without saying so", buildinfo.App)
+}
+
+// refuseNoRowsOverUnknownProject is the floor under a scope of one project,
+// asked for only once the answer has come back with nothing in it.
+//
+// Cloud's search answers `project = "NOPE"` with HTTP 200 and no rows
+// (measured 2026-10-12), and that went out as a complete, empty collection at
+// exit 0 with EMPTY_RESULT naming the key: the document a real project with
+// nothing in it gives. A mistyped key, and a context whose project has since
+// been deleted or closed to this credential, both read as "nothing matches",
+// and a feed polling one reported "nothing changed" for as long as it ran.
+//
+// It is asked after the search and not before it, which is where the set's
+// check sits, because of what each costs. A row from the project is the
+// project vouching for itself, so an answer with rows needs nothing, and that
+// is nearly every invocation there is: checking first would double the
+// requests of the commonest command and take `--max-requests 1` away from it.
+// Zero rows is the one answer that says nothing about whether the project is
+// there. So this is one request, and only then. A consequence worth knowing:
+// `--max-requests 1` over a project that answers empty now stops at the
+// budget, because the search and the question are two.
+//
+// It can still refuse before stdout, in every format, which is the thing
+// refuseQueryJiraDoesNotUnderstand says a late verdict cannot do. That is true
+// once a row is out. With no row, nothing is: TSV writes its header with the
+// first row or at Close, and the buffered formats write at Close, and every
+// caller reaches this from inside the command's Stream, ahead of Close. The
+// MCP server calls the same function, so a model gets the refusal too.
+//
+// What is counted is the issues the walk read, not the rows the command wrote,
+// and the two differ. `issue activity` and `issue changes` search for issues
+// and report events on them, so an issue with no event in the window is a
+// project that exists and an answer that is honestly empty. A walk a limit or
+// a budget cut short is not asked about either: it did not finish, so it says
+// so, and it has not claimed there is nothing.
+//
+// Cloud only, and the reason is a measurement. Data Center 10.4.0 refuses the
+// search itself, with a 400 carrying the sentence the parse endpoint gives
+// (measured on the rig, 2026-10-12), so no empty answer over an unknown key
+// reaches here. Its only verdict route is that same search bounded to zero
+// rows, which would be a second request, on every empty answer, to hear again
+// what the first one said. If a Data Center is found that answers such a
+// search with no rows, this condition is the line to change.
+//
+// A scope of several is not asked again. refuseUnknownProject asked before
+// anything was searched.
+func refuseNoRowsOverUnknownProject(
+	ctx context.Context, inv *registry.Invocation, info site.Info,
+	scope []string, walked *ListResult,
+) error {
+	if !walked.Complete || walked.Fetched > 0 {
+		return nil
+	}
+	if len(scope) != 1 || info.Kind != site.Cloud || inv.Jira == nil {
+		return nil
+	}
+	said, known, err := whatJiraSaysOfProjects(ctx, inv, scope)
+	if err != nil || known {
+		return err
+	}
+	// The scope may have come from a context or the environment, with no
+	// --project typed at all, so the message names the scope and the remedy
+	// says where one comes from. A stale context is the likeliest source of a
+	// key that used to work.
+	return errs.NotFound("UNKNOWN_PROJECT",
+		"no rows, and the project this was scoped to does not exist or is one "+
+			"this credential cannot see").
+		WithDetail("%s", said).
+		WithRemedy("check the key with `%s project list`; the scope is --project "+
+			"where one is given, then JIRA_PROJECT, then the context's project",
+			buildinfo.App)
+}
+
+// whatJiraSaysOfProjects asks the server about a project scope alone: whether
+// it knows every key, and what it said where it does not.
+//
+// The clause is rendered by the builder the search uses, so the question is
+// about the scope as it is sent. The words are Jira's own, unedited: they name
+// the key. A warning counts as an error does, for the reason
+// refuseQueryJiraDoesNotUnderstand gives.
+func whatJiraSaysOfProjects(
+	ctx context.Context, inv *registry.Invocation, projects []string,
+) (said string, known bool, err error) {
 	clause, err := jql.New().Project(projects...).Render()
 	if err != nil {
-		return err
+		return "", false, err
 	}
 	meta, err := inv.Jira.Metadata(ctx)
 	if err != nil {
-		return err
+		return "", false, err
 	}
 	got, err := meta.CheckJQL(ctx, clause)
 	if err != nil {
-		return err
+		return "", false, err
 	}
 	if got.Valid && len(got.Warnings) == 0 {
-		return nil
+		return "", true, nil
 	}
-	// Jira's own words, unedited: they name the key.
-	said := append(append([]string{}, got.Errors...), got.Warnings...)
-	return errs.NotFound("UNKNOWN_PROJECT",
-		"--project names a project that does not exist, or that this credential cannot see").
-		WithDetail("%s", strings.Join(said, " ")).
-		WithRemedy("check the keys with `%s project list`; a search over the "+
-			"rest would leave this one out without saying so", buildinfo.App)
+	return strings.Join(append(append([]string{}, got.Errors...), got.Warnings...), " "),
+		false, nil
 }
 
 // Constrained reports whether these options narrow the result set at all.

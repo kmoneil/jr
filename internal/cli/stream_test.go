@@ -367,6 +367,34 @@ func TestAFailureBeforeTheFirstRowStillWritesNothing(t *testing.T) {
 	}
 }
 
+// TestAFailureAfterAnEmptyPageStillWritesNothing is the same boundary reached
+// the other way: the command got as far as a page, and the page held nothing.
+//
+// A paged walk hands the stream every page it reads, so "before the first row"
+// includes a write of no rows, and the header used to go out with it. `issue
+// list` over a project Jira does not know is that sequence exactly: one empty
+// page, then UNKNOWN_PROJECT, and the TSV header was on stdout beside an exit
+// 5 with nothing on stderr to say so.
+func TestAFailureAfterAnEmptyPageStillWritesNothing(t *testing.T) {
+	fail := func(out *render.Stream) error {
+		if err := out.Write(); err != nil {
+			return err
+		}
+		return errs.NotFound("UNKNOWN_PROJECT", "the project does not exist")
+	}
+	got := runStream(t, failingStream(t, 0, fail), "fake", "list", "--format", "tsv")
+
+	if got.stdout != "" {
+		t.Errorf("a failure after an empty page wrote to stdout:\n%q", got.stdout)
+	}
+	if got.exit != exitcode.NotFound {
+		t.Errorf("exit = %v, want %v\nstderr: %s", got.exit, exitcode.NotFound, got.stderr)
+	}
+	if strings.Contains(got.stderr, "reached stdout") {
+		t.Errorf("the error claimed rows were emitted:\n%s", got.stderr)
+	}
+}
+
 // TestStdoutOwnerEmitsNoDocument covers the layer the MCP protocol tests
 // missed.
 //

@@ -81,15 +81,16 @@ func TestASetOfProjectsIsNeverPagedByKey(t *testing.T) {
 	}
 }
 
-// TestAnUnknownProjectInASetIsRefused is the floor a set needs and one project
-// does not.
+// TestAnUnknownProjectInASetIsRefused is the floor a set needs before it is
+// searched, which one project does not.
 //
 // Cloud's search answers `project in ("ENG","NOPE")` with HTTP 200, ENG's rows,
-// and no word about NOPE (measured 2026-10-12). One unknown key is at least
-// visibly empty. Among several it contributes nothing and the answer reads as
-// the union that was asked for. The parse endpoint does name it, in the words
-// below, so the scope clause is checked there before any search, on each of
-// the three commands that take a set.
+// and no word about NOPE (measured 2026-10-12). One unknown key answers with
+// nothing, and is asked about then: see norows_test.go. Among several it
+// contributes nothing and the answer reads as the union that was asked for, so
+// there is no empty answer to wait for. The parse endpoint does name it, in
+// the words below, so the scope clause is checked there before any search, on
+// each of the three commands that take a set.
 func TestAnUnknownProjectInASetIsRefused(t *testing.T) {
 	// Cloud's own answer for `project IN ("ET", "NOPE")`, less the structure.
 	const unknown = `{"queries":[{"query":"x","errors":` +
@@ -134,9 +135,10 @@ func TestAnUnknownProjectInASetIsRefused(t *testing.T) {
 				t.Errorf("a set of projects Jira knows was refused: %v", err)
 			}
 
-			// One project never asks. The server here would refuse it, and it
-			// is admitted, because the check is the price of a set and a scope
-			// of one is every invocation that came before.
+			// One project never asks before the search. The server here would
+			// refuse it, and it is admitted, because asking first is the price
+			// of a set and a scope of one is every invocation that came before.
+			// It is asked about after a search that found nothing.
 			if err := validate(&stubSession{
 				project: "NOPE", kind: site.Cloud, jqlVerdict: unknown,
 			}); err != nil {

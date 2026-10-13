@@ -508,7 +508,8 @@ produces the same empty feed:
   list` and `issue activity` both take `--all-projects`, and when a run used it
   the note reads `scope=none` rather than going quiet, so you can tell a lifted
   scope from an unreported one. A run over several, from a repeated `--project`,
-  reads `projects=OPS NET DO`.
+  reads `projects=OPS NET DO`. The key is one Jira knows: a project that does
+  not exist is refused as `UNKNOWN_PROJECT` and never reported as empty.
 - **`since=...Z`.** Is that the boundary you meant? A bare date is read in the
   **Jira account's** timezone, not your machine's, so `--since 2026-09-02` from
   a laptop five hours west of the account starts at 19:00 the previous evening
@@ -643,12 +644,14 @@ silently, so a command that printed one project's boards for a question about
 two looked like a complete answer. Run the command once per project, or use one
 of the four that take a set.
 
-### `UNKNOWN_PROJECT`: a repeated `--project` names a project Jira does not know
+### `UNKNOWN_PROJECT`: the project scope names a project Jira does not know
 
 ```console
 $ jr issue list --project OPS --project NTE
 # exit 5
 # detail: The value 'NTE' does not exist for the field 'project'.
+$ jr issue list --project NTE
+# exit 5, the same detail, and nothing on stdout
 ```
 
 Jira Cloud's search leaves an unknown key out of `project in (...)` and answers
@@ -659,9 +662,20 @@ two or more keys. A project you cannot browse is refused in the same words as
 one that does not exist, because Jira does not tell the two apart. `jr project
 list` shows the keys this credential can reach.
 
-One `--project` on its own is not checked. On Cloud an unknown one answers with
-no rows and `EMPTY_RESULT: 0 issues, project=NTE`, which at least names it. On
-Data Center Jira refuses it, as `BAD_REQUEST` with the same sentence.
+One project is asked about too, afterwards and only if it has to be. Jira
+Cloud answers a search over a project it has never heard of with no rows, which
+is what it says of a real project with nothing in it, and that used to reach you
+as `EMPTY_RESULT: 0 issues, project=NTE` at exit 0. Now `issue list`, `issue
+activity` and `issue changes` ask Jira about the project when no issue comes
+back, and refuse when it is not there. A project that is there and holds
+nothing that matches is still an empty result at exit 0.
+
+If you typed no `--project`, the key came from `JIRA_PROJECT` or from the
+context: `jr context show` prints the project in effect, and a context whose
+project was deleted or renamed is the usual cause. The question costs one
+request, so `--max-requests 1` over a project that answers empty stops at the
+budget. On Data Center Jira refuses the search itself, as `BAD_REQUEST` with the
+same sentence.
 
 One thing this does not catch, on Cloud only: the operand of a `WAS`,
 `CHANGED TO`, or `CHANGED FROM` predicate. `--jql 'status was "NoSuchStatus"'`
