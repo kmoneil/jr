@@ -75,11 +75,15 @@ do not catch, add the test in the same change and cite it here.
   along `--format`, because the same collection refused for the same reason
   writes nothing at all under XML, JSON, and YAML, and it is stated rather than
   closed: closing it means buffering every format, which is what streaming exists
-  not to do.
+  not to do. "After its first row" is exact: the TSV header goes out with the
+  first row and not with the first page, so a command that read an empty page
+  and then refused the answer has written nothing.
   **Enforced by:** `TestErrorsGoToStderrAndLeaveStdoutClean`,
   `TestStdoutOwnersEmitNothingElse`,
   `TestAStreamedFailureLeavesTheRowsItAlreadyWroteAndSaysSo`,
   `TestAFailureBeforeTheFirstRowStillWritesNothing`,
+  `TestAFailureAfterAnEmptyPageStillWritesNothing`,
+  `TestABatchOfNothingWritesNothing`,
   `TestAHalfAppliedWriteReachesStdoutAndStillFails`,
   `TestAnOrdinaryFailureStillWritesNothingToStdout`.
 - **A refusal of a name the caller typed names the near misses, from one rule.**
@@ -541,9 +545,29 @@ do not catch, add the test in the same change and cite it here.
   activity` and `issue changes`, and refused as `UNKNOWN_PROJECT` in Jira's
   own words. Data Center 10.4.0 refuses the search itself with a 400, and the
   check is what gives the two deployments one code for one mistake. One
-  project pays nothing for it.
+  project pays nothing for it before the search: see the next rule.
   **Enforced by:** `TestAnUnknownProjectInASetIsRefused`,
   `TestTheRecordedUnknownProjectIsRefusedInJirasWords`.
+- **No rows over one project is asked about before it is called empty.**
+  Cloud's search answers `project = "NOPE"` with HTTP 200 and no rows, the same
+  bytes it sends for a real project with nothing in it (measured and recorded
+  2026-10-12), and both went out complete, empty, and exit 0. `issue list`,
+  `issue activity` and `issue changes` ask Jira about the scope when the walk
+  finished having read no issue, and refuse as `UNKNOWN_PROJECT` before
+  anything reaches stdout, wherever the key came from. It is one request and
+  only then: a project that sent an issue back is not asked about, nor a walk
+  that did not finish, nor a set, which was asked about first. It is Cloud
+  only, because Data Center 10.4.0 refuses the search itself and can only ask
+  by searching again. The question lives in each command's own stream
+  function, which the command line and the MCP server both call, so neither
+  can report the empty answer without it.
+  **Enforced by:** `TestNoRowsOverAProjectJiraDoesNotKnowIsRefused`,
+  `TestNoRowsOverAProjectJiraKnowsIsStillAnAnswer`,
+  `TestAProjectThatAnsweredIsNotAskedAbout`,
+  `TestAWalkThatDidNotFinishIsNotAskedAbout`,
+  `TestTheFloorIsAskedOnlyWhereItCanAnswer`,
+  `TestTheRecordedEmptyAnswersAreToldApart`,
+  `TestAnUnknownProjectIsNotAnEmptyResult`.
 - **A query whose `--jql` names a project the scope excludes says so.** The
   fragment and the context scope are ANDed into a query that cannot match by
   construction, and the answer is a complete, empty, exit-0 result that is the

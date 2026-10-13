@@ -767,6 +767,13 @@ func runActivity(
 	if err != nil {
 		return registry.StreamResult{}, err
 	}
+	// Asked of the candidates, not the events: an issue that came back with
+	// nothing on it in the window is still the project answering.
+	if err := refuseNoRowsOverUnknownProject(
+		ctx, inv, info, activityScope(inv), result,
+	); err != nil {
+		return registry.StreamResult{}, err
+	}
 
 	// Candidates arrive in issue-key order, which says nothing about when
 	// anything happened on them, so the newest event can be on the last page.

@@ -84,6 +84,11 @@ const EmptyResultCode = "EMPTY_RESULT"
 // Exit stays 0. The query was legal, the answer is honest, and an empty result
 // is not a failure. Not being able to tell what it was empty *about* is what
 // was missing.
+//
+// "Honest" has a floor under it where it needs one. The commands that search a
+// project scope ask Jira about the project before they report no rows over it,
+// from inside their own Stream, so a key Jira does not know is refused there
+// and never reaches this note.
 func (a *app) warnEmptyResult(
 	rc *registry.Command,
 	inv *registry.Invocation,

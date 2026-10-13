@@ -385,6 +385,15 @@ func streamFeed(
 	if err != nil {
 		return feedEnd{outcome: feedShort}, err
 	}
+	// A poll with no candidate is the common one, and it is where an unknown
+	// project costs the most: every tick after it says "nothing changed". So
+	// a quiet poll over one project pays a request to hear the project is
+	// still there, and a cursor is never issued over one that is not.
+	if err := refuseNoRowsOverUnknownProject(
+		ctx, inv, client.Site, feedScope(inv), result,
+	); err != nil {
+		return feedEnd{outcome: feedShort}, err
+	}
 
 	// Oldest first across the whole window, which needs every candidate read
 	// first: they arrive in issue-key order, which says nothing about when a

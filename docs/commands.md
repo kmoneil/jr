@@ -2244,7 +2244,10 @@ Every list filter has both directions: --status and --not-status, --type and
 --project repeats too, here and on issue activity and issue changes: --project
 OPS --project NET searches both, with every key quoted, and the result names
 the set. A key Jira does not know is refused as UNKNOWN_PROJECT rather than
-left out of the answer, which costs one request when there are several.
+left out of the answer, which costs one request when there are several. One
+project is asked about only when no rows come back, so on Jira Cloud a
+mistyped key is that refusal and not an empty result. Data Center refuses the
+search itself.
 
 None of them splits on commas. --label a,b asks for one label whose name
 contains a comma, which Jira genuinely stores, so splitting it would make that

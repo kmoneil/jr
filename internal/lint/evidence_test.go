@@ -92,6 +92,13 @@ var recordedFixtures = map[string][]string{
 		// and a constructed cassette would restate it rather than hold it.
 		"list-projects-recorded.cloud.json",
 		"unknown-project-recorded.cloud.json",
+		// One project, and no rows. The claim is that Cloud's search says the
+		// same thing, byte for byte, of a project it has never heard of and
+		// of one with nothing that matches, and that only the parse endpoint
+		// tells them apart. Constructed, the pair would be two files somebody
+		// typed the same body into.
+		"no-rows-unknown-project-recorded.cloud.json",
+		"no-rows-known-project-recorded.cloud.json",
 		// The same two requests against both project styles. The symmetry is
 		// the claim — that the parent field needs no branch on style — so one
 		// of these quietly becoming hand-written would leave the claim

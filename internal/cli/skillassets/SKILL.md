@@ -106,7 +106,11 @@ scope (or `scope=none` where `--all-projects` lifted it), and any bound the
 command resolved rather than you typing it: the instant a bare `--since` became
 in the account's timezone, the account `currentUser` resolved to. Read it before
 reporting "nothing matched", because zero rows is the one answer that looks the
-same however narrow the question was.
+same however narrow the question was. A `project=` it names is one Jira knows:
+on Jira Cloud, no rows over a project that does not exist is `UNKNOWN_PROJECT`
+(exit 5) with nothing on stdout, whether the key came from `--project`,
+`JIRA_PROJECT` or a stale context. Data Center refuses that search itself, as
+`BAD_REQUEST`.
 
 An empty value does not lift the scope. `--project ""` is refused as
 `EMPTY_SCOPE`, because it used to fall back to the context and produce exactly
