@@ -110,7 +110,9 @@ same however narrow the question was. A `project=` it names is one Jira knows:
 on Jira Cloud, no rows over a project that does not exist is `UNKNOWN_PROJECT`
 (exit 5) with nothing on stdout, whether the key came from `--project`,
 `JIRA_PROJECT` or a stale context. Data Center refuses that search itself, as
-`BAD_REQUEST`.
+`BAD_REQUEST`. An archived project on Data Center is the exception: it answers
+with no rows at exit 0, so if a project that should hold issues reports none,
+check that `project list` still shows it.
 
 An empty value does not lift the scope. `--project ""` is refused as
 `EMPTY_SCOPE`, because it used to fall back to the context and produce exactly

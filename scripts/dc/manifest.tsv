@@ -46,6 +46,15 @@ internal/resource/issue datacenter	internal/resource/issue/testdata/comma-label-
 # projects is not here: the seed holds one, and it was measured against a
 # second made for the purpose and removed, 2026-10-12, 10.4.0.
 internal/resource/issue datacenter	internal/resource/issue/testdata/unknown-project-recorded.datacenter.json	issue list --project ENG --project NOPE
+# One project the server does not know. Data Center refuses the search itself,
+# a 400 with the sentence Cloud keeps for its parse endpoint, where Cloud's
+# search answers 200 and no rows. So there is no empty answer to ask about
+# here, the refusal is BAD_REQUEST and not UNKNOWN_PROJECT, and the check that
+# stands under an empty answer on Cloud is not made. Recorded 2026-10-13,
+# 10.4.0. The same 400 answers a key this credential cannot browse; an archived
+# project answers 200 and no rows, with an issue in it. Both were measured
+# against a project made for the purpose and removed.
+internal/resource/issue datacenter	internal/resource/issue/testdata/no-rows-unknown-project-recorded.datacenter.json	issue list --project NOPE
 
 # The label check, both verdicts, so the second is a control on the first. The
 # unknown one above spends two lookups, the label and then a check that the

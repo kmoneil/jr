@@ -379,44 +379,9 @@ func TestAWalkThatDidNotFinishIsNotAskedAbout(t *testing.T) {
 // question is one Jira accepts as this code builds it and answers in the
 // sentence the refusal carries.
 func TestTheRecordedEmptyAnswersAreToldApart(t *testing.T) {
-	cmd, ok := registry.Lookup("issue.list")
-	if !ok {
-		t.Fatal("issue list is not registered")
-	}
-
 	run := func(t *testing.T, fixture, project string, set func(registry.Flags)) error {
 		t.Helper()
-		conn, replayer := recordedConn(t, fixture)
-		info := site.Info{Kind: site.Cloud, Version: "test"}
-
-		flags := registry.NewFlags()
-		if set != nil {
-			set(flags)
-		}
-		inv := &registry.Invocation{
-			Jira: &stubSession{
-				project: project, conn: conn, kind: site.Cloud,
-				meta: &site.Metadata{Client: conn, Info: info},
-			},
-			Flags: flags, Limit: registry.Limit{N: 50},
-			Stderr: io.Discard, Progress: registry.NoProgress,
-		}
-		var buf strings.Builder
-		stream, err := render.NewStream(&buf, render.TSV, render.StreamSpec{
-			Kind: cmd.Kind(), Version: cmd.KindVersion(),
-			Name: cmd.CollectionName, Columns: cmd.Columns,
-		})
-		if err != nil {
-			t.Fatalf("stream: %v", err)
-		}
-		_, runErr := cmd.Stream(t.Context(), inv, stream)
-		if buf.Len() != 0 {
-			t.Errorf("bytes reached stdout before the stream was closed: %q", buf.String())
-		}
-		if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
-			t.Errorf("a recorded exchange was never requested: %v", unplayed)
-		}
-		return runErr
+		return listOverRecording(t, site.Cloud, fixture, project, set)
 	}
 
 	t.Run("a project Jira does not know", func(t *testing.T) {
@@ -441,4 +406,95 @@ func TestTheRecordedEmptyAnswersAreToldApart(t *testing.T) {
 			t.Fatalf("the recorded empty answer over a real project was refused: %v", err)
 		}
 	})
+}
+
+// TestTheRecordedDataCenterSearchRefusesAnUnknownProjectItself replays what a
+// Data Center 10.4.0 said to `issue list --project NOPE`: one exchange, the
+// search, answered with a 400 and the sentence Cloud keeps for its parse
+// endpoint.
+//
+// It is why the floor is asked only on Cloud. There is no empty answer here to
+// ask about, and the search is the whole conversation: the cassette holds one
+// exchange, so a question asked before it or after it has nothing to play. The
+// refusal reaches the caller as BAD_REQUEST at exit 2 and not as
+// UNKNOWN_PROJECT at exit 5, and that difference between the deployments is
+// what this recording is here to state rather than leave as a note.
+//
+// The sentence is asserted as recorded, from an account whose language is
+// English. Jira writes it in the account's language (a German one is told
+// "Der Wert 'NOPE' existiert nicht für das Feld 'project'.", measured on the
+// same instance on 2026-10-13), and the body carries nothing else, so the
+// sentence is passed on and never read to decide the code.
+//
+// It does not show that Data Center never answers empty over a project that
+// is gone. An archived one does: HTTP 200 and no rows, with an issue in it,
+// measured on the same instance the same day. Nothing asks about that.
+func TestTheRecordedDataCenterSearchRefusesAnUnknownProjectItself(t *testing.T) {
+	err := listOverRecording(t, site.DataCenter,
+		"no-rows-unknown-project-recorded.datacenter.json", "NOPE", nil)
+	if err == nil {
+		t.Fatal("the recorded refusal of an unknown project was accepted")
+	}
+	e := errs.Coerce(err)
+	if e.Code != "BAD_REQUEST" || e.Exit != exitcode.Usage {
+		t.Errorf("refusal = %s at exit %v, want BAD_REQUEST at %v, which is what "+
+			"Data Center's own refusal of the search reaches the caller as",
+			e.Code, e.Exit, exitcode.Usage)
+	}
+	if want := "The value 'NOPE' does not exist for the field 'project'."; !strings.Contains(e.Detail, want) {
+		t.Errorf("detail = %q, want it to carry the server's own sentence %q", e.Detail, want)
+	}
+}
+
+// listOverRecording runs `issue list` over one project against a recorded
+// conversation, validation first as a real invocation has it, and fails if a
+// byte reached stdout before the stream was closed or an exchange in the
+// recording was never asked for.
+//
+// Validation is part of the conversation and not a preamble to it: the check a
+// set of projects gets is made there, before anything is searched, and a
+// recording that holds one exchange only says "the search is all there was" if
+// that step ran against it too.
+func listOverRecording(
+	t *testing.T, kind site.Kind, fixture, project string, set func(registry.Flags),
+) error {
+	t.Helper()
+	cmd, ok := registry.Lookup("issue.list")
+	if !ok {
+		t.Fatal("issue list is not registered")
+	}
+	conn, replayer := recordedConn(t, fixture)
+	info := site.Info{Kind: kind, Version: "test"}
+
+	flags := registry.NewFlags()
+	if set != nil {
+		set(flags)
+	}
+	inv := &registry.Invocation{
+		Jira: &stubSession{
+			project: project, conn: conn, kind: kind,
+			meta: &site.Metadata{Client: conn, Info: info},
+		},
+		Flags: flags, Limit: registry.Limit{N: 50},
+		Stderr: io.Discard, Progress: registry.NoProgress,
+	}
+	if err := cmd.Validate(t.Context(), inv); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	var buf strings.Builder
+	stream, err := render.NewStream(&buf, render.TSV, render.StreamSpec{
+		Kind: cmd.Kind(), Version: cmd.KindVersion(),
+		Name: cmd.CollectionName, Columns: cmd.Columns,
+	})
+	if err != nil {
+		t.Fatalf("stream: %v", err)
+	}
+	_, runErr := cmd.Stream(t.Context(), inv, stream)
+	if buf.Len() != 0 {
+		t.Errorf("bytes reached stdout before the stream was closed: %q", buf.String())
+	}
+	if unplayed := replayer.Unplayed(); len(unplayed) > 0 {
+		t.Errorf("a recorded exchange was never requested: %v", unplayed)
+	}
+	return runErr
 }

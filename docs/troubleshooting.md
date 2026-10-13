@@ -677,6 +677,11 @@ request, so `--max-requests 1` over a project that answers empty stops at the
 budget. On Data Center Jira refuses the search itself, as `BAD_REQUEST` with the
 same sentence.
 
+An archived project on Data Center is not caught. Jira answers a search over it
+with no rows, whatever it holds, and that reaches you as `EMPTY_RESULT` at exit
+0. If a project you expected issues from reports none, check that `jr project
+list` still shows it.
+
 One thing this does not catch, on Cloud only: the operand of a `WAS`,
 `CHANGED TO`, or `CHANGED FROM` predicate. `--jql 'status was "NoSuchStatus"'`
 is checked by neither of Cloud's endpoints and still returns an empty result

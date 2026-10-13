@@ -927,10 +927,20 @@ that answers empty now stops at the budget, as `REQUEST_BUDGET_EXCEEDED` at
 exit 3, because the search and the question are two requests.
 
 Cloud only. Data Center refuses the search itself, as `BAD_REQUEST` at exit 2
-carrying the same sentence (measured on 10.4.0), so there is no empty answer
+carrying the same sentence (recorded on 10.4.0), so there is no empty answer
 over an unknown project to ask about there, and its only way of asking is that
-search again. Several projects are a different check, made before the search and
-on both deployments: see [Errors about scope](#errors-about-scope).
+search again. A key the credential cannot browse is refused the same way. The
+sentence is in the account's language, and the body carries nothing else, so
+the refusal is passed on as Jira made it and not read to pick a code. Several
+projects are a different check, made before the search and on both deployments:
+see [Errors about scope](#errors-about-scope).
+
+**What this does not cover: an archived project on Data Center.** Its search
+answers HTTP 200 and no rows, whatever the project holds, so `issue list` over
+one is `EMPTY_RESULT` at exit 0. Measured on 10.4.0 as an administrator, with an
+issue in the project that `issue get` went on returning. Nothing asks about it:
+the question above is Cloud's, and to Data Center this is a project it knows.
+`jr project list` leaves an archived project out, which is the way to tell.
 
 ### `SCOPE_MISMATCH`
 
