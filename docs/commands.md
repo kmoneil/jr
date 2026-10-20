@@ -2481,9 +2481,17 @@ array of words per step, and is read by that command's own flags:
 
 A step is issue edit, issue assign, issue comment add, issue link add,
 sprint add, or issue move, on this issue and no other (a link's far end
-excepted). At most one move, as the last step: a transition is resolved
-against the status the issue is in now, and a step after one would run against
-a status nothing checked.
+excepted). At most one move, as the first step or the last: a transition is
+resolved against the status the issue is in now, so a second cannot be. Last
+is a close: the fields, then the move. First is a reopen: the move, then the
+fields, since a closed status can refuse an edit outright.
+
+After a first move, the later steps run against a status the issue is not in
+yet. Their requests are resolved and recorded as any step's, and the checks
+that read the status (the permissions, the edit screen, the assignee) wait for
+the move: the plan says so, and the apply runs them once the move has landed,
+before sending any later step. A step they block stops the run there, with the
+issue moved and nothing else sent.
 
 --plan-out writes the plan and sends nothing. Every step is dry-run as its own
 command, which resolves what that command resolves, and then checked for what

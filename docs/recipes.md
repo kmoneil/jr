@@ -735,9 +735,35 @@ landed, which failed with what code, and which were not attempted. Run the
 same `--apply` again once the cause is fixed and it sends only the steps not
 yet done.
 
-A sequence carries at most one `issue move`, as its last step, and changes
-only its own issue (a link's far end excepted). Create stays its own call:
-`jr issue create`, then a sequence for the sprint, the link and the move.
+A sequence carries at most one `issue move`, as its first step or its last,
+and changes only its own issue (a link's far end excepted). Create stays its
+own call: `jr issue create`, then a sequence for the sprint, the link and the
+move.
+
+### Reopening an issue and changing it, as one
+
+A reopen runs the other way round from a close: the move comes first, because
+the edits belong to the reopened ticket, and a closed status can refuse them
+outright (the classic workflow's Closed sets `jira.issue.editable=false`).
+
+```json
+[["issue", "move", "ENG-101", "Reopen Issue"],
+ ["issue", "edit", "ENG-101", "--summary", "Flaky on ARM", "--description-file", "d.txt"],
+ ["issue", "comment", "add", "ENG-101", "Reopening: it came back on the ARM runners."]]
+```
+
+The steps after the move will run in a status the issue is not in yet, so the
+plan checks what it can now and says what waits. Every step is still dry-run,
+so a field name, a value, a person or a sprint that could never work refuses
+the plan before anything is sent. The permissions, the edit screen and the
+assignee depend on the status, and each later step's checks read
+`after step 1: ...` instead.
+
+The apply sends the move, then runs those checks against the reopened issue,
+then sends the rest. If one of them fails, the run stops with the issue moved
+and nothing else sent, the step reported `failed` with the check's own code
+(`FIELD_NOT_ON_SCREEN`, `PERMISSION_DENIED`). Fix the cause and run the same
+`--apply` again: the move is `skipped` and the rest go.
 
 Assigning is its own verb:
 

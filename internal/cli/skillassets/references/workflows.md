@@ -160,7 +160,12 @@ jr issue sequence --apply close.xml
   `--apply` resumes: steps already done are `skipped`.
 - `STALE_WRITE` or `PLAN_DRIFTED` from `--apply` means the issue or the site
   moved since planning. Plan again; never edit the plan file.
-- One `issue move` at most, last. No global flags, `--dry-run` or
+- One `issue move` at most, first or last. Last closes (fields, then the move);
+  first reopens (the move, then the fields, which a closed status may refuse).
+  After a first move, each later step's checks read `after step 1: ...`: they
+  run once the move lands, and one that fails stops the run with the issue
+  moved and nothing else sent. Re-apply the same file once fixed.
+- No global flags, `--dry-run` or
   `--if-unchanged` inside a step: the sequence decides those. Steps change only
   the sequence's issue. Over MCP there is no stdin, so give `--steps` inline or
   `--steps-file` a path, never `--steps-file -`.

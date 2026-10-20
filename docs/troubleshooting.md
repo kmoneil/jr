@@ -1519,10 +1519,13 @@ $ jr issue sequence --apply close.xml
 ### `TRANSITION_NOT_LAST`, `STEP_NOT_ALLOWED`, `STEP_NAMES_ANOTHER_ISSUE` (exit 2)
 
 Refusals of a sequence's steps, decided from the text before anything reads
-the issue. A sequence carries one `issue move`, as its last step: a transition
-is resolved against the status the issue is in now, and a step after it would
-run against a status nothing checked. Plan up to the move, apply it, then plan
-the rest. A step is one of `issue edit`, `issue assign`, `issue comment add`,
+the issue. A sequence carries one `issue move`, as its first step or its last:
+a transition is resolved against the status the issue is in now, so a second
+cannot be, and steps on both sides of one would be checked against two
+statuses. Move first to reopen and then change; move last to change and then
+close. For anything else, plan up to the move, apply it, then plan the rest.
+The code still says `NOT_LAST`, from when last was the only place a move could
+go. A step is one of `issue edit`, `issue assign`, `issue comment add`,
 `issue link add`, `sprint add` and `issue move`, written without the binary's
 name, and it changes the sequence's issue and no other; only a link's far end
 may be another issue.
