@@ -28,9 +28,9 @@ const (
 	KindCreate    = "issue.create"
 	VersionCreate = 1
 	KindEdit      = "issue.edit"
-	VersionEdit   = 2
+	VersionEdit   = 3
 	KindMove      = "issue.move"
-	VersionMove   = 3
+	VersionMove   = 4
 )
 
 func init() {
@@ -590,6 +590,11 @@ comparison, and then the write, and the window between the read and the write
 is one round trip wide. The result says method="read-compare" rather than
 letting the word precondition imply an atomic one.
 
+--precondition reads the issue back after the write and puts its precondition
+on the result, for the next --if-unchanged, at the cost of one more request.
+It is the issue as read after the write, so a change that lands in between,
+an automation rule this edit fired among them, is inside it.
+
 --dry-run prints the exact request, body included, and sends nothing.
 
 --description and --body-format work exactly as on issue create.
@@ -616,6 +621,7 @@ write is a silent last-one-wins.`),
 			buildinfo.App + " issue edit ENG-101 --parent ENG-42",
 			buildinfo.App + " issue edit ENG-101 --parent none",
 			buildinfo.App + " issue edit ENG-101 --priority High --if-unchanged eyJkIjo",
+			buildinfo.App + " issue edit ENG-101 --summary Reopened --precondition",
 			buildinfo.App + " issue edit ENG-101 --field 'Story Points=0.5'",
 			buildinfo.App + " issue edit ENG-101 --field-json customfield_11350='\"ENG-42\"'",
 		}, "\n"),
@@ -667,6 +673,7 @@ write is a silent last-one-wins.`),
 			fieldJSONFlagDecl(),
 			bodyFormatFlag(),
 			ifUnchangedFlagDecl(),
+			readBackFlagDecl(),
 			dryRunFlag(),
 			planOutFlag(),
 			applyFlag(),
@@ -693,6 +700,9 @@ write is a silent last-one-wins.`),
 }
 
 func validateEdit(ctx context.Context, inv *registry.Invocation) error {
+	if err := validateReadBack(inv); err != nil {
+		return err
+	}
 	if err := validateEditShape(inv); err != nil {
 		return err
 	}
@@ -933,9 +943,9 @@ func runEdit(ctx context.Context, inv *registry.Invocation) (*render.Doc, error)
 	if err := client.send(ctx, req); err != nil {
 		return nil, err
 	}
-	return stampPrecondition(
+	return readBackPrecondition(ctx, inv, client, opt.Key, "edited", stampPrecondition(
 		EditedDoc(KindEdit, VersionEdit, opt.Key, "edited"), checked,
-	), nil
+	))
 }
 
 // editOptionsFor reads the change set out of the flags.
@@ -1095,6 +1105,8 @@ arrives with the transitions.
 exactly as on issue edit. Resolving the transition already guards against a
 status that moved underneath you; this guards against everything else, which
 matters most when the transition sets a resolution or adds a comment.
+--precondition reads the issue back after the move and reports its new
+precondition, exactly as on issue edit.
 
 --idempotency-key makes a retry safe. A transition is the one mutation here
 that is not idempotent — applying "Start Progress" twice is not applying it
@@ -1111,6 +1123,7 @@ than answered with another request's result.
 			buildinfo.App + " issue move ENG-101 'Close Issue' --resolution Done",
 			buildinfo.App + " issue move ENG-101 11 --dry-run",
 			buildinfo.App + " issue move ENG-101 Done --if-unchanged eyJkIjo",
+			buildinfo.App + " issue move ENG-101 Open --if-unchanged eyJkIjo --precondition",
 			buildinfo.App + " issue move ENG-101 Done --idempotency-key deploy-42",
 		}, "\n"),
 		Args: []registry.Arg{
@@ -1139,6 +1152,7 @@ than answered with another request's result.
 				Usage: "make a retry safe: the same key returns the recorded move",
 			},
 			ifUnchangedFlagDecl(),
+			readBackFlagDecl(),
 			dryRunFlag(),
 			planOutFlag(),
 			applyFlag(),
@@ -1165,6 +1179,9 @@ than answered with another request's result.
 }
 
 func validateMove(_ context.Context, inv *registry.Invocation) error {
+	if err := validateReadBack(inv); err != nil {
+		return err
+	}
 	if err := validateVerbShape(inv, "transition",
 		[]string{"resolution", "comment", "idempotency-key"}); err != nil {
 		return err
@@ -1284,7 +1301,9 @@ func runMove(ctx context.Context, inv *registry.Invocation) (*render.Doc, error)
 		return nil, err
 	}
 	if claim.replay != nil {
-		return claim.replay, nil
+		// Read afresh: the ledger holds where the move went, and the token is
+		// about the issue now.
+		return readBackPrecondition(ctx, inv, client, inv.Args[0], "moved", claim.replay)
 	}
 
 	// Everything from here to the send is work this claim has to be released
@@ -1364,7 +1383,8 @@ func sendMove(
 		},
 	}
 	claim.complete(inv, moved)
-	return stampPrecondition(MovedDoc(moved, false), checked), nil
+	return readBackPrecondition(ctx, inv, client, inv.Args[0], "moved",
+		stampPrecondition(MovedDoc(moved, false), checked))
 }
 
 // movedResult is what the ledger stores about a transition that happened.

@@ -1,0 +1,15 @@
+      <element name="issue">
+        <attributes count="3">
+          <attribute name="key" type="string" optional="false"/>
+          <attribute name="action" type="string" optional="false" enum="edited"/>
+          <attribute name="next-precondition" type="string" optional="true"/>
+        </attributes>
+        <elements count="1">
+          <element name="precondition" optional="true" repeated="false">
+            <attributes count="1">
+              <attribute name="method" type="string" optional="false" enum="read-compare"/>
+            </attributes>
+            <elements count="0"/>
+          </element>
+        </elements>
+      </element>

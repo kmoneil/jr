@@ -156,7 +156,9 @@ Two specifics worth knowing:
 | `CONFIRMATION_REQUIRED` | 10 | A destructive command with no `--yes`. Ask the user for authorization for that specific action. Do not supply it yourself |
 | `STALE_WRITE` | 7 | The issue changed since the read your precondition came from. Nothing was sent. Re-read for a fresh precondition, decide again, retry |
 | `TRANSITION_TAKES_NO_RESOLUTION` | 2 | `--resolution` on a transition whose screen has no resolution field, which Jira refuses as well. Default workflows have none. Move it without `--resolution`; `jr meta transitions <key> --format xml` shows which transitions carry one |
-| `INVALID_PRECONDITION` | 2 | The `--if-unchanged` value is not one this tool issued, or describes another issue or another site. It comes from the `precondition` attribute of `jr issue get` and nowhere else |
+| `INVALID_PRECONDITION` | 2 | The `--if-unchanged` value is not one this tool issued, or describes another issue or another site. It comes from the `precondition` attribute of `jr issue get` or `jr issue list --precondition`, or a write's `next-precondition`, and nowhere else |
+| `PRECONDITION_TAKES_NO_VALUE` | 2 | A precondition token was passed after `--precondition`, which takes none. The token goes to `--if-unchanged`; keep `--precondition` to get the next one |
+| `PRECONDITION_NEEDS_A_WRITE` | 2 | `--precondition` beside `--dry-run`, `--plan-out` or `--apply`. There is no one write to read back. Drop it |
 | `IDEMPOTENCY_KEY_REUSED` | 7 | The key was already used for a *different* operation. Answering one with the other's result would be worse than refusing. Use a new key |
 | `SPRINT_HAS_NO_DATES` | - | Jira will not run a sprint with no window. The refusal names only the missing half, so being asked for `--end` alone means the start is already set |
 | `INVALID_SPRINT_DATE` | - | Not RFC 3339. A bare `2026-08-17` names no time and no zone. An offset is fine and normalizes to UTC |

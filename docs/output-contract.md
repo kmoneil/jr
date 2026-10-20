@@ -1897,11 +1897,13 @@ silently get it.
 `issue edit` and `issue assign` do not need one: both are `PUT`s, so the
 transport already replays them after an upstream error and setting a field twice
 sets it once. A transition is the mutation that is not idempotent, and
-`issue.move` v3 marks a replayed one `replayed="true"` on the `issue` element,
+`issue.move` v4 marks a replayed one `replayed="true"` on the `issue` element,
 the way `issue.create` v1 does.
 
 A replayed move sends **nothing at all**, including the read that resolves the
-transition name. By the time a caller retries, a transition that did apply has
+transition name; the one exception is the read `--precondition` asks for after
+it (see [Preconditions](#preconditions)), which is about the issue now and not
+about the move. By the time a caller retries, a transition that did apply has
 left the issue somewhere that name is no longer offered from, so resolving it
 first would answer a safe retry with `UNKNOWN_TRANSITION`. The key is therefore
 bound to the issue and the transition as typed: a second run naming either
@@ -2014,7 +2016,7 @@ honours no `If-Match`. So the check is a read, a comparison, and then the write,
 and it has a window one round trip wide. A verb that ran one records it:
 
 ```xml
-<result kind="issue.edit" v="2" site="https://acme.atlassian.net">
+<result kind="issue.edit" v="3" site="https://acme.atlassian.net">
   <issue key="ENG-101" action="edited">
     <precondition method="read-compare"/>
   </issue>
@@ -2027,6 +2029,49 @@ read-then-write are not the same promise, and a caller entitled to know which
 one they got should not have to infer it from the absence of a claim. The
 element is absent when the flag was not passed; it never appears saying a check
 did not happen.
+
+**A write can hand back the next precondition.** A write moves the issue's
+`updated`, so the token it was guarded by is stale once it lands, and a chain of
+guarded writes otherwise costs an `issue get` between every two. `--precondition`
+on `issue edit`, `issue move` and `issue assign` reads the issue back after the
+write and puts its token on the result as `next-precondition`, which the next
+`--if-unchanged` takes:
+
+```xml
+<result kind="issue.move" v="4" site="https://acme.atlassian.net">
+  <issue key="ENG-101" action="moved" transition="171" next-precondition="eyJkIjoi...">
+    <to id="1" category="to-do">Open</to>
+    <precondition method="read-compare"/>
+  </issue>
+</result>
+```
+
+It is `next-precondition` and not `precondition`, the attribute's name on
+`issue.get` and `issue.list`, because a write's `issue` element already has a
+`precondition` child, and JSON and YAML put attributes and children in one
+object. It is the same token `issue get` would mint at that moment,
+millisecond-precise.
+
+It costs one request, `GET` of the issue's `updated`, because all three answer
+`204` with no body on both deployments. That is why it is a flag: a write that
+did not ask pays nothing. It works with or without `--if-unchanged`.
+
+**It is the issue as read after the write, not the version the write made.**
+Jira says nothing about the second. A change that lands between the two is
+inside the token, and the likeliest one is not another caller but an automation
+rule the write itself fired: a reopen is a common trigger. `issue get` after the
+write has the same window, but shows the fields, and this shows none.
+
+If the write lands and the read fails, the result reaches stdout without the
+attribute and the exit is the read's: a write that happened is not reported as
+one that did not. The error says the write is done, names `issue get` for the
+token, and is never `retryable`, because retrying the command sends the write
+again, and for a move that is a second transition.
+
+| Code                          | Exit | Meaning |
+| ----------------------------- | ---- | ------- |
+| `PRECONDITION_NEEDS_A_WRITE`  | 2    | `--precondition` beside `--dry-run` or `--plan-out`, which send nothing, or `--apply`, whose document reports a plan's rows and carries no token. |
+| `PRECONDITION_TAKES_NO_VALUE` | 2    | `--precondition` was given and an argument is a precondition token: it reads one back and takes none. `--if-unchanged <token>` is the flag that checks one. Only beside the flag, so the same arguments without it keep the answer they had. |
 
 | Code                       | Exit | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | -------------------------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

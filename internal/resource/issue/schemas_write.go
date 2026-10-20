@@ -86,13 +86,22 @@ func AssignSchema() *render.Schema {
 	return withPrecondition(s)
 }
 
-// withPrecondition adds the record of an --if-unchanged check.
+// withPrecondition adds the record of an --if-unchanged check, and the token
+// --precondition reads back after the write.
 //
 // On the three verbs that accept the flag and nowhere else. A shape that
 // declared it everywhere would tell a consumer to look for a check that verb
 // cannot perform, and the point of publishing the method is that a caller can
 // tell which guarantee they got.
+//
+// The token is an attribute of the issue, placed as on `issue.get` and
+// `issue.list`, and named next-precondition because `precondition` is the
+// child's name here (see nextPreconditionAttr). It is not on the precondition
+// element, which records a check that ran and is absent when none did: a token
+// is wanted after an unguarded write as much as a guarded one.
 func withPrecondition(s *render.Schema) *render.Schema {
+	s.Attrs = append(s.Attrs,
+		render.Field{Name: nextPreconditionAttr, Type: render.TypeString, Optional: true})
 	s.Children = append(s.Children, preconditionChild())
 	return s
 }

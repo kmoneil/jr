@@ -219,7 +219,9 @@ attempt and reuse it on every retry of that same logical create.
 If your edit is computed from a read, the issue may have moved between the two.
 
 The precondition token comes from the `precondition` attribute of `jr issue get`
-and from nowhere else. It is opaque, so there is nothing to assemble by hand.
+or of a row of `jr issue list --precondition`, or from the `next-precondition`
+a write reports under `--precondition`. It is opaque, so there is nothing to
+assemble by hand.
 
 ```console
 jr issue get ENG-101 --format json | jq -r '.issue.precondition'
@@ -243,6 +245,24 @@ alternative is deciding which changes count, and getting that wrong loses an edi
 silently.
 
 Do not drop the flag to force the write through.
+
+### Two guarded writes to one issue
+
+A write moves `updated`, so the token it was guarded by is stale once it lands.
+Ask the first write for the next one with `--precondition`, and pass that on:
+
+```console
+p=$(jr issue get ENG-101 --format json | jq -r '.issue.precondition')
+p=$(jr issue move ENG-101 Open --if-unchanged "$p" --precondition \
+      --format json | jq -r '.issue["next-precondition"]')
+jr issue edit ENG-101 --summary 'Reopened: ...' --if-unchanged "$p"
+```
+
+It costs one read after the write, the same read an `issue get` would make,
+and it has the same window: a change landing between the write and that read,
+such as an automation rule the move fired, is inside the token. Where the
+writes are all changes to one issue that can be planned together,
+`issue sequence` is the better shape: one reviewed plan, one baseline.
 
 **A description edit has an exact round trip.** `issue get --raw-field
 description` writes the stored bytes alone (no envelope, no added newline),
