@@ -1,0 +1,221 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/AGL-12",
+        "query": "fields=updated"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=399;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=150;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "400"
+          ],
+          "X-Ratelimit-Remaining": [
+            "399"
+          ]
+        },
+        "body": "{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10127\",\"self\":\"https://recorded.invalid/rest/api/3/issue/10127\",\"key\":\"AGL-12\",\"fields\":{\"updated\":\"2026-10-20T09:19:47.689-0500\"}}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/AGL-12/transitions",
+        "query": "expand=transitions.fields"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=349;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "350"
+          ],
+          "X-Ratelimit-Remaining": [
+            "349"
+          ]
+        },
+        "body": "{\"expand\":\"transitions\",\"transitions\":[{\"id\":\"11\",\"name\":\"To Do\",\"to\":{\"self\":\"https://recorded.invalid/rest/api/3/status/10008\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"To Do\",\"id\":\"10008\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"blue-gray\",\"name\":\"To Do\"}},\"hasScreen\":false,\"isGlobal\":true,\"isInitial\":false,\"isAvailable\":true,\"isConditional\":false,\"fields\":{},\"isLooped\":false},{\"id\":\"21\",\"name\":\"In Progress\",\"to\":{\"self\":\"https://recorded.invalid/rest/api/3/status/3\",\"description\":\"This work item is being actively worked on at the moment by the assignee.\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/inprogress.png\",\"name\":\"In Progress\",\"id\":\"3\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"}},\"hasScreen\":false,\"isGlobal\":true,\"isInitial\":false,\"isAvailable\":true,\"isConditional\":false,\"fields\":{},\"isLooped\":false},{\"id\":\"31\",\"name\":\"In Review\",\"to\":{\"self\":\"https://recorded.invalid/rest/api/3/status/10009\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"In Review\",\"id\":\"10009\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/4\",\"id\":4,\"key\":\"indeterminate\",\"colorName\":\"yellow\",\"name\":\"In Progress\"}},\"hasScreen\":false,\"isGlobal\":true,\"isInitial\":false,\"isAvailable\":true,\"isConditional\":false,\"fields\":{},\"isLooped\":false},{\"id\":\"41\",\"name\":\"Done\",\"to\":{\"self\":\"https://recorded.invalid/rest/api/3/status/10010\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"Done\",\"id\":\"10010\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/3\",\"id\":3,\"key\":\"done\",\"colorName\":\"green\",\"name\":\"Done\"}},\"hasScreen\":false,\"isGlobal\":true,\"isInitial\":false,\"isAvailable\":true,\"isConditional\":false,\"fields\":{},\"isLooped\":false}]}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/mypermissions",
+        "query": "issueKey=AGL-12\u0026permissions=TRANSITION_ISSUES"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=349;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "350"
+          ],
+          "X-Ratelimit-Remaining": [
+            "349"
+          ]
+        },
+        "body": "{\"permissions\":{\"TRANSITION_ISSUES\":{\"id\":\"46\",\"key\":\"TRANSITION_ISSUES\",\"name\":\"Transition Issues\",\"type\":\"PROJECT\",\"description\":\"Ability to transition issues.\",\"havePermission\":true}}}"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/3/issue/AGL-12/transitions",
+        "body": "{\"transition\":{\"id\":\"11\"}}"
+      },
+      "response": {
+        "status": 204,
+        "header": {
+          "Ratelimit": [
+            "\"jira-burst-based\";r=199;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "200"
+          ],
+          "X-Ratelimit-Remaining": [
+            "199"
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/mypermissions",
+        "query": "issueKey=AGL-12\u0026permissions=ADD_COMMENTS%2CEDIT_ISSUES"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=349;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "350"
+          ],
+          "X-Ratelimit-Remaining": [
+            "349"
+          ]
+        },
+        "body": "{\"permissions\":{\"EDIT_ISSUES\":{\"id\":\"12\",\"key\":\"EDIT_ISSUES\",\"name\":\"Edit Issues\",\"type\":\"PROJECT\",\"description\":\"Ability to edit issues.\",\"havePermission\":true},\"ADD_COMMENTS\":{\"id\":\"15\",\"key\":\"ADD_COMMENTS\",\"name\":\"Add Comments\",\"type\":\"PROJECT\",\"description\":\"Ability to comment on issues.\",\"havePermission\":true}}}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/AGL-12/editmeta"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=348;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "350"
+          ],
+          "X-Ratelimit-Remaining": [
+            "348"
+          ]
+        },
+        "body": "{\"fields\":{\"summary\":{\"required\":true,\"schema\":{\"type\":\"string\",\"system\":\"summary\"},\"name\":\"Summary\",\"key\":\"summary\",\"operations\":[\"set\"]},\"issuetype\":{\"required\":true,\"schema\":{\"type\":\"issuetype\",\"system\":\"issuetype\"},\"name\":\"Issue Type\",\"key\":\"issuetype\",\"operations\":[],\"allowedValues\":[{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10000\",\"id\":\"10000\",\"description\":\"A big user story that needs to be broken down. Created by Jira Software - do not edit or delete.\",\"iconUrl\":\"https://recorded.invalid/images/icons/issuetypes/epic.svg\",\"name\":\"Epic\",\"subtask\":false,\"hierarchyLevel\":1},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10014\",\"id\":\"10014\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Task\",\"subtask\":false,\"avatarId\":10318,\"hierarchyLevel\":0},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10005\",\"id\":\"10005\",\"description\":\"Stories track functionality or features expressed as user goals.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Story\",\"subtask\":false,\"avatarId\":10300,\"hierarchyLevel\":0},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10015\",\"id\":\"10015\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Feature\",\"subtask\":false,\"avatarId\":10314,\"hierarchyLevel\":0},{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10016\",\"id\":\"10016\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Bug\",\"subtask\":false,\"avatarId\":10303,\"hierarchyLevel\":0}]},\"parent\":{\"required\":false,\"schema\":{\"type\":\"issuelink\",\"system\":\"parent\"},\"name\":\"Parent\",\"key\":\"parent\",\"hasDefaultValue\":false,\"operations\":[\"set\"]},\"components\":{\"required\":false,\"schema\":{\"type\":\"array\",\"items\":\"component\",\"system\":\"components\"},\"name\":\"Components\",\"key\":\"components\",\"operations\":[\"add\",\"set\",\"remove\"],\"allowedValues\":[{\"self\":\"https://recorded.invalid/rest/api/3/component/10001\",\"id\":\"10001\",\"name\":\"probe plain\"},{\"self\":\"https://recorded.invalid/rest/api/3/component/10000\",\"id\":\"10000\",\"name\":\"probe, comma\"}]},\"description\":{\"required\":false,\"schema\":{\"type\":\"string\",\"system\":\"description\"},\"name\":\"Description\",\"key\":\"description\",\"operations\":[\"set\"]},\"customfield_10020\":{\"required\":false,\"schema\":{\"type\":\"array\",\"items\":\"json\",\"custom\":\"com.pyxis.greenhopper.jira:gh-sprint\",\"customId\":10020},\"name\":\"Sprint\",\"key\":\"customfield_10020\",\"operations\":[\"set\"]},\"reporter\":{\"required\":true,\"schema\":{\"type\":\"user\",\"system\":\"reporter\"},\"name\":\"Reporter\",\"key\":\"reporter\",\"autoCompleteUrl\":\"https://recorded.invalid/rest/api/3/user/recommend?context=Reporter\u0026issueKey=AGL-12\",\"operations\":[\"set\"]},\"customfield_10021\":{\"required\":false,\"schema\":{\"type\":\"array\",\"items\":\"option\",\"custom\":\"com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes\",\"customId\":10021},\"name\":\"Flagged\",\"key\":\"customfield_10021\",\"operations\":[\"add\",\"set\",\"remove\"],\"allowedValues\":[{\"self\":\"https://recorded.invalid/rest/api/3/customFieldOption/10019\",\"value\":\"Impediment\",\"id\":\"10019\"}]},\"fixVersions\":{\"required\":false,\"schema\":{\"type\":\"array\",\"items\":\"version\",\"system\":\"fixVersions\"},\"name\":\"Fix versions\",\"key\":\"fixVersions\",\"operations\":[\"set\",\"add\",\"remove\"],\"allowedValues\":[{\"self\":\"https://recorded.invalid/rest/api/3/version/10000\",\"id\":\"10000\",\"name\":\"probe 1.0, beta\",\"archived\":false,\"released\":false,\"projectId\":10002},{\"self\":\"https://recorded.invalid/rest/api/3/version/10001\",\"id\":\"10001\",\"name\":\"probe 2.0\",\"archived\":false,\"released\":false,\"projectId\":10002}]},\"customfield_10001\":{\"required\":false,\"schema\":{\"type\":\"team\",\"custom\":\"com.atlassian.jira.plugin.system.customfieldtypes:atlassian-team\",\"customId\":10001,\"configuration\":{\"com.atlassian.jira.plugin.system.customfieldtypes:atlassian-team\":true}},\"name\":\"Team\",\"key\":\"customfield_10001\",\"autoCompleteUrl\":\"https://recorded.invalid/gateway/api/v1/recommendations\",\"operations\":[\"set\"]},\"priority\":{\"required\":false,\"schema\":{\"type\":\"priority\",\"system\":\"priority\"},\"name\":\"Priority\",\"key\":\"priority\",\"operations\":[\"set\"],\"allowedValues\":[{\"self\":\"https://recorded.invalid/rest/api/3/priority/1\",\"iconUrl\":\"https://recorded.invalid/images/icons/priorities/highest_new.svg\",\"name\":\"Highest\",\"id\":\"1\"},{\"self\":\"https://recorded.invalid/rest/api/3/priority/2\",\"iconUrl\":\"https://recorded.invalid/images/icons/priorities/high_new.svg\",\"name\":\"High\",\"id\":\"2\"},{\"self\":\"https://recorded.invalid/rest/api/3/priority/3\",\"iconUrl\":\"https://recorded.invalid/images/icons/priorities/medium_new.svg\",\"name\":\"Medium\",\"id\":\"3\"},{\"self\":\"https://recorded.invalid/rest/api/3/priority/4\",\"iconUrl\":\"https://recorded.invalid/images/icons/priorities/low_new.svg\",\"name\":\"Low\",\"id\":\"4\"},{\"self\":\"https://recorded.invalid/rest/api/3/priority/5\",\"iconUrl\":\"https://recorded.invalid/images/icons/priorities/lowest_new.svg\",\"name\":\"Lowest\",\"id\":\"5\"}]},\"customfield_10015\":{\"required\":false,\"schema\":{\"type\":\"date\",\"custom\":\"com.atlassian.jira.plugin.system.customfieldtypes:datepicker\",\"customId\":10015},\"name\":\"Start date\",\"key\":\"customfield_10015\",\"operations\":[\"set\"]},\"labels\":{\"required\":false,\"schema\":{\"type\":\"array\",\"items\":\"string\",\"system\":\"labels\"},\"name\":\"Labels\",\"key\":\"labels\",\"autoCompleteUrl\":\"https://recorded.invalid/rest/api/1.0/labels/10127/suggest?query=\",\"operations\":[\"add\",\"set\",\"remove\"]},\"environment\":{\"required\":false,\"schema\":{\"type\":\"string\",\"system\":\"environment\"},\"name\":\"Environment\",\"key\":\"environment\",\"operations\":[\"set\"]},\"attachment\":{\"required\":false,\"schema\":{\"type\":\"array\",\"items\":\"attachment\",\"system\":\"attachment\"},\"name\":\"Attachment\",\"key\":\"attachment\",\"operations\":[\"set\",\"copy\"]},\"duedate\":{\"required\":false,\"schema\":{\"type\":\"date\",\"system\":\"duedate\"},\"name\":\"Due date\",\"key\":\"duedate\",\"operations\":[\"set\"]},\"comment\":{\"required\":false,\"schema\":{\"type\":\"comments-page\",\"system\":\"comment\"},\"name\":\"Comment\",\"key\":\"comment\",\"operations\":[\"add\",\"edit\",\"remove\"]},\"issuelinks\":{\"required\":false,\"schema\":{\"type\":\"array\",\"items\":\"issuelinks\",\"system\":\"issuelinks\"},\"name\":\"Linked Issues\",\"key\":\"issuelinks\",\"autoCompleteUrl\":\"https://recorded.invalid/rest/api/3/issue/picker?currentProjectId=\u0026showSubTaskParent=true\u0026showSubTasks=true\u0026currentIssueKey=AGL-12\u0026query=\",\"operations\":[\"add\",\"copy\"]},\"assignee\":{\"required\":false,\"schema\":{\"type\":\"user\",\"system\":\"assignee\"},\"name\":\"Assignee\",\"key\":\"assignee\",\"autoCompleteUrl\":\"https://recorded.invalid/rest/api/3/user/assignable/search?issueKey=AGL-12\u0026query=\",\"operations\":[\"set\"]}}}"
+      }
+    },
+    {
+      "request": {
+        "method": "PUT",
+        "path": "/rest/api/3/issue/AGL-12",
+        "body": "{\"fields\":{\"summary\":\"Reopened by a sequence\"}}"
+      },
+      "response": {
+        "status": 204,
+        "header": {
+          "Ratelimit": [
+            "\"jira-burst-based\";r=299;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=50;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "300"
+          ],
+          "X-Ratelimit-Remaining": [
+            "299"
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/3/issue/AGL-12/comment",
+        "body": "{\"body\":{\"type\":\"doc\",\"version\":1,\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"Reopening: recorded for issue 265.\"}]}]}}"
+      },
+      "response": {
+        "status": 201,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=198;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "200"
+          ],
+          "X-Ratelimit-Remaining": [
+            "198"
+          ]
+        },
+        "body": "{\"self\":\"https://recorded.invalid/rest/api/3/issue/10127/comment/10500\",\"id\":\"10500\",\"author\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"body\":{\"type\":\"doc\",\"version\":1,\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"Reopening: recorded for issue 265.\"}]}]},\"updateAuthor\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"created\":\"2026-10-20T09:20:00.064-0500\",\"updated\":\"2026-10-20T09:20:00.064-0500\",\"jsdPublic\":true}"
+      }
+    }
+  ]
+}

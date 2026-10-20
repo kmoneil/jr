@@ -333,7 +333,9 @@ func runSequenceApply(ctx context.Context, inv *registry.Invocation) (*render.Do
 		baseline = BaselineRechecked
 	}
 
-	rebuilt, err := rebuildSteps(ctx, inv, &preflight{conn: conn, info: info, key: plan.Key}, plan, done)
+	pf := &preflight{conn: conn, info: info, key: plan.Key}
+	waitFor := plan.movesFirst(done)
+	rebuilt, err := rebuildSteps(ctx, inv, pf, plan, done, waitFor)
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +343,13 @@ func runSequenceApply(ctx context.Context, inv *registry.Invocation) (*render.Do
 		return previewDoc(rebuilt), nil
 	}
 
-	outcomes := sendSteps(ctx, inv, conn, ledger, info.BaseURL, plan, done, rebuilt)
+	var recheck func(context.Context) (int, error)
+	if waitFor > 0 {
+		recheck = func(ctx context.Context) (int, error) {
+			return recheckAfterMove(ctx, pf, plan, rebuilt, waitFor)
+		}
+	}
+	outcomes := sendSteps(ctx, inv, conn, ledger, info.BaseURL, plan, done, rebuilt, recheck)
 	doc := SequenceApplyDoc(plan, baseline, outcomes)
 	for _, o := range outcomes {
 		if o.outcome == StepFailed {
@@ -349,6 +357,51 @@ func runSequenceApply(ctx context.Context, inv *registry.Invocation) (*render.Do
 		}
 	}
 	return doc, nil
+}
+
+// movesFirst is the step the rest of this apply waits for, as movesFirst says
+// of the steps, or 0 once that move is done: a resume runs against the status
+// the move led to, so every check it makes is against the right one.
+func (p *SequencePlan) movesFirst(done map[int]bool) int {
+	steps := make([]SequenceStep, len(p.Steps))
+	for i, s := range p.Steps {
+		steps[i] = s.SequenceStep
+	}
+	waitFor := movesFirst(steps)
+	if done[waitFor] {
+		return 0
+	}
+	return waitFor
+}
+
+// recheckAfterMove runs the checks the steps after a first move waited for,
+// against the issue as the move left it, before any of them is sent.
+//
+// It returns the first step they block, with the refusal that names every
+// blocked step, or 0. Nothing after the move is sent when one is blocked, even
+// a step before it that passed, so the issue is left exactly "moved, nothing
+// else", which is the state a reader can repair from and a resume picks up.
+// A read that fails is reported against the first step after the move, since
+// none of them can run without it.
+func recheckAfterMove(
+	ctx context.Context, pf *preflight, plan *SequencePlan,
+	rebuilt map[int]stepPlan, waitFor int,
+) (int, error) {
+	rest := make([]stepPlan, 0, len(plan.Steps)-waitFor)
+	for _, s := range plan.Steps[waitFor:] {
+		p := rebuilt[s.Number]
+		p.blocked, p.checks = nil, nil
+		rest = append(rest, p)
+	}
+	if err := pf.check(ctx, rest, 0); err != nil {
+		return rest[0].step.Number, atStep(rest[0].step.Number, err)
+	}
+	for _, p := range rest {
+		if p.blocked != nil {
+			return p.step.Number, refuseBlocked(rest)
+		}
+	}
+	return 0, nil
 }
 
 // completedSteps is the steps of this plan the ledger says are done, read
@@ -376,7 +429,7 @@ func completedSteps(ledger *idem.Ledger, site string, plan *SequencePlan) (map[i
 // they are known to be the ones the reader saw.
 func rebuildSteps(
 	ctx context.Context, inv *registry.Invocation, pf *preflight,
-	plan *SequencePlan, done map[int]bool,
+	plan *SequencePlan, done map[int]bool, waitFor int,
 ) (map[int]stepPlan, error) {
 	var todo []stepPlan
 	for _, s := range plan.Steps {
@@ -384,7 +437,7 @@ func rebuildSteps(
 			todo = append(todo, dryRun(ctx, inv, s.SequenceStep))
 		}
 	}
-	if err := pf.check(ctx, todo); err != nil {
+	if err := pf.check(ctx, todo, waitFor); err != nil {
 		return nil, err
 	}
 	if err := refuseBlocked(todo); err != nil {
@@ -457,16 +510,25 @@ func previewDoc(rebuilt map[int]stepPlan) *render.Doc {
 }
 
 // sendSteps sends the steps in order, stopping at the first failure.
+//
+// recheck, when it is set, runs once the first step has been applied: it is
+// the checks the steps after a first move waited for. A step it blocks is
+// reported failed with the check's own code and every other later step
+// not-attempted, and none of them is sent or claimed.
 func sendSteps(
 	ctx context.Context, inv *registry.Invocation, conn *transport.Client,
 	ledger *idem.Ledger, site string, plan *SequencePlan,
 	done map[int]bool, rebuilt map[int]stepPlan,
+	recheck func(context.Context) (int, error),
 ) []stepOutcome {
 	outcomes := make([]stepOutcome, 0, len(plan.Steps))
 	stopped := false
+	heldAt, held := 0, error(nil)
 	for _, s := range plan.Steps {
 		switch {
-		case stopped:
+		case heldAt != 0 && s.Number == heldAt:
+			outcomes = append(outcomes, stepOutcome{step: s, outcome: StepFailed, cause: held})
+		case stopped || heldAt != 0:
 			outcomes = append(outcomes, stepOutcome{step: s, outcome: StepNotAttempted})
 		case done[s.Number]:
 			outcomes = append(outcomes, stepOutcome{step: s, outcome: StepSkipped})
@@ -474,6 +536,9 @@ func sendSteps(
 			o := sendStep(ctx, inv, conn, ledger, site, s, rebuilt[s.Number].reqs)
 			outcomes = append(outcomes, o)
 			stopped = o.outcome == StepFailed
+			if !stopped && recheck != nil && s.Number == 1 {
+				heldAt, held = recheck(ctx)
+			}
 		}
 	}
 	return outcomes

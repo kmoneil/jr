@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/xml"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -33,7 +34,10 @@ type fakeJira struct {
 	routes map[string]string
 	// status overrides the 200 a route answers with.
 	status map[string]int
-	seen   []string
+	// then holds the routes a write replaces once it has answered, so an issue
+	// the fake serves can change status under a sequence as a real one does.
+	then map[string]map[string]string
+	seen []string
 }
 
 func newFakeJira() *fakeJira {
@@ -83,6 +87,9 @@ func (f *fakeJira) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.seen = append(f.seen, route+"?"+r.URL.RawQuery)
 	body, ok := f.routes[route]
 	status := f.status[route]
+	if r.Method != http.MethodGet {
+		maps.Copy(f.routes, f.then[route])
+	}
 	f.mu.Unlock()
 	w.Header().Set("Content-Type", "application/json")
 	if !ok {

@@ -214,13 +214,23 @@ func sameKey(a, b string) bool {
 	return okA && okB && ka == kb
 }
 
-// refuseMisplacedMoves allows one transition, as the last step.
+// refuseMisplacedMoves allows one transition, as the first step or the last.
 //
 // A transition is resolved against the issue's current status, so a second
 // one cannot be resolved when the sequence is planned: the issue is not yet in
-// the status it would start from. And every check runs against the issue as
-// it is now, so a step after a transition would run against a status the
-// checks never saw. The refusal names the split.
+// the status it would start from. One is enough for the two orders a team
+// needs. Last is a close: the fields are set, then the issue moves, which is
+// also the order a validator needs. First is a reopen: the issue moves, then
+// the fields are set, because a closed status can refuse the edit outright
+// (`jira.issue.editable=false` is the classic workflow's default on Closed),
+// and the edit belongs to the reopened ticket anyway.
+//
+// A move in the middle stays refused. Steps on both sides of it would be
+// checked against two statuses, one of them not yet reached, and nothing a
+// reader can check says which.
+//
+// The code is still TRANSITION_NOT_LAST, from when last was the only place a
+// move could go. Renaming it would change a code a caller may branch on.
 func refuseMisplacedMoves(steps []SequenceStep) error {
 	var moves []int
 	for _, s := range steps {
@@ -231,16 +241,33 @@ func refuseMisplacedMoves(steps []SequenceStep) error {
 	if len(moves) == 0 {
 		return nil
 	}
-	if len(moves) > 1 || moves[0] != len(steps) {
+	if len(moves) > 1 || (moves[0] != 1 && moves[0] != len(steps)) {
 		return errs.Usage("TRANSITION_NOT_LAST",
-			"a sequence carries one issue move, as its last step, and this one "+
-				"moves at step %s of %d", joinInts(moves), len(steps)).
+			"a sequence carries one issue move, as its first step or its last, "+
+				"and this one moves at step %s of %d", joinInts(moves), len(steps)).
 			WithDetail("a transition is resolved against the status the issue is in " +
-				"when the sequence is planned, and a step after one would run " +
-				"against a status nothing checked").
-			WithRemedy("plan the steps up to the first move, apply them, then plan the rest")
+				"when the sequence is planned, so a second cannot be, and steps on " +
+				"both sides of one would be checked against two statuses").
+			WithRemedy("move first to reopen and then change, or last to change and " +
+				"then close; or plan the steps up to the move, apply them, then plan the rest")
 	}
 	return nil
+}
+
+// movesFirst is the number of the step every later step waits for: 1 when the
+// sequence opens with its move and has steps after it, 0 otherwise.
+//
+// Those later steps run against the status the move leads to, which the issue
+// is not in when they are planned. Their dry runs do not read the status, so
+// they are recorded and held to the plan as any step is. The checks that do
+// read it (the permissions, the edit screen, whether the assignee may hold the
+// issue) wait for the move, at plan time and at the start of an apply, and run
+// once it has landed: see preflight.check and recheckAfterMove.
+func movesFirst(steps []SequenceStep) int {
+	if len(steps) > 1 && steps[0].Command.Name() == "issue.move" {
+		return 1
+	}
+	return 0
 }
 
 // atStep says which step a command's own refusal is about, and keeps

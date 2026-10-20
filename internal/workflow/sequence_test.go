@@ -66,6 +66,23 @@ func TestEveryStepCommandIsAllowed(t *testing.T) {
 	}
 }
 
+// TestAMoveMayOpenASequence is issue 265's reopen: the move first, then the
+// changes that belong to the reopened ticket. A closed status can refuse an
+// edit outright, so the order the close uses cannot express it.
+func TestAMoveMayOpenASequence(t *testing.T) {
+	steps, err := parseSteps(t, `[
+		["issue", "move", "ENG-1", "Open"],
+		["issue", "edit", "ENG-1", "--summary", "Reopened"],
+		["issue", "comment", "add", "ENG-1", "Reopening: it came back"]
+	]`, "ENG-1")
+	if err != nil {
+		t.Fatalf("the reopen was refused: %v", err)
+	}
+	if got := steps[0].Command.Name(); got != "issue.move" {
+		t.Errorf("step 1 is %s, want the move", got)
+	}
+}
+
 // TestASequenceThatCouldNeverRunIsRefusedFromTheText is every refusal decided
 // from the steps and the declarations alone, before anything reads the issue.
 // Each names the step it is about.
@@ -114,12 +131,20 @@ func TestASequenceThatCouldNeverRunIsRefusedFromTheText(t *testing.T) {
 		{"a sprint for another", `[["sprint", "add", "7", "ENG-1", "ENG-2"]]`, "STEP_NAMES_ANOTHER_ISSUE", "ENG-2"},
 		{"an assignee and no key", `[["issue", "assign", "ada"]]`, "NO_ISSUES", "step 1"},
 		{
-			"a move first", `[["issue", "move", "ENG-1", "Done"], ["issue", "comment", "add", "ENG-1", "x"]]`,
-			"TRANSITION_NOT_LAST", "step 1 of 2",
+			"a move in the middle", `[["issue", "comment", "add", "ENG-1", "x"], ` +
+				`["issue", "move", "ENG-1", "Done"], ["issue", "comment", "add", "ENG-1", "y"]]`,
+			"TRANSITION_NOT_LAST", "step 2 of 3",
 		},
 		{
 			"two moves", `[["issue", "move", "ENG-1", "In Progress"], ["issue", "move", "ENG-1", "Done"]]`,
 			"TRANSITION_NOT_LAST", "1 and 2",
+		},
+		{
+			// First and last are each allowed, and not both: the second would
+			// be resolved against a status the first has not reached.
+			"a move first and another last", `[["issue", "move", "ENG-1", "Open"], ` +
+				`["issue", "comment", "add", "ENG-1", "x"], ["issue", "move", "ENG-1", "Done"]]`,
+			"TRANSITION_NOT_LAST", "1 and 3",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

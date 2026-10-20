@@ -2212,7 +2212,7 @@ and read by that command's own flags through the parser the command line
 uses, so a step accepts exactly what the command accepts. A step is one of
 `issue edit`, `issue assign`, `issue comment add`, `issue link add`,
 `sprint add` and `issue move`, on the sequence's issue (a link's far end
-excepted), with at most one move, last.
+excepted), with at most one move, first or last.
 
 ```console
 $ jr issue sequence ENG-101 --steps-file close.json --plan-out close.xml
@@ -2259,6 +2259,22 @@ and a sequence is one change to one issue in an order the plan chose, so a
 step after a failed one would run against an issue nobody described. The
 document reaches stdout and the exit is the failing step's code.
 
+**A move first is a reopen, and the checks after it wait for it.** The later
+steps will run in the status the move leads to, which the issue is not in when
+they are planned. Their dry runs read nothing about the status, so their
+requests are recorded and held to the plan like any step's, and the checks
+that do not read it (a link's far end, the sprint) run at once. The rest, the
+permission, the edit screen and the assignee, would be asked of the status the
+issue is leaving, where a closed issue's empty edit screen refuses a plan that
+can run. So each later step's `checks` says `after step 1: ...` instead, and
+the apply runs those checks once the move has landed, against the issue as it
+then is, before sending any later step. One they block stops the run there:
+the move `applied`, the blocked step `failed` with the check's own code, every
+other later step `not-attempted`, and nothing after the move sent or claimed.
+That is the state a three-command reopen reaches when its second command is
+refused, with a document saying so. A resume runs in the status the move led
+to, so nothing waits on one.
+
 **Re-running the same file resumes.** A step the ledger has as done is
 `skipped` and sends nothing. The plan's own completed steps moved the issue,
 so a resume cannot compare the baseline: the document says `baseline=
@@ -2287,7 +2303,7 @@ give.
 | `STEP_TAKES_NO_PLAN_FLAG`  | 2    | A step carries `--dry-run`, `--plan-out`, `--apply`, `--if-unchanged` or `--idempotency-key`, which the sequence decides for all of them. |
 | `STEP_NAMES_ANOTHER_ISSUE` | 2    | A step names an issue that is not the sequence's, or a link joins two others. |
 | `STEP_READS_STDIN`         | 2    | A step reads `--description-file -`. |
-| `TRANSITION_NOT_LAST`      | 2    | More than one `issue move`, or one before the last step. A transition is resolved against the status the issue is in now, and a step after it would run against a status nothing checked. |
+| `TRANSITION_NOT_LAST`      | 2    | More than one `issue move`, or one that is neither the first step nor the last. A transition is resolved against the status the issue is in now, so a second cannot be, and steps on both sides of one would be checked against two statuses. The name is from when last was the only place a move could go. |
 | `FIELD_NOT_ON_SCREEN`      | 2    | An edit step sets a field the issue's edit screen does not hold. |
 | `USER_NOT_ASSIGNABLE`      | 2    | An assign step names somebody this issue cannot be assigned to. |
 | `PERMISSION_DENIED`        | 6    | A step needs a permission this account does not have on the issue. |

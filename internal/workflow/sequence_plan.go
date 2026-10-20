@@ -118,9 +118,17 @@ array of words per step, and is read by that command's own flags:
 
 A step is issue edit, issue assign, issue comment add, issue link add,
 sprint add, or issue move, on this issue and no other (a link's far end
-excepted). At most one move, as the last step: a transition is resolved
-against the status the issue is in now, and a step after one would run against
-a status nothing checked.
+excepted). At most one move, as the first step or the last: a transition is
+resolved against the status the issue is in now, so a second cannot be. Last
+is a close: the fields, then the move. First is a reopen: the move, then the
+fields, since a closed status can refuse an edit outright.
+
+After a first move, the later steps run against a status the issue is not in
+yet. Their requests are resolved and recorded as any step's, and the checks
+that read the status (the permissions, the edit screen, the assignee) wait for
+the move: the plan says so, and the apply runs them once the move has landed,
+before sending any later step. A step they block stops the run there, with the
+issue moved and nothing else sent.
 
 --plan-out writes the plan and sends nothing. Every step is dry-run as its own
 command, which resolves what that command resolves, and then checked for what
@@ -329,7 +337,7 @@ func runSequence(ctx context.Context, inv *registry.Invocation) (*render.Doc, er
 	for i, s := range steps {
 		plans[i] = dryRun(ctx, inv, s)
 	}
-	if err := pf.check(ctx, plans); err != nil {
+	if err := pf.check(ctx, plans, movesFirst(steps)); err != nil {
 		return nil, err
 	}
 	if err := refuseBlocked(plans); err != nil {
@@ -476,8 +484,22 @@ var stepPermissions = map[string]string{
 // check runs the checks the commands do not make, on every step whose dry run
 // succeeded. A read that fails is the plan's failure, not a step's: it says
 // nothing about whether the step could run.
-func (pf *preflight) check(ctx context.Context, plans []stepPlan) error {
-	perms, err := pf.permissions(ctx, plans)
+//
+// Steps numbered after waitFor, when it is not zero, run after a move that has
+// not happened yet (see movesFirst). Only their checks that do not depend on
+// the issue's status run here; the rest are named in the step's checks as
+// waiting, because running them against the status the issue is leaving would
+// refuse a plan that can run (a closed issue's empty edit screen) or pass one
+// that cannot.
+func (pf *preflight) check(ctx context.Context, plans []stepPlan, waitFor int) error {
+	waits := func(p *stepPlan) bool { return waitFor > 0 && p.step.Number > waitFor }
+	var now []stepPlan
+	for i := range plans {
+		if !waits(&plans[i]) {
+			now = append(now, plans[i])
+		}
+	}
+	perms, err := pf.permissions(ctx, now)
 	if err != nil {
 		return err
 	}
@@ -485,6 +507,12 @@ func (pf *preflight) check(ctx context.Context, plans []stepPlan) error {
 	for i := range plans {
 		p := &plans[i]
 		if p.blocked != nil {
+			continue
+		}
+		if waits(p) {
+			pf.checkStatusFree(ctx, p)
+			p.checks = append(p.checks, "after step "+strconv.Itoa(waitFor)+": "+
+				strings.Join(waitingChecks(p), ", "))
 			continue
 		}
 		pf.checkPermissions(p, perms)
@@ -496,6 +524,32 @@ func (pf *preflight) check(ctx context.Context, plans []stepPlan) error {
 		}
 	}
 	return nil
+}
+
+// checkStatusFree runs the checks that read something other than the issue's
+// status: a link's far end, and the sprint. A step waiting for a move is held
+// to these before anything is sent, so the move is not made for a sequence
+// whose later step could never have run whatever status the move led to.
+func (pf *preflight) checkStatusFree(ctx context.Context, p *stepPlan) {
+	switch p.step.Command.Name() {
+	case "issue.link.add":
+		pf.checkOtherEnd(ctx, p)
+	case "sprint.add":
+		pf.checkSprintOpen(ctx, p)
+	}
+}
+
+// waitingChecks names the checks a step waiting for a move has not had yet, in
+// the words its checks will use once they run.
+func waitingChecks(p *stepPlan) []string {
+	names := []string{stepPermissions[p.step.Command.Name()]}
+	switch p.step.Command.Name() {
+	case "issue.edit":
+		names = append(names, "the edit screen")
+	case "issue.assign":
+		names = append(names, "assignable")
+	}
+	return names
 }
 
 // checkStep runs the one check a step's command needs beyond its permission.
@@ -534,6 +588,10 @@ func (pf *preflight) permissions(ctx context.Context, plans []stepPlan) (map[str
 	}
 	slices.Sort(wanted)
 	wanted = slices.Compact(wanted)
+	if len(wanted) == 0 {
+		// Nothing to ask, and Cloud refuses an empty `permissions=`.
+		return map[string]bool{}, nil
+	}
 
 	var got struct {
 		Permissions map[string]struct {
