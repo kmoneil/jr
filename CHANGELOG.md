@@ -20,6 +20,112 @@ accident.
 
 Nothing yet.
 
+## [0.20.2] - 2026-10-20
+
+**Take this one if you reopen issues, or write to one issue more than once
+under `--if-unchanged`.** A sequence can now open with its move, so a reopen
+and the changes that go with it are one plan (issue 265), and a guarded write
+can hand back the precondition for the next one (issue 266).
+
+Nothing changed for anybody who does not use the new spellings, except that
+`issue edit`, `issue move` and `issue assign` report their new schema version
+in `v`: a consumer pinning `v` on those three has a version to add.
+
+**A reopen is one sequence.** `issue sequence` carried one move, as its last
+step, which is a close. A reopen runs the other way round: the move first, then
+the edits that belong to the reopened ticket, which a closed status can refuse
+outright (the classic workflow's Closed sets `jira.issue.editable=false`).
+
+```json
+[["issue", "move", "ENG-101", "Reopen Issue"],
+ ["issue", "edit", "ENG-101", "--summary", "Flaky on ARM"],
+ ["issue", "comment", "add", "ENG-101", "Reopening: it came back on the ARM runners."]]
+```
+
+- One move, as the first step or the last. A move in the middle, or a second
+  move, is still `TRANSITION_NOT_LAST`.
+- Every step is still dry-run when the plan is written, so a field, a value, a
+  person or a sprint that could never work refuses the plan before anything is
+  sent. The checks that depend on the status (the permission, the edit screen,
+  the assignee) wait for the move, and each later step's checks say
+  `after step 1: ...`.
+- The apply sends the move, runs those checks against the reopened issue, then
+  sends the rest. One that fails stops the run with the issue moved and nothing
+  else sent, and that step is `failed` with the check's own code. Re-applying
+  the same file once it is fixed sends the rest.
+- Measured against Jira Cloud. A status with `jira.issue.editable=false` has
+  not been measured on either deployment; the tests stand in for one with a
+  constructed issue.
+
+**The next precondition, from the write.** A write moves the issue's
+`updated`, so the token that guarded it is stale once it lands, and a chain of
+guarded writes cost an `issue get` between every two.
+
+```console
+$ p=$(jr issue move ENG-101 Open --if-unchanged "$p" --precondition \
+        --format json | jq -r '.issue["next-precondition"]')
+$ jr issue edit ENG-101 --summary 'Reopened' --if-unchanged "$p"
+```
+
+- `--precondition` on `issue edit`, `issue move` and `issue assign` reads the
+  issue back after the write and reports its token as `next-precondition`, with
+  or without `--if-unchanged`. It costs one request, so it is asked for.
+- It is the issue as read after the write, not the version the write made. A
+  change landing in between, such as an automation rule the write fired, is
+  inside it, as it would be in an `issue get` after the write.
+- If the write lands and the read fails, the result still says the write
+  happened and the exit is the read's. The error says not to send it again and
+  is never retryable: retrying a move sends a second transition.
+- A token after `--precondition` is refused as `PRECONDITION_TAKES_NO_VALUE`,
+  because it belongs to `--if-unchanged`. Beside `--dry-run`, `--plan-out` or
+  `--apply` the flag is `PRECONDITION_NEEDS_A_WRITE`.
+- Measured against Jira Cloud. On Data Center it is covered by constructed
+  fixtures and has not been run against a live server.
+
+**`--tz` on a live Data Center.** The 0.20.1 notes said `--tz` had not been run
+against a live Data Center. It has since, on 10.4.0: `issue get`, `issue list`,
+`issue activity` and `issue changes` under a named zone, `local` and `account`,
+`JIRA_TZ`, and a printed value given back to `--updated-after`. Nothing needed
+to change.
+
+### Documentation
+
+- docs/output-contract.md: what a write's `next-precondition` is and what it
+  is not; a sequence's first move and when the checks after it run; an
+  archived project on Data Center answers a search with no rows.
+- docs/recipes.md: reopening an issue and changing it, as one sequence; two
+  guarded writes to one issue.
+- docs/troubleshooting.md: `PRECONDITION_TAKES_NO_VALUE` and
+  `PRECONDITION_NEEDS_A_WRITE`; `TRANSITION_NOT_LAST` with a move first or
+  last; an archived Data Center project that reads as empty.
+- The skill: `--precondition` on the first of two writes to one issue, and a
+  sequence that reopens.
+
+### Internal
+
+- Recordings from Jira Cloud: a guarded edit, then a move guarded by the
+  token the edit handed back; a reopen sequence's plan and its apply. A
+  recording from Data Center of one unknown project, with its manifest row.
+- golang.org/x/sys 0.49.0 and golang.org/x/term 0.47.0.
+
+### Output contract
+
+- `issue.edit` **v3**, `issue.move` **v4**, `issue.assign` **v3**: an optional
+  `next-precondition` attribute on `issue`, present only under
+  `--precondition`.
+- New error codes `PRECONDITION_TAKES_NO_VALUE` and
+  `PRECONDITION_NEEDS_A_WRITE`, exit 2, reached only through `--precondition`.
+  On a sequence step the flag is `STEP_TAKES_NO_PLAN_FLAG`.
+- `TRANSITION_NOT_LAST` no longer refuses a move as the first step.
+  `issue.sequence.plan` and `issue.sequence` did not move: a first move's
+  waiting checks are entries in the `checks` list the plan already had.
+- **Priced a patch.** Each change is additive by its row. A first move was
+  refused and now answers, and so does `--precondition`, which was an unknown
+  flag: accepting an input that used to be refused. Three kinds gain an
+  optional attribute. The two new codes are reached only through the new flag,
+  so no invocation that worked before answers with one. No command makes more
+  requests than it did unless `--precondition` asks it to.
+
 ## [0.20.1] - 2026-10-13
 
 **Take this one if you read `jr`'s timestamps anywhere but UTC, or if a
@@ -3669,7 +3775,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.20.1...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.20.2...main
+[0.20.2]: https://github.com/kmoneil/jr/releases/tag/v0.20.2
 [0.20.1]: https://github.com/kmoneil/jr/releases/tag/v0.20.1
 [0.20.0]: https://github.com/kmoneil/jr/releases/tag/v0.20.0
 [0.19.8]: https://github.com/kmoneil/jr/releases/tag/v0.19.8
