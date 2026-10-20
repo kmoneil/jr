@@ -75,7 +75,9 @@ func linkEnds(args []string) []string { return []string{args[0], args[2]} }
 // because the sequence decides them for every step at once: it is planned and
 // applied as one, it carries one baseline, and it derives each step's
 // idempotency key.
-var stepPlanFlags = []string{"dry-run", "plan-out", "apply", "if-unchanged", "idempotency-key"}
+var stepPlanFlags = []string{
+	"dry-run", "plan-out", "apply", "if-unchanged", "precondition", "idempotency-key",
+}
 
 // StepCommands names the commands a step may be, in the order a refusal lists
 // them.

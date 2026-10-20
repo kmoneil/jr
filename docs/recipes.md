@@ -1187,6 +1187,25 @@ is empty. Passing an empty `--if-unchanged` is a usage error rather than an
 unchecked write, which is the refusal you want: there was no baseline to check
 against, and the loop should say so rather than write anyway.
 
+### Two guarded writes to one issue
+
+A write moves the issue's `updated`, so the token that guarded it is stale the
+moment it lands. `--precondition` asks the write for the next one, so a chain of
+guarded writes needs no `issue get` between them:
+
+```console
+$ p=$(jr issue get ENG-101 --format json | jq -r '.issue.precondition')
+$ p=$(jr issue move ENG-101 Open --if-unchanged "$p" --precondition \
+        --format json | jq -r '.issue["next-precondition"]')
+$ jr issue edit ENG-101 --summary 'Reopened: flaky on ARM' --if-unchanged "$p"
+```
+
+It costs one request after the write, which is the read `issue get` would have
+made, and it has the same window: a change landing between the write and the
+read, such as an automation rule the move fired, is inside the token. If the
+write lands and that read fails, the result still says the move happened, and
+the exit is the read's; do not retry the move, read the token with `issue get`.
+
 ### Resuming a truncated run
 
 If a run is cut short, the stderr warning carries a token:

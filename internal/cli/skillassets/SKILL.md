@@ -254,7 +254,9 @@ Mutations are gated on purpose, and the gates are cheap to satisfy honestly.
    in its own output. The token is the `precondition` attribute, which
    `issue get` always reports and `issue list --precondition` puts on every row:
    use the listing when you are about to edit several, because it is the same
-   value and it costs one request instead of one per issue.
+   value and it costs one request instead of one per issue. Writing the same
+   issue twice? Add `--precondition` to the first write: its result carries
+   `next-precondition`, the token for the second, so no read between them.
 4. **A plan for more than one issue.** `issue edit` refuses several keys unless
    `--plan-out <file>` is given, and that writes a document instead of sending
    anything: one row per issue, each carrying its own baseline, and the change

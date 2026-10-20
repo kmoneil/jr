@@ -96,6 +96,10 @@ func TestASequenceThatCouldNeverRunIsRefusedFromTheText(t *testing.T) {
 			"STEP_TAKES_NO_PLAN_FLAG", "--plan-out",
 		},
 		{
+			"a read back", `[["issue", "edit", "ENG-1", "--summary", "x", "--precondition"]]`,
+			"STEP_TAKES_NO_PLAN_FLAG", "--precondition",
+		},
+		{
 			"a flag the command does not have", `[["issue", "comment", "add", "ENG-1", "x", "--field", "a=b"]]`,
 			"INVALID_USAGE", "step 1",
 		},

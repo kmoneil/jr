@@ -15,7 +15,7 @@ epic.remove	2	epic.remove
 field.list	2	field.list
 issue.activity	2	issue.activity
 issue.apply	2	issue.assign,issue.edit,issue.move
-issue.assign	2	issue.assign
+issue.assign	3	issue.assign
 issue.attachment.download	1	issue.attachment.download
 issue.attachment.list	1	issue.attachment.list
 issue.attachment.upload	1	issue.attachment.upload
@@ -27,14 +27,14 @@ issue.comment.edit	1	issue.comment.edit
 issue.comment.list	2	issue.comment.list
 issue.create	1	issue.create
 issue.delete	1	issue.delete
-issue.edit	2	issue.edit
+issue.edit	3	issue.edit
 issue.get	12	issue.get
 issue.history	1	issue.history
 issue.link.add	1	issue.link.add
 issue.link.list	1	issue.link.list
 issue.link.remove	1	issue.link.remove
 issue.list	10	issue.list
-issue.move	3	issue.move
+issue.move	4	issue.move
 issue.plan	2	issue.assign,issue.edit,issue.move
 issue.remotelink.list	1	issue.remotelink.list
 issue.sequence	1	issue.sequence

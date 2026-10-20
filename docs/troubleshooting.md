@@ -1456,9 +1456,10 @@ edit silently.
 
 The value passed to `--if-unchanged` is not one this tool issued: not a token at
 all, one describing a different issue, one minted against your other site, or
-empty. It comes from the `precondition` attribute of `jr issue get`, or from
-`jr issue list --precondition`, which puts the same value on every row. Nowhere
-else: it is deliberately opaque, so there is nothing to assemble by hand.
+empty. It comes from the `precondition` attribute of `jr issue get`, from
+`jr issue list --precondition`, which puts the same value on every row, or from
+the `next-precondition` a write reports under `--precondition`. Nowhere else:
+it is deliberately opaque, so there is nothing to assemble by hand.
 
 **An empty value is refused rather than ignored**, and that case is worth
 naming, because a loop produces it without anybody typing it. A row for an issue
@@ -1471,6 +1472,23 @@ entirely still writes unconditionally, because that is a different request.
 Refused rather than compared, because comparing a value from somewhere else
 would report "the issue changed", which is a claim about your issue that nobody
 checked.
+
+### `PRECONDITION_TAKES_NO_VALUE`, `PRECONDITION_NEEDS_A_WRITE` (exit 2)
+
+`--precondition` on `issue edit`, `issue move` and `issue assign` reads the
+issue back after the write and reports the token for the next write. It takes
+no value. `PRECONDITION_TAKES_NO_VALUE` means a token followed it, which is
+almost always a token meant for `--if-unchanged`:
+
+```console
+$ jr issue move ENG-101 Open --precondition "$p"                     # refused
+$ jr issue move ENG-101 Open --if-unchanged "$p" --precondition      # checks, then reports the next
+```
+
+`PRECONDITION_NEEDS_A_WRITE` means it was given beside `--dry-run` or
+`--plan-out`, which send nothing, or `--apply`, whose document reports a plan's
+rows without a token. Drop the flag. After an apply, `jr issue list
+--precondition` over the same issues reads every row's token in one request.
 
 ### `CONFLICTING_PLAN_FLAGS` (exit 2)
 

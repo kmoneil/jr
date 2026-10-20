@@ -20,7 +20,7 @@ import (
 // Kinds the remaining mutating verbs emit.
 const (
 	KindAssign    = "issue.assign"
-	VersionAssign = 2
+	VersionAssign = 3
 	KindDelete    = "issue.delete"
 	VersionDelete = 1
 	KindClone     = "issue.clone"
@@ -77,7 +77,8 @@ word currentUser means whoever holds the credential, as it does on issue list.
 
 --if-unchanged refuses the assignment if the issue changed since you read it,
 exactly as on issue edit. Reassigning work somebody else has just picked up is
-the case it is for.`),
+the case it is for. --precondition reads the issue back after the assignment
+and reports its new precondition, exactly as on issue edit.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue assign ENG-101 'Ada Lovelace'",
 			buildinfo.App + " issue assign ENG-101 unassigned",
@@ -97,7 +98,8 @@ the case it is for.`),
 			},
 		},
 		Flags: []registry.Flag{
-			ifUnchangedFlagDecl(), dryRunFlag(), planOutFlag(), applyFlag(),
+			ifUnchangedFlagDecl(), readBackFlagDecl(),
+			dryRunFlag(), planOutFlag(), applyFlag(),
 		},
 		Mutating:     true,
 		NeedsJira:    true,
@@ -161,6 +163,9 @@ func (c *Client) AssignRequest(key, assignee string) (transport.Request, error) 
 // names nobody — or two people — is refused here rather than by a 400 that
 // says which field was wrong and nothing else.
 func validateAssign(ctx context.Context, inv *registry.Invocation) error {
+	if err := validateReadBack(inv); err != nil {
+		return err
+	}
 	if err := validateVerbShape(inv, "assignee", nil); err != nil {
 		return err
 	}
@@ -218,10 +223,11 @@ func runAssign(ctx context.Context, inv *registry.Invocation) (*render.Doc, erro
 	// same command with her accountId produce byte-identical output, which is
 	// the rule --field settled. How a request was spelled is not part of the
 	// contract.
-	return stampPrecondition(render.Record(KindAssign, VersionAssign, render.El("issue").
-		Attr("key", inv.Args[0]).
-		Attr("action", "assigned").
-		Leaf("assignee", assignee)), checked), nil
+	return readBackPrecondition(ctx, inv, client, inv.Args[0], "assigned",
+		stampPrecondition(render.Record(KindAssign, VersionAssign, render.El("issue").
+			Attr("key", inv.Args[0]).
+			Attr("action", "assigned").
+			Leaf("assignee", assignee)), checked))
 }
 
 func deleteCommand() *registry.Command {

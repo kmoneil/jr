@@ -276,6 +276,133 @@ func compareUnchanged(ctx context.Context, c *Client, key, encoded string) error
 	return nil
 }
 
+// readBackFlagDecl asks a write for the issue's precondition after it.
+//
+// The name is `issue list --precondition`'s and so is the meaning, "put the
+// token in the output", so a caller who knows one knows the other. A bool, so a
+// token typed after it by somebody who meant --if-unchanged is left as a
+// positional, and validateReadBack names that mistake before the verb's own
+// argument checks report a different one.
+//
+// Opt-in, because it costs a request: edit, move and assign answer 204 with no
+// body on both deployments, so the new `updated` has to be read. §2.4 is why a
+// write that did not ask does not pay for it.
+func readBackFlagDecl() registry.Flag {
+	return registry.Flag{
+		Name: preconditionFlagName, Type: registry.TypeBool,
+		Usage: "read the issue back after the write and report its precondition, " +
+			"for the next --" + ifUnchangedFlag + "; one more request",
+	}
+}
+
+// validateReadBack refuses --precondition where there is no one write to read
+// back, and a token passed as an argument beside it.
+//
+// First in each verb's Validate, ahead of the argument checks: `issue edit
+// ENG-1 --precondition <token>` is otherwise two keys and BULK_NEEDS_A_PLAN,
+// which tells a caller who mixed up two flags that they asked for a bulk edit.
+// Only beside the flag, so no invocation that worked before it existed answers
+// differently now.
+func validateReadBack(inv *registry.Invocation) error {
+	if !inv.Flags.Bool(preconditionFlagName) {
+		return nil
+	}
+	for _, arg := range inv.Args {
+		if _, err := ParsePrecondition(arg); err == nil {
+			return errs.Usage("PRECONDITION_TAKES_NO_VALUE",
+				"--%s takes no value, and an argument here is a precondition",
+				preconditionFlagName).
+				WithDetail("--%s reports the issue's precondition after the "+
+					"write; --%s is the flag that checks one",
+					preconditionFlagName, ifUnchangedFlag).
+				WithRemedy("pass the token as --%s <precondition>, and keep "+
+					"--%s to be given the next one", ifUnchangedFlag, preconditionFlagName)
+		}
+	}
+	var mode string
+	switch {
+	case inv.Flags.Bool("dry-run"):
+		mode = "--dry-run sends nothing"
+	case inv.Flags.String(planOutFlagName) != "":
+		mode = "--" + planOutFlagName + " sends nothing"
+	case inv.Flags.String(applyFlagName) != "":
+		mode = "--" + applyFlagName + " writes a plan's rows, and reports them " +
+			"in a document that carries no precondition"
+	default:
+		return nil
+	}
+	return errs.Usage("PRECONDITION_NEEDS_A_WRITE",
+		"--%s reads back the one issue a write changed, and %s",
+		preconditionFlagName, mode).
+		WithRemedy("drop --%s; `%s issue get` reads a baseline when one is needed",
+			preconditionFlagName, buildinfo.App)
+}
+
+// readBackPrecondition puts the issue's precondition on a write's document,
+// read after the write, when --precondition asked for it.
+//
+// It is the version read after the write and not the version the write made.
+// Jira says nothing about the second: the write answered 204. A change landing
+// between the two, most often an automation rule the write itself fired, is
+// inside the token, which is the window `issue get` after the write has too.
+// The contract says so rather than letting "after the write" imply more.
+//
+// The write has landed by the time this runs, so a failed read is a partial
+// write and not a failed one: the document reaches stdout without the token,
+// and the exit is the read's. The cause says the write is done and is never
+// retryable, because a caller retrying a move on exit 9 sends the transition
+// again.
+func readBackPrecondition(
+	ctx context.Context, inv *registry.Invocation, c *Client,
+	key, action string, doc *render.Doc,
+) (*render.Doc, error) {
+	if !inv.Flags.Bool(preconditionFlagName) || doc == nil || doc.Record == nil {
+		return doc, nil
+	}
+	token, err := readBack(ctx, c, key)
+	if err != nil {
+		e := *errs.Coerce(err)
+		e.Message = key + " was " + action + ", and reading its precondition " +
+			"back failed: " + e.Message
+		e.Remedy = "the write is done, so do not send it again; read the " +
+			"precondition with `" + buildinfo.App + " issue get " + key + "`"
+		e.Retryable = false
+		return nil, &registry.PartiallyApplied{Doc: doc, Cause: &e}
+	}
+	// Absent rather than empty for an issue Jira reports no `updated` for, as
+	// on `issue get`: an empty token handed to --if-unchanged is refused, and
+	// a missing attribute says why before the caller gets that far.
+	if token != "" {
+		doc.Record.Attr(nextPreconditionAttr, token)
+	}
+	return doc, nil
+}
+
+// nextPreconditionAttr is where a write puts the token --precondition read
+// back.
+//
+// Not `precondition`, which is the attribute's name on `issue.get` and
+// `issue.list`: a write already has a precondition child, the record of the
+// check, and JSON and YAML flatten attributes and children into one object, so
+// the renderer refuses a node that uses one name for both. "next" because it is
+// the token the next --if-unchanged takes.
+const nextPreconditionAttr = "next-precondition"
+
+// readBack mints the token from one read of the issue's `updated`, the read
+// compareUnchanged makes, at the millisecond the issue endpoint serves.
+func readBack(ctx context.Context, c *Client, key string) (string, error) {
+	current, err := c.Get(ctx, key, []string{"updated"})
+	if err != nil {
+		return "", err
+	}
+	// The key Jira answered with, so a lower-case argument mints the token
+	// `issue get` would have.
+	if current.Key != "" {
+		key = current.Key
+	}
+	return EncodePrecondition(c.Site, key, current.updatedRaw, PrecisionMillisecond)
+}
+
 // stampPrecondition records that a check ran, on the document a verb returns.
 //
 // Nothing is added when no check ran: an element saying a precondition was not

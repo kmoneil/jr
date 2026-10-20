@@ -1149,13 +1149,14 @@ jr issue assign ENG-101 'Ada Lovelace' --if-unchanged eyJkIjo
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
+| `--precondition` | `bool` | — | read the issue back after the write and report its precondition, for the next --if-unchanged; one more request |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
 | `--plan-out` | `string` | — | write a plan for these issues to this file and send nothing; apply it later with --apply |
 | `--apply` | `string` | — | run a plan written by --plan-out; takes no issue keys, no field flags and no --dry-run, because the plan carries the first two and is itself the preview |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.assign` | v2 | one issue is assigned |
+| `issue.assign` | v3 | one issue is assigned |
 | `issue.plan` | v2 | --plan-out is given |
 | `issue.apply` | v2 | --apply is given |
 | `dry-run` | v2 | --dry-run is given |
@@ -1182,7 +1183,8 @@ word currentUser means whoever holds the credential, as it does on issue list.
 
 --if-unchanged refuses the assignment if the issue changed since you read it,
 exactly as on issue edit. Reassigning work somebody else has just picked up is
-the case it is for.
+the case it is for. --precondition reads the issue back after the assignment
+and reports its new precondition, exactly as on issue edit.
 
 ### `jr issue attachment download`
 
@@ -1799,6 +1801,7 @@ jr issue edit ENG-101 --assignee unassigned --dry-run
 jr issue edit ENG-101 --parent ENG-42
 jr issue edit ENG-101 --parent none
 jr issue edit ENG-101 --priority High --if-unchanged eyJkIjo
+jr issue edit ENG-101 --summary Reopened --precondition
 jr issue edit ENG-101 --field 'Story Points=0.5'
 jr issue edit ENG-101 --field-json customfield_11350='"ENG-42"'
 ```
@@ -1822,13 +1825,14 @@ jr issue edit ENG-101 --field-json customfield_11350='"ENG-42"'
 | `--field-json` | `string` | — | set a field to a JSON value sent as written, as id=&lt;json>, e.g. customfield_11350='"ENG-42"'; for a field whose type this tool will not guess at (repeatable) |
 | `--body-format` | `text\|markdown\|adf` | `text` | how to read the body: text sends it uninterpreted, markdown converts it, adf takes a document as JSON; the last two are Cloud only |
 | `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
+| `--precondition` | `bool` | — | read the issue back after the write and report its precondition, for the next --if-unchanged; one more request |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
 | `--plan-out` | `string` | — | write a plan for these issues to this file and send nothing; apply it later with --apply |
 | `--apply` | `string` | — | run a plan written by --plan-out; takes no issue keys, no field flags and no --dry-run, because the plan carries the first two and is itself the preview |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.edit` | v2 | one issue is edited |
+| `issue.edit` | v3 | one issue is edited |
 | `issue.plan` | v2 | --plan-out is given |
 | `issue.apply` | v2 | --apply is given |
 | `dry-run` | v2 | --dry-run is given |
@@ -1863,6 +1867,11 @@ Jira offers no conditional request on an issue, so the check is a read, a
 comparison, and then the write, and the window between the read and the write
 is one round trip wide. The result says method="read-compare" rather than
 letting the word precondition imply an atomic one.
+
+--precondition reads the issue back after the write and puts its precondition
+on the result, for the next --if-unchanged, at the cost of one more request.
+It is the issue as read after the write, so a change that lands in between,
+an automation rule this edit fired among them, is inside it.
 
 --dry-run prints the exact request, body included, and sends nothing.
 
@@ -2310,6 +2319,7 @@ jr issue move ENG-101 'Start Progress'
 jr issue move ENG-101 'Close Issue' --resolution Done
 jr issue move ENG-101 11 --dry-run
 jr issue move ENG-101 Done --if-unchanged eyJkIjo
+jr issue move ENG-101 Open --if-unchanged eyJkIjo --precondition
 jr issue move ENG-101 Done --idempotency-key deploy-42
 ```
 
@@ -2324,13 +2334,14 @@ jr issue move ENG-101 Done --idempotency-key deploy-42
 | `--comment` | `string` | — | comment to add with the transition |
 | `--idempotency-key` | `string` | — | make a retry safe: the same key returns the recorded move |
 | `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
+| `--precondition` | `bool` | — | read the issue back after the write and report its precondition, for the next --if-unchanged; one more request |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
 | `--plan-out` | `string` | — | write a plan for these issues to this file and send nothing; apply it later with --apply |
 | `--apply` | `string` | — | run a plan written by --plan-out; takes no issue keys, no field flags and no --dry-run, because the plan carries the first two and is itself the preview |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.move` | v3 | one issue is moved |
+| `issue.move` | v4 | one issue is moved |
 | `issue.plan` | v2 | --plan-out is given |
 | `issue.apply` | v2 | --apply is given |
 | `dry-run` | v2 | --dry-run is given |
@@ -2360,6 +2371,8 @@ arrives with the transitions.
 exactly as on issue edit. Resolving the transition already guards against a
 status that moved underneath you; this guards against everything else, which
 matters most when the transition sets a resolution or adds a comment.
+--precondition reads the issue back after the move and reports its new
+precondition, exactly as on issue edit.
 
 --idempotency-key makes a retry safe. A transition is the one mutation here
 that is not idempotent — applying "Start Progress" twice is not applying it

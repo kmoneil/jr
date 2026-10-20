@@ -1,0 +1,38 @@
+{
+  "deployment": "cloud",
+  "source": "constructed",
+  "interactions": [
+    {
+      "request": {
+        "method": "PUT",
+        "path": "/rest/api/3/issue/ENG-101/assignee",
+        "body": "{\"accountId\":\"712020:8f3a\"}"
+      },
+      "response": {
+        "status": 204,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": ""
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/ENG-101",
+        "query": "fields=updated"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"id\":\"10001\",\"key\":\"ENG-101\",\"fields\":{\"updated\":\"2026-08-04T11:32:08.937+0000\"}}"
+      }
+    }
+  ]
+}
