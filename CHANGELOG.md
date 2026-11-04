@@ -20,6 +20,37 @@ accident.
 
 Nothing yet.
 
+## [0.20.4] - 2026-11-04
+
+**Take this one if you pass `--field key`, or keep the key in a context's field
+set.** Through 0.20.3 it added an `issuekey` column that was empty on every row,
+and an element saying the issue had no key (issue 274).
+
+### Fixed
+
+- **Naming the key adds nothing.** `--field key` resolves to Jira's `issuekey`
+  field, and Jira never sends a value for it there: the key is the issue's own
+  top-level property, already the first column. `jr` asked for it, found
+  nothing, and reported `<issuekey name="Key" set="false"/>` beside
+  `key="ENG-102"`, with a TSV `issuekey` column empty on every row. Naming the
+  key now does what naming `summary` always has, which is nothing, because it
+  is already there. The same holds for every spelling that reaches it: `key`
+  and `issuekey`, and on Cloud `id`, `issue` and `workItem` too. `issue list`
+  and `issue get` print the same bytes with the flag as without it.
+- Measured on Jira Cloud. There, every built-in field arrives in `fields` when
+  asked for except the key, `thumbnail`, `issuerestriction` and an unset
+  `parent`. Data Center 10.3.26 reports the key the same way, from the issue.
+  Two of those are not fixed here: `--field thumbnail` still says `set="false"`
+  on every issue, and `--field issuerestriction` still prints raw JSON.
+
+### Output contract
+
+- No kind moved. Under `--field key`, `issue.get` and `issue.list` no longer
+  carry an `issuekey` element, and TSV no longer has an `issuekey` column. The
+  element was in the open part of the shape, and its `set="false"`
+  contradicted what the contract says that attribute means, so this is priced
+  as a correction: patch.
+
 ## [0.20.3] - 2026-11-04
 
 **Take this one whichever commands you use**, for a standard-library fix: the
