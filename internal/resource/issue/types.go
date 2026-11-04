@@ -952,12 +952,21 @@ func DetailFields() []string {
 
 // nativeFields are the fields this package models itself. A caller naming one
 // of these with --field changes nothing, because it is already in the output.
+//
+// `issuekey` is the one Jira never fills. The catalogue lists it as "Key" on
+// both deployments, and on Cloud with `key`, `id` and `issue` among its clause
+// names, so `--field key` resolves to it; asked for by id, it still never
+// appears in `fields`, because the key is the issue's top-level property, which
+// every row already leads with. Left out of this set, it became a column empty
+// on every row and an element saying `set="false"` about an issue that plainly
+// had a key (issue 274).
 var nativeFields = map[string]bool{
 	"summary": true, "status": true, "assignee": true, "reporter": true,
 	"priority": true, "issuetype": true, "project": true,
 	"created": true, "updated": true, "labels": true,
 	"description": true, "resolution": true, "parent": true,
 	"components": true, "fixversions": true, "fixVersions": true,
+	"issuekey": true,
 }
 
 // reservedNames are the element and attribute names an issue already uses. A
@@ -1131,7 +1140,7 @@ func ExtraFieldNames(resolved []string) []string {
 // after the first two is that a flag either affects the output or does not
 // exist.
 //
-// The four fields ListColumns already projects are deliberately absent: naming
+// The five fields ListColumns already projects are deliberately absent: naming
 // one is not a no-op, it asks for something already there, and adding a second
 // `updated` column would be a stranger answer than doing nothing. Every other
 // native field is here, and the paths are the node's own shape rather than the

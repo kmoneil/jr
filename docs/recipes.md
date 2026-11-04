@@ -956,10 +956,10 @@ $ jr issue list --field created --field reporter --field priority
 $ jr issue list --field labels        # a list flattens into one cell, comma-joined
 ```
 
-Naming a field that is already a column — `summary`, `status`, `assignee`,
-`updated` — does nothing, because it is already there. Everything else gets a
-column, headed the way the document names it: `--field issuetype` is a `type`
-column, `--field fixVersions` a `fix-versions` one.
+Naming a field that is already a column (`key`, `summary`, `status`,
+`assignee`, `updated`) does nothing, because it is already there. Everything
+else gets a column, headed the way the document names it: `--field issuetype`
+is a `type` column, `--field fixVersions` a `fix-versions` one.
 
 If your team has fields that belong on every issue, store them on the context:
 
