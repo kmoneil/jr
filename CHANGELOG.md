@@ -20,6 +20,91 @@ accident.
 
 Nothing yet.
 
+## [0.20.3] - 2026-11-04
+
+**Take this one whichever commands you use**, for a standard-library fix: the
+binaries are built with Go 1.26.10, where 0.20.2 and every release back to
+0.19.8 were built with 1.26.9. 1.26.10 fixes one advisory that `govulncheck`
+reports reachable from this code:
+
+- `GO-2026-6809`, `crypto/x509`: distrust compromised intermediate
+  certificates. The path runs through verifying the Jira server's certificate
+  chain, which `jr` does on every TLS request.
+
+**And take it if you attach files, comment or log work between guarded
+writes.** An upload, a comment or a worklog moves the issue's `updated` as an
+edit does, so a guarded edit after your own upload was refused `STALE_WRITE`
+and the only way on was another `issue get` (issue 270). The six writes that
+change one issue without editing it now take the same two flags as edit:
+
+```console
+$ p=$(jr issue get ENG-101 --format json | jq -r '.issue.precondition')
+$ p=$(jr issue attachment upload ENG-101 ./repro.py --if-unchanged "$p" \
+        --precondition --format json | jq -r '.attachment["next-precondition"]')
+$ jr issue edit ENG-101 --description-file desc.txt --if-unchanged "$p"
+```
+
+- `--if-unchanged` and `--precondition` on `issue attachment upload`,
+  `issue comment add`, `edit` and `delete`, and `issue worklog add` and
+  `delete`. The guard is compared before the write and before a `--dry-run`
+  preview; on the two deletions `--yes` confirms the deletion and does not
+  replace the check.
+- The token is on the element the write reports, so read it from
+  `.attachment`, `.comment` or `.worklog`, not `.issue`.
+- Guard the first write as well as asking it for the token: a token read after
+  an unguarded write includes whatever changed between your read and that
+  write. Every write with `--precondition` now has `--if-unchanged`, and a test
+  keeps it that way.
+- If the write lands and the read after it fails, the result still says what
+  landed ("comment 10099 was added to ENG-101"), and the error is never
+  retryable: retrying a comment posts it twice.
+- Measured on Jira Cloud and Data Center 10.4.0, and the upload-then-edit chain
+  is recorded from both. Every one of the six moves `updated` on both. So does
+  watching or unwatching an issue on Cloud, though not on Data Center, and
+  neither a comment nor a watch is in the changelog: a guarded write can be
+  refused for a change `jr issue history` does not show.
+
+Nothing changed for anybody who does not use the new flags, except that the
+six kinds report a new schema version in `v`.
+
+### Documentation
+
+- docs/output-contract.md: which writes take the guard, where their token is,
+  and what moves it on each deployment.
+- docs/recipes.md: attach the evidence, then rewrite the description.
+- docs/troubleshooting.md: `STALE_WRITE` after your own upload or comment, and
+  why the changelog cannot tell you a change was yours.
+- docs/invariants.md: the guard and the read-back come as a pair.
+- The skill: the same chain, and the `.attachment|.comment|.worklog` paths.
+
+### Internal
+
+- Go 1.26.10 (PR 272).
+- Recordings from Jira Cloud and Data Center of an upload guarded and read
+  back, then an edit guarded by its token. The fixture replayer now sets a
+  multipart boundary aside when it matches a body, which is what lets an
+  upload be recorded at all; every other byte, the file included, still has to
+  match.
+
+### Output contract
+
+- `issue.attachment.upload` **v2**, `issue.comment.add` **v3**,
+  `issue.comment.edit` **v2**, `issue.comment.delete` **v2**,
+  `issue.worklog.add` **v3**, `issue.worklog.delete` **v2**: an optional
+  `next-precondition` attribute on the record's element, present only under
+  `--precondition`, and an optional `precondition` child, present only when
+  `--if-unchanged` ran.
+- `PRECONDITION_TAKES_NO_VALUE`, `PRECONDITION_NEEDS_A_WRITE` and
+  `STALE_WRITE` can now come from those six, reached only through the new
+  flags. On a sequence step, `--if-unchanged` on `comment add` is
+  `STEP_TAKES_NO_PLAN_FLAG` where it was an unknown flag.
+- **Priced a patch.** Each change is additive by its row. The two flags were
+  unknown on these verbs, so an invocation that uses them is an input that used
+  to be refused and now answers. Six kinds gain an optional attribute and an
+  optional element. No invocation that worked before answers differently, and
+  none makes more requests unless the new flags ask it to. No exit code changed
+  meaning.
+
 ## [0.20.2] - 2026-10-20
 
 **Take this one if you reopen issues, or write to one issue more than once
@@ -3775,7 +3860,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.20.2...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.20.3...main
+[0.20.3]: https://github.com/kmoneil/jr/releases/tag/v0.20.3
 [0.20.2]: https://github.com/kmoneil/jr/releases/tag/v0.20.2
 [0.20.1]: https://github.com/kmoneil/jr/releases/tag/v0.20.1
 [0.20.0]: https://github.com/kmoneil/jr/releases/tag/v0.20.0
