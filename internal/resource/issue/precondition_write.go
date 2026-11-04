@@ -28,8 +28,8 @@ const ifUnchangedFlag = "if-unchanged"
 // day one appears, the difference is expressible rather than silent.
 const preconditionMethod = "read-compare"
 
-// ifUnchangedFlagDecl is declared once because edit, move, and assign all ask
-// the same question and must answer it identically.
+// ifUnchangedFlagDecl is declared once because every guarded write asks the
+// same question and must answer it identically.
 func ifUnchangedFlagDecl() registry.Flag {
 	return registry.Flag{
 		Name: ifUnchangedFlag, Type: registry.TypeString,
@@ -338,8 +338,38 @@ func validateReadBack(inv *registry.Invocation) error {
 			preconditionFlagName, buildinfo.App)
 }
 
+// validateGuard is the local half of both flags on a write whose first argument
+// is the one issue it changes: a comment, a worklog, or an attachment.
+//
+// The two flags are declared together on every such write. A verb with
+// --if-unchanged and no --precondition hands back no token for the next write,
+// which is issue 266; one with --precondition and no --if-unchanged launders a
+// change between the caller's read and the write into the token it reports,
+// which is why issue 270 added both, and TestEveryReadBackIsGuarded holds them
+// as a pair.
+//
+// First in the verb's Validate, for validateReadBack's reason: a token typed
+// after --precondition lands in a positional, where the verb's own check would
+// report it as a comment body, a duration, a file that does not exist, or an id,
+// and the caller who mixed up two flags is told about a mistake they did not
+// make. A comment whose whole text is a precondition is refused beside the flag
+// too, which is the price of that and one nobody pays on purpose.
+func validateGuard(inv *registry.Invocation) error {
+	if err := validateReadBack(inv); err != nil {
+		return err
+	}
+	if len(inv.Args) == 0 {
+		return nil
+	}
+	return validatePrecondition(inv, inv.Args[:1])
+}
+
 // readBackPrecondition puts the issue's precondition on a write's document,
 // read after the write, when --precondition asked for it.
+//
+// done says what landed, as a clause naming the issue ("ENG-1 was edited",
+// "comment 10042 was added to ENG-1"), because a failed read is reported as
+// that write having happened.
 //
 // It is the version read after the write and not the version the write made.
 // Jira says nothing about the second: the write answered 204. A change landing
@@ -354,7 +384,7 @@ func validateReadBack(inv *registry.Invocation) error {
 // again.
 func readBackPrecondition(
 	ctx context.Context, inv *registry.Invocation, c *Client,
-	key, action string, doc *render.Doc,
+	key, done string, doc *render.Doc,
 ) (*render.Doc, error) {
 	if !inv.Flags.Bool(preconditionFlagName) || doc == nil || doc.Record == nil {
 		return doc, nil
@@ -362,8 +392,8 @@ func readBackPrecondition(
 	token, err := readBack(ctx, c, key)
 	if err != nil {
 		e := *errs.Coerce(err)
-		e.Message = key + " was " + action + ", and reading its precondition " +
-			"back failed: " + e.Message
+		e.Message = done + ", and reading the issue's precondition back " +
+			"failed: " + e.Message
 		e.Remedy = "the write is done, so do not send it again; read the " +
 			"precondition with `" + buildinfo.App + " issue get " + key + "`"
 		e.Retryable = false

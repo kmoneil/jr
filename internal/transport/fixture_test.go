@@ -269,6 +269,51 @@ func TestJSONFieldOrderDoesNotAffectMatching(t *testing.T) {
 	}
 }
 
+// TestAnUploadMatchesWhateverItsBoundary is what lets an upload be recorded. The
+// boundary is random per request, so a byte match could never replay one; the
+// boundary is set aside and the rest of the form, the file included, still has
+// to match.
+func TestAnUploadMatchesWhateverItsBoundary(t *testing.T) {
+	form := func(boundary, content string) string {
+		return "--" + boundary + "\r\n" +
+			`Content-Disposition: form-data; name="file"; filename="repro.py"` + "\r\n" +
+			"Content-Type: application/octet-stream\r\n\r\n" +
+			content + "\r\n--" + boundary + "--\r\n"
+	}
+	cassette := &transport.Cassette{
+		Deployment: transport.DataCenter,
+		Interactions: []transport.Interaction{{
+			Request: transport.RecordedRequest{
+				Method: http.MethodPost, Path: "/rest/api/2/issue/ENG-1/attachments",
+				Body: form("4d6f1b0a9c2e", "print('hello')\n"),
+			},
+			Response: transport.RecordedResponse{Status: 200, Body: `[{"id":"10044"}]`},
+		}},
+	}
+	send := func(body string) error {
+		c, err := transport.New(transport.Options{
+			BaseURL:    "https://recorded.invalid",
+			HTTPClient: transport.NewReplayer(cassette).Client(),
+			Retries:    -1,
+		})
+		if err != nil {
+			t.Fatalf("new client: %v", err)
+		}
+		_, err = c.Do(t.Context(), transport.Request{
+			Method: http.MethodPost, Path: "/rest/api/2/issue/ENG-1/attachments",
+			Body: []byte(body),
+		})
+		return err
+	}
+
+	if err := send(form("a07c33e1f95b", "print('hello')\n")); err != nil {
+		t.Errorf("the same file under another boundary was not matched: %v", err)
+	}
+	if err := send(form("a07c33e1f95b", "print('goodbye')\n")); err == nil {
+		t.Error("a different file matched, so the match no longer reads the file")
+	}
+}
+
 // TestHeadersDoNotAffectMatching keeps fixtures from breaking on every release.
 // Matching on User-Agent or X-Request-Id would invalidate every cassette the
 // moment the version string changed, or on every single run.

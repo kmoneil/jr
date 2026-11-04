@@ -18,12 +18,12 @@ issue.apply	2	issue.assign,issue.edit,issue.move
 issue.assign	3	issue.assign
 issue.attachment.download	1	issue.attachment.download
 issue.attachment.list	1	issue.attachment.list
-issue.attachment.upload	1	issue.attachment.upload
+issue.attachment.upload	2	issue.attachment.upload
 issue.changes	1	issue.changes
 issue.clone	1	issue.clone
-issue.comment.add	2	issue.comment.add
-issue.comment.delete	1	issue.comment.delete
-issue.comment.edit	1	issue.comment.edit
+issue.comment.add	3	issue.comment.add
+issue.comment.delete	2	issue.comment.delete
+issue.comment.edit	2	issue.comment.edit
 issue.comment.list	2	issue.comment.list
 issue.create	1	issue.create
 issue.delete	1	issue.delete
@@ -40,8 +40,8 @@ issue.remotelink.list	1	issue.remotelink.list
 issue.sequence	1	issue.sequence
 issue.sequence.plan	1	issue.sequence
 issue.watch	1	issue.watch
-issue.worklog.add	2	issue.worklog.add
-issue.worklog.delete	1	issue.worklog.delete
+issue.worklog.add	3	issue.worklog.add
+issue.worklog.delete	2	issue.worklog.delete
 issue.worklog.list	2	issue.worklog.list
 jql.explain	3	issue.activity,issue.changes,issue.list,jql.explain
 jql.validate	1	jql.validate

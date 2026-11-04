@@ -943,7 +943,7 @@ func runEdit(ctx context.Context, inv *registry.Invocation) (*render.Doc, error)
 	if err := client.send(ctx, req); err != nil {
 		return nil, err
 	}
-	return readBackPrecondition(ctx, inv, client, opt.Key, "edited", stampPrecondition(
+	return readBackPrecondition(ctx, inv, client, opt.Key, opt.Key+" was edited", stampPrecondition(
 		EditedDoc(KindEdit, VersionEdit, opt.Key, "edited"), checked,
 	))
 }
@@ -1303,7 +1303,8 @@ func runMove(ctx context.Context, inv *registry.Invocation) (*render.Doc, error)
 	if claim.replay != nil {
 		// Read afresh: the ledger holds where the move went, and the token is
 		// about the issue now.
-		return readBackPrecondition(ctx, inv, client, inv.Args[0], "moved", claim.replay)
+		return readBackPrecondition(ctx, inv, client, inv.Args[0],
+			inv.Args[0]+" was moved", claim.replay)
 	}
 
 	// Everything from here to the send is work this claim has to be released
@@ -1383,7 +1384,7 @@ func sendMove(
 		},
 	}
 	claim.complete(inv, moved)
-	return readBackPrecondition(ctx, inv, client, inv.Args[0], "moved",
+	return readBackPrecondition(ctx, inv, client, inv.Args[0], inv.Args[0]+" was moved",
 		stampPrecondition(MovedDoc(moved, false), checked))
 }
 

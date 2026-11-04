@@ -223,7 +223,7 @@ func runAssign(ctx context.Context, inv *registry.Invocation) (*render.Doc, erro
 	// same command with her accountId produce byte-identical output, which is
 	// the rule --field settled. How a request was spelled is not part of the
 	// contract.
-	return readBackPrecondition(ctx, inv, client, inv.Args[0], "assigned",
+	return readBackPrecondition(ctx, inv, client, inv.Args[0], inv.Args[0]+" was assigned",
 		stampPrecondition(render.Record(KindAssign, VersionAssign, render.El("issue").
 			Attr("key", inv.Args[0]).
 			Attr("action", "assigned").

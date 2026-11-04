@@ -117,6 +117,12 @@ func TestASequenceThatCouldNeverRunIsRefusedFromTheText(t *testing.T) {
 			"STEP_TAKES_NO_PLAN_FLAG", "--precondition",
 		},
 		{
+			// A comment takes the guard since issue 270, and a step still may
+			// not: the sequence carries the one baseline.
+			"a comment's own guard", `[["issue", "comment", "add", "ENG-1", "x", "--if-unchanged", "eyJkIjo"]]`,
+			"STEP_TAKES_NO_PLAN_FLAG", "--if-unchanged",
+		},
+		{
 			"a flag the command does not have", `[["issue", "comment", "add", "ENG-1", "x", "--field", "a=b"]]`,
 			"INVALID_USAGE", "step 1",
 		},

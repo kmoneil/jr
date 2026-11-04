@@ -346,6 +346,9 @@ func canonicalQuery(raw string) string {
 func canonicalBody(body string) string {
 	var v any
 	if err := json.Unmarshal([]byte(body), &v); err != nil {
+		if b := multipartBoundary(body); b != "" {
+			body = strings.ReplaceAll(body, b, multipartPlaceholder)
+		}
 		return strings.Join(strings.Fields(body), " ")
 	}
 	out, err := json.Marshal(v)
@@ -353,6 +356,37 @@ func canonicalBody(body string) string {
 		return body
 	}
 	return string(out)
+}
+
+// multipartPlaceholder stands in for a multipart boundary on both sides of a
+// match.
+const multipartPlaceholder = "BOUNDARY"
+
+// multipartBoundary is the boundary a multipart/form-data body is framed by, or
+// "" for any other body.
+//
+// An upload's boundary is random per request, so a recorded upload could never
+// be replayed: the body matched byte for byte and no second run builds the same
+// bytes. Matching on everything but the body would assert nothing about the
+// part that matters, the file. So the boundary alone is set aside, found the way
+// a multipart reader finds it, by the opening delimiter line and its closing
+// twin, and every other byte, the part headers and the file among them, still
+// has to match.
+//
+// Read from the body rather than the Content-Type header because matching
+// ignores headers, deliberately (see matchKey), and the body says the same
+// thing: RFC 2046 has it open with "--" and the boundary and close with the
+// boundary and "--".
+func multipartBoundary(body string) string {
+	first, _, ok := strings.Cut(body, "\r\n")
+	b, isDelimiter := strings.CutPrefix(first, "--")
+	if !ok || !isDelimiter || b == "" {
+		return ""
+	}
+	if !strings.Contains(body, "\r\n--"+b+"--") {
+		return ""
+	}
+	return b
 }
 
 func buildResponse(req *http.Request, rec RecordedResponse) *http.Response {

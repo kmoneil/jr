@@ -1,0 +1,54 @@
+{
+  "deployment": "cloud",
+  "source": "constructed",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/ENG-101",
+        "query": "fields=updated"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"id\":\"10001\",\"key\":\"ENG-101\",\"fields\":{\"updated\":\"2026-08-04T11:32:07.412+0000\"}}"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/3/issue/ENG-101/attachments",
+        "body": "--8f2c1e0b7a6d\r\nContent-Disposition: form-data; name=\"file\"; filename=\"repro.py\"\r\nContent-Type: application/octet-stream\r\n\r\nprint('reproduces issue 270')\n\r\n--8f2c1e0b7a6d--\r\n"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "[{\"id\":\"10044\",\"filename\":\"repro.py\",\"mimeType\":\"text/x-python\",\"size\":30,\"created\":\"2026-08-04T11:32:08.511+0000\",\"content\":\"https://recorded.invalid/secure/attachment/10044/repro.py\",\"author\":{\"displayName\":\"Ada Lovelace\"}}]"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/ENG-101",
+        "query": "fields=updated"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": "{\"id\":\"10001\",\"key\":\"ENG-101\",\"fields\":{\"updated\":\"2026-08-04T11:32:08.937+0000\"}}"
+      }
+    }
+  ]
+}

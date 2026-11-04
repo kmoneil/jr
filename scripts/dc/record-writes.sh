@@ -98,6 +98,25 @@ record worklog-delete-recorded.datacenter.json issue worklog delete \
 record link-add-recorded.datacenter.json issue link add \
 	"$subject" "relates to" "$project-2" >/dev/null
 
+# Issue 270's chain: an upload guarded by a read and asked for the precondition
+# after it, then an edit guarded by that one, with no read between. The files
+# are written here, so the upload's body is the same bytes on every run; the
+# replayer sets the multipart boundary aside and matches the rest.
+upload_dir=$(mktemp -d)
+trap 'rm -rf "$upload_dir"' EXIT
+printf "print('reproduces issue 270')\n" >"$upload_dir/repro.py"
+printf 'Steps to reproduce are in the attached repro.py.\n' >"$upload_dir/desc.txt"
+before=$("$jr" issue get "$subject" --format tsv | field @precondition)
+next=$(record readback-upload-recorded.datacenter.json issue attachment upload \
+	"$subject" "$upload_dir/repro.py" --if-unchanged "$before" --precondition \
+	--format tsv | field @next-precondition)
+[ -n "$next" ] || {
+	say "the upload reported no next precondition"
+	exit 1
+}
+record readback-upload-edit-recorded.datacenter.json issue edit "$subject" \
+	--description-file "$upload_dir/desc.txt" --if-unchanged "$next" >/dev/null
+
 # The transition name is the site's, not this tool's, so it is read rather than
 # assumed: a workflow renames these freely and "In Progress" is only the
 # default scheme's spelling.

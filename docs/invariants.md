@@ -181,6 +181,15 @@ do not catch, add the test in the same change and cite it here.
   change the caller never saw. A plan's token may name any issue the plan holds.
   **Enforced by:** `TestADryRunComparesTheBaseline`,
   `TestAPlanComparesTheCallersBaseline`.
+- **The guard and the read-back come as a pair.** A write that takes
+  `--if-unchanged` takes `--precondition`, and the reverse. Without the second,
+  a chain of guarded writes to one issue costs an `issue get` between every two
+  (issue 266). Without the first, the chain is unguarded at its first step: the
+  token read after that write includes whatever changed between the caller's
+  read and the write, and the next guarded write is checked against a version
+  nobody looked at (issue 270, where an upload had neither).
+  **Enforced by:** `TestEveryGuardedVerbCanReadBack`,
+  `TestEveryReadBackIsGuarded`.
 - **Paging is invisible.** Every paginated command answers with the same
   document whether the server sends a collection in one page or one row per
   page, with `total` and `isLast` saying there is more. Jira caps pages and an

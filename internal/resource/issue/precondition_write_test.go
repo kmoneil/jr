@@ -296,7 +296,8 @@ func TestAPreconditionFromTheOtherDeploymentIsRefused(t *testing.T) {
 	theWriteWasNeverSent(t, replayer)
 }
 
-// TestEveryVerbTakingAPreconditionChecksIt holds the three to one verdict.
+// TestEveryVerbTakingAPreconditionChecksIt holds every verb that takes the
+// flag to one verdict.
 //
 // The flag is declared per command and the check is called per command, which
 // is two lists with no reason to agree — the shape that let `--jql` be
@@ -308,6 +309,14 @@ func TestEveryVerbTakingAPreconditionChecksIt(t *testing.T) {
 		"issue.edit":   {"ENG-101"},
 		"issue.move":   {"ENG-101", "Done"},
 		"issue.assign": {"ENG-101", "Ada Lovelace"},
+		// The file need not exist: the token is refused before it is looked
+		// for, as every local check of the guard comes first.
+		"issue.attachment.upload": {"ENG-101", "repro.py"},
+		"issue.comment.add":       {"ENG-101", "a new comment"},
+		"issue.comment.edit":      {"ENG-101", "10001", "an edited comment"},
+		"issue.comment.delete":    {"ENG-101", "10001"},
+		"issue.worklog.add":       {"ENG-101", "3h"},
+		"issue.worklog.delete":    {"ENG-101", "10001"},
 	}
 
 	for _, cmd := range registry.All() {

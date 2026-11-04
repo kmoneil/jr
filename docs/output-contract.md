@@ -1955,10 +1955,14 @@ caller told only `PERMISSION` assumes nothing happened and something did.
 
 ### Preconditions
 
-`issue edit`, `issue move`, and `issue assign` accept `--if-unchanged`, which
+`issue edit`, `issue move` and `issue assign` accept `--if-unchanged`, which
 refuses the write if the issue has changed since the caller read it. Without it
 two callers editing one issue both exit 0 and the earlier write is lost, with
-nothing truncated, nothing in error, and nothing to say it happened.
+nothing truncated, nothing in error, and nothing to say it happened. So do the
+writes that change one issue without editing it: `issue attachment upload`,
+`issue comment add`, `edit` and `delete`, and `issue worklog add` and `delete`.
+On the two deletions `--yes` confirms the deletion and does not stand in for the
+check: a stale token stops it unsent.
 
 **`--dry-run` and `--plan-out` compare it too.** A preview of a stale write is
 refused `STALE_WRITE`, as the write would be, and so is a plan, before any file
@@ -2033,8 +2037,8 @@ did not happen.
 **A write can hand back the next precondition.** A write moves the issue's
 `updated`, so the token it was guarded by is stale once it lands, and a chain of
 guarded writes otherwise costs an `issue get` between every two. `--precondition`
-on `issue edit`, `issue move` and `issue assign` reads the issue back after the
-write and puts its token on the result as `next-precondition`, which the next
+on every verb that takes `--if-unchanged` reads the issue back after the write
+and puts its token on the result as `next-precondition`, which the next
 `--if-unchanged` takes:
 
 ```xml
@@ -2046,15 +2050,41 @@ write and puts its token on the result as `next-precondition`, which the next
 </result>
 ```
 
+On a comment, a worklog or an attachment it is on the element the write
+reports, beside the `issue` attribute that names the issue it describes, so
+`jq` reads it at `.attachment`, `.comment` or `.worklog` rather than `.issue`:
+
+```xml
+<result kind="issue.attachment.upload" v="2" site="https://acme.atlassian.net">
+  <attachment id="10044" size="30" mime-type="text/x-python" issue="ENG-101" next-precondition="eyJkIjoi...">
+    <filename>repro.py</filename>
+    <author>Ada Lovelace</author>
+    <created>2026-08-04T11:32:08Z</created>
+    <precondition method="read-compare"/>
+  </attachment>
+</result>
+```
+
 It is `next-precondition` and not `precondition`, the attribute's name on
-`issue.get` and `issue.list`, because a write's `issue` element already has a
+`issue.get` and `issue.list`, because a write's element already has a
 `precondition` child, and JSON and YAML put attributes and children in one
 object. It is the same token `issue get` would mint at that moment,
 millisecond-precise.
 
-It costs one request, `GET` of the issue's `updated`, because all three answer
-`204` with no body on both deployments. That is why it is a flag: a write that
-did not ask pays nothing. It works with or without `--if-unchanged`.
+It costs one request, `GET` of the issue's `updated`. Edit, move and assign
+answer `204` with no body on both deployments, and the others answer with the
+attachment, comment or worklog they made, which says nothing about the issue's
+`updated`. That is why it is a flag: a write that did not ask pays nothing. It
+works with or without `--if-unchanged`, and every verb that has it has
+`--if-unchanged` too, because a token read after an unguarded first write folds
+in whatever changed between the caller's read and that write.
+
+**What moves the token.** Measured on 2026-11-04 on both deployments: every
+write above moves `updated`, and a plain read does not. Starting or stopping
+watching an issue moves it on Cloud and not on Data Center. Neither a comment
+nor a watch is in the changelog, so a guarded write can be refused
+`STALE_WRITE` for a change `issue history` does not show, and "every change
+since my read was mine" is not something the changelog can answer.
 
 **It is the issue as read after the write, not the version the write made.**
 Jira says nothing about the second. A change that lands between the two is

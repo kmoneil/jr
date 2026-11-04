@@ -154,7 +154,7 @@ Two specifics worth knowing:
 | --- | --- | --- |
 | `READ_ONLY` | 10 | `--readonly`, `JIRA_READONLY`, or a context created read-only. A one-way latch within an invocation; `JIRA_READONLY=0` does not clear it. Stop and tell the user. Making a context writable again is a deliberate `jr context edit <name> --unset readonly` |
 | `CONFIRMATION_REQUIRED` | 10 | A destructive command with no `--yes`. Ask the user for authorization for that specific action. Do not supply it yourself |
-| `STALE_WRITE` | 7 | The issue changed since the read your precondition came from. Nothing was sent. Re-read for a fresh precondition, decide again, retry |
+| `STALE_WRITE` | 7 | The issue changed since the read your precondition came from. Nothing was sent. Re-read for a fresh precondition, decide again, retry. Your own attachment, comment or worklog since the read counts: give that write `--precondition` and pass its `next-precondition` on |
 | `TRANSITION_TAKES_NO_RESOLUTION` | 2 | `--resolution` on a transition whose screen has no resolution field, which Jira refuses as well. Default workflows have none. Move it without `--resolution`; `jr meta transitions <key> --format xml` shows which transitions carry one |
 | `INVALID_PRECONDITION` | 2 | The `--if-unchanged` value is not one this tool issued, or describes another issue or another site. It comes from the `precondition` attribute of `jr issue get` or `jr issue list --precondition`, or a write's `next-precondition`, and nowhere else |
 | `PRECONDITION_TAKES_NO_VALUE` | 2 | A precondition token was passed after `--precondition`, which takes none. The token goes to `--if-unchanged`; keep `--precondition` to get the next one |

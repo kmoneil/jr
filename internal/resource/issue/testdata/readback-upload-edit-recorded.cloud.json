@@ -1,0 +1,58 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/AGL-18",
+        "query": "fields=updated"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=398;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=150;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "400"
+          ],
+          "X-Ratelimit-Remaining": [
+            "398"
+          ]
+        },
+        "body": "{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10133\",\"self\":\"https://recorded.invalid/rest/api/3/issue/10133\",\"key\":\"AGL-18\",\"fields\":{\"updated\":\"2026-11-04T10:31:25.706-0600\"}}"
+      }
+    },
+    {
+      "request": {
+        "method": "PUT",
+        "path": "/rest/api/3/issue/AGL-18",
+        "body": "{\"fields\":{\"description\":{\"type\":\"doc\",\"version\":1,\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"Steps to reproduce are in the attached repro.py.\"},{\"type\":\"hardBreak\"}]}]}}}"
+      },
+      "response": {
+        "status": 204,
+        "header": {
+          "Ratelimit": [
+            "\"jira-burst-based\";r=298;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=50;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "300"
+          ],
+          "X-Ratelimit-Remaining": [
+            "298"
+          ]
+        }
+      }
+    }
+  ]
+}
