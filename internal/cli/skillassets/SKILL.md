@@ -256,7 +256,9 @@ Mutations are gated on purpose, and the gates are cheap to satisfy honestly.
    use the listing when you are about to edit several, because it is the same
    value and it costs one request instead of one per issue. Writing the same
    issue twice? Add `--precondition` to the first write: its result carries
-   `next-precondition`, the token for the second, so no read between them.
+   `next-precondition`, the token for the second, so no read between them. An
+   attachment, a comment or a worklog you add moves the issue's `updated` as an
+   edit does, and takes both flags the same way.
 4. **A plan for more than one issue.** `issue edit` refuses several keys unless
    `--plan-out <file>` is given, and that writes a document instead of sending
    anything: one row per issue, each carrying its own baseline, and the change

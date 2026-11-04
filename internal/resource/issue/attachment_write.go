@@ -24,7 +24,7 @@ import (
 // Kind the attachment upload emits.
 const (
 	KindAttachmentUpload    = "issue.attachment.upload"
-	VersionAttachmentUpload = 1
+	VersionAttachmentUpload = 2
 )
 
 func init() {
@@ -32,7 +32,8 @@ func init() {
 
 	// The same shape a listing reports, plus the issue it landed on: Jira
 	// answers an upload with the attachment it created.
-	render.RegisterSchema(KindAttachmentUpload, withIssue(AttachmentSchema()))
+	render.RegisterSchema(KindAttachmentUpload,
+		withPrecondition(withIssue(AttachmentSchema())))
 }
 
 // xsrfHeader is what Jira requires before it will accept an attachment.
@@ -66,11 +67,19 @@ same bytes again, and a pipe cannot do that. Reading from a pipe would mean
 either refusing every retry or sending a truncated file, and one of those is
 much worse than the other.
 
+--if-unchanged refuses the upload if the issue changed since you read it,
+exactly as on issue edit. It is compared once, before the first byte is sent;
+a retry after a 429 re-sends the file, not the check. An attachment moves the
+issue's updated, so --precondition reads the issue back after the upload and
+reports the precondition the next --if-unchanged takes: attach the evidence,
+then edit the description, with no read between.
+
 --dry-run prints the request without the file's contents. The body is the file,
 and printing it would be neither useful nor safe.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue attachment upload ENG-101 ./report.pdf",
 			buildinfo.App + " issue attachment upload ENG-101 ./out.log --name run-42.log",
+			buildinfo.App + " issue attachment upload ENG-101 ./repro.py --if-unchanged eyJkIjo --precondition",
 		}, "\n"),
 		Args: []registry.Arg{
 			{Name: "key", Usage: "issue key, e.g. ENG-101", Required: true},
@@ -81,6 +90,7 @@ and printing it would be neither useful nor safe.`),
 				Name: "name", Type: registry.TypeString,
 				Usage: "store it under this name instead of the file's own",
 			},
+			ifUnchangedFlagDecl(), readBackFlagDecl(),
 			dryRunFlag(),
 		},
 		Mutating:     true,
@@ -97,6 +107,9 @@ and printing it would be neither useful nor safe.`),
 }
 
 func validateUpload(_ context.Context, inv *registry.Invocation) error {
+	if err := validateGuard(inv); err != nil {
+		return err
+	}
 	if err := requireIssueKey(inv); err != nil {
 		return err
 	}
@@ -268,6 +281,12 @@ func runAttachmentUpload(ctx context.Context, inv *registry.Invocation) (*render
 	if err != nil {
 		return nil, err
 	}
+	// Once, before the first send: the transport's retries re-open the file
+	// and never come back here, so a 429 does not cost another read.
+	checked, err := checkUnchanged(ctx, inv, client, key)
+	if err != nil {
+		return nil, err
+	}
 	if inv.Flags.Bool("dry-run") {
 		// The body is the file. Printing it would be neither useful nor safe,
 		// and DryRunDoc prints whatever Body holds — which is nothing here,
@@ -298,6 +317,8 @@ func runAttachmentUpload(ctx context.Context, inv *registry.Invocation) (*render
 		return nil, err
 	}
 
-	return render.Record(KindAttachmentUpload, VersionAttachmentUpload,
-		attached.Node().Attr("issue", key)), nil
+	return readBackPrecondition(ctx, inv, client, key,
+		"attachment "+attached.ID+" was added to "+key,
+		stampPrecondition(render.Record(KindAttachmentUpload, VersionAttachmentUpload,
+			attached.Node().Attr("issue", key)), checked))
 }

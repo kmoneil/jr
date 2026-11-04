@@ -1,0 +1,37 @@
+{
+  "deployment": "datacenter",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/2/issue/ENG-6",
+        "query": "fields=updated"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "body": "{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10005\",\"self\":\"http://recorded.invalid/rest/api/2/issue/10005\",\"key\":\"ENG-6\",\"fields\":{\"updated\":\"2026-11-04T16:32:34.498+0000\"},\"renderedFields\":null}"
+      }
+    },
+    {
+      "request": {
+        "method": "PUT",
+        "path": "/rest/api/2/issue/ENG-6",
+        "body": "{\"fields\":{\"description\":\"Steps to reproduce are in the attached repro.py.\\n\"}}"
+      },
+      "response": {
+        "status": 204,
+        "header": {
+          "Content-Type": [
+            "text/html;charset=UTF-8"
+          ]
+        }
+      }
+    }
+  ]
+}

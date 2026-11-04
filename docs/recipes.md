@@ -1232,6 +1232,25 @@ read, such as an automation rule the move fired, is inside the token. If the
 write lands and that read fails, the result still says the move happened, and
 the exit is the read's; do not retry the move, read the token with `issue get`.
 
+### Attach the evidence, then rewrite the description
+
+An attachment moves `updated` as an edit does, so the guarded edit after an
+upload needs the token the upload left. The upload takes both flags, and so do
+`issue comment add`, `edit` and `delete` and `issue worklog add` and `delete`.
+The token is on the element the write reports, here `attachment`:
+
+```console
+$ p=$(jr issue get ENG-101 --format json | jq -r '.issue.precondition')
+$ p=$(jr issue attachment upload ENG-101 ./repro.py --if-unchanged "$p" \
+        --precondition --format json | jq -r '.attachment["next-precondition"]')
+$ jr issue edit ENG-101 --description-file desc.txt --if-unchanged "$p"
+```
+
+Guard the upload as well as asking it for the token. Without `--if-unchanged`
+on the first write, the token it hands back includes whatever changed between
+your read and the upload, and the edit is then checked against a version you
+never looked at.
+
 ### Resuming a truncated run
 
 If a run is cut short, the stderr warning carries a token:

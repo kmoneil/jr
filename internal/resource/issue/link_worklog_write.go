@@ -23,9 +23,9 @@ const (
 	KindLinkRemove       = "issue.link.remove"
 	VersionLinkRemove    = 1
 	KindWorklogAdd       = "issue.worklog.add"
-	VersionWorklogAdd    = 2
+	VersionWorklogAdd    = 3
 	KindWorklogDelete    = "issue.worklog.delete"
-	VersionWorklogDelete = 1
+	VersionWorklogDelete = 2
 )
 
 func init() {
@@ -258,7 +258,8 @@ this tool does not decide how long anyone's day is.
 --started says when the work happened, which is not when it is being logged.
 It defaults to now, and takes an RFC 3339 timestamp otherwise.
 
---comment and --body-format work exactly as on issue comment add.`),
+--comment and --body-format work exactly as on issue comment add, and so do
+--if-unchanged and --precondition: a worklog moves the issue's updated.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue worklog add ENG-101 3h",
 			buildinfo.App + ` issue worklog add ENG-101 "1d 4h" --comment "pairing on the retry path"`,
@@ -278,6 +279,7 @@ It defaults to now, and takes an RFC 3339 timestamp otherwise.
 				Usage: "a note about the work, as plain text",
 			},
 			bodyFormatFlag(),
+			ifUnchangedFlagDecl(), readBackFlagDecl(),
 			dryRunFlag(),
 		},
 		Mutating:     true,
@@ -294,6 +296,9 @@ It defaults to now, and takes an RFC 3339 timestamp otherwise.
 }
 
 func validateWorklogAdd(_ context.Context, inv *registry.Invocation) error {
+	if err := validateGuard(inv); err != nil {
+		return err
+	}
 	if err := requireIssueKey(inv); err != nil {
 		return err
 	}
@@ -381,6 +386,10 @@ func runWorklogAdd(ctx context.Context, inv *registry.Invocation) (*render.Doc, 
 	if err != nil {
 		return nil, err
 	}
+	checked, err := checkUnchanged(ctx, inv, client, inv.Args[0])
+	if err != nil {
+		return nil, err
+	}
 	if inv.Flags.Bool("dry-run") {
 		return registry.DryRunDoc("issue.worklog.add", req), nil
 	}
@@ -406,8 +415,10 @@ func runWorklogAdd(ctx context.Context, inv *registry.Invocation) (*render.Doc, 
 		return nil, err
 	}
 
-	return render.Record(KindWorklogAdd, VersionWorklogAdd,
-		logged.Node().Attr("issue", inv.Args[0])), nil
+	return readBackPrecondition(ctx, inv, client, inv.Args[0],
+		"worklog "+logged.ID+" was added to "+inv.Args[0],
+		stampPrecondition(render.Record(KindWorklogAdd, VersionWorklogAdd,
+			logged.Node().Attr("issue", inv.Args[0])), checked))
 }
 
 func worklogDeleteCommand() *registry.Command {
@@ -418,7 +429,10 @@ func worklogDeleteCommand() *registry.Command {
 Deletes one worklog entry permanently, by the id ` + "`" + buildinfo.App +
 			` issue worklog list` + "`" + ` reports.
 
-Jira has no undo for this, which is why --yes is required.`),
+Jira has no undo for this, which is why --yes is required.
+
+--if-unchanged and --precondition work as on issue comment add: a deleted
+worklog moves the issue's updated, and --yes does not stand in for the check.`),
 		Example: buildinfo.App + " issue worklog delete ENG-101 10042 --yes",
 		Args: []registry.Arg{
 			{Name: "key", Usage: "issue key, e.g. ENG-101", Required: true},
@@ -426,6 +440,7 @@ Jira has no undo for this, which is why --yes is required.`),
 		},
 		Flags: []registry.Flag{
 			{Name: "yes", Type: registry.TypeBool, Usage: "confirm the deletion"},
+			ifUnchangedFlagDecl(), readBackFlagDecl(),
 			dryRunFlag(),
 		},
 		Mutating:     true,
@@ -438,6 +453,9 @@ Jira has no undo for this, which is why --yes is required.`),
 		},
 		ExitCodes: writeExits(),
 		Validate: func(_ context.Context, inv *registry.Invocation) error {
+			if err := validateGuard(inv); err != nil {
+				return err
+			}
 			if err := requireIssueKey(inv); err != nil {
 				return err
 			}
@@ -462,6 +480,10 @@ func runWorklogDelete(ctx context.Context, inv *registry.Invocation) (*render.Do
 		Path: client.Site.APIBase() + "/issue/" + url.PathEscape(parsed.String()) +
 			"/worklog/" + url.PathEscape(inv.Args[1]),
 	}
+	checked, err := checkUnchanged(ctx, inv, client, inv.Args[0])
+	if err != nil {
+		return nil, err
+	}
 	if inv.Flags.Bool("dry-run") {
 		return registry.DryRunDoc("issue.worklog.delete", req), nil
 	}
@@ -469,8 +491,10 @@ func runWorklogDelete(ctx context.Context, inv *registry.Invocation) (*render.Do
 		return nil, err
 	}
 
-	return render.Record(KindWorklogDelete, VersionWorklogDelete, render.El("worklog").
-		Attr("id", inv.Args[1]).
-		Attr("issue", inv.Args[0]).
-		Attr("action", "deleted")), nil
+	return readBackPrecondition(ctx, inv, client, inv.Args[0],
+		"worklog "+inv.Args[1]+" was deleted from "+inv.Args[0],
+		stampPrecondition(render.Record(KindWorklogDelete, VersionWorklogDelete, render.El("worklog").
+			Attr("id", inv.Args[1]).
+			Attr("issue", inv.Args[0]).
+			Attr("action", "deleted")), checked))
 }

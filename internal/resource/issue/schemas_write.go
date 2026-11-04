@@ -20,15 +20,15 @@ func init() {
 	render.RegisterSchema(KindAssign, AssignSchema())
 	render.RegisterSchema(KindWatch, WatchSchema())
 
-	render.RegisterSchema(KindCommentAdd, withIssue(CommentSchema()))
-	render.RegisterSchema(KindCommentEdit, subAckSchema("comment", "edited"))
-	render.RegisterSchema(KindCommentDelete, subAckSchema("comment", "deleted"))
+	render.RegisterSchema(KindCommentAdd, withPrecondition(withIssue(CommentSchema())))
+	render.RegisterSchema(KindCommentEdit, withPrecondition(subAckSchema("comment", "edited")))
+	render.RegisterSchema(KindCommentDelete, withPrecondition(subAckSchema("comment", "deleted")))
 
 	render.RegisterSchema(KindLinkAdd, LinkAddSchema())
 	render.RegisterSchema(KindLinkRemove, ackSchema("link", "id", "removed"))
 
-	render.RegisterSchema(KindWorklogAdd, withIssue(WorklogSchema()))
-	render.RegisterSchema(KindWorklogDelete, subAckSchema("worklog", "deleted"))
+	render.RegisterSchema(KindWorklogAdd, withPrecondition(withIssue(WorklogSchema())))
+	render.RegisterSchema(KindWorklogDelete, withPrecondition(subAckSchema("worklog", "deleted")))
 }
 
 // CreateSchema is the shape of a created issue.
@@ -89,16 +89,19 @@ func AssignSchema() *render.Schema {
 // withPrecondition adds the record of an --if-unchanged check, and the token
 // --precondition reads back after the write.
 //
-// On the three verbs that accept the flag and nowhere else. A shape that
+// On the verbs that accept the flag and nowhere else: edit, move and assign,
+// and the comment, worklog and attachment writes to one issue. A shape that
 // declared it everywhere would tell a consumer to look for a check that verb
 // cannot perform, and the point of publishing the method is that a caller can
 // tell which guarantee they got.
 //
-// The token is an attribute of the issue, placed as on `issue.get` and
-// `issue.list`, and named next-precondition because `precondition` is the
-// child's name here (see nextPreconditionAttr). It is not on the precondition
-// element, which records a check that ran and is absent when none did: a token
-// is wanted after an unguarded write as much as a guarded one.
+// The token is an attribute of the record's own element, placed as on
+// `issue.get` and `issue.list` for an issue, and on the comment, worklog or
+// attachment for those, which carry the issue as their `issue` attribute. It is
+// named next-precondition because `precondition` is the child's name here (see
+// nextPreconditionAttr). It is not on the precondition element, which records a
+// check that ran and is absent when none did: a token is wanted after an
+// unguarded write as much as a guarded one.
 func withPrecondition(s *render.Schema) *render.Schema {
 	s.Attrs = append(s.Attrs,
 		render.Field{Name: nextPreconditionAttr, Type: render.TypeString, Optional: true})

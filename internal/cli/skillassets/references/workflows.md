@@ -247,7 +247,8 @@ it describes a version of the issue that no longer exists.
 `updated` moves for any change, including a comment somebody added, so this can
 refuse a write that would not actually have collided. That is deliberate: the
 alternative is deciding which changes count, and getting that wrong loses an edit
-silently.
+silently. On Cloud a watch moves it too. Comments and watches are not in the
+changelog, so `issue history` cannot show that a change was yours.
 
 Do not drop the flag to force the write through.
 
@@ -268,6 +269,21 @@ and it has the same window: a change landing between the write and that read,
 such as an automation rule the move fired, is inside the token. Where the
 writes are all changes to one issue that can be planned together,
 `issue sequence` is the better shape: one reviewed plan, one baseline.
+
+Your own attachment, comment or worklog is a change too, and each of those
+writes takes `--if-unchanged` and `--precondition`. The token is on the element
+the write reports, so read it from `.attachment`, `.comment` or `.worklog`:
+
+```console
+p=$(jr issue get ENG-101 --format json | jq -r '.issue.precondition')
+p=$(jr issue attachment upload ENG-101 ./repro.py --if-unchanged "$p" \
+      --precondition --format json | jq -r '.attachment["next-precondition"]')
+jr issue edit ENG-101 --description-file desc.txt --if-unchanged "$p"
+```
+
+Guard the first write as well as asking it for the token. A token read after
+an unguarded write includes whatever changed between your read and that write,
+which is the change the guard on the next one was there to catch.
 
 **A description edit has an exact round trip.** `issue get --raw-field
 description` writes the stored bytes alone (no envelope, no added newline),

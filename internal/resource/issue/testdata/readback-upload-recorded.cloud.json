@@ -1,0 +1,90 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/AGL-18",
+        "query": "fields=updated"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=398;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=150;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "400"
+          ],
+          "X-Ratelimit-Remaining": [
+            "398"
+          ]
+        },
+        "body": "{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10133\",\"self\":\"https://recorded.invalid/rest/api/3/issue/10133\",\"key\":\"AGL-18\",\"fields\":{\"updated\":\"2026-11-04T10:31:23.635-0600\"}}"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/3/issue/AGL-18/attachments",
+        "body": "--482c0e01907556ba60982734270763eb3c715c6f4bd7a6854ec69330c7ea\r\nContent-Disposition: form-data; name=\"file\"; filename=\"repro.py\"\r\nContent-Type: application/octet-stream\r\n\r\nprint('reproduces issue 270')\n\r\n--482c0e01907556ba60982734270763eb3c715c6f4bd7a6854ec69330c7ea--\r\n"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=199;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "200"
+          ],
+          "X-Ratelimit-Remaining": [
+            "199"
+          ]
+        },
+        "body": "[{\"self\":\"https://recorded.invalid/rest/api/3/attachment/10003\",\"id\":\"10003\",\"filename\":\"repro.py\",\"author\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"created\":\"2026-11-04T10:31:24.871-0600\",\"size\":30,\"mimeType\":\"application/octet-stream\",\"content\":\"https://recorded.invalid/rest/api/3/attachment/content/10003\"}]"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/AGL-18",
+        "query": "fields=updated"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=399;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=150;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "400"
+          ],
+          "X-Ratelimit-Remaining": [
+            "399"
+          ]
+        },
+        "body": "{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10133\",\"self\":\"https://recorded.invalid/rest/api/3/issue/10133\",\"key\":\"AGL-18\",\"fields\":{\"updated\":\"2026-11-04T10:31:25.706-0600\"}}"
+      }
+    }
+  ]
+}

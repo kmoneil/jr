@@ -76,6 +76,42 @@ var modePairs = map[string]modePair{
 		means: "a preview does not claim the key; true by the code, asserted only for move",
 	},
 
+	// Issue 270's guarded writes. Each preview compares as edit's does, and on
+	// the two deletions --yes confirms the write without standing in for the
+	// check.
+	"issue.attachment.upload --dry-run --if-unchanged": {
+		test:  "TestADryRunComparesTheBaseline",
+		means: "the preview compares, and a stale one is refused as the upload would be",
+	},
+	"issue.comment.add --dry-run --if-unchanged": {
+		test:  "TestADryRunComparesTheBaseline",
+		means: "the preview compares, and a stale one is refused as the comment would be",
+	},
+	"issue.comment.edit --dry-run --if-unchanged": {
+		test:  "TestADryRunComparesTheBaseline",
+		means: "the preview compares, and a stale one is refused as the edit would be",
+	},
+	"issue.comment.delete --dry-run --if-unchanged": {
+		test:  "TestADryRunComparesTheBaseline",
+		means: "the preview compares, and a stale one is refused as the deletion would be",
+	},
+	"issue.comment.delete --if-unchanged --yes": {
+		test:  "TestAConfirmedDeletionStillComparesTheBaseline",
+		means: "--yes confirms the deletion, and a stale token still stops it unsent",
+	},
+	"issue.worklog.add --dry-run --if-unchanged": {
+		test:  "TestADryRunComparesTheBaseline",
+		means: "the preview compares, and a stale one is refused as the worklog would be",
+	},
+	"issue.worklog.delete --dry-run --if-unchanged": {
+		test:  "TestADryRunComparesTheBaseline",
+		means: "the preview compares, and a stale one is refused as the deletion would be",
+	},
+	"issue.worklog.delete --if-unchanged --yes": {
+		test:  "TestAConfirmedDeletionStillComparesTheBaseline",
+		means: "--yes confirms the deletion, and a stale token still stops it unsent",
+	},
+
 	"issue.comment.delete --dry-run --yes": {
 		test: "TestADryRunNeedsNoConfirmation", means: "a preview needs no confirmation",
 	},

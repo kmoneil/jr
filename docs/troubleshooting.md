@@ -1450,7 +1450,21 @@ loop is the same.
 `updated` moves for any change, including a comment somebody added, so this can
 refuse a write that would not actually have collided. That is deliberate — the
 alternative is deciding which changes count, and getting that wrong loses an
-edit silently.
+edit silently. On Cloud it moves when somebody starts or stops watching the
+issue, too. Comments and watches are not in the changelog, so `jr issue history`
+cannot tell you this was nobody's change but yours.
+
+**Your own writes move it as well.** An attachment, a comment or a worklog you
+added after the read is a change, and a guarded edit after it is refused. Ask
+that write for the next token with `--precondition` and pass it on, so the chain
+needs no read between:
+
+```console
+$ p=$(jr issue get ENG-101 --format json | jq -r '.issue.precondition')
+$ p=$(jr issue attachment upload ENG-101 ./repro.py --if-unchanged "$p" \
+        --precondition --format json | jq -r '.attachment["next-precondition"]')
+$ jr issue edit ENG-101 --description-file desc.txt --if-unchanged "$p"
+```
 
 ### `INVALID_PRECONDITION` (exit 2)
 
@@ -1475,10 +1489,11 @@ checked.
 
 ### `PRECONDITION_TAKES_NO_VALUE`, `PRECONDITION_NEEDS_A_WRITE` (exit 2)
 
-`--precondition` on `issue edit`, `issue move` and `issue assign` reads the
+`--precondition` on a write (every verb that takes `--if-unchanged`) reads the
 issue back after the write and reports the token for the next write. It takes
 no value. `PRECONDITION_TAKES_NO_VALUE` means a token followed it, which is
-almost always a token meant for `--if-unchanged`:
+almost always a token meant for `--if-unchanged`. On a comment it is also what
+stops the token being posted as the comment's text:
 
 ```console
 $ jr issue move ENG-101 Open --precondition "$p"                     # refused

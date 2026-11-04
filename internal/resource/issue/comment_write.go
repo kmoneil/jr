@@ -20,11 +20,11 @@ import (
 // Kinds the comment write verbs emit.
 const (
 	KindCommentAdd       = "issue.comment.add"
-	VersionCommentAdd    = 2
+	VersionCommentAdd    = 3
 	KindCommentEdit      = "issue.comment.edit"
-	VersionCommentEdit   = 1
+	VersionCommentEdit   = 2
 	KindCommentDelete    = "issue.comment.delete"
-	VersionCommentDelete = 1
+	VersionCommentDelete = 2
 )
 
 func init() {
@@ -148,11 +148,18 @@ refused by name rather than approximated, and a single newline joins its lines,
 which is what markdown means by one. --body-format adf takes a document as
 JSON. Both are Cloud only, because Data Center stores wiki markup.
 
+--if-unchanged refuses the comment if the issue changed since you read it,
+exactly as on issue edit. A comment moves the issue's updated as an edit does,
+so the token it was guarded by is stale once it lands: --precondition reads the
+issue back after it and reports the precondition the next --if-unchanged takes,
+at the cost of one more request.
+
 --dry-run prints the exact request, body included, and sends nothing.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue comment add ENG-101 'Reproduced on 9.12.7'",
 			buildinfo.App + " issue comment add ENG-101 \"$(cat notes.txt)\"",
 			buildinfo.App + " issue comment add ENG-101 \"$(cat notes.md)\" --body-format markdown",
+			buildinfo.App + " issue comment add ENG-101 'Repro attached' --if-unchanged eyJkIjo --precondition",
 		}, "\n"),
 		Args: []registry.Arg{
 			{Name: "key", Usage: "issue key, e.g. ENG-101", Required: true},
@@ -164,6 +171,7 @@ JSON. Both are Cloud only, because Data Center stores wiki markup.
 				Usage: "restrict to a role, e.g. 'role:Administrators'",
 			},
 			bodyFormatFlag(),
+			ifUnchangedFlagDecl(), readBackFlagDecl(),
 			dryRunFlag(),
 		},
 		Mutating:     true,
@@ -180,6 +188,9 @@ JSON. Both are Cloud only, because Data Center stores wiki markup.
 }
 
 func validateCommentBody(_ context.Context, inv *registry.Invocation) error {
+	if err := validateGuard(inv); err != nil {
+		return err
+	}
 	if err := requireIssueKey(inv); err != nil {
 		return err
 	}
@@ -248,6 +259,13 @@ func runCommentAdd(ctx context.Context, inv *registry.Invocation) (*render.Doc, 
 	if err != nil {
 		return nil, err
 	}
+	// After the request is built and before the preview, as on issue edit: a
+	// request this tool would refuse to build costs no read, and a dry run of a
+	// stale comment is refused the way the comment would be.
+	checked, err := checkUnchanged(ctx, inv, client, inv.Args[0])
+	if err != nil {
+		return nil, err
+	}
 	if inv.Flags.Bool("dry-run") {
 		return registry.DryRunDoc("issue.comment.add", req), nil
 	}
@@ -275,8 +293,10 @@ func runCommentAdd(ctx context.Context, inv *registry.Invocation) (*render.Doc, 
 		return nil, err
 	}
 
-	return render.Record(KindCommentAdd, VersionCommentAdd,
-		comment.Node().Attr("issue", inv.Args[0])), nil
+	return readBackPrecondition(ctx, inv, client, inv.Args[0],
+		"comment "+comment.ID+" was added to "+inv.Args[0],
+		stampPrecondition(render.Record(KindCommentAdd, VersionCommentAdd,
+			comment.Node().Attr("issue", inv.Args[0])), checked))
 }
 
 func commentEditCommand() *registry.Command {
@@ -289,7 +309,8 @@ Replaces a comment's body. The comment is named by its id, which
 comments are added.
 
 The text and --body-format are handled exactly as on add: sent uninterpreted by
-default, parsed as markdown or taken as a document when asked for.`),
+default, parsed as markdown or taken as a document when asked for. So are
+--if-unchanged and --precondition: an edited comment moves the issue's updated.`),
 		Example: buildinfo.App + " issue comment edit ENG-101 10042 'Corrected: it was 9.12.7'",
 		Args: []registry.Arg{
 			{Name: "key", Usage: "issue key, e.g. ENG-101", Required: true},
@@ -302,6 +323,7 @@ default, parsed as markdown or taken as a document when asked for.`),
 				Usage: "restrict to a role, e.g. 'role:Administrators'",
 			},
 			bodyFormatFlag(),
+			ifUnchangedFlagDecl(), readBackFlagDecl(),
 			dryRunFlag(),
 		},
 		Mutating:     true,
@@ -353,6 +375,10 @@ func runCommentEdit(ctx context.Context, inv *registry.Invocation) (*render.Doc,
 	if err != nil {
 		return nil, err
 	}
+	checked, err := checkUnchanged(ctx, inv, client, inv.Args[0])
+	if err != nil {
+		return nil, err
+	}
 	if inv.Flags.Bool("dry-run") {
 		return registry.DryRunDoc("issue.comment.edit", req), nil
 	}
@@ -360,10 +386,12 @@ func runCommentEdit(ctx context.Context, inv *registry.Invocation) (*render.Doc,
 		return nil, err
 	}
 
-	return render.Record(KindCommentEdit, VersionCommentEdit, render.El("comment").
-		Attr("id", inv.Args[1]).
-		Attr("issue", inv.Args[0]).
-		Attr("action", "edited")), nil
+	return readBackPrecondition(ctx, inv, client, inv.Args[0],
+		"comment "+inv.Args[1]+" on "+inv.Args[0]+" was edited",
+		stampPrecondition(render.Record(KindCommentEdit, VersionCommentEdit, render.El("comment").
+			Attr("id", inv.Args[1]).
+			Attr("issue", inv.Args[0]).
+			Attr("action", "edited")), checked))
 }
 
 func commentDeleteCommand() *registry.Command {
@@ -376,7 +404,10 @@ is required: a confirmation this tool cannot ask for is a refusal rather than a
 question nobody can answer.
 
 --dry-run shows the request without needing --yes, because you look at what
-would happen in order to decide whether to allow it.`),
+would happen in order to decide whether to allow it.
+
+--if-unchanged and --precondition work as on issue comment add: a deleted
+comment moves the issue's updated, and --yes does not stand in for the check.`),
 		Example: buildinfo.App + " issue comment delete ENG-101 10042 --yes",
 		Args: []registry.Arg{
 			{Name: "key", Usage: "issue key, e.g. ENG-101", Required: true},
@@ -384,6 +415,7 @@ would happen in order to decide whether to allow it.`),
 		},
 		Flags: []registry.Flag{
 			{Name: "yes", Type: registry.TypeBool, Usage: "confirm the deletion"},
+			ifUnchangedFlagDecl(), readBackFlagDecl(),
 			dryRunFlag(),
 		},
 		Mutating:     true,
@@ -396,6 +428,9 @@ would happen in order to decide whether to allow it.`),
 		},
 		ExitCodes: writeExits(),
 		Validate: func(_ context.Context, inv *registry.Invocation) error {
+			if err := validateGuard(inv); err != nil {
+				return err
+			}
 			if err := requireIssueKey(inv); err != nil {
 				return err
 			}
@@ -434,6 +469,10 @@ func runCommentDelete(ctx context.Context, inv *registry.Invocation) (*render.Do
 	if err != nil {
 		return nil, err
 	}
+	checked, err := checkUnchanged(ctx, inv, client, inv.Args[0])
+	if err != nil {
+		return nil, err
+	}
 	if inv.Flags.Bool("dry-run") {
 		return registry.DryRunDoc("issue.comment.delete", req), nil
 	}
@@ -441,10 +480,12 @@ func runCommentDelete(ctx context.Context, inv *registry.Invocation) (*render.Do
 		return nil, err
 	}
 
-	return render.Record(KindCommentDelete, VersionCommentDelete, render.El("comment").
-		Attr("id", inv.Args[1]).
-		Attr("issue", inv.Args[0]).
-		Attr("action", "deleted")), nil
+	return readBackPrecondition(ctx, inv, client, inv.Args[0],
+		"comment "+inv.Args[1]+" was deleted from "+inv.Args[0],
+		stampPrecondition(render.Record(KindCommentDelete, VersionCommentDelete, render.El("comment").
+			Attr("id", inv.Args[1]).
+			Attr("issue", inv.Args[0]).
+			Attr("action", "deleted")), checked))
 }
 
 // validCommentID rejects an id this tool cannot address.

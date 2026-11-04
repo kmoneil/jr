@@ -1298,6 +1298,7 @@ Examples:
 ```console
 jr issue attachment upload ENG-101 ./report.pdf
 jr issue attachment upload ENG-101 ./out.log --name run-42.log
+jr issue attachment upload ENG-101 ./repro.py --if-unchanged eyJkIjo --precondition
 ```
 
 | Argument | Required | Description |
@@ -1308,12 +1309,14 @@ jr issue attachment upload ENG-101 ./out.log --name run-42.log
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--name` | `string` | — | store it under this name instead of the file's own |
+| `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
+| `--precondition` | `bool` | — | read the issue back after the write and report its precondition, for the next --if-unchanged; one more request |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
 | `--tz` | `string` | — | timezone timestamps are written in: utc\|account\|local\|<IANA name>. Values keep their offset, so each is still RFC 3339. Default utc, or JIRA_TZ, or the context's |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.attachment.upload` | v1 | always |
+| `issue.attachment.upload` | v2 | always |
 | `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
@@ -1331,6 +1334,13 @@ than accepting input on stdin: an upload retried after a 429 has to send the
 same bytes again, and a pipe cannot do that. Reading from a pipe would mean
 either refusing every retry or sending a truncated file, and one of those is
 much worse than the other.
+
+--if-unchanged refuses the upload if the issue changed since you read it,
+exactly as on issue edit. It is compared once, before the first byte is sent;
+a retry after a 429 re-sends the file, not the check. An attachment moves the
+issue's updated, so --precondition reads the issue back after the upload and
+reports the precondition the next --if-unchanged takes: attach the evidence,
+then edit the description, with no read between.
 
 --dry-run prints the request without the file's contents. The body is the file,
 and printing it would be neither useful nor safe.
@@ -1486,6 +1496,7 @@ Examples:
 jr issue comment add ENG-101 'Reproduced on 9.12.7'
 jr issue comment add ENG-101 "$(cat notes.txt)"
 jr issue comment add ENG-101 "$(cat notes.md)" --body-format markdown
+jr issue comment add ENG-101 'Repro attached' --if-unchanged eyJkIjo --precondition
 ```
 
 | Argument | Required | Description |
@@ -1497,12 +1508,14 @@ jr issue comment add ENG-101 "$(cat notes.md)" --body-format markdown
 | --- | --- | --- | --- |
 | `--visibility` | `string` | — | restrict to a role, e.g. 'role:Administrators' |
 | `--body-format` | `text\|markdown\|adf` | `text` | how to read the body: text sends it uninterpreted, markdown converts it, adf takes a document as JSON; the last two are Cloud only |
+| `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
+| `--precondition` | `bool` | — | read the issue back after the write and report its precondition, for the next --if-unchanged; one more request |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
 | `--tz` | `string` | — | timezone timestamps are written in: utc\|account\|local\|<IANA name>. Values keep their offset, so each is still RFC 3339. Default utc, or JIRA_TZ, or the context's |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.comment.add` | v2 | always |
+| `issue.comment.add` | v3 | always |
 | `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
@@ -1520,6 +1533,12 @@ it is not.
 refused by name rather than approximated, and a single newline joins its lines,
 which is what markdown means by one. --body-format adf takes a document as
 JSON. Both are Cloud only, because Data Center stores wiki markup.
+
+--if-unchanged refuses the comment if the issue changed since you read it,
+exactly as on issue edit. A comment moves the issue's updated as an edit does,
+so the token it was guarded by is stale once it lands: --precondition reads the
+issue back after it and reports the precondition the next --if-unchanged takes,
+at the cost of one more request.
 
 --dry-run prints the exact request, body included, and sends nothing.
 
@@ -1549,11 +1568,13 @@ jr issue comment delete ENG-101 10042 --yes
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--yes` | `bool` | — | confirm the deletion |
+| `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
+| `--precondition` | `bool` | — | read the issue back after the write and report its precondition, for the next --if-unchanged; one more request |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.comment.delete` | v1 | always |
+| `issue.comment.delete` | v2 | always |
 | `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
@@ -1564,6 +1585,9 @@ question nobody can answer.
 
 --dry-run shows the request without needing --yes, because you look at what
 would happen in order to decide whether to allow it.
+
+--if-unchanged and --precondition work as on issue comment add: a deleted
+comment moves the issue's updated, and --yes does not stand in for the check.
 
 ### `jr issue comment edit`
 
@@ -1592,11 +1616,13 @@ jr issue comment edit ENG-101 10042 'Corrected: it was 9.12.7'
 | --- | --- | --- | --- |
 | `--visibility` | `string` | — | restrict to a role, e.g. 'role:Administrators' |
 | `--body-format` | `text\|markdown\|adf` | `text` | how to read the body: text sends it uninterpreted, markdown converts it, adf takes a document as JSON; the last two are Cloud only |
+| `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
+| `--precondition` | `bool` | — | read the issue back after the write and report its precondition, for the next --if-unchanged; one more request |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.comment.edit` | v1 | always |
+| `issue.comment.edit` | v2 | always |
 | `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
@@ -1606,7 +1632,8 @@ Replaces a comment's body. The comment is named by its id, which
 comments are added.
 
 The text and --body-format are handled exactly as on add: sent uninterpreted by
-default, parsed as markdown or taken as a document when asked for.
+default, parsed as markdown or taken as a document when asked for. So are
+--if-unchanged and --precondition: an edited comment moves the issue's updated.
 
 ### `jr issue comment list`
 
@@ -2588,12 +2615,14 @@ jr issue worklog add ENG-101 30m --started 2026-08-05T09:00:00Z
 | `--started` | `string` | — | when the work happened, RFC 3339; defaults to now |
 | `--comment` | `string` | — | a note about the work, as plain text |
 | `--body-format` | `text\|markdown\|adf` | `text` | how to read the body: text sends it uninterpreted, markdown converts it, adf takes a document as JSON; the last two are Cloud only |
+| `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
+| `--precondition` | `bool` | — | read the issue back after the write and report its precondition, for the next --if-unchanged; one more request |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
 | `--tz` | `string` | — | timezone timestamps are written in: utc\|account\|local\|<IANA name>. Values keep their offset, so each is still RFC 3339. Default utc, or JIRA_TZ, or the context's |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.worklog.add` | v2 | always |
+| `issue.worklog.add` | v3 | always |
 | `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
@@ -2608,7 +2637,8 @@ this tool does not decide how long anyone's day is.
 --started says when the work happened, which is not when it is being logged.
 It defaults to now, and takes an RFC 3339 timestamp otherwise.
 
---comment and --body-format work exactly as on issue comment add.
+--comment and --body-format work exactly as on issue comment add, and so do
+--if-unchanged and --precondition: a worklog moves the issue's updated.
 
 ### `jr issue worklog delete`
 
@@ -2636,11 +2666,13 @@ jr issue worklog delete ENG-101 10042 --yes
 | Flag | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--yes` | `bool` | — | confirm the deletion |
+| `--if-unchanged` | `string` | — | refuse the write if the issue changed since this precondition, which jr issue get reports |
+| `--precondition` | `bool` | — | read the issue back after the write and report its precondition, for the next --if-unchanged; one more request |
 | `--dry-run` | `bool` | — | print the request that would be sent, and send nothing |
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.worklog.delete` | v1 | always |
+| `issue.worklog.delete` | v2 | always |
 | `dry-run` | v2 | --dry-run is given |
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `7` CONFLICT, `8` RATE_LIMIT, `9` REMOTE, `10` BLOCKED
@@ -2648,6 +2680,9 @@ Exit codes: `0` OK, `1` ERROR, `2` USAGE, `4` AUTH, `5` NOT_FOUND, `6` PERMISSIO
 Deletes one worklog entry permanently, by the id `jr issue worklog list` reports.
 
 Jira has no undo for this, which is why --yes is required.
+
+--if-unchanged and --precondition work as on issue comment add: a deleted
+worklog moves the issue's updated, and --yes does not stand in for the check.
 
 ### `jr issue worklog list`
 
