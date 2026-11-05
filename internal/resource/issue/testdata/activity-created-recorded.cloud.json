@@ -1,0 +1,91 @@
+{
+  "deployment": "cloud",
+  "source": "recorded",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/3/jql/parse",
+        "query": "validation=warn",
+        "body": "{\"queries\":[\"key in (AGL-8, AGL-9)\"]}"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=199;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "200"
+          ],
+          "X-Ratelimit-Remaining": [
+            "199"
+          ]
+        },
+        "body": "{\"queries\":[{\"query\":\"key in (AGL-8, AGL-9)\",\"structure\":{\"where\":{\"field\":{\"name\":\"key\",\"encodedName\":\"key\"},\"operator\":\"in\",\"operand\":{\"values\":[{\"value\":\"AGL-8\",\"encodedValue\":\"AGL-8\"},{\"value\":\"AGL-9\",\"encodedValue\":\"AGL-9\"}],\"encodedOperand\":\"(AGL-8, AGL-9)\"}}}}]}"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/rest/api/3/search/approximate-count",
+        "body": "{\"jql\":\"updated \\u003e= \\\"-60d\\\" AND (key in (AGL-8, AGL-9)) ORDER BY issuekey DESC\"}"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=299;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=150;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "300"
+          ],
+          "X-Ratelimit-Remaining": [
+            "299"
+          ]
+        },
+        "body": "{\"count\":2}"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/search/jql",
+        "query": "fields=summary%2Cstatus%2Cassignee%2Creporter%2Cpriority%2Cissuetype%2Cproject%2Ccreated%2Cupdated%2Clabels%2Ccreator\u0026jql=updated+%3E%3D+%22-60d%22+AND+%28key+in+%28AGL-8%2C+AGL-9%29%29+ORDER+BY+issuekey+DESC\u0026maxResults=50"
+      },
+      "response": {
+        "status": 200,
+        "header": {
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ],
+          "Ratelimit": [
+            "\"jira-burst-based\";r=349;t=1"
+          ],
+          "Ratelimit-Policy": [
+            "\"jira-burst-based\";q=100;w=1"
+          ],
+          "X-Ratelimit-Limit": [
+            "350"
+          ],
+          "X-Ratelimit-Remaining": [
+            "349"
+          ]
+        },
+        "body": "{\"issues\":[{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10062\",\"self\":\"https://recorded.invalid/rest/api/3/issue/10062\",\"key\":\"AGL-9\",\"fields\":{\"summary\":\"Heron colony census at the reservoir\",\"issuetype\":{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10005\",\"id\":\"10005\",\"description\":\"Stories track functionality or features expressed as user goals.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Story\",\"subtask\":false,\"avatarId\":10300,\"hierarchyLevel\":0},\"creator\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"created\":\"2026-09-23T06:44:16.465-0500\",\"project\":{\"self\":\"https://recorded.invalid/rest/api/3/project/10002\",\"id\":\"10002\",\"key\":\"AGL\",\"name\":\"Agile fixtures\",\"projectTypeKey\":\"software\",\"simplified\":false,\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"projectCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/projectCategory/10001\",\"id\":\"10001\",\"description\":\"The platform teams\",\"name\":\"Platform\"}},\"reporter\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"assignee\":null,\"priority\":{\"self\":\"https://recorded.invalid/rest/api/3/priority/3\",\"iconUrl\":\"https://recorded.invalid/images/icons/priorities/medium_new.svg\",\"name\":\"Medium\",\"id\":\"3\"},\"updated\":\"2026-09-23T06:44:16.532-0500\",\"status\":{\"self\":\"https://recorded.invalid/rest/api/3/status/10008\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"To Do\",\"id\":\"10008\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"blue-gray\",\"name\":\"To Do\"}},\"labels\":[]}},{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10061\",\"self\":\"https://recorded.invalid/rest/api/3/issue/10061\",\"key\":\"AGL-8\",\"fields\":{\"summary\":\"Wetland boardwalk maintenance schedule\",\"issuetype\":{\"self\":\"https://recorded.invalid/rest/api/3/issuetype/10005\",\"id\":\"10005\",\"description\":\"Stories track functionality or features expressed as user goals.\",\"iconUrl\":\"https://recorded.invalid/avatar\",\"name\":\"Story\",\"subtask\":false,\"avatarId\":10300,\"hierarchyLevel\":0},\"creator\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"created\":\"2026-09-23T06:44:15.350-0500\",\"project\":{\"self\":\"https://recorded.invalid/rest/api/3/project/10002\",\"id\":\"10002\",\"key\":\"AGL\",\"name\":\"Agile fixtures\",\"projectTypeKey\":\"software\",\"simplified\":false,\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"projectCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/projectCategory/10001\",\"id\":\"10001\",\"description\":\"The platform teams\",\"name\":\"Platform\"}},\"reporter\":{\"self\":\"https://recorded.invalid/rest/api/3/user?accountId=000000%3A00000000-0000-0000-0000-000000000000\",\"accountId\":\"000000:00000000-0000-0000-0000-000000000000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"America/Chicago\",\"accountType\":\"atlassian\"},\"assignee\":null,\"priority\":{\"self\":\"https://recorded.invalid/rest/api/3/priority/3\",\"iconUrl\":\"https://recorded.invalid/images/icons/priorities/medium_new.svg\",\"name\":\"Medium\",\"id\":\"3\"},\"updated\":\"2026-09-23T06:44:15.412-0500\",\"status\":{\"self\":\"https://recorded.invalid/rest/api/3/status/10008\",\"description\":\"\",\"iconUrl\":\"https://recorded.invalid/images/icons/statuses/generic.png\",\"name\":\"To Do\",\"id\":\"10008\",\"statusCategory\":{\"self\":\"https://recorded.invalid/rest/api/3/statuscategory/2\",\"id\":2,\"key\":\"new\",\"colorName\":\"blue-gray\",\"name\":\"To Do\"}},\"labels\":[]}}],\"isLast\":true}"
+      }
+    }
+  ]
+}

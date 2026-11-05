@@ -73,10 +73,13 @@ var recordedFixtures = map[string][]string{
 		// almost certainly have made them agree, which is the one thing they
 		// do not do.
 		"with-comments-recorded.cloud.json",
-		// The activity feed, and its --kind variant, which is a separate
+		// The activity feed, and its --kind variants, each a separate
 		// recording because the flag narrows the request as well as the output.
+		// The created one is the only recording of `creator`, which nothing
+		// else asks for.
 		"activity-recorded.cloud.json",
 		"activity-comments-recorded.cloud.json",
+		"activity-created-recorded.cloud.json",
 		// Remote links, both verbs that read them. The claims worth evidence
 		// are that the endpoint serves a bare unpaged array and that a
 		// hand-added link arrives as an empty application object; a

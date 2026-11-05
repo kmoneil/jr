@@ -21,8 +21,8 @@ import (
 const (
 	KindActivity = "issue.activity"
 	// v2 adds `truncated` and `length` to an event's body, written when
-	// --body-chars cut it.
-	VersionActivity = 2
+	// --body-chars cut it. v3 adds the `created` event kind (issue 278).
+	VersionActivity = 3
 )
 
 // Event kinds. Closed, and extendable only by a schema bump, because branching
@@ -32,11 +32,16 @@ const (
 	EventTransition = "transition"
 	EventField      = "field"
 	EventWorklog    = "worklog"
+	// EventCreated is an issue being created, attributed to its creator.
+	EventCreated = "created"
 )
 
 // EventKinds is every kind an event can have, in the order they are documented.
+//
+// created is last because it was added last, so the order `jr schema` and the
+// contract list the older four in does not move.
 func EventKinds() []string {
-	return []string{EventComment, EventTransition, EventField, EventWorklog}
+	return []string{EventComment, EventTransition, EventField, EventWorklog, EventCreated}
 }
 
 func init() {
@@ -59,7 +64,7 @@ func EventSchema() *render.Schema {
 			{Name: "kind", Type: render.TypeString, Enum: EventKinds()},
 			{Name: "issue", Type: render.TypeString},
 			// The field a transition or a field event moved. Absent on the
-			// other two kinds, which move nothing.
+			// other kinds, which move nothing.
 			{Name: "field", Type: render.TypeString, Optional: true},
 		},
 		Children: []render.Child{
@@ -199,6 +204,13 @@ func activityColumnsFor(inv *registry.Invocation) []render.Column {
 // consumer writing `if field == "status"`.
 func eventsFrom(i Issue) []Event {
 	var out []Event
+	// Every issue was created once, and whether that is inside the window is
+	// the event filter's question, asked of At like every other event's.
+	if i.Created != "" {
+		out = append(out, Event{
+			Kind: EventCreated, At: i.Created, Issue: i.Key, Author: i.creator,
+		})
+	}
 	for _, c := range i.Thread {
 		out = append(out, Event{
 			Kind: EventComment, At: c.Created, Issue: i.Key, Author: c.Author,
@@ -273,8 +285,8 @@ func activityCommand() *registry.Command {
 		SeveralProjects: true,
 		Summary:         "List what happened across issues, as events rather than rows",
 		Description: strings.TrimSpace(`
-Merges four sources into one time-ordered feed: comments, transitions, other
-field changes, and worklogs. Newest first.
+Merges five sources into one time-ordered feed: the issue's own creation,
+comments, transitions, other field changes, and worklogs. Newest first.
 
 Newest first across the whole feed, so every candidate issue is read before a
 row is written, whatever --limit says. Candidates arrive in issue-key order,
@@ -350,6 +362,14 @@ command correctly reports none. That is Jira's data model rather than something
 to paper over here, and knowing it is the difference between reading the empty
 answer and believing it.
 
+**A created event is the issue's creator's, which is not always its
+reporter.** Jira records who made an issue in ` + "`creator`" + `, which nothing can
+change, and who it is reported by in ` + "`reporter`" + `, which anybody with the
+permission can. An issue filed on somebody else's behalf is reported by them
+and created by whoever filed it, so --user matches the person who filed it.
+The event is written when the issue's created timestamp falls inside the
+window; the changelog has no entry for it on either deployment.
+
 Exit 3 is sharper than it looks when --user is given. It means some events were
 not sent, so it also means this person may have events here that you cannot
 see — a comment of theirs can sit outside the twenty Cloud returned. An empty
@@ -380,8 +400,8 @@ feed that exits 3 is not the same answer as an empty feed that exits 0.`),
 				"the word currentUser resolves to the caller",
 		}, {
 			Name: kindFlag, Type: registry.TypeString, Repeatable: true,
-			Usage: "only events of this kind: comment, transition, field, or " +
-				"worklog; repeat for several",
+			Usage: "only events of this kind: comment, transition, field, " +
+				"worklog, or created; repeat for several",
 		}, {
 			Name: "jql", Type: registry.TypeString,
 			Usage: "raw JQL narrowing the issues searched, combined with " +
@@ -746,7 +766,7 @@ func runActivity(
 		Query:    activityQuery(inv),
 		Limit:    registry.Limit{All: true},
 		PageSize: pageSize,
-		Fields:   DefaultFields(),
+		Fields:   want.searchFields(),
 		// The three projections this feed is made of, on one request per page.
 		WithComments:  want.kinds[EventComment],
 		WithWorklogs:  want.kinds[EventWorklog],
@@ -952,6 +972,23 @@ func (w activityWant) accepts(e Event) bool {
 	}
 	return byUser(e, w.user)
 }
+
+// searchFields is the field set each candidate is fetched with: the default
+// set, and `creator` when a created event was asked for.
+//
+// Only then, because the default set is what every other read sends and the
+// recordings replay it byte for byte. `reporter` is in it already and is not
+// the same fact: see the command's description.
+func (w activityWant) searchFields() []string {
+	fields := DefaultFields()
+	if w.kinds[EventCreated] {
+		fields = append(fields, creatorField)
+	}
+	return fields
+}
+
+// creatorField is the field that names who made an issue.
+const creatorField = "creator"
 
 // activityFilter reads the flags into the filter the body applies.
 func activityFilter(inv *registry.Invocation) activityWant {

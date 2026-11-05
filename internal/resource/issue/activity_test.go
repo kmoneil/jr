@@ -191,6 +191,12 @@ func runActivityOn(
 	return runActivityIn(t, kind, fixture, query, activityWindow{since: cutoff}, set...)
 }
 
+// recordedEventKinds are the four kinds every activity cassette before issue
+// 278 was recorded with, which was every kind there was.
+var recordedEventKinds = []string{
+	issue.EventComment, issue.EventTransition, issue.EventField, issue.EventWorklog,
+}
+
 // activityWindow pins the feed's instants after Validate has resolved the
 // flags against the clock. An empty end keeps what Validate resolved.
 type activityWindow struct{ since, until string }
@@ -216,6 +222,19 @@ func runActivityIn(
 	for _, apply := range set {
 		if apply != nil {
 			apply(flags)
+		}
+	}
+	// The kinds the recordings were made with, unless the test names its own.
+	//
+	// Every cassette here predates the created kind, which adds `creator` to
+	// the fields the search asks for, and replay matches a query exactly. So
+	// the feed these replay is the one `--kind` with these four sends, which
+	// is the request they were recorded from; the created kind has recordings
+	// of its own. scripts/dc/manifest.tsv names the same four, so re-recording
+	// remakes this cassette and not a different one.
+	if !flags.WasSet("kind") {
+		for _, k := range recordedEventKinds {
+			flags.SetString("kind", k)
 		}
 	}
 	// --limit and --max-requests are global, and the CLI layer hands them to a
@@ -879,5 +898,46 @@ func TestTheCeilingIsTenPagesOfTheWalkTheSweepWillMake(t *testing.T) {
 				t.Errorf("%d candidates were refused: %v", tc.candidates, err)
 			}
 		})
+	}
+}
+
+// TestACreatedEventIsReadOffTheIssueOnCloud is issue 278 against the recording.
+//
+// AGL-8 and AGL-9 were created a second apart on the sandbox, and --kind
+// created asked for nothing but them: no changelog, no comments, no worklogs,
+// because a creation is the issue's own `created` and `creator`, and the
+// changelog records no entry for it. The recording holds what Cloud sent for
+// that search, `creator` included.
+//
+// The recording was made with --since -60d on 2026-11-05, which is in the
+// query it replays; a re-recording after late November 2026 needs a longer
+// offset to reach issues created on 2026-09-23.
+func TestACreatedEventIsReadOffTheIssueOnCloud(t *testing.T) {
+	out, result, replayer := runActivityIn(t, site.Cloud,
+		"activity-created-recorded.cloud.json", "key in (AGL-8, AGL-9)",
+		activityWindow{since: farPast},
+		func(f registry.Flags) {
+			f.SetString("since", "-60d")
+			f.SetString("kind", issue.EventCreated)
+		})
+
+	if got := replayer.Unmatched(); len(got) != 0 {
+		t.Fatalf("asked for something outside the recording: %v", got)
+	}
+	if !result.Complete {
+		t.Error("a feed with nothing to clip reported itself partial")
+	}
+	want := []string{
+		"2026-09-23T11:44:16Z\tAGL-9\tcreated\tAda Lovelace",
+		"2026-09-23T11:44:15Z\tAGL-8\tcreated\tAda Lovelace",
+	}
+	rows := strings.Split(strings.TrimRight(out, "\n"), "\n")[1:]
+	if len(rows) != len(want) {
+		t.Fatalf("want %d rows, got %d:\n%s", len(want), len(rows), out)
+	}
+	for i, row := range rows {
+		if !strings.HasPrefix(row, want[i]) {
+			t.Errorf("row %d is %q, want it to start %q", i, row, want[i])
+		}
 	}
 }
