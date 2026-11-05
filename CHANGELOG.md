@@ -20,6 +20,71 @@ accident.
 
 Nothing yet.
 
+## [0.21.0] - 2026-11-05
+
+**Read this one if anything parses `issue activity`.** It now reports creating
+an issue as an event, and that event appears in the default feed, so a
+consumer that branches on an event's `kind` meets a value it has not seen
+(issue 278). That is why this release takes the minor position. The feed as
+it was is one flag away:
+`--kind comment --kind transition --kind field --kind worklog`.
+
+**And take it if you pass `--field` with a date or time field.** A requested
+`resolutiondate`, `lastViewed` or datetime custom field was written exactly as
+Jira sent it, in the server's zone and not in RFC 3339, beside built-in
+timestamps that were (issue 277).
+
+### Added
+
+- **`issue activity` reports a creation.** A `created` event is written when
+  an issue's `created` timestamp falls inside the window, with `at` that
+  timestamp and `author` the issue's creator. The changelog has no entry for a
+  creation on either deployment, so before this an issue somebody filed showed
+  up only through what they changed on it afterwards, and an issue filed for a
+  colleague and then given an epic read as "set an epic link on a colleague's
+  ticket".
+
+  ```console
+  $ jr issue activity --since -7d --user currentUser
+  at                    issue  kind     author        field      time-spent  from  to     body
+  2026-11-04T19:18:51Z  ENG-2  field    Ada Lovelace  Epic Link                    ENG-9
+  2026-11-04T19:12:22Z  ENG-2  created  Ada Lovelace
+  ```
+
+- **The creator, not the reporter.** `reporter` can be set to anybody, and an
+  issue filed on somebody else's behalf is reported by them; `--user` matches
+  whoever filed it. `--kind created` asks for creations alone, and costs no
+  projection at all.
+- The search asks Jira for `creator` only when created events are wanted.
+  `--kind` without `created` sends exactly the request it did in 0.20.4.
+
+### Fixed
+
+- **A requested datetime field is a timestamp.** A `--field` the site's
+  catalogue types `datetime` is written as `created` and `updated` are: RFC
+  3339, in UTC to the second, and in the zone `--tz` names. Before this, one
+  row could carry `updated` as `2026-11-04T18:50:16Z` and `resolutiondate`,
+  the same instant, as `2026-11-04T13:50:16.000-0500`, which no date flag
+  would take back, and `--tz` moved only the first.
+- A value in such a field that does not parse is refused as
+  `MALFORMED_TIMESTAMP`, as an unreadable `created` always was. A `date` field
+  such as `duedate` is unchanged: a calendar date has no zone, and Jira already
+  sends `YYYY-MM-DD`.
+
+### Output contract
+
+- `issue.activity` is **v3**: the event `kind` enum gains `created`, and the
+  default feed emits it. **Breaking**, under the row for a kind an existing
+  command starts emitting: the enum is closed and branching on it is what it
+  is for. Nothing else in the event's shape moved.
+- No other kind moved. A requested `datetime` field on `issue.list` and
+  `issue.get` changes its text from Jira's spelling to RFC 3339 in UTC; its
+  declared type is still `string`. The contract already said every timestamp
+  `jr` emits is RFC 3339 in UTC, so this is priced as a correction: patch, on
+  its own.
+- `docs/output-contract.md` gains "Creating an issue is an event", and its
+  open-shape section says which requested fields are timestamps.
+
 ## [0.20.4] - 2026-11-04
 
 **Take this one if you pass `--field key`, or keep the key in a context's field
@@ -3891,7 +3956,9 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.20.3...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.21.0...main
+[0.21.0]: https://github.com/kmoneil/jr/releases/tag/v0.21.0
+[0.20.4]: https://github.com/kmoneil/jr/releases/tag/v0.20.4
 [0.20.3]: https://github.com/kmoneil/jr/releases/tag/v0.20.3
 [0.20.2]: https://github.com/kmoneil/jr/releases/tag/v0.20.2
 [0.20.1]: https://github.com/kmoneil/jr/releases/tag/v0.20.1
