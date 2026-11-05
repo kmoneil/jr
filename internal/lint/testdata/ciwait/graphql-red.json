@@ -1,0 +1,78 @@
+{
+  "data": {
+    "repository": {
+      "object": {
+        "checkSuites": {
+          "nodes": [
+            {
+              "checkRuns": {
+                "nodes": [
+                  {
+                    "name": "test on windows, every profile",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "test (tags=none)",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "build profiles and size budget",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "test (tags=mcp)",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "format, vet, lint",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "test (tags=mcp,write)",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "output contract is unchanged",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "test (tags=prompt,render,mcp,write,admin)",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "vulnerability scan",
+                    "status": "COMPLETED",
+                    "conclusion": "FAILURE"
+                  },
+                  {
+                    "name": "list the packages with fuzz targets",
+                    "status": "COMPLETED",
+                    "conclusion": "SKIPPED"
+                  },
+                  {
+                    "name": "fuzz (${{ matrix.package }})",
+                    "status": "COMPLETED",
+                    "conclusion": "SKIPPED"
+                  },
+                  {
+                    "name": "fuzz",
+                    "status": "COMPLETED",
+                    "conclusion": "SKIPPED"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

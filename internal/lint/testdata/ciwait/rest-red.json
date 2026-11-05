@@ -1,0 +1,65 @@
+{
+  "total_count": 12,
+  "check_runs": [
+    {
+      "name": "fuzz",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "fuzz (${{ matrix.package }})",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "list the packages with fuzz targets",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "vulnerability scan",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "name": "test (tags=prompt,render,mcp,write,admin)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "output contract is unchanged",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "test (tags=mcp,write)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "format, vet, lint",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "test (tags=mcp)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "build profiles and size budget",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "test (tags=none)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "test on windows, every profile",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ]
+}
