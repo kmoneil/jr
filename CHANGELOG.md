@@ -20,6 +20,54 @@ accident.
 
 Nothing yet.
 
+## [0.22.0] - 2026-11-05
+
+**Read this one if anything branches on `NOT_FOUND` after a delete.** A delete
+Jira carried out while a proxy in front of it answered 503 was reported as
+`NOT_FOUND`, exit 5, by the run that had just removed it. It is now
+`OUTCOME_UNKNOWN`, exit 9, not retryable. The same failure carries a different
+code and exit, which is why this release takes the minor position. Nothing
+else a script reads has moved.
+
+### Fixed
+
+- **A delete found gone on its resend is not reported as missing.** `jr` sends
+  a `DELETE` again after a 5xx or a dropped connection, as HTTP allows, and
+  Jira Cloud answers a second delete of an issue, a comment, a worklog or a
+  link with 404 (measured 2026-11-05). So `issue delete`,
+  `issue comment delete`, `issue worklog delete` and `issue link remove` could
+  say that what they named did not exist, after deleting it. A 404 cannot say
+  whether the first attempt removed it or it was never there, so that is now
+  `OUTCOME_UNKNOWN`, and its remedy says that sending it again settles nothing
+  (PR 284).
+- A 404 after a 429, which Jira refuses before doing anything, or after a
+  connection that never opened, is still `NOT_FOUND`, and so is a 404 on a
+  `PUT`, which removes nothing. `issue watch --remove` was never affected:
+  Jira answers a second removal with 204.
+
+### Internal
+
+- `scripts/ci-wait` reads a request GitHub failed as no answer. A 500 with an
+  empty body on the check-runs endpoint ended it with exit 1, its code for a
+  failed check, and "unexpected end of JSON input", and `scripts/land` gave up
+  on a green pull request. It now names the request and the status, reads the
+  same check runs through GraphQL, and waits when both fail, so an outage ends
+  in the timeout's exit 2 (PR 283).
+- A test holds every request the transport may resend to `update` operations
+  that are safe to apply twice, and reads the source for any new one, so a
+  `PUT` that posts a comment cannot arrive unnoticed (PR 282).
+
+### Output contract
+
+- No kind's schema version moves.
+- **Breaking**, under the row for the same input carrying a different `code`:
+  a `DELETE` answered with a 5xx or lost, and then 404 when it was sent again,
+  reports `OUTCOME_UNKNOWN` (exit 9, `retryable` false) where it reported
+  `NOT_FOUND` (exit 5).
+- `docs/output-contract.md` says so under Idempotency and in the
+  `OUTCOME_UNKNOWN` row, and `docs/troubleshooting.md` gains the delete case
+  and what to read instead of deleting again.
+
 ## [0.21.0] - 2026-11-05
 
 **Read this one if anything parses `issue activity`.** It now reports creating
@@ -3956,7 +4004,8 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.21.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.22.0...main
+[0.22.0]: https://github.com/kmoneil/jr/releases/tag/v0.22.0
 [0.21.0]: https://github.com/kmoneil/jr/releases/tag/v0.21.0
 [0.20.4]: https://github.com/kmoneil/jr/releases/tag/v0.20.4
 [0.20.3]: https://github.com/kmoneil/jr/releases/tag/v0.20.3
