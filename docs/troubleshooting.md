@@ -1634,6 +1634,18 @@ To make retries safe in the first place, hold a key:
 $ jr issue create --type Task --summary Ship --idempotency-key release-42
 ```
 
+A delete is the one write `jr` does send again, because deleting twice deletes
+once. Jira answers the second with 404 when the first did the work, and a 404
+cannot say whether this run removed the comment, worklog, link or issue or it
+was never there, so a delete whose resend finds nothing is `OUTCOME_UNKNOWN`
+too, not `NOT_FOUND`. It is gone either way. Sending it again settles nothing,
+since every later attempt meets the same 404; if the id may have been mistyped,
+read what is there instead:
+
+```console
+$ jr issue comment list ENG-1
+```
+
 ## When it is the network or the server
 
 `NO_SUCH_ENDPOINT`, `NETWORK`, `TIMEOUT`, `MALFORMED_SERVER_INFO`,

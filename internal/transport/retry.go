@@ -79,6 +79,24 @@ func shouldRetry(method string, status int, idempotent bool) (bool, string) {
 	}
 }
 
+// doubt is whether an attempt so far may have been carried out by Jira
+// without saying so: answered with a 5xx, or lost once it may have been sent.
+// A 429 is refused before anything is done, and a failed dial sent nothing,
+// so neither adds to it. Response.PriorMayHaveApplied carries it out.
+type doubt bool
+
+func (d *doubt) afterStatus(status int) {
+	if status >= http.StatusInternalServerError {
+		*d = true
+	}
+}
+
+func (d *doubt) afterFailure(err error) {
+	if !NeverSent(err) {
+		*d = true
+	}
+}
+
 // shouldRetryNetworkError decides whether a transport-level failure is worth
 // another attempt. A cancelled context never is.
 //

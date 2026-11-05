@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/kmoneil/jr/internal/cli"
+	"github.com/kmoneil/jr/internal/errs"
 	"github.com/kmoneil/jr/internal/idem"
 	"github.com/kmoneil/jr/internal/registry"
 	"github.com/kmoneil/jr/internal/render"
@@ -35,8 +36,10 @@ import (
 // deployments, at the default budget of three retries, through a fake that
 // applies each write and answers the first one with 503. A request that is not
 // idempotent by its method must reach the server at most once. A PUT or a
-// DELETE may be sent again, which HTTP allows. An apply needs a real plan, so
-// a command declaring --apply names the test that drives one.
+// DELETE may be sent again, which HTTP allows, but a DELETE sent again finds
+// nothing to delete, and the 404 that answers it is the first attempt's work,
+// not a missing resource. An apply needs a real plan, so a command declaring
+// --apply names the test that drives one.
 func TestAWriteJiraMayHaveAppliedIsNotSentTwice(t *testing.T) {
 	requireNothingIsWritten(t)
 	var driven int
@@ -154,6 +157,32 @@ func requireNoRepeatedWrite(
 		t.Errorf("on %s with %s, the only write was answered 503 and not resent, "+
 			"and the command reported success", kind, with)
 	}
+	if deletedAgain(applied) {
+		code := "success"
+		if err != nil {
+			code = errs.Coerce(err).Code
+		}
+		if code != "OUTCOME_UNKNOWN" {
+			t.Errorf("on %s with %s, Jira did the delete and answered 503, the "+
+				"resend was answered 404, and the command reported %s. Whether "+
+				"this run removed it or it was never there, the 404 cannot say, "+
+				"so the answer is OUTCOME_UNKNOWN", kind, with, code)
+		}
+	}
+}
+
+// deletedAgain reports a DELETE that reached the fake more than once and was
+// answered 404 the second time: the first sending did the work, and the later
+// one found nothing. A watcher's removal is answered 204 again, so it is not one.
+func deletedAgain(applied map[string]int) bool {
+	for request, n := range applied {
+		method, rest, _ := strings.Cut(request, " ")
+		path, _, _ := strings.Cut(rest, " ")
+		if method == http.MethodDelete && n > 1 && !strings.HasSuffix(path, "/watchers") {
+			return true
+		}
+	}
+	return false
 }
 
 func idempotentByMethod(method string) bool {
@@ -228,6 +257,12 @@ func driveFaulted(
 
 // faultingTransport is a Jira behind a proxy that times out: it applies every
 // write it is sent and answers the first one with 503.
+//
+// A DELETE it has already applied is answered as Cloud answered one on
+// 2026-11-05: 404 for an issue, a comment, a worklog and a link, which were
+// gone, and 204 for a watcher, whose removal Jira repeats without complaint.
+// Answering every resend 200, as this did, is the one answer a deleted
+// resource never gets, and it hid the 404 from every command that deletes.
 type faultingTransport struct {
 	kind    site.Kind
 	failed  bool
@@ -251,10 +286,16 @@ func (f *faultingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	if r.Method == http.MethodGet || r.Method == http.MethodHead {
 		return respond(http.StatusOK, sweepResponse(r.URL.Path, f.kind))
 	}
-	f.applied[r.Method+" "+r.URL.Path+" "+body]++
+	request := r.Method + " " + r.URL.Path + " " + body
+	f.applied[request]++
 	if !f.failed {
 		f.failed = true
 		return respond(http.StatusServiceUnavailable, `{"errorMessages":["upstream timed out"]}`)
+	}
+	if r.Method == http.MethodDelete && f.applied[request] > 1 &&
+		!strings.HasSuffix(r.URL.Path, "/watchers") {
+		return respond(http.StatusNotFound,
+			`{"errorMessages":["Issue does not exist or you do not have permission to see it."],"errors":{}}`)
 	}
 	return respond(http.StatusOK, sweepResponse(r.URL.Path, f.kind))
 }

@@ -198,6 +198,12 @@ a 429, which is a refusal before processing, is retried. Such a failure is
 whether it happened, and do not resend it blind. With a key the claim stays
 held, and a repeat inside ten minutes is refused as `IDEMPOTENT_IN_FLIGHT`.
 
+A delete is resent, because deleting twice deletes once, and when the resend
+finds nothing to delete that is `OUTCOME_UNKNOWN` (9) as well, not `NOT_FOUND`.
+Whatever it named is gone now; the 404 cannot say whether this run removed it.
+Do not tell the user their key or id was wrong unless it may have been, and do
+not delete again to find out: every later attempt meets the same 404.
+
 `INVALID_ENCODING` (2) is text you supplied that is not valid UTF-8; correct it.
 `UNRENDERABLE_VALUE` (1) came back from Jira and names the field: the value holds
 a character no output format can carry, and it is refused rather than replaced

@@ -1910,7 +1910,7 @@ looked.
 | `LEDGER_INVALID`          | 1    | The ledger could not be parsed. It is refused rather than ignored: everywhere else an unreadable cache is a miss because the cost is a round trip, and here the cost is a duplicate issue.             |
 | `LEDGER_LOCKED`           | 1    | Another run is writing the ledger and did not finish.                                                                                                                                                  |
 | `LEDGER_LOCK_STOLEN`      | 1    | This run was presumed dead while it held the ledger, so another run broke its lock and this run's write may have been lost. The request may or may not have been sent; read the issue before retrying. |
-| `OUTCOME_UNKNOWN`         | 9    | A write was sent and the answer never said whether it happened: a 5xx, a connection that dropped after the request went out, or a deadline that passed. It is not sent again, with or without a key, and unlike every other `REMOTE` code it is not `retryable`: Jira may already have applied it, and a second attempt can apply it twice. Read what you were changing to see whether it happened. With a key, a repeat is refused as `IDEMPOTENT_IN_FLIGHT` until the claim goes stale. |
+| `OUTCOME_UNKNOWN`         | 9    | A write was sent and the answer never said whether it happened: a 5xx, a connection that dropped after the request went out, or a deadline that passed. It is not sent again, with or without a key, and unlike every other `REMOTE` code it is not `retryable`: Jira may already have applied it, and a second attempt can apply it twice. Read what you were changing to see whether it happened. With a key, a repeat is refused as `IDEMPOTENT_IN_FLIGHT` until the claim goes stale. A `DELETE` is the write that is sent again, and a resend that finds nothing to delete is this code too, not `NOT_FOUND`: it is gone either way, and the 404 cannot say whether this run removed it. |
 
 An attempt that claimed a key and then died leaves the claim pending, and a
 retry inside `idem.StaleClaim` is **refused** rather than allowed. The first
@@ -1928,7 +1928,14 @@ silently get it.
 `issue create`, `issue clone`, and `issue move` accept `--idempotency-key`.
 `issue edit` and `issue assign` do not need one: both are `PUT`s, so the
 transport already replays them after an upstream error and setting a field twice
-sets it once. A transition is the mutation that is not idempotent, and
+sets it once. The deletes, `issue delete`, `issue comment delete`,
+`issue worklog delete` and `issue link remove`, are `DELETE`s and replayed the
+same way, and deleting twice deletes once, but it is not answered as once: Jira
+answers the second with 404. A delete whose resend finds nothing is therefore
+`OUTCOME_UNKNOWN` and not `NOT_FOUND`, because a 404 cannot say whether the
+first attempt removed it or it was never there. A 404 after a 429, which Jira
+refuses before doing anything, or after a connection that never opened, is
+still `NOT_FOUND`. A transition is the mutation that is not idempotent, and
 `issue.move` v4 marks a replayed one `replayed="true"` on the `issue` element,
 the way `issue.create` v1 does.
 
