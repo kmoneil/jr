@@ -965,6 +965,20 @@ do not catch, add the test in the same change and cite it here.
   **Enforced by:** `TestLandWaitsOnTheHeadItPushed`,
   `TestLandFromAWorktreeLeavesTheBaseWhereItIs`,
   `TestLandRefusesAHeadOriginHasNotSeen`.
+- **`scripts/ci-wait` reads a request GitHub failed as no answer, neither red
+  nor green.** On 2026-11-05 the check-runs endpoint answered one commit with
+  a 500 and an empty body for over ten minutes. gh ran the filter over the
+  empty body, ci-wait exited 1, its code for a failed check, with "unexpected
+  end of JSON input" and no request or status, and `scripts/land` gave up on
+  a green pull request twice. A failed read is now named on stderr with the
+  status GitHub answered, the same check runs are read through GraphQL, and
+  when both fail the next poll tries again, so an outage that outlasts the
+  wait exits 2, the timeout, and never 1. The GraphQL reading is the check
+  suites' latest runs, which matched the REST endpoint run for run on four
+  commits; the status rollup did not, and leaves out checks a tag starts.
+  **Enforced by:** `TestCIWaitReadsAFailedRequestAsNoAnswer`,
+  `TestCIWaitTimesOutWhenGitHubNeverAnswers`,
+  `TestCIWaitReadsTheRecordedChecks`.
 - **A commit on the default branch is refused before it exists.** `main` is
   protected, so the push is refused anyway, but by then the commit has to be
   moved; it happened twice before the guard. The pre-commit hook runs

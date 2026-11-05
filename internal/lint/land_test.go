@@ -17,10 +17,12 @@ import (
 
 // ghForLand stands in for gh against one pull request on a bare repository. It
 // answers what land and ci-wait ask, reports every commit whose checks it is
-// asked about as green, and merges the way the repository's ruleset does: only
-// a head whose checks were seen green, and only the head --match-head-commit
-// names when it names one. A merge is a squash onto main, and the branch goes,
-// as --delete-branch does on the server.
+// asked about as one passed check, in the rows ci-wait's filter makes and
+// after the headers its --include asks for, and merges the way the
+// repository's ruleset does: only a head whose checks were seen green, and
+// only the head --match-head-commit names when it names one. A merge is a
+// squash onto main, and the branch goes, as --delete-branch does on the
+// server.
 //
 // GH_STALE_HEAD is the head GitHub reports for the pull request. Set to the
 // commit a rebase replaced, it is the gap between a push and GitHub
@@ -37,7 +39,7 @@ case "$*" in
 "api repos/"*check-runs*)
 	sha=${2#*/commits/}
 	echo "${sha%%/*}" >> "$GH_LOG.green"
-	printf '1\t0\t0\n' ;;
+	printf 'HTTP/2.0 200 OK\n\r\nci\tcompleted\tsuccess\n' ;;
 "pr merge"*)
 	head=$(origin rev-parse "refs/heads/$GH_BRANCH")
 	if ! grep -qx "$head" "$GH_LOG.green" 2>/dev/null; then

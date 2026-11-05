@@ -1,0 +1,123 @@
+{
+  "data": {
+    "repository": {
+      "object": {
+        "checkSuites": {
+          "nodes": [
+            {
+              "checkRuns": {
+                "nodes": [
+                  {
+                    "name": "vulnerability scan",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "build profiles and size budget",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "output contract is unchanged",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "test on windows, every profile",
+                    "status": "IN_PROGRESS",
+                    "conclusion": null
+                  },
+                  {
+                    "name": "format, vet, lint",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "list the packages with fuzz targets",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "test (tags=none)",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "test (tags=mcp)",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "test (tags=mcp,write)",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "test (tags=prompt,render,mcp,write,admin)",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "fuzz (internal/render)",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "fuzz (internal/workflow)",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "fuzz (internal/resource/sprint)",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "fuzz (internal/jql)",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "fuzz (internal/auth)",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "fuzz (internal/jctx)",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "fuzz (internal/transport)",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "fuzz (internal/adf)",
+                    "status": "IN_PROGRESS",
+                    "conclusion": null
+                  },
+                  {
+                    "name": "fuzz (internal/resource/issue)",
+                    "status": "IN_PROGRESS",
+                    "conclusion": null
+                  },
+                  {
+                    "name": "fuzz (internal/site)",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  },
+                  {
+                    "name": "fuzz (internal/resource/epic)",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

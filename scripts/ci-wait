@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ci-wait — block until every check on a commit settles, and say how it went.
+# ci-wait: block until every check on a commit settles, and say how it went.
 #
 #   scripts/ci-wait              the checks on HEAD
 #   scripts/ci-wait <sha>        the checks on a commit
@@ -11,8 +11,16 @@
 # push and the first check appearing is exactly when an eager reading says
 # GREEN over nothing.
 #
+# A read GitHub fails says nothing about the checks, so it is read as neither
+# green nor red. ci-wait names the request and the status GitHub answered on
+# stderr, asks GraphQL for the same check runs, and when that fails too waits
+# for the next poll. On 2026-11-05 the REST endpoint answered one commit with
+# a 500 and an empty body for over ten minutes while GraphQL read its checks
+# fine, and ci-wait exited 1, its code for a failed check, saying only
+# "unexpected end of JSON input". land gave up on a green pull request twice.
+#
 # POLL (default 30) seconds between reads; TIMEOUT (default 1800) seconds
-# overall. Every read is one API call.
+# overall. Every read is one API call, and two when GitHub fails the first.
 set -euo pipefail
 
 poll=${POLL:-30}
@@ -32,30 +40,98 @@ case ${1:-} in
 	;;
 esac
 
-settled='(.conclusion == "success" or .conclusion == "skipped"
-          or .conclusion == "neutral")'
+# Both readers write a check run as one row: its name, status and conclusion,
+# tab separated and in lower case, with the conclusion empty while it runs.
+# What counts as settled is then decided once, below, whichever one answered.
+rest_path="repos/$repo/commits/$sha/check-runs?per_page=100"
+rest_rows='.check_runs[] | [.name, .status, (.conclusion // "")] | @tsv'
+
+# GraphQL reaches the same runs through their suites. LATEST is the REST
+# endpoint's default, the newest run of each check once a job is re-run, and
+# the two agreed run for run on 2026-11-05 across a pull request's head, a
+# commit on main still running, a tagged one, and one whose release workflow
+# ran twice. The status rollup GraphQL also offers is a different set: it left
+# out the three install checks the tag started.
+graphql_query='query($owner: String!, $name: String!, $sha: GitObjectID!) {
+  repository(owner: $owner, name: $name) {
+    object(oid: $sha) {
+      ... on Commit {
+        checkSuites(first: 100) {
+          nodes {
+            checkRuns(first: 100, filterBy: {checkType: LATEST}) {
+              nodes { name status conclusion }
+            }
+          }
+        }
+      }
+    }
+  }
+}'
+graphql_rows='.data.repository.object.checkSuites.nodes[].checkRuns.nodes[]
+  | [.name, (.status | ascii_downcase), ((.conclusion // "") | ascii_downcase)]
+  | @tsv'
+
+errors=$(mktemp)
+trap 'rm -f "$errors"' EXIT
+
+# fetch prints what one request's filter made of the answer, or names the
+# request, the status GitHub answered with and what gh said, on stderr, and
+# returns 1. --include is what carries the status: gh runs --jq over whatever
+# body came back, so a 500 with an empty one is reported as "unexpected end of
+# JSON input" and nothing else, but the status line is printed before that.
+fetch() {
+	local what=$1 out status said line body=
+	shift
+	if ! out=$(gh api "$@" --include 2>"$errors"); then
+		status=${out%%$'\n'*}
+		status=${status%$'\r'}
+		said=$(cat "$errors")
+		echo "ci-wait: $what: ${status:-no answer}: ${said//$'\n'/ }" >&2
+		return 1
+	fi
+	# The headers end at the first empty line, and each ends in a CR.
+	while IFS= read -r line; do
+		if [ -n "$body" ]; then
+			printf '%s\n' "$line"
+		elif [ -z "${line%$'\r'}" ]; then
+			body=1
+		fi
+	done <<<"$out"
+}
+
+read_checks() {
+	fetch "GET $rest_path" "$rest_path" --jq "$rest_rows" ||
+		fetch "POST graphql, the same check runs" graphql \
+			-f query="$graphql_query" -f owner="${repo%%/*}" -f name="${repo#*/}" \
+			-f sha="$sha" --jq "$graphql_rows"
+}
 
 deadline=$((SECONDS + timeout))
 while [ "$SECONDS" -lt "$deadline" ]; do
-	line=$(gh api "repos/$repo/commits/$sha/check-runs?per_page=100" --jq "
-		[ .total_count,
-		  ([.check_runs[] | select(.status != \"completed\")] | length),
-		  ([.check_runs[] | select(.status == \"completed\"
-		    and ($settled | not))] | length)
-		] | @tsv")
-	IFS=$'\t' read -r total running failed <<<"$line"
+	if rows=$(read_checks); then
+		total=0 running=0 failing=
+		while IFS=$'\t' read -r name status conclusion; do
+			[ -n "$name" ] || continue
+			total=$((total + 1))
+			if [ "$status" != completed ]; then
+				running=$((running + 1))
+				continue
+			fi
+			case $conclusion in
+			success | skipped | neutral) ;;
+			*) failing="$failing$name: $conclusion"$'\n' ;;
+			esac
+		done <<<"$rows"
 
-	if [ "${failed:-0}" -gt 0 ]; then
-		gh api "repos/$repo/commits/$sha/check-runs?per_page=100" --jq "
-			.check_runs[]
-			| select(.status == \"completed\" and ($settled | not))
-			| \"\(.name): \(.conclusion)\""
-		echo "RED $sha"
-		exit 1
-	fi
-	if [ "${total:-0}" -gt 0 ] && [ "${running:-1}" -eq 0 ]; then
-		echo "GREEN $sha"
-		exit 0
+		if [ -n "$failing" ]; then
+			printf '%s' "$failing"
+			echo "RED $sha"
+			exit 1
+		fi
+		if [ "$total" -gt 0 ] && [ "$running" -eq 0 ]; then
+			echo "GREEN $sha"
+			exit 0
+		fi
 	fi
 	sleep "$poll"
 done
