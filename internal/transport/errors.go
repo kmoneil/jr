@@ -146,7 +146,9 @@ func snippet(body []byte) string {
 // statusError maps an HTTP response to a structured error.
 //
 // The mapping is fixed: a caller pins the exit codes it handles, so a status
-// must always produce the same one.
+// must always produce the same one for the same request and the same history.
+// The history matters to two: a 5xx on a write, and a 404 on a DELETE sent
+// again after an attempt Jira may have carried out.
 func statusError(resp *Response) *errs.Error {
 	detail := parseJiraError(resp.Body, resp.Header.Get("Content-Type"))
 
@@ -187,6 +189,18 @@ func statusError(resp *Response) *errs.Error {
 				"the server returned a web page, not a Jira API response").
 				WithRemedy("check the site URL, including any context path: a Data Center " +
 					"instance is often served under one, e.g. https://jira.example.com/jira")
+			break
+		}
+		if resp.Method == http.MethodDelete && resp.PriorMayHaveApplied {
+			// The first attempt was answered with a 5xx or lost, and the
+			// resend found nothing to delete. That is what the first attempt
+			// having worked looks like, and it is also what a key that never
+			// existed looks like, so neither NOT_FOUND nor success is true.
+			e = errs.Remote("OUTCOME_UNKNOWN",
+				"Jira may have done this delete on an attempt it answered with an "+
+					"error, and found nothing to delete when it was sent again").
+				WithRemedy("%s", unknownDeleteRemedy)
+			e.Retryable = false
 			break
 		}
 		e = errs.NotFound("NOT_FOUND", "Jira has no such resource").
@@ -243,6 +257,12 @@ func statusError(resp *Response) *errs.Error {
 // whether it happened.
 const unknownOutcomeRemedy = "check whether it happened before you send it " +
 	"again: Jira may have applied it, and a second attempt can apply it twice"
+
+// unknownDeleteRemedy is what to do about a delete whose resend found nothing.
+// Sending it again settles nothing, because a third attempt meets the same 404.
+const unknownDeleteRemedy = "it is not there now, but Jira's answers cannot say " +
+	"whether this run removed it or it was never there; if the key or id may " +
+	"have been wrong, check it, since a resource you cannot see also reports as missing"
 
 // lostWrite reports a connection-level failure on a write that may already
 // have reached Jira as what it is, an unknown outcome, and never as a

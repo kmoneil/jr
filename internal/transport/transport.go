@@ -245,6 +245,14 @@ type Response struct {
 	// Idempotent is the request's own mark, carried so that an error built
 	// from this response knows whether a 5xx left a write's outcome unknown.
 	Idempotent bool
+	// PriorMayHaveApplied says an earlier attempt at this request failed in a
+	// way that does not prove Jira left it undone: a 5xx, or a connection lost
+	// once the request may have been sent. A 429 and a failed dial prove the
+	// opposite, and leave it false. A DELETE carrying it reads a 404 as what
+	// the earlier attempt may have done, not as a resource that was never
+	// there: Cloud answers a second delete of an issue, a comment, a worklog
+	// or a link with 404 (measured 2026-11-05).
+	PriorMayHaveApplied bool
 }
 
 // Close releases a streamed body, and does nothing for a buffered one.
@@ -376,6 +384,7 @@ func (c *Client) Do(ctx context.Context, r Request) (*Response, error) {
 	requestID := newRequestID()
 
 	var lastErr error
+	var prior doubt
 	for attempt := 1; ; attempt++ {
 		if err := c.spend(attempt, lastErr); err != nil {
 			return nil, err
@@ -387,13 +396,16 @@ func (c *Client) Do(ctx context.Context, r Request) (*Response, error) {
 			if err := c.retryNetwork(ctx, r, target, requestID, attempt, err); err != nil {
 				return nil, err
 			}
+			prior.afterFailure(err)
 			continue
 		}
 
 		retry, reason := shouldRetry(r.Method, resp.Status, r.Idempotent)
 		if !retry || attempt > c.retries {
+			resp.PriorMayHaveApplied = bool(prior)
 			return c.settle(r, target, requestID, attempt, resp, retry, reason), nil
 		}
+		prior.afterStatus(resp.Status)
 		// Only a success streams, and a success is never retried, but the two
 		// facts live in different functions and a leaked connection is not the
 		// way to find out they diverged.

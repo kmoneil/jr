@@ -1182,6 +1182,20 @@ do not catch, add the test in the same change and cite it here.
   provably never left this process, keeps its ordinary code.
   **Enforced by:** `TestAWriteAnsweredWithA5xxHasAnUnknownOutcome`,
   `TestAWriteWhoseConnectionDroppedHasAnUnknownOutcome`.
+- **A delete whose resend finds nothing is not reported as missing.** The
+  transport sends a DELETE again after a 5xx or a dropped connection, as HTTP
+  allows, and Cloud answers a second delete of an issue, a comment, a worklog
+  or a link with 404 (measured 2026-11-05). So a delete Jira did behind a proxy
+  that answered 503 was `NOT_FOUND`, exit 5, telling the caller that what they
+  named did not exist, from the run that removed it. A 404 on a DELETE after
+  an attempt Jira may have carried out is `OUTCOME_UNKNOWN`; after a 429 or a
+  failed dial, which prove nothing was done, and on a PUT, which removes
+  nothing, it is still `NOT_FOUND`. The replay sweep's fake answered every
+  resend 200, which no resent delete gets, so the path could not run in it; it
+  now answers a resent delete the way Cloud did.
+  **Enforced by:** `TestADeleteFoundGoneOnItsResendHasAnUnknownOutcome`,
+  `TestADeleteWhoseDialFailedReadsItsNotFound`,
+  `TestAWriteJiraMayHaveAppliedIsNotSentTwice`.
 - **A retry this client declines to make is traced as a decision.** The rule
   above was enforced by a test that counts requests, which passes whether or not
   anything says why the count is one. It was one: `shouldRetry` built the reason
