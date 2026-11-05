@@ -1018,7 +1018,7 @@ jr issue activity --since -1d --kind transition --format json
 | `--since` | `string` | — | only events at or after this date, offset, or RFC 3339 instant, e.g. -7d; required, and it bounds the issues searched as well as the events reported; a date function like startOfWeek() is refused here, because this command compares dates itself (required) |
 | `--until` | `string` | — | only events before this date or offset, e.g. -1h; ends the window --since starts, and bounds the events reported but not the issues searched, so it does not make a sweep cheaper; a date function is refused, as on --since |
 | `--user` | `string` | — | only events by this person, by display name, email, or id; the word currentUser resolves to the caller |
-| `--kind` | `string` | — | only events of this kind: comment, transition, field, or worklog; repeat for several (repeatable) |
+| `--kind` | `string` | — | only events of this kind: comment, transition, field, worklog, or created; repeat for several (repeatable) |
 | `--jql` | `string` | — | raw JQL narrowing the issues searched, combined with --since and always parenthesized |
 | `--changed-field` | `string` | — | only events about this field, by the name the changelog records or by its id; repeat for several; a comment and a worklog move no field and so never match (repeatable) |
 | `--not-changed-field` | `string` | — | drop events about this field, e.g. Rank on a groomed backlog; a comment and a worklog move no field and so are never dropped; wins over --changed-field (repeatable) |
@@ -1032,15 +1032,15 @@ jr issue activity --since -1d --kind transition --format json
 
 | Emits | Schema | When |
 | --- | --- | --- |
-| `issue.activity` | v2 | always |
+| `issue.activity` | v3 | always |
 | `jql.explain` | v3 | --explain is given |
 
 Default TSV columns: `at`, `issue`, `kind`, `author`, `field`, `time-spent`, `from`, `to`, `body`
 
 Exit codes: `0` OK, `1` ERROR, `2` USAGE, `3` PARTIAL, `4` AUTH, `5` NOT_FOUND, `6` PERMISSION, `8` RATE_LIMIT, `9` REMOTE
 
-Merges four sources into one time-ordered feed: comments, transitions, other
-field changes, and worklogs. Newest first.
+Merges five sources into one time-ordered feed: the issue's own creation,
+comments, transitions, other field changes, and worklogs. Newest first.
 
 Newest first across the whole feed, so every candidate issue is read before a
 row is written, whatever --limit says. Candidates arrive in issue-key order,
@@ -1115,6 +1115,14 @@ an issue entirely through commits produces no events for that person, and this
 command correctly reports none. That is Jira's data model rather than something
 to paper over here, and knowing it is the difference between reading the empty
 answer and believing it.
+
+**A created event is the issue's creator's, which is not always its
+reporter.** Jira records who made an issue in `creator`, which nothing can
+change, and who it is reported by in `reporter`, which anybody with the
+permission can. An issue filed on somebody else's behalf is reported by them
+and created by whoever filed it, so --user matches the person who filed it.
+The event is written when the issue's created timestamp falls inside the
+window; the changelog has no entry for it on either deployment.
 
 Exit 3 is sharper than it looks when --user is given. It means some events were
 not sent, so it also means this person may have events here that you cannot

@@ -357,6 +357,11 @@ func runActivityAgainstConn(
 	flags.SetString("since", "-1d")
 	flags.SetString("jql", "key = AGL-3")
 	flags.SetInt("page-size", 50)
+	// The kinds the recording it is cut from was made with: see
+	// recordedEventKinds.
+	for _, k := range recordedEventKinds {
+		flags.SetString("kind", k)
+	}
 	inv := &registry.Invocation{
 		Jira: &stubSession{
 			doer: &stubDoer{body: catalogueJSON}, conn: conn,

@@ -194,6 +194,12 @@ type Issue struct {
 	// Unexported for the reason updatedRaw is: the field is fetched to be
 	// reported once, in the warning, and is not an element of the row.
 	sortValue string
+
+	// creator is who made the issue, which is not always its reporter. It is
+	// asked for only by `issue activity`, which attributes a created event to
+	// it, and is unexported because no kind renders it: adding it to the row
+	// would be an element nobody asked for on every issue.list and issue.get.
+	creator User
 }
 
 // ExtraField is one field requested by id and reduced to a scalar.
@@ -272,6 +278,9 @@ type rawIssue struct {
 		} `json:"status"`
 		Assignee *rawUser `json:"assignee"`
 		Reporter *rawUser `json:"reporter"`
+		// Creator is asked for only by `issue activity`, and is not
+		// rendered: see Issue.creator.
+		Creator  *rawUser `json:"creator"`
 		Priority *struct {
 			Name string `json:"name"`
 		} `json:"priority"`
@@ -387,6 +396,7 @@ func (r rawIssue) convert(mode BodyMode) (Issue, error) {
 		},
 		Assignee:   r.Fields.Assignee.convert(),
 		Reporter:   r.Fields.Reporter.convert(),
+		creator:    r.Fields.Creator.convert(),
 		Created:    created,
 		Updated:    updated,
 		updatedRaw: r.Fields.Updated,

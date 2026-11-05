@@ -1034,8 +1034,8 @@ each cut body carries it, the way `--no-body` drops whole bodies at exit 0.
 The flag is refused with `--no-body` (`BODY_CHARS_AND_NO_BODY`), with
 `--raw-body` (`BODY_CHARS_AND_RAW_BODY`: an ADF document cut short is not a
 document, whatever `format` says), and below 1 (`INVALID_BODY_CHARS`), all
-exit 2 and before any request. `truncated` and `length` arrived with
-`issue.activity` v2; the other kinds carrying a body did not move.
+exit 2 and before any request. `truncated` and `length` arrived with version 2
+of `issue.activity`; the other kinds carrying a body did not move.
 
 ### Carriage returns in XML
 
@@ -1218,6 +1218,36 @@ It was asked for on every request from the first version of this tool — it is 
 the default field set — parsed, and then rendered in no format at all, so
 `--reporter ada` filtered on a value nothing could show. Found by asking why
 `--field reporter` did nothing, which it also did.
+
+### Creating an issue is an event
+
+`issue.activity` v3 adds a fifth event `kind`, `created`, beside `comment`,
+`transition`, `field` and `worklog`. It is written when the issue's `created`
+falls inside the window, with `at` that timestamp and `author` the issue's
+**creator**, and it carries nothing else: no `field`, no `from` or `to`, no
+body.
+
+```console
+$ jr issue activity --since -7d --user currentUser
+at                    issue  kind     author        field      time-spent  from  to     body
+2026-11-04T19:18:51Z  ENG-2  field    Ada Lovelace  Epic Link                    ENG-9
+2026-11-04T19:12:22Z  ENG-2  created  Ada Lovelace
+```
+
+**Creator, not reporter.** Jira records who made an issue in `creator`, which
+nothing changes afterwards, and who it is reported by in `reporter`, which
+anybody with the permission can set. An issue filed on somebody else's behalf
+is the filer's creation and the other person's report, so `--user` finds it in
+the filer's feed. Neither deployment's changelog has an entry for a creation,
+so the event is read off the issue itself, and the search asks for `creator`
+only when `created` is among the kinds wanted: `--kind` without it sends the
+field set it always did.
+
+**Priced as breaking, at the minor position.** The event `kind` is a closed
+enum, and branching on it is what it is for. `issue activity` with no `--kind`,
+an invocation callers already make, now emits a value it never did, which is
+the row for a kind an existing command starts emitting. The feed as it was is
+`--kind comment --kind transition --kind field --kind worklog`.
 
 ### `--age` adds a column, and never changes one
 

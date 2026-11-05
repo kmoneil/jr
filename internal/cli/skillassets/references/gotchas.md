@@ -193,7 +193,7 @@ by anyone this week."
 
 **`issue activity --user` narrows the answer, not the search.** Every issue
 updated in the window is read and the person is matched afterwards, because
-three of the four event kinds are not searchable. Across a whole instance that
+most event kinds are not searchable. Across a whole instance that
 is everybody's week, and past ten pages it is refused with `SWEEP_TOO_LARGE`.
 Narrow the candidates to the person's involvement, the fields `--involving`
 covers plus the transitions they made:
@@ -205,7 +205,9 @@ jr issue activity --since -7d --user currentUser --all-projects \
 
 It misses a comment, or a change to any field but status, on an issue they are
 not otherwise tied to, which are the two limits above. If the question was
-"everything they did", say so in the answer.
+"everything they did", say so in the answer. An issue they filed is covered:
+`created` events are matched on `creator`, which the query names, and not on
+`reporter`.
 
 The five who-touched-it flags are genuinely different questions:
 

@@ -311,7 +311,12 @@ at                    issue   kind        author         field   time-spent  fro
 2026-08-11T14:02:11Z  ENG-412 comment     Ada Lovelace                                              rolled the runner back
 2026-08-11T13:58:04Z  ENG-412 transition  Ada Lovelace   status              In Progress  Blocked
 2026-08-10T09:14:00Z  ENG-388 worklog     Ada Lovelace           2h
+2026-08-10T08:41:37Z  ENG-430 created     Ada Lovelace
 ```
+
+A `created` row is an issue Ada filed inside the window. It is matched on the
+issue's creator, not its reporter, so an issue she filed for somebody else is
+still hers here.
 
 `--kind` narrows it, and narrows the request with it, so a transition feed does
 not pay for comment bodies:
