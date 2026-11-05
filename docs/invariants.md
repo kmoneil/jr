@@ -436,8 +436,15 @@ do not catch, add the test in the same change and cite it here.
   window and a plan read back by `apply` all compare that text. A string or a
   date that looks like a timestamp is left alone, since nothing declared it
   one, and with no zone nothing is walked, so the default is the bytes it
-  always was.
+  always was. The one value no schema can declare is a field requested with
+  `--field`, whose element an open shape admits by an id nobody knows until the
+  request; one the catalogue types `datetime` is marked an instant on the node,
+  held to UTC like a declared one, and respelled like one (issue 277).
   **Enforced by:** `TestAZoneRespellsEveryDeclaredTimestampAndNothingElse`,
+  `TestAZoneMovesAnInstantAnOpenShapeAdmits`,
+  `TestAnInstantAnOpenShapeAdmitsIsHeldToUTC`,
+  `TestARequestedDatetimeFieldIsWrittenAsATimestamp`,
+  `TestARequestedDatetimeFieldFollowsTheZone`,
   `TestARespelledTimestampNamesTheSameInstant`,
   `TestNoZoneWritesTheDocumentAsBuilt`,
   `TestAStreamedCollectionIsWrittenInItsZone`,
@@ -451,7 +458,8 @@ do not catch, add the test in the same change and cite it here.
   would be the one value still in UTC beside neighbours that had moved. Every
   command the sweep can answer is driven under a zone on both deployments, and
   what it wrote may hold none. The writer does not look inside an open shape,
-  so no kind may declare a timestamp in one.
+  so no kind may declare a timestamp in one; an element there is moved only
+  when it marks itself an instant, as a requested `datetime` field does.
   **Enforced by:** `TestUnderAZoneNoTimestampIsLeftInUTC`,
   `TestNoOpenShapeDeclaresATimestamp`.
 - **The zone is settled before the command runs.** `--tz account` is a request

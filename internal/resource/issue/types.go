@@ -222,6 +222,9 @@ type ExtraField struct {
 	// give Node something to render structurally, and Value carries the same
 	// sprints flattened for anything that wants one cell.
 	sprints []sprintRef
+	// instant is set when the catalogue types the field `datetime`. Value is
+	// then RFC 3339 in UTC, and the element says so, so a zone moves it.
+	instant bool
 }
 
 // Status is an issue's workflow state, plus the category the state belongs to.
@@ -476,7 +479,7 @@ func decodeDescription(raw json.RawMessage, mode BodyMode) (text, format string,
 // request asked for, and sortField is the field id a walk is ordered by, empty
 // when nothing needs to read it.
 func decodeIssues(
-	raw []json.RawMessage, extras []string, labels map[string]string,
+	raw []json.RawMessage, extras []string, known map[string]FieldInfo,
 	mode BodyMode, want Projections, sortField string,
 ) ([]Issue, error) {
 	out := make([]Issue, 0, len(raw))
@@ -492,7 +495,10 @@ func decodeIssues(
 		if err != nil {
 			return nil, err
 		}
-		issue.Extra = extraFields(data, extras, labels)
+		issue.Extra, err = extraFields(data, extras, known)
+		if err != nil {
+			return nil, err
+		}
 		if sortField != "" {
 			issue.sortValue = boundaryValue(issue, data, sortField)
 		}
@@ -702,32 +708,49 @@ func (i Issue) ThreadComplete() bool {
 // than omitted, so a caller can tell "this issue has no value for it" from "I
 // asked for something that does not exist" — the latter shows up as empty on
 // every row.
-func extraFields(data json.RawMessage, names []string, labels map[string]string) []ExtraField {
+//
+// A field the catalogue types `datetime` is normalized the way `created` is,
+// and refused the way `created` is when it does not parse. Both deployments
+// send it as `2026-11-04T13:50:16.000-0500`, in the server's zone with no
+// colon in the offset, and passing that through put two spellings of the same
+// instant in one row, only one of which --tz moved.
+func extraFields(data json.RawMessage, names []string, known map[string]FieldInfo) ([]ExtraField, error) {
 	if len(names) == 0 {
-		return nil
+		return nil, nil
 	}
 	var envelope struct {
 		Fields map[string]json.RawMessage `json:"fields"`
 	}
+	// The same bytes already decoded as an issue, so this cannot fail on a
+	// payload that reached here. If it does, the requested fields are not
+	// readable, and an empty row would say the issue had no value for them.
 	if err := json.Unmarshal(data, &envelope); err != nil {
-		return nil
+		return nil, errs.Remote("MALFORMED_ISSUE",
+			"Jira returned an issue this tool cannot read").Wrap(err)
 	}
 	fields := envelope.Fields
 
 	out := make([]ExtraField, 0, len(names))
 	for _, name := range names {
 		raw := fields[name]
-		f := ExtraField{ID: name, Name: labels[name], Value: scalarize(raw)}
+		info := known[name]
+		f := ExtraField{ID: name, Name: info.Name, Value: scalarize(raw)}
 		if refs, ok := sprintValue(raw); ok {
 			f.sprints = refs
 			f.Value = joinSprintNames(refs)
+		} else if info.Instant {
+			value, err := normalizeTime(name, f.Value)
+			if err != nil {
+				return nil, err
+			}
+			f.Value, f.instant = value, true
 		}
 		// A sprint list is a value even though it contributes no text of its
 		// own, so it is asked about separately rather than through Value.
 		f.Set = f.Value != "" || len(f.sprints) > 0
 		out = append(out, f)
 	}
-	return out
+	return out, nil
 }
 
 // sprintValue reads a field value as Data Center's sprint field, which is an
@@ -892,6 +915,7 @@ func (i Issue) Node() *render.Node {
 		// value and would otherwise pay for an attribute on every row saying
 		// so. Its absence means the element's text is the value.
 		el := render.El(f.ID).AttrIf("name", f.Name).SetText(f.Value)
+		el.Instant = f.instant
 		if !f.Set {
 			el.Attr("set", "false")
 		}

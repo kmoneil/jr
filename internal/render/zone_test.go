@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kmoneil/jr/internal/errs"
 	"github.com/kmoneil/jr/internal/render"
 )
 
@@ -342,5 +343,152 @@ func TestASchemaSaysWhetherItHoldsATimestamp(t *testing.T) {
 	}
 	if render.KindHasTimestamp("test.zone.unregistered") {
 		t.Error("a kind with no schema reports a timestamp")
+	}
+}
+
+// The open kind the instant tests write: a row whose other elements are named
+// by whoever asked for them, as `issue list --field` rows are.
+const openZonedKind = "test.zoned.open"
+
+var registerOpenZoned = sync.OnceFunc(func() {
+	render.RegisterSchema(openZonedKind, &render.Schema{
+		Element: "row",
+		Attrs: []render.Field{
+			{Name: "key", Type: render.TypeString},
+		},
+		Children: []render.Child{
+			{Schema: render.Leaf("updated", render.TypeTimestamp)},
+		},
+		Extra: &render.Extra{
+			Named: "a field somebody asked for",
+			Type:  render.TypeString,
+			Attrs: []render.Field{{Name: "name", Type: render.TypeString, Optional: true}},
+		},
+	})
+})
+
+// openZonedRow carries two requested fields with the same text. One is marked
+// an instant, as a field the catalogue types `datetime` is, and one is not, as
+// a text field somebody typed a timestamp into is.
+func openZonedRow(key string) *render.Node {
+	n := render.El("row").Attr("key", key).Leaf("updated", "2026-11-04T18:50:16Z")
+	resolved := render.El("resolutiondate").Attr("name", "Resolved").
+		SetText("2026-11-04T18:50:16Z")
+	resolved.Instant = true
+	n.Child(resolved)
+	n.Child(render.El("customfield_1").Attr("name", "Notes").SetText("2026-11-04T18:50:16Z"))
+	return n
+}
+
+func openZonedColumns() []render.Column {
+	return []render.Column{
+		{Header: "key", Path: "@key"},
+		{Header: "updated", Path: "updated"},
+		{Header: "resolutiondate", Path: "resolutiondate"},
+		{Header: "customfield_1", Path: "customfield_1"},
+	}
+}
+
+// TestAZoneMovesAnInstantAnOpenShapeAdmits is issue 277 at the writer.
+//
+// `--field resolutiondate` beside `updated` put the same instant in one row
+// twice, and `--tz` moved only `updated`, because the zone pass walks the
+// schema and an open shape's elements are named by the caller and declared as
+// strings. An element marked an instant is moved as a declared timestamp is,
+// in every format and in a stream as in a buffered document. One that is not
+// marked keeps its text, whatever the text looks like: the mark is the rule,
+// as the declaration is for a closed shape.
+func TestAZoneMovesAnInstantAnOpenShapeAdmits(t *testing.T) {
+	registerOpenZoned()
+
+	buffered := render.List(openZonedKind, 1, &render.Collection{
+		Name: "rows", Items: []*render.Node{openZonedRow("E-1")},
+		Columns: openZonedColumns(), Complete: true,
+	})
+	buffered.Zone = plusTwo
+
+	for _, format := range []render.Format{render.TSV, render.XML, render.JSON, render.YAML} {
+		var want strings.Builder
+		if err := render.Write(&want, buffered, format); err != nil {
+			t.Fatalf("%s: write: %v", format, err)
+		}
+		got := want.String()
+		// updated and resolutiondate are one instant, and are written as one.
+		if n := strings.Count(got, "2026-11-04T20:50:16+02:00"); n != 2 {
+			t.Errorf("%s: %d values in the zone, want updated and resolutiondate:\n%s",
+				format, n, got)
+		}
+		// customfield_1 is text that looks like a timestamp, and stays text.
+		if n := strings.Count(got, "2026-11-04T18:50:16Z"); n != 1 {
+			t.Errorf("%s: %d values still in UTC, want only the unmarked one:\n%s",
+				format, n, got)
+		}
+
+		if format == render.YAML {
+			continue
+		}
+		var streamed strings.Builder
+		s, err := render.NewStream(&streamed, format, render.StreamSpec{
+			Kind: openZonedKind, Version: 1, Name: "rows",
+			Columns: openZonedColumns(), Zone: plusTwo,
+		})
+		if err != nil {
+			t.Fatalf("%s: new stream: %v", format, err)
+		}
+		if err := s.Write(openZonedRow("E-1")); err != nil {
+			t.Fatalf("%s: stream write: %v", format, err)
+		}
+		if err := s.Close(true, ""); err != nil {
+			t.Fatalf("%s: close: %v", format, err)
+		}
+		if streamed.String() != got {
+			t.Errorf("%s: streamed differs from buffered under a zone:\n%s\nwant\n%s",
+				format, streamed.String(), got)
+		}
+	}
+
+	// The node is as the resource built it, as every respelled one is.
+	row := openZonedRow("E-1")
+	doc := render.Record(openZonedKind, 1, row)
+	doc.Zone = plusTwo
+	var out strings.Builder
+	if err := render.Write(&out, doc, render.XML); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if got, _ := row.Lookup("resolutiondate"); got != "2026-11-04T18:50:16Z" {
+		t.Errorf("writing in a zone changed the document: resolutiondate = %q", got)
+	}
+}
+
+// TestAnInstantAnOpenShapeAdmitsIsHeldToUTC is the other half of the mark. A
+// resource that marks a value an instant has promised RFC 3339 in UTC, and a
+// value Jira spelled, which is what the open shape used to pass through, is a
+// contract violation rather than a string.
+func TestAnInstantAnOpenShapeAdmitsIsHeldToUTC(t *testing.T) {
+	registerOpenZoned()
+
+	for name, value := range map[string]string{
+		"Jira's own spelling": "2026-11-04T13:50:16.000-0500",
+		"an offset":           "2026-11-04T13:50:16-05:00",
+	} {
+		row := openZonedRow("E-1")
+		marked, _ := row.ChildNamed("resolutiondate")
+		marked.Text = value
+		err := render.Write(&strings.Builder{}, render.Record(openZonedKind, 1, row), render.XML)
+		if err == nil {
+			t.Errorf("%s: a marked instant %q was written", name, value)
+			continue
+		}
+		if e := errs.Coerce(err); e.Code != "SCHEMA_VIOLATION" {
+			t.Errorf("%s: code = %q, want SCHEMA_VIOLATION", name, e.Code)
+		}
+	}
+
+	// Unmarked, the same text is a string, and a string is anything.
+	row := openZonedRow("E-1")
+	plain, _ := row.ChildNamed("customfield_1")
+	plain.Text = "2026-11-04T13:50:16.000-0500"
+	if err := render.Write(&strings.Builder{}, render.Record(openZonedKind, 1, row), render.XML); err != nil {
+		t.Errorf("an unmarked extra was held to the timestamp rule: %v", err)
 	}
 }
