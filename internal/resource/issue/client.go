@@ -79,14 +79,28 @@ type Client struct {
 	// an invocation would let any of them read a flag, and what a request
 	// contains would stop being a function of what was passed in.
 	Warn func(code, message string)
-	// FieldNames maps a resolved field id to its name in the site's
-	// catalogue, so a requested field can report what it is called.
+	// FieldInfo maps a resolved field id to what the site's catalogue says
+	// about it: its name, so a requested field can report what it is called,
+	// and whether its value is a point in time, so it is written as one.
 	//
 	// Here rather than on each options struct for the reason Body gives: every
 	// read that can carry a requested field answers the same question. It is
 	// nil on a command that resolved no fields, which is the common one, and
 	// an absent name renders as no attribute rather than as an empty one.
-	FieldNames map[string]string
+	FieldInfo map[string]FieldInfo
+}
+
+// FieldInfo is what the catalogue says about one requested field, taken while
+// the request was resolved, because the catalogue is in hand then and nowhere
+// downstream.
+type FieldInfo struct {
+	// Name is the field's name in the catalogue.
+	Name string
+	// Instant says the catalogue types the field `datetime`, so its value is
+	// written the way `created` and `updated` are: RFC 3339, in UTC, and in
+	// the zone --tz names. A `date` is not one. A calendar date has no zone,
+	// and Jira already sends it as YYYY-MM-DD.
+	Instant bool
 }
 
 // ListOptions is one `issue list` request.
@@ -506,7 +520,7 @@ func (c *Client) readPage(
 	}
 	out.Requests++
 
-	issues, err := decodeIssues(page.Issues, ExtraFieldNames(opt.Fields), c.FieldNames,
+	issues, err := decodeIssues(page.Issues, ExtraFieldNames(opt.Fields), c.FieldInfo,
 		c.Body, opt.projections(), opt.SortField)
 	if err != nil {
 		return pageRead{}, err
@@ -944,7 +958,7 @@ func (c *Client) Get(ctx context.Context, key string, fields []string) (Issue, e
 	}
 
 	issues, err := decodeIssues([]json.RawMessage{resp.Body}, ExtraFieldNames(fields),
-		c.FieldNames, c.Body, Projections{}, "")
+		c.FieldInfo, c.Body, Projections{}, "")
 	if err != nil {
 		return Issue{}, err
 	}

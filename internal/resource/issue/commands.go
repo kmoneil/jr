@@ -475,7 +475,7 @@ func runList(
 	if err != nil {
 		return registry.StreamResult{}, err
 	}
-	client := &Client{Transport: conn, Site: info, FieldNames: fieldNames(inv)}
+	client := &Client{Transport: conn, Site: info, FieldInfo: fieldInfo(inv)}
 
 	// A thread the server clipped makes the whole run incomplete. The caller
 	// asked for the comments; some of them are missing; "complete" would be
@@ -622,12 +622,13 @@ func RequestedFields(resolved []string) []string {
 // the rest of the invocation.
 const resolvedFieldsKey = "issue.fields"
 
-// fieldNamesKey is where the id-to-name map from the same resolution is left.
+// fieldInfoKey is where the id-to-FieldInfo map from the same resolution is
+// left.
 //
 // Separate from resolvedFieldsKey rather than folded into it because the ids
 // are ordered and the names are not: column order is the order the caller
 // named them, and a map has no order to lose.
-const fieldNamesKey = "issue.fieldnames"
+const fieldInfoKey = "issue.fieldinfo"
 
 // noContextFieldsFlag suppresses the context's default field set for one
 // invocation.
@@ -999,30 +1000,30 @@ func validateFields(ctx context.Context, inv *registry.Invocation) error {
 	resolved := append(contextIDs, flagIDs...)
 	inv.SetValue(resolvedFieldsKey, resolved)
 
-	// The catalogue is in hand here and nowhere downstream, so the names are
-	// taken now. Keyed by id, so two spellings of one field agree by
+	// The catalogue is in hand here and nowhere downstream, so the names and
+	// types are taken now. Keyed by id, so two spellings of one field agree by
 	// construction and the answer cannot depend on which one was typed.
 	//
 	// Resolve accepts an id as readily as a name, which is what makes this a
 	// second pass over the same catalogue rather than a change to what
 	// ResolveFields returns. A field that resolved a moment ago cannot fail
-	// here, and if one somehow does it is reported without a name rather than
-	// failing a read over a label.
-	labels := make(map[string]string, len(resolved))
+	// here, and if one somehow does it is reported without a name, and as
+	// text, rather than failing a read over a label.
+	known := make(map[string]FieldInfo, len(resolved))
 	for _, id := range resolved {
 		if f, err := catalogue.Resolve(id); err == nil {
-			labels[id] = f.Name
+			known[id] = FieldInfo{Name: f.Name, Instant: f.Type == "datetime"}
 		}
 	}
-	inv.SetValue(fieldNamesKey, labels)
+	inv.SetValue(fieldInfoKey, known)
 	return nil
 }
 
-// fieldNames returns the id-to-name map validation resolved, nil when the
-// command resolved no fields.
-func fieldNames(inv *registry.Invocation) map[string]string {
-	names, _ := inv.Value(fieldNamesKey).(map[string]string)
-	return names
+// fieldInfo returns what validation learned about each resolved field, nil
+// when the command resolved no fields.
+func fieldInfo(inv *registry.Invocation) map[string]FieldInfo {
+	known, _ := inv.Value(fieldInfoKey).(map[string]FieldInfo)
+	return known
 }
 
 // contextFields is the default field set, unless this invocation opted out.
@@ -1812,7 +1813,7 @@ func runGet(ctx context.Context, inv *registry.Invocation) (*render.Doc, error) 
 		return nil, err
 	}
 	client := &Client{
-		Transport: conn, Site: info, Body: bodyMode(inv), FieldNames: fieldNames(inv),
+		Transport: conn, Site: info, Body: bodyMode(inv), FieldInfo: fieldInfo(inv),
 	}
 
 	if rawFieldOwnsStdout(inv) {

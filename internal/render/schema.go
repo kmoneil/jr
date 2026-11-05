@@ -332,10 +332,19 @@ func (s *Schema) conformChild(c *Node, at string, counts map[string]int) error {
 		// when something was declared", because the meta-schema was spelling
 		// its recursion as an Extra and every hedge was really a way of saying
 		// so. Recursive says it directly and the hedge is gone.
+		//
+		// An element marked as an instant is held to the timestamp rule in
+		// place of the declared type. That only ever narrows: every timestamp
+		// is a string, and the open shape's one type cannot be anything else
+		// while it has to cover every field a caller might name.
+		text := s.Extra.Type
+		if c.Instant {
+			text = TypeTimestamp
+		}
 		leaf := Schema{
 			Element: c.Name,
 			Attrs:   s.Extra.Attrs,
-			Text:    &Field{Type: s.Extra.Type},
+			Text:    &Field{Type: text},
 		}
 		return leaf.Conform(c, at)
 	}

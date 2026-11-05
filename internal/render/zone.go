@@ -64,6 +64,11 @@ func KindHasTimestamp(kind string) bool {
 // kind declares a timestamp inside an open shape:
 // TestNoOpenShapeDeclaresATimestamp fails when one does, which is the moment
 // to teach this function about it and not before.
+//
+// The one exception is an element an Extra admits that marks itself an
+// instant (Node.Instant). Its text is respelled like a declared timestamp's.
+// Nothing else about it is descended into: the mark is on a leaf, and a leaf
+// has nothing below it.
 func (s *Schema) inZone(n *Node, loc *time.Location) *Node {
 	// A struct copy, so a field added to Node later is carried without this
 	// function knowing its name. The two slices are the only shared state.
@@ -81,6 +86,12 @@ func (s *Schema) inZone(n *Node, loc *time.Location) *Node {
 	for i, c := range out.Children {
 		if child, ok := s.child(c.Name); ok {
 			out.Children[i] = child.Schema.inZone(c, loc)
+			continue
+		}
+		if s.Extra != nil && c.Instant {
+			moved := *c
+			moved.Text = spellIn(c.Text, loc)
+			out.Children[i] = &moved
 		}
 	}
 	return &out

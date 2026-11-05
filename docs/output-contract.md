@@ -1355,7 +1355,9 @@ them untouched. A tool call over MCP takes `tz` on the same commands, and one
 that names none falls back to the zone `jr mcp serve` was started with.
 
 **What moves is what a kind declares a `timestamp`**, which `jr contract`
-shows. What does not:
+shows, and a field requested with `--field` that the site's catalogue types
+`datetime`, which no kind can declare because its element is named for an id
+only the request knows. What does not:
 
 - A `date`. A calendar date has no zone, and a release date of the 12th is the
   12th everywhere.
@@ -2813,6 +2815,26 @@ So the check is: no `set` attribute means the text is the value; `set="false"`
 means there is no value. Note this does not distinguish a field the server
 omitted from one it returned as null. That is a question about whether the field
 applies to this issue, which `jr meta createmeta` answers properly.
+
+**A requested field the catalogue types `datetime` is a timestamp like any
+other**: RFC 3339, in UTC to the second, and in the zone `--tz` names. Its
+`type` in `jr contract` is still `string`, because one declaration covers
+every field a caller can name, and the catalogue is what says which of them
+is an instant. `jr field list` shows the type.
+
+```xml
+<updated>2026-11-04T18:50:16Z</updated>
+<resolutiondate name="Resolved">2026-11-04T18:50:16Z</resolutiondate>
+<duedate name="Due Date">2026-11-04</duedate>
+```
+
+Both deployments send such a value as `2026-11-04T13:50:16.000-0500`, in the
+server's zone with no colon in the offset, and before issue 277 it was written
+that way: one instant in two spellings in one row, of which `--tz` moved only
+the first. A value that does not parse is refused as
+`MALFORMED_TIMESTAMP`, as an unreadable `created` is. A field typed `date`, like
+`duedate`, is a calendar date, has no zone, and is written as Jira sends it,
+`YYYY-MM-DD`. Every other type is the text Jira sent, reduced to one cell.
 
 **An open shape can still be structured, and then it says that too.** Most
 requested fields are a scalar and render as text. A Data Center sprint field is

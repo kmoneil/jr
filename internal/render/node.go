@@ -42,6 +42,17 @@ type Node struct {
 	// [], never an absent field — so a consumer never has to distinguish
 	// "none" from "not applicable".
 	ListOf string
+	// Instant marks Text as a timestamp in an element no schema can name: one
+	// an open shape admits, such as a field requested with --field, whose id
+	// is not known until the request is. Such a value is held to the
+	// timestamp rule and written in the zone a caller asked for, exactly as a
+	// declared timestamp is.
+	//
+	// A declared element ignores it, because its declaration already says.
+	// It exists because an open shape declares one text type for every
+	// element it admits, and the site's catalogue can say of one field what
+	// that declaration cannot say of all of them.
+	Instant bool
 }
 
 // El builds a node with the given element name.
