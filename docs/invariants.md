@@ -1143,6 +1143,24 @@ do not catch, add the test in the same change and cite it here.
   `TestAKeyedCreateJiraMayHaveMadeIsNotSentAgain`,
   `TestAKeyedMoveJiraMayHaveAppliedIsNotSentAgain`,
   `TestAnApplyRowJiraMayHaveAppliedIsNotSentTwice`.
+- **A request the transport may resend changes nothing the second time.** A PUT
+  is resent after a 5xx, and so is anything marked `Idempotent`, and the sweep
+  above allows it because HTTP does. That holds only while the body is
+  set-semantic. A PUT's `fields` replace values outright, which a second sending
+  repeats exactly; its `update` block is operations Jira applies one by one,
+  and one that appends, `comment: [{add: ...}]`, posts a second comment and
+  reports one success. Measured 2026-09-03: a server that applied an edit and
+  answered 503 saw it 4 times, exit 0. Every `update` operation a PUT can carry
+  is listed with the reason applying it twice lands where once does (today a
+  label's `add` and `remove`, labels being a set); the one appending operation
+  in the tree, a transition's comment, travels by POST. Every PUT builder is
+  driven with every option it has set, filled by reflection so a new option is
+  walked without being listed, and the source is read for every function that
+  builds a PUT or marks a request `Idempotent`, so a new one is a decision and
+  not an accident.
+  **Enforced by:** `TestNoReplayedRequestCarriesAnAppendingUpdate`,
+  `TestTheUpdateCheckFindsAnAppendingOperation`,
+  `TestEveryReplayedRequestIsWalked`.
 - **A write whose outcome is unknown is never reported as retryable.** A 5xx, a
   dropped connection or a passed deadline on a write leaves nobody knowing
   whether it happened, and `retryable` true told an agent to send it again. It
