@@ -20,6 +20,41 @@ accident.
 
 Nothing yet.
 
+## [0.22.2] - 2026-11-06
+
+**Take this one if you run `issue activity` or poll `issue changes` on Cloud.**
+An issue edited more than forty times was reported clipped and left
+unread, so `issue activity` exited 3 and a poll over it issued no cursor at
+all: one busy issue stalled `issue changes` until it left the window. It is
+now read whole (PR 288). Nothing a script parses has changed shape.
+
+### Fixed
+
+- **A clipped Cloud changelog is read whole.** Cloud inlines the newest forty
+  saves of an issue's changelog in a search and says how many it holds. Both
+  feeds now spend one further request on Cloud's paged changelog for an issue
+  the search cut off, the way worklogs already were, and nothing for one it
+  did not. That request reads up to a hundred saves, so an issue with forty to
+  a hundred is complete, and a run over it exits 0 where it exited 3.
+- **`issue changes` issues the cursor it withheld** for such an issue, so the
+  next poll starts where this one ended rather than from the same window.
+- An issue past a hundred saves is read for its newest hundred, not its
+  oldest, and is still reported clipped, exit 3, with no cursor.
+  `issue history` reads it in full.
+- The `--max-requests` floor `issue activity` states for a sweep leaves this
+  request out, as it leaves out the worklog one: an issue past forty saves on
+  Cloud costs one more than the floor.
+
+### Output contract
+
+- No kind's schema version moves.
+- A run over a Cloud issue with forty to a hundred saves is complete where it
+  was partial. Additive, under the row for populating what was already
+  declared: the rows and the `complete` attribute were always there, and
+  more inputs now fill them.
+- `docs/output-contract.md` says how the changelog is topped up and where it
+  still clips; `docs/recipes.md` and `docs/troubleshooting.md` follow.
+
 ## [0.22.1] - 2026-11-06
 
 **Take this one if you pass `--max-requests`.** The flag bounds a run from
