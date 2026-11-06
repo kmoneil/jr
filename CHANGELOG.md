@@ -20,6 +20,73 @@ accident.
 
 Nothing yet.
 
+## [0.22.1] - 2026-11-06
+
+**Take this one if you pass `--max-requests`.** The flag bounds a run from
+above and never said what number to give it, so a caller guessed: too low and
+a legitimate `issue list --limit all` exits 3 partway, too high and the flag
+bounds nothing. A run can now say what it will cost before it spends anything,
+and a run given a budget says what it spent of it. Nothing a script already
+reads has moved.
+
+### Added
+
+- **`--explain-cost` says what a run will cost.** A new global flag. Instead of
+  running, the command answers with a `request.cost` document: how many
+  requests the invocation would make, split by what each one is for. That
+  number is the `--max-requests` the run needs. `issue list` is the first
+  command to price itself (PR 286).
+
+  ```console
+  $ jr issue list --jql 'labels = flaky' --limit all --explain-cost
+  ```
+
+  ```xml
+  <result kind="request.cost" v="1" site="https://acme.atlassian.net" project="ENG">
+    <cost requests="14" approximate="true" retries="3" spent="2">
+      <steps count="2">
+        <step name="preparation" requests="1"/>
+        <step name="search" requests="13" rows="1250" page-size="100" paging="cursor"/>
+      </steps>
+    </cost>
+  </result>
+  ```
+
+- **Preparation is measured, not predicted.** The flag runs validation exactly
+  as a run would, so the deployment probe on a cold cache and the server-side
+  check of a raw `--jql` are counted because they were made, and an invocation
+  that would be refused is refused rather than priced.
+- **The search is sized by one count**, the one `issue activity` already
+  spends to size its sweep, and paged with the walk's own arithmetic. Data
+  Center's count is exact. Cloud's is an estimate, and the document says
+  `approximate="true"`. A Data Center offset page after the first re-reads one
+  row, so at the largest page size 200 issues are three pages, not two.
+- A Cloud search over one project that comes back empty asks afterwards
+  whether the project exists. That request is a `check` step, present only
+  when it will be made.
+- Retries are named in `retries`, not predicted. `spent` says what the answer
+  itself cost: the preparation and the count.
+- Refused with `INVALID_USAGE`, before any request: beside `--explain` or
+  `--describe`, beside `--page-token` (a Cloud cursor is opaque, so what lies
+  past it cannot be sized), and on any command other than `issue list`.
+- **A run given `--max-requests` says what it spent of it**, as the
+  `REQUESTS_SPENT` warning on stderr:
+  `N of M requests spent, retries included`. A run without a budget says
+  nothing, so an agent that never asked pays nothing to read it.
+
+### Output contract
+
+- `request.cost` v1 is a new kind. Additive, under the row for adding a kind:
+  only an invocation carrying `--explain-cost` emits it, and that flag was
+  refused as unknown until this release, so no invocation a consumer already
+  makes sees it.
+- `REQUESTS_SPENT` is a new warning code. Additive, and it bumps no kind.
+- No existing kind's schema version moves.
+- `docs/output-contract.md` gains "`--explain-cost` answers with what the run
+  would spend" and the warning's row. `docs/invariants.md` gains "A stated
+  cost is what the run spends", and `docs/troubleshooting.md` says how to size
+  a budget under exit 3.
+
 ## [0.22.0] - 2026-11-05
 
 **Read this one if anything branches on `NOT_FOUND` after a delete.** A delete
