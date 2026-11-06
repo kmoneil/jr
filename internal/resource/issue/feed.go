@@ -373,6 +373,13 @@ func streamFeed(
 		read    int
 	)
 	result, err := client.ListStream(ctx, opt, func(page []Issue, total int) error {
+		// Before feedRows, so its shortness check reads the topped-up
+		// changelog, and feedRows stays a function of what it is given.
+		for k := range page {
+			if err := topUpChanges(ctx, client, &page[k]); err != nil {
+				return err
+			}
+		}
 		got, short := feedRows(page, window)
 		if short {
 			clipped = true
@@ -480,6 +487,8 @@ func feedWindow(
 // 2026-08-17: Cloud bounds the projection at forty saves, so an issue edited more
 // than that in the window holds changes the response does not carry, and a feed
 // that emitted what it got and advanced its cursor would skip them silently.
+// streamFeed tops the changelog up first, so what is still short here is an
+// issue past what one further request reads.
 func feedRows(page []Issue, window ChangeWindow) ([]FeedChange, bool) {
 	var short bool
 	var rows []FeedChange

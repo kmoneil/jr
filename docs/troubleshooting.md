@@ -778,8 +778,8 @@ above it, and above the retries a sick site will cost.
 Everything above is the first one: the rows ran out against a bound. The other is
 that every row is present and a container *inside* one was clipped by the server.
 `jr issue activity` reports this when Cloud returns the newest twenty comments of
-a longer thread, or caps an inlined changelog at forty entries. There is nothing
-to resume and nothing to raise:
+a longer thread, or when an issue's changelog holds more than the hundred saves
+one further request reads. There is nothing to resume and nothing to raise:
 
 ```console
 $ jr issue activity --since -7d

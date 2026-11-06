@@ -1088,7 +1088,8 @@ sweep can take. Narrow it with --project, --jql or a shorter --since, or pass
 --max-requests at or above that number to accept the cost. A --max-requests
 that leaves fewer is refused the same way, because this command has no resume
 token and a sweep the budget cuts short cannot be continued. The number is a
-floor: an issue holding more than twenty worklogs costs one request more.
+floor: an issue holding more than twenty worklogs, or on Cloud more than forty
+saves in its changelog, costs one request more for each.
 
 **Where the comment half comes from.** Comment authorship is not searchable in
 JQL on either deployment, so comments are matched here rather than by the
@@ -1101,11 +1102,10 @@ The servers also bound what they inline, differently and in different
 directions. Cloud returns the newest 20 comments of a longer thread and Data
 Center returns all of them; both return the *oldest* 20 worklogs, which for a
 feed about recent work is the wrong twenty, so an issue with more than that
-costs one further request to read them properly. Cloud bounds the changelog at
-40 entries and reports how many it holds, and this feed does not yet fetch the
-rest, so an issue with more saves than that is reported clipped rather than
-topped up. Anything still clipped is reported: the run exits 3 and the rows say
-which issue and which source.
+costs one further request to read them properly. Cloud bounds the changelog it
+inlines at 40 saves and reports how many it holds, so an issue with more costs
+one further request too, which reads up to a hundred. Anything still clipped is
+reported: the run exits 3 and the rows say which issue and which source.
 
 **--user matches the account an event is recorded against, which is not always
 the person who did the work.** Jira attributes an event to whoever wrote it, and

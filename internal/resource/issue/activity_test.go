@@ -22,12 +22,14 @@ import (
 //
 // Comments, worklogs and the changelog are three projections on one search, so
 // a page of issues yields every kind of event in the request that fetched the
-// page. The recording holds exactly one interaction, so a second request would
-// be a replay miss.
+// page. The one further request the recording holds is the recorded issue's
+// own: Cloud inlined 40 of its 85 saves, and the rest cost one read of the
+// paged changelog. Any other request would be a replay miss, and a top-up
+// that never happened would leave its interaction unplayed.
 func TestActivityMergesFourSourcesInOneRequest(t *testing.T) {
 	out, _, replayer := runActivity(t, nil)
 
-	if got := replayer.Unplayed(); len(got) != 0 {
+	if got := unplayedByTheRun(replayer); len(got) != 0 {
 		t.Errorf("recorded requests nobody made: %v", got)
 	}
 	if got := replayer.Unmatched(); len(got) != 0 {
@@ -161,6 +163,23 @@ const (
 	activityUntilKey = "issue.activity.until"
 	farPast          = "2000-01-01T00:00:00Z"
 )
+
+// unplayedByTheRun is what a recording holds and the run never asked for, less
+// the two requests Validate makes: the server-side check of the raw --jql, and
+// the count that sizes the sweep. A recording takes the whole invocation, and
+// this harness answers Validate's metadata from a stub, so those two are in the
+// cassette and are never replayed from it.
+func unplayedByTheRun(r *transport.Replayer) []string {
+	var out []string
+	for _, key := range r.Unplayed() {
+		if strings.Contains(key, "/jql/parse") ||
+			strings.Contains(key, "/search/approximate-count") {
+			continue
+		}
+		out = append(out, key)
+	}
+	return out
+}
 
 // runActivity drives the registered command against the recording.
 func runActivity(

@@ -60,6 +60,32 @@ type feedServer struct {
 	pages    [][]string
 	searches int
 	queries  []string
+	// history is the whole changelog of an issue, oldest first, served from
+	// Cloud's paged /issue/{key}/changelog the way Cloud serves it. A key with
+	// no entry is answered 404, so a top-up nobody expected fails the run
+	// rather than reading an empty page as an answer.
+	history map[string][]string
+	// historyAsks is every changelog request, as "KEY startAt=N".
+	historyAsks []string
+}
+
+// changelogPage answers one request to the paged changelog route.
+func (f *feedServer) changelogPage(r *http.Request) (int, string) {
+	parts := strings.Split(r.URL.Path, "/")
+	key := parts[len(parts)-2]
+	startAt, _ := strconv.Atoi(r.URL.Query().Get("startAt"))
+	maxResults, _ := strconv.Atoi(r.URL.Query().Get("maxResults"))
+	f.historyAsks = append(f.historyAsks, fmt.Sprintf("%s startAt=%d", key, startAt))
+	saves, ok := f.history[key]
+	if !ok {
+		return http.StatusNotFound, `{"errorMessages":["no history in this stub"]}`
+	}
+	end := min(startAt+maxResults, len(saves))
+	start := min(startAt, end)
+	return http.StatusOK, fmt.Sprintf(
+		`{"startAt":%d,"maxResults":%d,"total":%d,"isLast":%t,"values":[%s]}`,
+		startAt, maxResults, len(saves), end == len(saves),
+		strings.Join(saves[start:end], ","))
 }
 
 // page answers one search. Without pages every issue arrives on a single last
@@ -82,8 +108,10 @@ func (f *feedServer) page(cursor string) string {
 }
 
 func (f *feedServer) RoundTrip(r *http.Request) (*http.Response, error) {
-	body := `{}`
+	status, body := http.StatusOK, `{}`
 	switch {
+	case strings.HasSuffix(r.URL.Path, "/changelog"):
+		status, body = f.changelogPage(r)
 	case strings.HasSuffix(r.URL.Path, "/serverInfo"):
 		body = fmt.Sprintf(`{"deploymentType":"Cloud","version":"1001.0.0",
 			"serverTime":%q}`, feedServerTime)
@@ -93,7 +121,7 @@ func (f *feedServer) RoundTrip(r *http.Request) (*http.Response, error) {
 		body = f.page(r.URL.Query().Get("nextPageToken"))
 	}
 	return &http.Response{
-		StatusCode: http.StatusOK,
+		StatusCode: status,
 		Header:     http.Header{"Content-Type": {"application/json"}},
 		Body:       io.NopCloser(strings.NewReader(body)),
 		Request:    r,
@@ -381,13 +409,14 @@ func TestALimitedFeedKeepsTheOldest(t *testing.T) {
 // forty saves, and a feed that emitted what it got and advanced anyway would
 // skip the rest for good.
 func TestTheFeedIssuesNoCursorWhenTheChangelogWasClipped(t *testing.T) {
-	server := &feedServer{issues: []string{
-		// Two saves sent, fifty-eight held: the shape the recorded Cloud
-		// cassette carries.
-		feedIssue("ENG-1", 58,
-			feedSave("400", "2026-08-17T14:00:00.000+0000", "status", "To Do", "Done"),
-			feedSave("401", "2026-08-17T14:10:00.000+0000", "labels", "", "a")),
-	}}
+	// Two saves sent, a hundred and fifty held: past what the one further
+	// request the feed spends on a clipped changelog can read, so the issue
+	// is still short after its top-up.
+	history := historySaves(150)
+	server := &feedServer{
+		issues:  []string{feedIssue("ENG-1", len(history), history[149], history[148])},
+		history: map[string][]string{"ENG-1": history},
+	}
 
 	doc, result := runFeed(t, server, render.JSON, everyRow)
 
