@@ -67,6 +67,7 @@ type app struct {
 	formatFromFlag bool
 	describe       bool
 	explain        bool
+	explainCost    bool
 	contract       bool
 
 	// exit is the status the run resolved to.

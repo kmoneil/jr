@@ -38,6 +38,7 @@ The flags themselves:
 | `--format` | `enum` | — | output format: tsv\|xml\|json\|yaml\|markdown (default: tsv for lists, xml for records; markdown is for reading and is not a versioned contract). JIRA_FORMAT sets it for every command |
 | `--describe` | `bool` | — | print this command's schema instead of running it |
 | `--explain` | `bool` | — | print the query this command would send instead of running it |
+| `--explain-cost` | `bool` | — | print the requests this command would make instead of making them; it validates as a run would and spends one count to size the search |
 | `--context` | `string` | — | use this context for one invocation, without selecting it |
 | `--site` | `string` | — | Jira site, overriding the context's |
 | `--project` | `string` | — | project key, overriding the context's; repeat it on a command that searches several |
@@ -2269,6 +2270,7 @@ jr issue list --changed-by currentUser --changed-after -1w
 | --- | --- | --- |
 | `issue.list` | v10 | always |
 | `jql.explain` | v3 | --explain is given |
+| `request.cost` | v1 | --explain-cost is given |
 
 Default TSV columns: `key`, `status`, `assignee`, `updated`, `summary`
 

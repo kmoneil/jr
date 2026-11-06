@@ -231,6 +231,14 @@ type Command struct {
 	// a silent no-op.
 	Explain func(inv *Invocation) (*render.Doc, error)
 
+	// ExplainCost answers the global --explain-cost: what this invocation
+	// would spend in requests, instead of spending it. It runs after Validate,
+	// so an invocation that would be refused is refused rather than priced,
+	// and the preparation it reports is measured by doing it. The caller fills
+	// in Retries and Spent, which belong to the session rather than the
+	// command. On a command that does not declare it the flag is a refusal.
+	ExplainCost func(ctx context.Context, inv *Invocation) (Cost, error)
+
 	// Exactly one of Run and Stream is set. Stream is for a command that emits
 	// a collection; Run is for one that emits a record.
 	Run    RunFunc

@@ -1,0 +1,27 @@
+      <element name="cost">
+        <attributes count="4">
+          <attribute name="requests" type="int" optional="false"/>
+          <attribute name="approximate" type="bool" optional="false"/>
+          <attribute name="retries" type="int" optional="false"/>
+          <attribute name="spent" type="int" optional="false"/>
+        </attributes>
+        <elements count="1">
+          <element name="steps" list-of="step" optional="false" repeated="false">
+            <attributes count="1">
+              <attribute name="count" type="int" optional="false"/>
+            </attributes>
+            <elements count="1">
+              <element name="step" optional="true" repeated="true">
+                <attributes count="5">
+                  <attribute name="name" type="string" optional="false" enum="preparation,search,check"/>
+                  <attribute name="requests" type="int" optional="false"/>
+                  <attribute name="rows" type="int" optional="true"/>
+                  <attribute name="page-size" type="int" optional="true"/>
+                  <attribute name="paging" type="string" optional="true" enum="cursor,keyset,offset"/>
+                </attributes>
+                <elements count="0"/>
+              </element>
+            </elements>
+          </element>
+        </elements>
+      </element>

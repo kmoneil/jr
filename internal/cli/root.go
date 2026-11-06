@@ -87,6 +87,7 @@ and go to stderr.`),
 	bind.str(&a.requestedFormat, registry.GlobalFormat)
 	bind.boolean(&a.describe, registry.GlobalDescribe)
 	bind.boolean(&a.explain, registry.GlobalExplain)
+	bind.boolean(&a.explainCost, registry.GlobalExplainCost)
 	bind.str(&a.contextName, registry.GlobalContext)
 	bind.str(&a.site, registry.GlobalSite)
 	bind.strs(&a.projects, registry.GlobalProject)
@@ -303,12 +304,32 @@ func (a *app) runLeaf(
 		if err := a.admit(cmd.Context(), rc, inv); err != nil {
 			return err
 		}
-
-		if rc.Streams() {
-			return a.stream(cmd.Context(), rc, inv)
-		}
-		return a.runDocument(cmd.Context(), rc, inv)
+		return a.runAdmitted(cmd.Context(), rc, inv)
 	}
+}
+
+// runAdmitted runs an invocation that admit has let through, or prices it.
+//
+// --explain-cost is answered here, after admit, not before it the way
+// --explain is: a cost is only worth stating for an invocation that would
+// run, and the requests validation makes are part of it, measured by making
+// them.
+func (a *app) runAdmitted(
+	ctx context.Context, rc *registry.Command, inv *registry.Invocation,
+) error {
+	if a.explainCost {
+		return a.priceInvocation(ctx, rc, inv)
+	}
+	var err error
+	if rc.Streams() {
+		err = a.stream(ctx, rc, inv)
+	} else {
+		err = a.runDocument(ctx, rc, inv)
+	}
+	if err != nil {
+		return err
+	}
+	return a.reportSpent(rc, inv)
 }
 
 // checkProjectScope makes registry.Gate's two refusals about a repeated
@@ -405,6 +426,9 @@ func (a *app) answerAboutTheCommand(rc *registry.Command) (bool, error) {
 				"--describe and --explain each name a different output").
 				WithRemedy("ask for one of them")
 		}
+		if refused, err := a.refuseExplainCost(rc); refused {
+			return true, err
+		}
 		// --describe answers "what would this do" without doing it, so it
 		// runs before any validation the real invocation would have to
 		// satisfy.
@@ -419,7 +443,50 @@ func (a *app) answerAboutTheCommand(rc *registry.Command) (bool, error) {
 			WithRemedy("use it on a command that builds a query from " +
 				"its flags, or run jql explain for a raw fragment")
 	}
+	return a.refuseExplainCost(rc)
+}
+
+// refuseExplainCost makes the refusals of --explain-cost that the declaration
+// alone decides: beside another flag that names a different output, and on a
+// command that cannot price itself, which refuses the flag rather than running
+// as if it had not been given and spending what the caller asked to be told.
+func (a *app) refuseExplainCost(rc *registry.Command) (bool, error) {
+	if !a.explainCost {
+		return false, nil
+	}
+	if a.describe || a.explain {
+		other := "--explain"
+		if a.describe {
+			other = "--describe"
+		}
+		return true, errs.Usage("INVALID_USAGE",
+			"%s and --explain-cost each name a different output", other).
+			WithRemedy("ask for one of them")
+	}
+	if rc.ExplainCost == nil {
+		return true, errs.Usage("INVALID_USAGE",
+			"%s cannot price itself, so --explain-cost has nothing to show",
+			rc.Name()).
+			WithRemedy("bound what it spends with --max-requests instead; "+
+				"`%s schema` lists request.cost among the outputs of a "+
+				"command that can", buildinfo.App)
+	}
 	return false, nil
+}
+
+// priceInvocation answers "what would this cost" with what it would spend,
+// and fills in the two parts of the answer that belong to the session rather
+// than the command: the retry allowance, and what answering cost.
+func (a *app) priceInvocation(
+	ctx context.Context, rc *registry.Command, inv *registry.Invocation,
+) error {
+	cost, err := rc.ExplainCost(ctx, inv)
+	if err != nil {
+		return err
+	}
+	cost.Retries = a.retries
+	cost.Spent = spentBy(inv)
+	return a.emitResult(rc, inv, cost.Doc())
 }
 
 // explainInvocation answers "what would this send" without sending it. It

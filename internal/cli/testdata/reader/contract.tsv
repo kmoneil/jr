@@ -30,6 +30,7 @@ project.get	3	project.get
 project.list	3	project.list
 project.statuses	2	project.statuses
 project.versions	1	project.versions
+request.cost	1	issue.list
 schema.command	2	schema
 schema.commands	1	schema
 sprint.get	1	sprint.current,sprint.get

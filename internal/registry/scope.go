@@ -34,9 +34,10 @@ func WatchScope(s Session) *ScopeWatcher {
 	return &ScopeWatcher{Session: s}
 }
 
-// Unwatched is the session underneath, for the one caller that has to ask
-// about the scope without that being a read: Gate, deciding whether a repeated
-// --project may reach this command at all. A nil watcher has none.
+// Unwatched is the session underneath, for the callers that have to reach it
+// without that being a read of the scope: Gate, deciding whether a repeated
+// --project may reach this command at all, and the CLI reading how many
+// requests the session spent. A nil watcher has none.
 func (w *ScopeWatcher) Unwatched() Session {
 	if w == nil {
 		return nil

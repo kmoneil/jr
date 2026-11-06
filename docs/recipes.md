@@ -1323,6 +1323,19 @@ $ jr issue list --limit all --max-requests 20
 
 Exceeding the budget truncates and exits 3 rather than running forever.
 
+**Or ask what it will cost before paying it.** `--explain-cost` validates the
+invocation, spends one count, and answers with the requests the run would
+make instead of making them:
+
+```console
+$ jr issue list --limit all --explain-cost
+$ jr issue list --limit all --max-requests 14   # the requests it stated
+```
+
+The second run reports what it spent on stderr as `REQUESTS_SPENT`, so the
+estimate can be checked. On Cloud the count behind it is an estimate, and
+the answer says `approximate="true"`.
+
 ## Scripting and CI
 
 Set everything from the environment; no login step, no config file:

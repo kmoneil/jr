@@ -114,9 +114,10 @@ the `jql.explain` kind moved down from the jql resource when the global
 `--explain` arrived, because `issue list`, `issue activity` and
 `issue changes` all emit one and resources may not import each other. A kind
 owned outside `resource/*` has precedent: `internal/registry` owns
-`schema.commands` and `contract`. The command surface stays in
-`internal/resource/jql`; what moved is the document every explaining command
-shares.
+`schema.commands` and `contract`, and `request.cost`, which any command that
+prices itself under the global `--explain-cost` emits. The command surface
+stays in `internal/resource/jql`; what moved is the document every explaining
+command shares.
 
 **Reading a value back is the same package's job.** `jql.Unquote` is the
 inverse of the quoting nothing else is allowed to do, and it exists because
@@ -157,7 +158,7 @@ flags, args, output kinds, exit codes, required tags, and the function that runs
 it. From that one declaration come the cobra tree, `jr schema`, and the MCP tool
 list. They cannot drift because there is only one of them.
 
-It also holds `registry.GlobalFlags`, the thirteen flags declared once and
+It also holds `registry.GlobalFlags`, the fourteen flags declared once and
 inherited by every command, and `internal/cli` binds cobra's persistent set from
 it rather than declaring them a second time. They used to be declared straight
 onto the cobra root, which meant they were bound, accepted and printed in
