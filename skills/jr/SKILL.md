@@ -208,6 +208,11 @@ Feeding results to a model is the common case and format choice dominates it.
   mistaken for a `--limit` you can raise. Whether there is a token to resume
   from depends on the command: `issue list` has one, `issue activity` and
   `issue changes` have none, and the `remedy` is what says which.
+- **Price a big `issue list` before running it.** `--explain-cost` answers with
+  a `request.cost` document whose `requests` is what the run would make, and
+  costs one count plus the validation a run does anyway. Pass that number as
+  `--max-requests`; the run then reports `REQUESTS_SPENT` on stderr. On Cloud
+  the count is an estimate, and the answer says `approximate="true"`.
 - **`issue activity` sizes its sweep before it starts.** Past ten search pages,
   or past what `--max-requests` leaves, it refuses with `SWEEP_TOO_LARGE` and
   reads nothing, because it cannot resume a sweep cut short. The count is one

@@ -389,6 +389,18 @@ do not catch, add the test in the same change and cite it here.
 - **Retries count against `--max-requests`.** A retry is another request from
   the server's side; a budget that ignored them would bound nothing.
   **Enforced by:** `TestRetriesCountAgainstTheBudget`.
+- **A stated cost is what the run spends.** The `requests` an `--explain-cost`
+  answer states is the number of requests the same invocation makes, and as a
+  `--max-requests` it buys the run while one fewer cuts it short, on a Cloud
+  cursor walk, a Data Center keyset walk and a Data Center offset walk, with a
+  limit above and below the count, and with nothing to find. The walk's part is
+  computed through the walk's own `freshPerPage`, so a change to how a walk
+  pages moves both or fails here: dividing by the page size, which is wrong
+  for an offset page at the largest size, fails
+  `TestAnOffsetPageAtTheLargestSizeBringsOneFewer`.
+  **Enforced by:** `TestTheStatedCostIsWhatTheRunSpends`,
+  `TestAnOffsetPageAtTheLargestSizeBringsOneFewer`,
+  `TestExplainCostSpendsOneCountAndNoPage`.
 - **No accepted date form reaches a query in a shape JQL refuses.** Every date
   flag takes an RFC 3339 instant, which is what this tool prints, and Jira
   refuses RFC 3339 on both deployments, so an instant is the one form whose

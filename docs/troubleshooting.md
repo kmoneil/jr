@@ -760,6 +760,20 @@ command asked for, or resume with the token to cover the rest.
 If a script inherited a failure from this, it is checking `$?` without treating
 3 as a success — see [recipes.md](recipes.md#scripting-and-ci).
 
+When the `remedy` names `--max-requests`, the budget stopped the run, not the
+limit. Ask what the whole run costs before picking a bigger one:
+
+```console
+$ jr issue list --project ENG --limit all --explain-cost
+# stdout: <cost requests="14" approximate="false" ...>
+$ jr issue list --project ENG --limit all --max-requests 14
+# stderr: REQUESTS_SPENT: 14 of 14 requests spent, retries included
+```
+
+`--explain-cost` runs validation and one count, and no page. On Cloud the
+count is an estimate and the answer says `approximate="true"`; leave room
+above it, and above the retries a sick site will cost.
+
 **Exit 3 has a second meaning, and the warning's `remedy` tells them apart.**
 Everything above is the first one: the rows ran out against a bound. The other is
 that every row is present and a container *inside* one was clipped by the server.

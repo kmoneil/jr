@@ -49,6 +49,7 @@ const (
 	GlobalFormat      = "format"
 	GlobalDescribe    = "describe"
 	GlobalExplain     = "explain"
+	GlobalExplainCost = "explain-cost"
 	GlobalContext     = "context"
 	GlobalSite        = "site"
 	GlobalProject     = "project"
@@ -86,6 +87,11 @@ func GlobalFlags() []Flag {
 		{
 			Name: GlobalExplain, Type: TypeBool,
 			Usage: "print the query this command would send instead of running it",
+		},
+		{
+			Name: GlobalExplainCost, Type: TypeBool,
+			Usage: "print the requests this command would make instead of making them; " +
+				"it validates as a run would and spends one count to size the search",
 		},
 		{
 			Name: GlobalContext, Type: TypeString,

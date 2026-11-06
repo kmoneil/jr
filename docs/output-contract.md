@@ -737,7 +737,7 @@ fire on a change below the walk, because nothing it has already read moved.
 
 A warning is a structured document on stderr carrying a `code` and a `message`,
 in whatever format the invocation asked for. It never changes the exit code and
-never reaches stdout. There are nine, and each exists because something true
+never reaches stdout. There are ten, and each exists because something true
 about the answer cannot be read off the answer itself.
 
 | Code               | Emitted by                                      | What it says                                                                                                                                                                                                                        |
@@ -751,6 +751,7 @@ about the answer cannot be read off the answer itself.
 | `DATE_ROUNDED`     | `issue list`, from a date flag given an RFC 3339 instant | JQL bounds a date to a minute of the account's clock, so the instant was moved outward to one: down for an `-after` flag, up for a `-before`. It names the instant typed, the literal sent, the zone, the instant that literal is, and how far it moved. The query still runs and still exits 0. |
 | `AMBIGUOUS_WIKI_MARKUP` | any write carrying a body, on Data Center only | A construct in the body has more than one reading, so how it renders cannot be predicted here. The write still happens and the exit stays 0: nothing is known to be wrong. Never emitted on Cloud, where a body becomes an ADF document and a brace is a brace. |
 | `CONTEXT_NOT_CREATED` | `auth login` | The credential was stored and no context was made for the site, because the name it would have had belongs to another site's context. It names that context and its site, and the two ways out: `--context-name` on a login, or `context create`. Still exits 0, and the result carries no `context` attribute. |
+| `REQUESTS_SPENT` | any command run with `--max-requests` that reached Jira | How many requests the run spent of the budget, retries included, as `N of M requests spent, retries included`, so a figure from `--explain-cost` can be checked against what happened. Written after the result, at exit 0 or 3, and never by a run without `--max-requests`. See [`--explain-cost`](#--explain-cost-answers-with-what-the-run-would-spend). |
 
 `UNKNOWN_LABEL` exists because an empty answer to a mistyped label and an empty
 answer to a correct one are the same bytes: `--label retyr` returns a header, no
@@ -770,7 +771,7 @@ is said rather than something guessed.
 
 ## Scope, and what a global flag reaches
 
-Thirteen flags are declared on the root and inherited by every command, and
+Fourteen flags are declared on the root and inherited by every command, and
 they are not all the same kind of thing. `--format` decides how an answer is
 printed. `--project` decides what the answer **is**, on the commands that read
 it, and nothing in the result says so.
@@ -1807,6 +1808,66 @@ rather than running as if it had not been given. `--describe` beside
 `--explain` is `DESCRIBE_AND_EXPLAIN` and exit 2, for the reason
 `HEADER_AND_FORMAT` is: they name two different outputs, and honoring both
 would mean ignoring one.
+
+### `--explain-cost` answers with what the run would spend
+
+`--max-requests` bounds an invocation from above, and says nothing about what
+number to give it. The global `--explain-cost` answers with a
+`request.cost` document instead of running: how many requests the invocation
+would make, split by what each one is for. `issue list` is the command that
+prices itself today; on any other the flag is refused with `INVALID_USAGE`
+before a request, rather than running and spending what the caller asked to be
+told.
+
+```console
+$ jr issue list --jql 'labels = flaky' --limit all --explain-cost
+```
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<result kind="request.cost" v="1" site="https://acme.atlassian.net" project="ENG">
+  <cost requests="14" approximate="true" retries="3" spent="2">
+    <steps count="2">
+      <step name="preparation" requests="1"/>
+      <step name="search" requests="13" rows="1250" page-size="100" paging="cursor"/>
+    </steps>
+  </cost>
+</result>
+```
+
+- `requests` is the `--max-requests` a run made now needs to finish, if no
+  request is retried and the result set does not change under it. It is the sum
+  of the steps.
+- `approximate` is `true` when a step rests on a count the server itself calls
+  an estimate, which is every count Cloud gives. Data Center's count is exact,
+  and so is the page arithmetic built on it.
+- `retries` is the `--retries` in effect. Retries are not predicted, because
+  nothing before a request can say it will fail; every resend counts against
+  `--max-requests`, so the ceiling is `requests` times one more than `retries`,
+  a multiplication left to the caller rather than a number this tool would
+  have to guess.
+- `spent` is what the answer itself cost: the preparation and one count.
+
+The steps:
+
+| `name`        | What it counts |
+| ------------- | -------------- |
+| `preparation` | Everything a run spends before its first page: the deployment probe on a cold cache, and every lookup validation makes, such as the server-side check of a raw `--jql`. **Measured, not predicted:** the flag runs validation exactly as a run would, so an invocation that would be refused is refused rather than priced, and a run made right after it makes the same requests, less any this answer cached. |
+| `search`      | The pages of the walk. `rows` is how many issues the count says the query matches, before any `--limit`; `paging` is `cursor` (Cloud), `keyset` (Data Center, one project, key order) or `offset` (Data Center otherwise). An offset page after the first asks again for the row the last one ended on, so at the largest page size it brings 99 new rows, not 100: 200 issues are three pages, not two. A query matching nothing is one page, the one that finds it empty. |
+| `check`       | A request a run makes after the walk because of what it found. Present only when it will be made: on Cloud, a search over one project that comes back empty asks whether the project exists, so an unknown key is refused rather than reported as zero rows. |
+
+The count is the one request spent to answer that a run would not spend, and
+it is the same count `issue activity` spends to size its sweep: Data Center's
+zero-row search, or Cloud's approximate-count endpoint.
+
+`--page-token` beside it is refused with `INVALID_USAGE`: a resumed walk's size
+is what lies past its token, and a Cloud cursor is opaque. `--explain-cost`
+beside `--explain` or `--describe` is `INVALID_USAGE` and exit 2, for the
+reason `DESCRIBE_AND_EXPLAIN` is.
+
+A run given `--max-requests` says afterwards what it spent of it, as the
+`REQUESTS_SPENT` warning, so the estimate can be checked against what
+happened. A run without one says nothing.
 
 ### Verdicts
 

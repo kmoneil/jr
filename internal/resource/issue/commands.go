@@ -440,11 +440,16 @@ to status and everything else has to be asked for.`),
 		ColumnsFor:     listColumnsFor,
 		Validate:       validateList,
 		Explain:        explainList,
+		ExplainCost:    costList,
 		Outputs: []registry.Output{
 			{Kind: KindList, Version: VersionList},
 			{
 				Kind: jql.KindExplain, Version: jql.VersionExplain,
 				When: "--explain is given",
+			},
+			{
+				Kind: registry.KindCost, Version: registry.VersionCost,
+				When: "--explain-cost is given",
 			},
 		},
 		ExitCodes: []exitcode.Code{
