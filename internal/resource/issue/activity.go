@@ -333,7 +333,8 @@ sweep can take. Narrow it with --project, --jql or a shorter --since, or pass
 --max-requests at or above that number to accept the cost. A --max-requests
 that leaves fewer is refused the same way, because this command has no resume
 token and a sweep the budget cuts short cannot be continued. The number is a
-floor: an issue holding more than twenty worklogs costs one request more.
+floor: an issue holding more than twenty worklogs, or on Cloud more than forty
+saves in its changelog, costs one request more for each.
 
 **Where the comment half comes from.** Comment authorship is not searchable in
 JQL on either deployment, so comments are matched here rather than by the
@@ -346,11 +347,10 @@ The servers also bound what they inline, differently and in different
 directions. Cloud returns the newest 20 comments of a longer thread and Data
 Center returns all of them; both return the *oldest* 20 worklogs, which for a
 feed about recent work is the wrong twenty, so an issue with more than that
-costs one further request to read them properly. Cloud bounds the changelog at
-40 entries and reports how many it holds, and this feed does not yet fetch the
-rest, so an issue with more saves than that is reported clipped rather than
-topped up. Anything still clipped is reported: the run exits 3 and the rows say
-which issue and which source.
+costs one further request to read them properly. Cloud bounds the changelog it
+inlines at 40 saves and reports how many it holds, so an issue with more costs
+one further request too, which reads up to a hundred. Anything still clipped is
+reported: the run exits 3 and the rows say which issue and which source.
 
 **--user matches the account an event is recorded against, which is not always
 the person who did the work.** Jira attributes an event to whoever wrote it, and
@@ -833,29 +833,20 @@ func runActivity(
 }
 
 // eventsForPage turns one page of issues into the events the caller asked for,
-// topping up the worklogs that the projection cut off.
+// topping up the worklogs and the changelog that the projections cut off.
 //
-// It reports whether anything is still missing after that. Two of the three
-// sources have no second request available here and are reported rather than
-// resolved:
-//
-//   - **Comments.** `issue comment list` is the command for those, so a clipped
-//     Cloud thread makes the run incomplete rather than costing another round
-//     trip per issue.
-//   - **The changelog.** Cloud's projection is a paged bean bounded at forty and
-//     this said nothing about it until 2026-08-17, so any Cloud issue with more
-//     than forty saves lost its oldest ones and the feed reported itself
-//     complete at exit 0. Saying so is the fix; topping it up from Cloud's paged
-//     /issue/{key}/changelog is a second one, and it cannot land until the
-//     recording this replays holds that request. See
-//     _plans/backlog/ready/cloud-clips-the-changelog-projection-at-forty.md.
+// It reports whether anything is still missing after that. Comments are the
+// one source with no second request here, and are reported rather than
+// resolved: `issue comment list` is the command for those, so a clipped Cloud
+// thread makes the run incomplete rather than costing another round trip per
+// issue.
 func eventsForPage(
 	ctx context.Context, client *Client, page []Issue, want activityWant,
 ) ([]Event, bool, error) {
 	var short bool
 	var events []Event
 	for _, i := range page {
-		clipped, err := topUpWorklogs(ctx, client, &i)
+		clipped, err := topUpIssue(ctx, client, &i)
 		if err != nil {
 			return nil, false, err
 		}
@@ -895,6 +886,50 @@ func (w activityWant) selected(i Issue) []Event {
 		out = append(out, e)
 	}
 	return out
+}
+
+// topUpIssue refetches whatever one issue's projections cut off and has a
+// second route, and reports whether its worklogs are still short afterwards.
+// The changelog reports its own shortness through ChangesComplete, which both
+// readers already consult.
+func topUpIssue(ctx context.Context, client *Client, i *Issue) (bool, error) {
+	if err := topUpChanges(ctx, client, i); err != nil {
+		return false, err
+	}
+	return topUpWorklogs(ctx, client, i)
+}
+
+// topUpChanges refetches an issue's changelog when the projection cut it off.
+//
+// Cloud bounds the changelog it inlines in a search at forty saves, newest
+// first, and says how many it holds. Its paged /issue/{key}/changelog serves
+// up to a hundred, so an issue with up to a hundred saves is read whole in one
+// further request, and an issue under the bound costs nothing: the projection
+// has already answered for it. ListHistory carries the deployment split, and
+// Data Center, which does not clip, never gets here unless its projection
+// carried no count.
+//
+// The paged route is oldest first, so above a hundred saves this asks for the
+// newest page rather than the first one. Asking from zero would trade the
+// forty newest saves the projection held for the hundred oldest, which for a
+// feed about recent work is the wrong hundred. Whatever is still missing stays
+// visible: ChangeSaves and ChangeTotal are set from the answer, so
+// ChangesComplete reports the issue short, and the run says so, rather than
+// paging an issue's whole history on every poll.
+func topUpChanges(ctx context.Context, client *Client, i *Issue) error {
+	if !i.HasChanges || i.ChangesComplete() {
+		return nil
+	}
+	start := 0
+	if i.ChangeTotal != nil && *i.ChangeTotal > MaxPageSize {
+		start = *i.ChangeTotal - MaxPageSize
+	}
+	topped, err := client.ListHistory(ctx, i.Key, start, MaxPageSize)
+	if err != nil {
+		return err
+	}
+	i.Changes, i.ChangeSaves, i.ChangeTotal = topped.Changes, topped.Saves, topped.Total
+	return nil
 }
 
 // topUpWorklogs refetches an issue's worklogs when the projection cut them off,

@@ -424,8 +424,8 @@ Five things it will not pretend about:
   deployments send the *oldest* twenty worklogs, which for a feed about recent
   work is the wrong twenty, so an issue with more than that costs one extra
   request to read properly and gets it. Cloud also caps the changelog it inlines
-  at forty saves, and this feed does not yet fetch the rest, so a heavily edited
-  issue is reported clipped instead.
+  at forty saves, and an issue with more costs one further request, which reads
+  up to a hundred, so only an issue edited more than that is reported clipped.
 
 ### Polling for what changed
 

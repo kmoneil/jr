@@ -138,15 +138,17 @@ type Issue struct {
 	//
 	// **Cloud clips it at forty and says so; nothing here used to listen.** The
 	// projection is a paged bean, and the recorded Cloud conversation in
-	// testdata/activity-recorded.cloud.json has carried
-	// `startAt=0 maxResults=40 total=58 histories=40` since it was made: 18 of
-	// that issue's saves are not in the response. This field said the opposite in
+	// testdata/activity-recorded.cloud.json carried
+	// `startAt=0 maxResults=40 total=58 histories=40` when it was made on
+	// 2026-08-12, and `total=85` since its re-recording on 2026-11-06: the rest
+	// of that issue's saves are not in the response. This field said the opposite in
 	// a comment for as long as the recording sat beside it, `attachChanges` threw
 	// the count away, and `issue activity` therefore dropped the oldest saves of
 	// any Cloud issue with more than forty and reported `complete="true"` at exit
 	// 0. Data Center reports `maxResults` mirroring the count, so its number says
 	// nothing about a bound and everything it sent is everything it has, which is
-	// the same shape `issue history` measured there.
+	// the same shape `issue history` measured there. The two feeds that read
+	// this projection top a clipped one up through topUpChanges.
 	//
 	// ChangeSaves is what the projection sent and ChangeTotal what the server
 	// says it holds. Both count *saves*, not the flattened rows in Changes: one

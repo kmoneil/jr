@@ -300,7 +300,21 @@ func TestAWorklogProjectionWithNoTotalIsToppedUp(t *testing.T) {
 func worklogProjectionWithoutTotal(t *testing.T) (*transport.Client, *transport.Replayer) {
 	t.Helper()
 
+	// The recorded search alone, its body replaced. The rest of the recording
+	// is Validate's two requests, which this harness answers from a stub, and
+	// the recorded issue's changelog top-up, which this body gives it no reason
+	// to make.
 	cassette := recordedShape(t, "activity-recorded.cloud.json")
+	var search transport.Interaction
+	for _, it := range cassette.Interactions {
+		if strings.HasSuffix(it.Request.Path, "/search/jql") {
+			search = it
+		}
+	}
+	if search.Request.Path == "" {
+		t.Fatal("the recording holds no search")
+	}
+	cassette.Interactions = []transport.Interaction{search}
 	cassette.Interactions[0].Response.Body = fmt.Sprintf(`{
 		"isLast": true,
 		"issues": [{"id": "10020", "key": "AGL-3", "fields": {
