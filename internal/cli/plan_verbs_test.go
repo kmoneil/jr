@@ -82,6 +82,8 @@ func planVerbsJiraWith(
 				`{"id":"1","key":"ENG-1","fields":{"updated":` + updated + `}},` +
 				`{"id":"2","key":"ENG-2","fields":{"updated":` + updated + `}},` +
 				`{"id":"3","key":"ENG-3","fields":{"updated":` + updated + `}}]}`))
+		case strings.HasSuffix(r.URL.Path, "/editmeta"):
+			_, _ = w.Write([]byte(editScreenJSON))
 		case strings.HasSuffix(r.URL.Path, "/transitions") && r.Method == http.MethodGet:
 			_, _ = w.Write([]byte(transitions[key]))
 		case strings.HasSuffix(r.URL.Path, "/transitions") && r.Method == http.MethodPost:
