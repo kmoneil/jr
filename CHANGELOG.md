@@ -20,6 +20,59 @@ accident.
 
 Nothing yet.
 
+## [0.23.0] - 2026-11-10
+
+**Read this one if anything branches on `BAD_REQUEST` from `issue edit` on
+Data Center.** An edit naming a field the issue's edit screen does not hold
+was approved by `--dry-run` and then refused whole by Jira, dropping every
+other change sent beside it (issue 291). It is now refused before anything is
+sent, as `FIELD_NOT_ON_SCREEN`, exit 2, and `--dry-run` refuses it too. The
+same input carries a different `code`, which is why this release takes the
+minor position. No kind moved.
+
+### Fixed
+
+- **`issue edit` on Data Center is held to the issue's edit screen.** It reads
+  `editmeta` before it previews or sends, one request, and refuses a field the
+  screen does not hold with nothing sent. The `message` names the field by id
+  and name, the `detail` lists every field the screen does hold, and the
+  `remedy` says what to drop to apply the rest (PR 292).
+
+  ```console
+  $ jr issue edit ENG-7 --summary "New summary" --field 'Story Points=5' --dry-run
+  ```
+
+  ```xml
+  <error v="1">
+    <code>FIELD_NOT_ON_SCREEN</code>
+    <message>customfield_10110 (Story Points) is not on the edit screen of ENG-7</message>
+    ...
+  </error>
+  ```
+
+- **`issue sequence` no longer refuses a Cloud edit that Cloud makes.** Its
+  pre-flight held every edit step to `editmeta` on both deployments, and on
+  Cloud an edit was measured setting and storing fields its `editmeta` does
+  not list. The screen is now checked on Data Center only, by both commands.
+  Whether Cloud refuses such a field to a credential without administration
+  has not been measured.
+
+### Output contract
+
+- No kind's schema version moves.
+- **Breaking**, under the row for the same input carrying a different `code`:
+  on Data Center, `issue edit` setting a field off the issue's edit screen
+  reports `FIELD_NOT_ON_SCREEN` (exit 2, nothing sent) where Jira's refusal
+  reported `BAD_REQUEST` (exit 2). Under `--dry-run` the same invocation
+  exited 0 and now refuses.
+- On Cloud, an `issue sequence` edit step is no longer refused as
+  `FIELD_NOT_ON_SCREEN`; that plan is now written. Additive: an input that
+  was refused is accepted.
+- `docs/output-contract.md` gains the `issue edit` row and the request it
+  costs, `docs/troubleshooting.md` rewrites `FIELD_NOT_ON_SCREEN` for both
+  commands, and `docs/recipes.md` and the skill say the screen is Data
+  Center's.
+
 ## [0.22.2] - 2026-11-06
 
 **Take this one if you run `issue activity` or poll `issue changes` on Cloud.**
@@ -4106,7 +4159,10 @@ recent enough to be worth reading.
   twenty comments as the whole thread.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
-[unreleased]: https://github.com/kmoneil/jr/compare/v0.22.0...main
+[unreleased]: https://github.com/kmoneil/jr/compare/v0.23.0...main
+[0.23.0]: https://github.com/kmoneil/jr/releases/tag/v0.23.0
+[0.22.2]: https://github.com/kmoneil/jr/releases/tag/v0.22.2
+[0.22.1]: https://github.com/kmoneil/jr/releases/tag/v0.22.1
 [0.22.0]: https://github.com/kmoneil/jr/releases/tag/v0.22.0
 [0.21.0]: https://github.com/kmoneil/jr/releases/tag/v0.21.0
 [0.20.4]: https://github.com/kmoneil/jr/releases/tag/v0.20.4
