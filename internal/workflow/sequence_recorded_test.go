@@ -18,7 +18,8 @@ import (
 // pre-flight makes. The fake the other tests use was written from belief;
 // these were recorded, so the mypermissions, editmeta and assignable-search
 // requests are the shapes the servers answered, and every one of them is
-// asked for again here or the replay fails.
+// asked for again here or the replay fails. editmeta is Data Center's alone
+// since issue 291, and the Cloud recording no longer holds it.
 func TestASequencePlanReplaysTheRecordings(t *testing.T) {
 	for _, tc := range []struct {
 		fixture string

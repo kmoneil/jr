@@ -1561,10 +1561,28 @@ may be another issue.
 
 ### `FIELD_NOT_ON_SCREEN` (exit 2)
 
-An edit step in a sequence sets a field the issue's edit screen does not hold.
-Jira would refuse it at that step, after the steps before it had run, so the
-plan is refused instead. `jr issue get <key> --format xml` shows the issue's
-fields; an administrator adds a field to the screen.
+Data Center only. `jr issue edit`, or an edit step in `jr issue sequence`, sets
+a field the issue's edit screen does not hold. Data Center refuses such an edit
+whole, and every other change in the same request is dropped with it, so `jr`
+reads the screen first and refuses with nothing sent. `--dry-run` makes the
+same check. The `detail` lists every field the screen does hold.
+
+```console
+$ jr issue edit ENG-1 --summary "New summary" --field 'Acceptance Criteria=* one'
+```
+
+Drop the field and run the rest, or ask a Jira administrator to add it to the
+issue type's edit screen. A field on the create screen is not always on the
+edit screen: `jr meta createmeta` lists the first and says nothing about the
+second. A screen holding no fields at all means nothing can be edited in the
+issue's current status.
+
+In a sequence, Jira would refuse at that step, after the steps before it had
+run, so the plan is refused instead.
+
+Cloud is not checked. A Cloud edit was measured setting fields the issue's edit
+screen does not list, so a check there would refuse writes Cloud makes. If Cloud
+does refuse one, the refusal comes back as `BAD_REQUEST` naming the field.
 
 ### Setting a field `jr` has no flag for
 

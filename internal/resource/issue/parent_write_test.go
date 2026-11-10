@@ -34,8 +34,12 @@ func parentEdit(
 	flags := registry.NewFlags()
 	flags.SetString("parent", parent)
 	flags.SetBool("dry-run", true)
+	session := &stubSession{kind: kind}
+	if kind == site.DataCenter {
+		session.conn = screenConn(key, everyWritableField()...)
+	}
 	inv := &registry.Invocation{
-		Jira: &stubSession{kind: kind}, Args: []string{key}, Flags: flags,
+		Jira: session, Args: []string{key}, Flags: flags,
 		Stderr: io.Discard, Progress: registry.NoProgress,
 	}
 

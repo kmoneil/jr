@@ -15,6 +15,13 @@ import (
 	"github.com/kmoneil/jr/internal/exitcode"
 )
 
+// editScreenJSON is the edit screen the Data Center fakes here answer
+// editmeta with: every field a typed flag on issue edit sets.
+const editScreenJSON = `{"fields":{"summary":{"name":"Summary"},` +
+	`"description":{"name":"Description"},"labels":{"name":"Labels"},` +
+	`"priority":{"name":"Priority"},"assignee":{"name":"Assignee"},` +
+	`"parent":{"name":"Parent"}}}`
+
 // editCaptureJira accepts one edit and records the description it was sent.
 func editCaptureJira(t *testing.T, sent *atomic.Value) string {
 	t.Helper()
@@ -27,6 +34,9 @@ func editCaptureJira(t *testing.T, sent *atomic.Value) string {
 		case strings.HasSuffix(r.URL.Path, "/serverInfo"):
 			_, _ = w.Write([]byte(`{"version":"10.4.0","deploymentType":"Server",` +
 				`"serverTime":"2026-09-23T12:00:00.000+0000"}`))
+		case strings.HasSuffix(r.URL.Path, "/editmeta"):
+			// A Data Center edit reads its edit screen first (issue 291).
+			_, _ = w.Write([]byte(editScreenJSON))
 		case r.Method == http.MethodPut && strings.Contains(r.URL.Path, "/issue/"):
 			var body struct {
 				Fields map[string]json.RawMessage `json:"fields"`

@@ -1688,9 +1688,13 @@ one with `BAD_REQUEST`.
 | `FIELD_NOT_A_NUMBER`   | 2    | A number field was given a value that is not a number. Refused locally, against the site's own catalogue, so it costs no write.                                                                                                                  |
 | `FIELD_NOT_JSON`       | 2    | A `--field-json` value did not parse. `detail` is the decoder's own words.                                                                                                                                                                       |
 | `DUPLICATE_FIELD`      | 2    | One field was named twice: twice through `--field` where the field is not an array, or once through each flag. Repeating `--field` on an array field is how an array is built and is not this.                                                   |
+| `FIELD_NOT_ON_SCREEN`  | 2    | Data Center only. `issue edit` sets a field the issue's edit screen does not hold, which Data Center refuses whole, dropping every other change in the request. Read from `editmeta` before the request is sent or previewed, so `--dry-run` refuses it too. `message` names the field by id and name, `detail` lists every field the screen holds, and nothing was sent. Cloud is not held to `editmeta`: it was measured storing fields its `editmeta` did not list. |
 
 Field resolution costs one request against a cold cache and none against a warm
 one; a command that names nothing to resolve makes no extra request at all.
+The edit screen is one more request for every `issue edit` on Data Center and is
+never cached, because a status can change which fields an issue may be edited
+in.
 
 **Transitions are never cached.** They depend on the issue's current status, so
 a stored copy answers the question as it stood when it was stored. Create
@@ -2356,7 +2360,8 @@ $ jr issue sequence ENG-101 --steps-file close.json --plan-out close.xml
 command's own `Validate`, so a step resolves what its command resolves and is
 refused where its command would be. Then it checks what the commands leave to
 Jira: the permission each step needs (one `mypermissions`), every edited field
-on the edit screen, the assignee assignable on this issue (matched exactly,
+on the edit screen (Data Center only, as for `issue edit`), the assignee
+assignable on this issue (matched exactly,
 because Data Center's search is by prefix), a link's other issue readable, and
 the sprint not closed. A plan with any step that cannot run is refused with
 nothing written; the code and exit are the first blocked step's own, and the
@@ -2438,7 +2443,7 @@ give.
 | `STEP_NAMES_ANOTHER_ISSUE` | 2    | A step names an issue that is not the sequence's, or a link joins two others. |
 | `STEP_READS_STDIN`         | 2    | A step reads `--description-file -`. |
 | `TRANSITION_NOT_LAST`      | 2    | More than one `issue move`, or one that is neither the first step nor the last. A transition is resolved against the status the issue is in now, so a second cannot be, and steps on both sides of one would be checked against two statuses. The name is from when last was the only place a move could go. |
-| `FIELD_NOT_ON_SCREEN`      | 2    | An edit step sets a field the issue's edit screen does not hold. |
+| `FIELD_NOT_ON_SCREEN`      | 2    | Data Center only. An edit step sets a field the issue's edit screen does not hold. |
 | `USER_NOT_ASSIGNABLE`      | 2    | An assign step names somebody this issue cannot be assigned to. |
 | `PERMISSION_DENIED`        | 6    | A step needs a permission this account does not have on the issue. |
 | `PERMISSION_NOT_REPORTED`  | 9    | Jira did not say whether the account has a permission a step needs, so the plan cannot claim it was checked. |

@@ -12,7 +12,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
-	"maps"
 	"net/url"
 	"os"
 	"slices"
@@ -133,7 +132,8 @@ issue moved and nothing else sent.
 --plan-out writes the plan and sends nothing. Every step is dry-run as its own
 command, which resolves what that command resolves, and then checked for what
 the commands leave to Jira: the permission each step needs, every edited field
-on the issue's edit screen, the assignee assignable here, a link's other issue
+on the issue's edit screen (on Data Center, as for issue edit), the assignee
+assignable here, a link's other issue
 readable, the sprint open. A plan with a step that cannot run is refused, with
 nothing written, naming every such step. The plan shows the exact request each
 step resolved to, as evidence for the reader: nothing is ever sent from the
@@ -366,6 +366,9 @@ func dryRun(ctx context.Context, inv *registry.Invocation, s SequenceStep) stepP
 		Jira: inv.Jira, Args: s.Args, Flags: s.Flags, Limit: inv.Limit,
 		Format: inv.Format, Stderr: inv.Stderr, Progress: inv.Progress,
 	}
+	// The edit screen is the pre-flight's to check (checkStep), once for every
+	// edit and after a leading move where there is one.
+	stepInv.SetValue(issue.ScreenCheckedByCallerKey, true)
 	// The gate every caller of a command runs, so read-only refuses a step as
 	// it refuses the command, whoever calls it.
 	if err := registry.Gate(s.Command, stepInv); err != nil {
@@ -503,7 +506,7 @@ func (pf *preflight) check(ctx context.Context, plans []stepPlan, waitFor int) e
 	if err != nil {
 		return err
 	}
-	var screen map[string]bool
+	var screen issue.EditScreen
 	for i := range plans {
 		p := &plans[i]
 		if p.blocked != nil {
@@ -512,7 +515,7 @@ func (pf *preflight) check(ctx context.Context, plans []stepPlan, waitFor int) e
 		if waits(p) {
 			pf.checkStatusFree(ctx, p)
 			p.checks = append(p.checks, "after step "+strconv.Itoa(waitFor)+": "+
-				strings.Join(waitingChecks(p), ", "))
+				strings.Join(waitingChecks(p, pf.info.Kind), ", "))
 			continue
 		}
 		pf.checkPermissions(p, perms)
@@ -541,11 +544,13 @@ func (pf *preflight) checkStatusFree(ctx context.Context, p *stepPlan) {
 
 // waitingChecks names the checks a step waiting for a move has not had yet, in
 // the words its checks will use once they run.
-func waitingChecks(p *stepPlan) []string {
+func waitingChecks(p *stepPlan, kind site.Kind) []string {
 	names := []string{stepPermissions[p.step.Command.Name()]}
 	switch p.step.Command.Name() {
 	case "issue.edit":
-		names = append(names, "the edit screen")
+		if issue.ScreenBindsEdits(kind) {
+			names = append(names, "the edit screen")
+		}
 	case "issue.assign":
 		names = append(names, "assignable")
 	}
@@ -553,12 +558,16 @@ func waitingChecks(p *stepPlan) []string {
 }
 
 // checkStep runs the one check a step's command needs beyond its permission.
-// The edit screen is read once, by the first edit that needs it.
-func (pf *preflight) checkStep(ctx context.Context, p *stepPlan, screen *map[string]bool) error {
+// The edit screen is read once, by the first edit that needs it, and only
+// where it decides what Jira refuses (issue.ScreenBindsEdits).
+func (pf *preflight) checkStep(ctx context.Context, p *stepPlan, screen *issue.EditScreen) error {
 	switch p.step.Command.Name() {
 	case "issue.edit":
+		if !issue.ScreenBindsEdits(pf.info.Kind) {
+			return nil
+		}
 		if *screen == nil {
-			read, err := pf.editScreen(ctx)
+			read, err := issue.ReadEditScreen(ctx, pf.conn, pf.info, pf.key)
 			if err != nil {
 				return err
 			}
@@ -632,67 +641,25 @@ func (pf *preflight) checkPermissions(p *stepPlan, have map[string]bool) {
 	}
 }
 
-// editScreen is the set of field ids the issue's edit screen holds.
-func (pf *preflight) editScreen(ctx context.Context) (map[string]bool, error) {
-	var got struct {
-		Fields map[string]json.RawMessage `json:"fields"`
-	}
-	if err := pf.get(ctx, pf.issuePath(pf.key)+"/editmeta", nil, &got); err != nil {
-		return nil, err
-	}
-	screen := make(map[string]bool, len(got.Fields))
-	for id := range got.Fields {
-		screen[id] = true
-	}
-	return screen, nil
-}
-
-// checkOnScreen holds every field an edit step sets to the edit screen. Jira
-// refuses a field that is not on it, and a sequence that found out at step
-// two would leave step one applied.
-func checkOnScreen(p *stepPlan, screen map[string]bool) {
-	ids, err := editedFields(p.reqs)
+// checkOnScreen holds every field an edit step sets to the edit screen. Data
+// Center refuses a field that is not on it, and a sequence that found out at
+// step two would leave step one applied.
+func checkOnScreen(p *stepPlan, screen issue.EditScreen) {
+	ids, err := issue.EditedFields(p.reqs)
 	if err != nil {
 		p.block(err)
 		return
 	}
-	var off []string
-	for _, id := range ids {
-		if !screen[id] {
-			off = append(off, id)
-		}
-	}
-	if len(off) > 0 {
+	if off := screen.Missing(ids); len(off) > 0 {
 		p.block(errs.Usage("FIELD_NOT_ON_SCREEN",
 			"%s sets %s, which the issue's edit screen does not hold",
 			p.step.Command.UseLine(), strings.Join(off, ", ")).
-			WithDetail("Jira refuses a field that is not on the edit screen, and a sequence " +
-				"that found out mid-run would leave the steps before it applied").
+			WithDetail("Data Center refuses a field that is not on the edit screen, and a " +
+				"sequence that found out mid-run would leave the steps before it applied").
 			WithRemedy("drop the field, or ask an administrator to add it to the screen"))
 		return
 	}
 	p.checks = append(p.checks, "on the edit screen: "+strings.Join(ids, ", "))
-}
-
-// editedFields is every field id an edit's requests set or update, sorted.
-func editedFields(reqs []transport.Request) ([]string, error) {
-	seen := map[string]bool{}
-	for _, r := range reqs {
-		var body struct {
-			Fields map[string]json.RawMessage `json:"fields"`
-			Update map[string]json.RawMessage `json:"update"`
-		}
-		if err := json.Unmarshal(r.Body, &body); err != nil {
-			return nil, errs.Runtime("MALFORMED_DRY_RUN", "the edit's dry run is not JSON").Wrap(err)
-		}
-		for id := range body.Fields {
-			seen[id] = true
-		}
-		for id := range body.Update {
-			seen[id] = true
-		}
-	}
-	return slices.Sorted(maps.Keys(seen)), nil
 }
 
 // checkAssignable holds an assign step's account to the issue's assignable

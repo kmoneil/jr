@@ -279,7 +279,9 @@ Mutations are gated on purpose, and the gates are cheap to satisfy honestly.
    and the value is typed from the site's catalogue, so a value of the wrong
    type is refused before anything is sent. A named value (an option, a
    priority, a version) goes as typed, and Jira refuses one it does not have
-   with `BAD_REQUEST`. Where the type is one `jr` will not guess at, and
+   with `BAD_REQUEST`. On Data Center a field the issue's edit screen does not
+   hold is refused as `FIELD_NOT_ON_SCREEN` before anything is sent, `--dry-run`
+   included. Where the type is one `jr` will not guess at, and
    Jira reports Epic Link and most plugin fields as `any`, the refusal names
    `--field-json`, which sends the value verbatim:
    `--field-json customfield_11350='"ENG-42"'`. Do not leave `jr` for `curl` to

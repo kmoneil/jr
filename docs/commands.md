@@ -1929,6 +1929,13 @@ case, and Epic Link is one: --field-json customfield_11350='"ENG-42"'. A field
 a typed flag already owns is refused by name, because two spellings of one
 write is a silent last-one-wins.
 
+On Data Center every field the edit sets, by any flag, is held to the issue's
+edit screen before anything is sent, --dry-run included, at the cost of one
+request. Data Center refuses a field the screen does not hold and drops the
+rest of the edit with it; this refuses it as FIELD_NOT_ON_SCREEN instead,
+listing what the screen holds. Cloud is not held to the screen, because it was
+measured setting fields its edit screen does not list.
+
 ### `jr issue get`
 
 Fetch one issue in full
@@ -2533,7 +2540,8 @@ issue moved and nothing else sent.
 --plan-out writes the plan and sends nothing. Every step is dry-run as its own
 command, which resolves what that command resolves, and then checked for what
 the commands leave to Jira: the permission each step needs, every edited field
-on the issue's edit screen, the assignee assignable here, a link's other issue
+on the issue's edit screen (on Data Center, as for issue edit), the assignee
+assignable here, a link's other issue
 readable, the sprint open. A plan with a step that cannot run is refused, with
 nothing written, naming every such step. The plan shows the exact request each
 step resolved to, as evidence for the reader: nothing is ever sent from the

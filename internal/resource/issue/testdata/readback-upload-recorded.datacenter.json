@@ -15,14 +15,14 @@
             "application/json;charset=UTF-8"
           ]
         },
-        "body": "{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10005\",\"self\":\"http://recorded.invalid/rest/api/2/issue/10005\",\"key\":\"ENG-6\",\"fields\":{\"updated\":\"2026-11-04T16:32:34.293+0000\"},\"renderedFields\":null}"
+        "body": "{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10100\",\"self\":\"http://recorded.invalid/rest/api/2/issue/10100\",\"key\":\"ENG-6\",\"fields\":{\"updated\":\"2026-11-10T12:57:02.839+0000\"},\"renderedFields\":null}"
       }
     },
     {
       "request": {
         "method": "POST",
         "path": "/rest/api/2/issue/ENG-6/attachments",
-        "body": "--4ffa7fd13fef452ab75cf150d4996e5028ed4d7042c530a8a411d3a51a8f\r\nContent-Disposition: form-data; name=\"file\"; filename=\"repro.py\"\r\nContent-Type: application/octet-stream\r\n\r\nprint('reproduces issue 270')\n\r\n--4ffa7fd13fef452ab75cf150d4996e5028ed4d7042c530a8a411d3a51a8f--\r\n"
+        "body": "--22e1f6551009447734a2b23c2d6cf5cb91616f38be9c3ff55ecca1c48c99\r\nContent-Disposition: form-data; name=\"file\"; filename=\"repro.py\"\r\nContent-Type: application/octet-stream\r\n\r\nprint('reproduces issue 270')\n\r\n--22e1f6551009447734a2b23c2d6cf5cb91616f38be9c3ff55ecca1c48c99--\r\n"
       },
       "response": {
         "status": 200,
@@ -31,7 +31,7 @@
             "application/json;charset=UTF-8"
           ]
         },
-        "body": "[{\"self\":\"http://recorded.invalid/rest/api/2/attachment/10001\",\"id\":\"10001\",\"filename\":\"repro.py\",\"author\":{\"self\":\"http://recorded.invalid/rest/api/2/user?username=ada\",\"name\":\"ada\",\"key\":\"JIRAUSER10000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"Etc/UTC\"},\"created\":\"2026-11-04T16:32:34.493+0000\",\"size\":30,\"mimeType\":\"application/octet-stream\",\"content\":\"http://recorded.invalid/secure/attachment/10001/repro.py\"}]"
+        "body": "[{\"self\":\"http://recorded.invalid/rest/api/2/attachment/10100\",\"id\":\"10100\",\"filename\":\"repro.py\",\"author\":{\"self\":\"http://recorded.invalid/rest/api/2/user?username=ada\",\"name\":\"ada\",\"key\":\"JIRAUSER10000\",\"emailAddress\":\"ada@example.invalid\",\"avatarUrls\":{\"48x48\":\"https://recorded.invalid/avatar\",\"24x24\":\"https://recorded.invalid/avatar\",\"16x16\":\"https://recorded.invalid/avatar\",\"32x32\":\"https://recorded.invalid/avatar\"},\"displayName\":\"Ada Lovelace\",\"active\":true,\"timeZone\":\"Etc/UTC\"},\"created\":\"2026-11-10T12:57:10.878+0000\",\"size\":30,\"mimeType\":\"application/octet-stream\",\"content\":\"http://recorded.invalid/secure/attachment/10100/repro.py\"}]"
       }
     },
     {
@@ -47,7 +47,7 @@
             "application/json;charset=UTF-8"
           ]
         },
-        "body": "{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10005\",\"self\":\"http://recorded.invalid/rest/api/2/issue/10005\",\"key\":\"ENG-6\",\"fields\":{\"updated\":\"2026-11-04T16:32:34.498+0000\"},\"renderedFields\":null}"
+        "body": "{\"expand\":\"renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations\",\"id\":\"10100\",\"self\":\"http://recorded.invalid/rest/api/2/issue/10100\",\"key\":\"ENG-6\",\"fields\":{\"updated\":\"2026-11-10T12:57:10.892+0000\"},\"renderedFields\":null}"
       }
     }
   ]
