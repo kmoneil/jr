@@ -152,8 +152,9 @@ jr issue sequence --apply close.xml
 ```
 
 - **Read the plan before applying it.** Planning dry-runs every step and checks
-  permissions, the edit screen, the assignee and the sprint; a plan that could
-  not run is refused naming every bad step, and no file is written.
+  permissions, the edit screen (Data Center), the assignee and the sprint; a
+  plan that could not run is refused naming every bad step, and no file is
+  written.
 - **A partial apply exits with the failing step's code** and its document, on
   stdout, says which steps were `applied`, which `failed`, and which were
   `not-attempted`. Report that, not "it failed". Re-running the same

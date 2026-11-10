@@ -728,8 +728,9 @@ $ jr issue sequence --apply close.xml
 
 Planning sends nothing. Each step is dry-run as its own command, so it is
 refused where that command would be, and then checked for what the commands
-leave to Jira: the permission it needs, every edited field on the edit screen,
-the assignee assignable, a linked issue readable, a sprint still open. A plan
+leave to Jira: the permission it needs, every edited field on the edit screen
+(on Data Center), the assignee assignable, a linked issue readable, a sprint
+still open. A plan
 with any step that cannot run is not written at all, and the refusal names
 every such step.
 

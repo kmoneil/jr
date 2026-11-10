@@ -219,9 +219,12 @@ func TestAStepAfterAMoveThatCouldNeverRunStopsTheMove(t *testing.T) {
 // to AGL-12.
 //
 // The plan's recording holds three reads and no edit screen. The apply's
-// holds the transition, then the permissions and the edit screen of the
-// reopened issue, then the edit and the comment: the order the server saw,
-// which the fake can only assert of itself.
+// holds the transition, then the permissions of the reopened issue, then the
+// edit and the comment: the order the server saw, which the fake can only
+// assert of itself. It also held the reopened issue's editmeta until
+// 2026-11-10, when Cloud was found storing fields its editmeta did not list
+// and the edit screen became a Data Center check (issue 291); that one
+// exchange was taken out and nothing else changed.
 func TestAReopenReplaysTheRecordings(t *testing.T) {
 	const steps = `[["issue","move","AGL-12","To Do"],` +
 		`["issue","edit","AGL-12","--summary","Reopened by a sequence"],` +
@@ -252,7 +255,7 @@ func TestAReopenReplaysTheRecordings(t *testing.T) {
 	flags.SetString("steps", steps)
 	flags.SetString("plan-out", path)
 	plan := run(planConn, []string{"AGL-12"}, flags, nil)
-	if got := checksOf(t, plan)[1]; !slices.Contains(got, "after step 1: EDIT_ISSUES, the edit screen") {
+	if got := checksOf(t, plan)[1]; !slices.Contains(got, "after step 1: EDIT_ISSUES") {
 		t.Errorf("the edit's checks are %q", got)
 	}
 

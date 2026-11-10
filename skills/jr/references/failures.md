@@ -130,6 +130,7 @@ as `BAD_REQUEST`.
 | `UNKNOWN_RESOLUTION` | 2 | Every resolution the transition's screen offers, each with its id. Pass either |
 | `AMBIGUOUS_RESOLUTION` | 2 | Both resolutions, where two names differ only in case. Pass the id |
 | `UNKNOWN_ISSUE_TYPE` | 2 | The types the project does offer |
+| `FIELD_NOT_ON_SCREEN` | 2 | Data Center only: every field the issue's edit screen holds. Nothing was sent; drop the field the `message` names and run the rest |
 | `UNKNOWN_USER` | 2 | Near misses with ids, or absent when nothing shares a word with what you typed |
 | `AMBIGUOUS_USER` | 2 | Every candidate with its id, whether the account is inactive, and whether it is an app rather than a person |
 | `UNKNOWN_LINK_TYPE` | 2 | Every link phrase this site offers |

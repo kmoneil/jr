@@ -613,7 +613,14 @@ comma is a character a value may contain.
 whose type this tool will not guess at. A schema type of "any" is the common
 case, and Epic Link is one: --field-json customfield_11350='"ENG-42"'. A field
 a typed flag already owns is refused by name, because two spellings of one
-write is a silent last-one-wins.`),
+write is a silent last-one-wins.
+
+On Data Center every field the edit sets, by any flag, is held to the issue's
+edit screen before anything is sent, --dry-run included, at the cost of one
+request. Data Center refuses a field the screen does not hold and drops the
+rest of the edit with it; this refuses it as FIELD_NOT_ON_SCREEN instead,
+listing what the screen holds. Cloud is not held to the screen, because it was
+measured setting fields its edit screen does not list.`),
 		Example: strings.Join([]string{
 			buildinfo.App + " issue edit ENG-101 --summary 'A better summary'",
 			buildinfo.App + " issue edit ENG-101 --add-label retry --remove-label wontfix",
@@ -927,6 +934,11 @@ func runEdit(ctx context.Context, inv *registry.Invocation) (*render.Doc, error)
 
 	req, err := client.EditRequest(opt)
 	if err != nil {
+		return nil, err
+	}
+	// Before the preview for the reason the precondition is: a dry run that
+	// approves a request Jira will refuse whole is the preview lying.
+	if err := checkEditScreen(ctx, inv, client, opt.Key, req); err != nil {
 		return nil, err
 	}
 	// After the request is built, so a request this tool would have refused to

@@ -1,0 +1,17 @@
+{
+  "deployment": "cloud",
+  "source": "constructed",
+  "note": "Constructed 2026-11-10 for issue 291 from what the oneil-team sandbox answered that day: a PUT /rest/api/3/issue setting custom fields the issue's editmeta did not list (customfield_10016, customfield_10034, customfield_10008 on ET-2, site administrator token) was answered 204 and each value stored. There is no editmeta exchange on purpose: a Cloud edit that reads one here fails with FIXTURE_MISS.",
+  "interactions": [
+    {
+      "request": {
+        "method": "PUT",
+        "path": "/rest/api/3/issue/ENG-101",
+        "body": "{\"fields\":{\"customfield_10111\":5,\"summary\":\"New summary\"}}"
+      },
+      "response": {
+        "status": 204
+      }
+    }
+  ]
+}

@@ -546,7 +546,9 @@ func firstUpdated(t *testing.T, fixture string) string {
 // asked for the token after it, then an edit of the description guarded by that
 // token, with no read between. Recorded on 2026-11-04 against a probe issue
 // made and deleted for it, on the oneil-team sandbox (scrubbed to AGL-18) and
-// on the Data Center rig (scripts/dc/record-writes.sh).
+// on the Data Center rig (scripts/dc/record-writes.sh). The Data Center pair
+// was recorded again on 2026-11-10 with the same commands, when a Data Center
+// edit began reading its edit screen first (issue 291).
 //
 // The edit's own check is the evidence: its first read is the server's, after
 // the upload, so a token minted from anything but the upload's read-back would

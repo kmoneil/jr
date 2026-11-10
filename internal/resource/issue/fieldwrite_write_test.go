@@ -68,6 +68,7 @@ func fieldWriteInvocation(repeated map[string][]string) *registry.Invocation {
 	return &registry.Invocation{
 		Jira: &stubSession{
 			doer: &stubDoer{body: writeCatalogueJSON}, kind: site.DataCenter,
+			conn: screenConn("ENG-101", everyWritableField()...),
 		},
 		Args: []string{"ENG-101"}, Flags: flags,
 		Stderr: io.Discard, Progress: registry.NoProgress,
