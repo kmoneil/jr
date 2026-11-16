@@ -83,8 +83,14 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      # Retried for the reason given in ci.yml's test-windows.
       - name: make
-        run: choco install make --version=4.4.1 --no-progress -y
+        run: |
+          for try in 1 2 3; do
+            choco install make --version=4.4.1 --no-progress -y && exit 0
+            [ "$try" = 3 ] || sleep 60
+          done
+          exit 1
       - name: gocognit
         run: go install github.com/uudashr/gocognit/cmd/gocognit@$(make -s print-GOCOGNIT_VERSION)
       - name: test
