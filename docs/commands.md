@@ -3307,11 +3307,15 @@ holds none.
 --dir writes the whole skill into a directory instead, laid out the way a skill
 loader reads one: SKILL.md, and each reference under references/. The bytes are
 the ones the command prints, and nothing is printed; exit 0 means every file
-was written. It refuses before writing anything when the directory holds a
-file the skill does not write, even with --force, and when it holds one the
-skill does write and --force was not given:
+was written:
 
     jr skill --dir ~/.agents/skills/jr
+
+It refuses before writing anything when the directory holds a file the skill
+does not write, even with --force, and when it holds one the skill does write
+and --force was not given. A path that is a symbolic link is refused even with
+--force: what it points to is another install's, and writing through the link
+would replace that install's files.
 
 The Markdown is the output, so nothing else is written to stdout: there is no
 result envelope, and --format does not apply. It is deliberately in every

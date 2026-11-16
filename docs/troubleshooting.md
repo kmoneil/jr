@@ -1182,7 +1182,7 @@ never causes this, because it is set once for a whole shell. The sibling
 `--age`, `--with-comments`, `--raw-body`, `--no-context-fields`) for the
 same reason: there is no document for them to shape.
 
-### `STRAY_FILES` / `DESTINATION_EXISTS` from `jr skill --dir`
+### `STRAY_FILES` / `DESTINATION_EXISTS` / `DESTINATION_IS_LINK` from `jr skill --dir`
 
 `jr skill --dir` never replaces a file without `--force`, so running it where a
 skill already is answers `DESTINATION_EXISTS`, exit 7. `--force` replaces the
@@ -1197,6 +1197,18 @@ something the skill does not write, and `detail` names it. After an upgrade
 that is usually a reference an older release carried, which would otherwise
 sit beside a skill that no longer mentions it. Delete what it names, or point
 `--dir` at an empty directory. `NOT_A_DIRECTORY` means the path is a file.
+
+`DESTINATION_IS_LINK`, exit 7, is refused even with `--force`: the path is a
+symbolic link, usually the one the Homebrew recipe makes into its own copy of
+the skill, and `detail` says where it points. Writing through it would replace
+that install's files and leave the link looking like this one's. If it points
+to the skill you want, leave it. Otherwise remove the link itself, which takes
+`rm` without `-r` and without a trailing slash, and run `--dir` again:
+
+```console
+$ rm ~/.agents/skills/jr
+$ jr skill --dir ~/.agents/skills/jr
+```
 
 ### `TRANSITION_UNAVAILABLE`
 

@@ -85,13 +85,20 @@ func (a *app) writeSkillDir(dir string, force bool) error {
 // are wrong: deleting it removes something this command did not create, and
 // keeping it leaves, say, a reference an older build carried beside a skill
 // that no longer mentions it, where an agent can still read it.
+//
+// A link is refused before anything else, --force or not, and whether what it
+// points to exists or not. It is how another install is put there, Homebrew's
+// in its keg or a clone's skills/jr, and writing through it would replace that
+// install's files and leave the link looking like this one's.
 func checkSkillDir(dir string, layout []string, force bool) error {
-	info, err := os.Stat(dir)
+	info, err := os.Lstat(dir)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		return nil
 	case err != nil:
 		return errs.Runtime("SKILL_UNWRITABLE", "cannot read %s", dir).Wrap(err)
+	case info.Mode()&fs.ModeSymlink != 0:
+		return linkRefusal(dir)
 	case !info.IsDir():
 		return errs.New(exitcode.Conflict, "NOT_A_DIRECTORY",
 			"%s exists and is not a directory", dir).
@@ -114,6 +121,18 @@ func checkSkillDir(dir string, layout []string, force bool) error {
 			WithRemedy("pass --force to replace them, or --dir a directory that holds no skill")
 	}
 	return nil
+}
+
+// linkRefusal names dir as a link, and what it points to when that can be
+// read, since that is the install the caller would have written into.
+func linkRefusal(dir string) error {
+	e := errs.New(exitcode.Conflict, "DESTINATION_IS_LINK",
+		"%s is a symbolic link, and --dir does not write through one, even with --force", dir)
+	if target, err := os.Readlink(dir); err == nil {
+		e = e.WithDetail("it points to %s", target)
+	}
+	return e.WithRemedy("leave the link if it points to the skill you want; " +
+		"otherwise remove the link itself, not what it points to, and run again")
 }
 
 // sortSkillDir splits what dir holds into the skill's own files and everything

@@ -207,6 +207,71 @@ func TestSkillDirRefusesAFile(t *testing.T) {
 		exitcode.Conflict, "NOT_A_DIRECTORY")
 }
 
+// TestSkillDirRefusesALinkEvenWithForce is issue 299. A link at --dir is
+// another install, Homebrew's keg or a clone's skills/jr, and --force used to
+// write through it: the keg's SKILL.md replaced, exit 0, and the path still a
+// link, so nothing said whose files had changed. Without --force, a link to an
+// empty directory was written through the same way.
+func TestSkillDirRefusesALinkEvenWithForce(t *testing.T) {
+	cases := []struct {
+		name   string
+		target map[string]string
+	}{
+		{"to another install", map[string]string{"SKILL.md": "another install's skill\n"}},
+		{"to an empty directory", map[string]string{}},
+		{"to nothing", nil},
+	}
+	for _, tc := range cases {
+		for _, force := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s, force %v", tc.name, force), func(t *testing.T) {
+				root := t.TempDir()
+				target := filepath.Join(root, "keg", "skill")
+				if tc.target != nil {
+					if err := os.MkdirAll(target, 0o755); err != nil {
+						t.Fatal(err)
+					}
+				}
+				for name, body := range tc.target {
+					writeFile(t, filepath.Join(target, name), body)
+				}
+				link := filepath.Join(root, "skills", "jr")
+				symlink(t, target, link)
+
+				args := []string{"skill", "--dir", link}
+				if force {
+					args = append(args, "--force")
+				}
+				got := run(t, nil, args...)
+				assertRefused(t, got, exitcode.Conflict, "DESTINATION_IS_LINK")
+				if !strings.Contains(got.stderr, target) {
+					t.Errorf("the refusal does not name what the link points to:\n%s", got.stderr)
+				}
+
+				if dest, err := os.Readlink(link); err != nil || dest != target {
+					t.Errorf("the link now reads %q, %v; want it untouched, pointing to %s", dest, err, target)
+				}
+				if tc.target != nil {
+					assertTree(t, target, tc.target)
+				} else if _, err := os.Lstat(target); err == nil {
+					t.Errorf("a refusal created %s", target)
+				}
+			})
+		}
+	}
+}
+
+// symlink makes link point to target, and skips where the platform will not
+// let this user make one, as Windows without developer mode does not.
+func symlink(t *testing.T, target, link string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("cannot make a symbolic link here: %v", err)
+	}
+}
+
 func TestSkillDirUsageRefusals(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "never")
 	cases := []struct {
