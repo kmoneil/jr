@@ -230,11 +230,14 @@ the suite on Windows, and `build` and `publish` both hang off them, so a red
 gate means nothing was compiled and nothing was published. There is no
 half-published state to clean up.
 
-This has happened once, on the first attempt at `v0.1.1`: `sum.golang.org`
+This has happened twice. On the first attempt at `v0.1.1`, `sum.golang.org`
 returned an `INTERNAL_ERROR` while the gate was installing the tools `make ci`
-expects. The re-run was green in every job. The tools are pinned and cached
-since, so that fetch is off the common path rather than retried, but a scan, a
-registry, or a runner can still fail transiently and the answer is the same one.
+expects; the tools are pinned and cached since, so that fetch is off the common
+path rather than retried. On the first attempt at `v0.20.0`, Chocolatey's feed
+answered a 504 while the suite on Windows was installing make; that install is
+retried since, three times a minute apart. Each re-run was green in every job.
+A scan, a registry, or a runner can still fail transiently, and the answer is
+the same one.
 
 One thing to know while reading the run list: **a re-run overwrites the run's
 conclusion**, so a release that failed and was re-run reads `success` afterwards

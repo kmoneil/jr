@@ -151,9 +151,17 @@ jobs:
         with:
           go-version-file: go.mod
       # The runner has Git Bash and no make, and the tool versions are read
-      # out of the Makefile, as they are everywhere else.
+      # out of the Makefile, as they are everywhere else. Chocolatey's feed has
+      # answered a 504 here before any test ran (2026-10-13, 2026-11-16), so
+      # the install gets three tries a minute apart: enough to outlast a blip,
+      # and an outage longer than that still fails the gate.
       - name: make
-        run: choco install make --version=4.4.1 --no-progress -y
+        run: |
+          for try in 1 2 3; do
+            choco install make --version=4.4.1 --no-progress -y && exit 0
+            [ "$try" = 3 ] || sleep 60
+          done
+          exit 1
       - name: gocognit
         run: go install github.com/uudashr/gocognit/cmd/gocognit@$(make -s print-GOCOGNIT_VERSION)
       # No -race: the ubuntu legs cover the request budget's concurrency, and
