@@ -427,26 +427,43 @@ once, and every `brew upgrade` moves the skill with the binary:
 
 ```console
 $ mkdir -p ~/.agents/skills ~/.claude/skills
+$ rm -rf ~/.agents/skills/jr ~/.claude/skills/jr
 $ ln -s "$(brew --prefix)/opt/jr/share/jr/skill" ~/.agents/skills/jr
 $ ln -s "$(brew --prefix)/opt/jr/share/jr/skill" ~/.claude/skills/jr
+$ readlink ~/.claude/skills/jr
+/opt/homebrew/opt/jr/share/jr/skill
 ```
+
+The `rm` clears what an earlier install left there, a folder from
+`jr skill --dir` or a copy: `ln -s` onto a folder puts the link inside it and
+says nothing. `readlink` prints the skill's path under your Homebrew prefix;
+if it prints nothing, the link is not there.
 
 Otherwise, install it into a directory a skill loader reads. The binary writes
 the whole skill, `SKILL.md` and its references, the same bytes `jr skill`
-prints; the second line hands Claude Code the same copy:
+prints; the link hands Claude Code the same copy:
 
 ```console
 $ jr skill --dir ~/.agents/skills/jr
+$ rm -rf ~/.claude/skills/jr
 $ mkdir -p ~/.claude/skills && ln -s ~/.agents/skills/jr ~/.claude/skills/jr
+$ readlink ~/.claude/skills/jr
+/Users/you/.agents/skills/jr
 ```
+
+`--dir` needs no `rm` before it: it refuses a folder that already holds a
+skill, or a link, and says which. Only the `ln -s` would nest quietly.
 
 Or symlink the copy in this repository, which `make skill` regenerates and a
 test refuses to let go stale:
 
 ```console
 $ mkdir -p ~/.agents/skills ~/.claude/skills
+$ rm -rf ~/.agents/skills/jr ~/.claude/skills/jr
 $ ln -s "$PWD/skills/jr" ~/.agents/skills/jr
 $ ln -s "$PWD/skills/jr" ~/.claude/skills/jr
+$ readlink ~/.claude/skills/jr
+/Users/you/src/jr/skills/jr
 ```
 
 What `--dir` refuses, and the form for a host that reads `AGENTS.md` instead,
