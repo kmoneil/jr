@@ -20,6 +20,55 @@ accident.
 
 Nothing yet.
 
+## [0.24.0] - 2026-11-16
+
+**Take this one if you installed with Homebrew and ever ran
+`jr skill --dir`.** Pointed at a symbolic link, such as the one the Homebrew
+recipe makes from `~/.agents/skills/jr` into the keg, `--dir --force`
+rewrote the keg's `SKILL.md` and references and exited 0, leaving the path a
+link (issue 299). A link is now refused, with or without `--force`, as
+`DESTINATION_IS_LINK`. The same input carries a different `code`, which is
+why this release takes the minor position. No kind moved.
+
+### Fixed
+
+- **`jr skill --dir` refuses a symbolic link, even with `--force`.** What the
+  link points to is another install's skill, and `--dir` never removes what it
+  did not write, so it neither writes through the link nor replaces it. The
+  `detail` names where the link points, and the `remedy` says to leave it or
+  remove the link itself (PR 300).
+
+  ```xml
+  <error v="1">
+    <code>DESTINATION_IS_LINK</code>
+    <message>/Users/you/.agents/skills/jr is a symbolic link, and --dir does not write through one, even with --force</message>
+    <detail>it points to /opt/homebrew/opt/jr/share/jr/skill</detail>
+    ...
+  </error>
+  ```
+
+- **The documented skill links replace an earlier install** rather than
+  landing inside it. `ln -s` onto a folder, from an earlier `--dir` or a copy,
+  puts the link inside the folder and exits 0, and the agent goes on reading
+  the old copy. Each `ln -s` block in the README and `docs/recipes.md` now
+  removes the destination first and runs `readlink` after, which prints the
+  skill's path or nothing. The recipe's third repository link, into
+  `.agents/skills/jr` from inside the clone, failed because this repository
+  has no `.agents/skills`; a sentence on linking one project replaces it.
+
+### Output contract
+
+- No kind's schema version moves.
+- **Breaking**, under the row for the same input carrying a different `code`:
+  `jr skill --dir PATH`, where PATH is a symbolic link, reports
+  `DESTINATION_IS_LINK` (exit 7, nothing written). A link to a folder holding
+  the skill reported `DESTINATION_EXISTS` (exit 7), and a dangling link
+  `SKILL_UNWRITABLE` (exit 1).
+- With `--force`, or at a link to an empty folder, the same invocation exited
+  0 having written through the link. Those alone are additive, a wrong answer
+  now refused.
+- `docs/troubleshooting.md` gains `DESTINATION_IS_LINK`.
+
 ## [0.23.1] - 2026-11-16
 
 **Take this one whichever commands you use**, for a standard-library fix: the
@@ -4210,6 +4259,7 @@ recent enough to be worth reading.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
 [unreleased]: https://github.com/kmoneil/jr/compare/v0.23.0...main
+[0.24.0]: https://github.com/kmoneil/jr/releases/tag/v0.24.0
 [0.23.1]: https://github.com/kmoneil/jr/releases/tag/v0.23.1
 [0.23.0]: https://github.com/kmoneil/jr/releases/tag/v0.23.0
 [0.22.2]: https://github.com/kmoneil/jr/releases/tag/v0.22.2
