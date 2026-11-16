@@ -20,6 +20,56 @@ accident.
 
 Nothing yet.
 
+## [0.23.1] - 2026-11-16
+
+**Take this one whichever commands you use**, for a standard-library fix: the
+binaries are built with Go 1.26.11, where 0.23.0 and every release back to
+0.20.3 were built with 1.26.10. 1.26.11 fixes one advisory that `govulncheck`
+reports reachable from this code:
+
+- `GO-2026-6859`, `net/http`: HTTP/1 server crash due to MaxBytesReader header
+  race. `jr` runs no HTTP server. `govulncheck` reports it because the fixed
+  code is in `net/http`, and the paths it prints run through the client `jr`
+  makes every request with. Whether a client is exposed to a server-side race
+  has not been judged; the toolchain moved so that the question does not have
+  to be.
+
+### Changed
+
+- Help shows a bool flag's value syntax, `--debug[=true|false]`, from pflag
+  1.1.0. Every bool flag takes `--flag=false`, as it did before.
+- A typed flag given a value it cannot parse says what it wanted, where it
+  quoted Go's parser. The `code` is still `INVALID_USAGE` and the exit still 2:
+
+  ```xml
+  <message>invalid argument "abc" for "--retries" flag: must be an integer</message>
+  ```
+
+  It read `strconv.ParseInt: parsing "abc": invalid syntax` after the colon,
+  and `--debug=maybe` now reads `must be true or false`. One loss: an integer
+  too large for its flag also reads `must be an integer`, where it used to say
+  `value out of range` (spf13/pflag#544).
+
+### Internal
+
+- Go 1.26.11 (PR 294).
+- `github.com/spf13/pflag` 1.1.0 (PR 290), `golang.org/x/term` 0.48.0 and
+  `golang.org/x/sys` 0.50.0 (PR 295).
+- The Windows gate tries Chocolatey's install of make three times, a minute
+  apart. The feed answered a 504 before any test ran on the first attempt at
+  0.20.0 and on a pull request since, and each time the only fix was a re-run
+  (PR 297).
+
+### Output contract
+
+- No kind's schema version moves.
+- Help is not a result document, so its new flag syntax moves no kind.
+- **Priced a patch.** A parse error's `message` is reworded with its `code` and
+  exit unchanged. The stability policy's row for rewording an error named only
+  `remedy` and `detail`, which left `message` under the stable-text row and
+  this release a minor; the row now names `message` too, for the reason it
+  already gave: `code` is what a program branches on.
+
 ## [0.23.0] - 2026-11-10
 
 **Read this one if anything branches on `BAD_REQUEST` from `issue edit` on
@@ -4160,6 +4210,7 @@ recent enough to be worth reading.
 - `issue.activity` v1 and `issue.history` v1 are new.
 
 [unreleased]: https://github.com/kmoneil/jr/compare/v0.23.0...main
+[0.23.1]: https://github.com/kmoneil/jr/releases/tag/v0.23.1
 [0.23.0]: https://github.com/kmoneil/jr/releases/tag/v0.23.0
 [0.22.2]: https://github.com/kmoneil/jr/releases/tag/v0.22.2
 [0.22.1]: https://github.com/kmoneil/jr/releases/tag/v0.22.1

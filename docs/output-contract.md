@@ -2686,22 +2686,29 @@ The rows:
   round-tripped. The number came out patch either way, and the row is here
   because a number that comes from an argument rather than a rule is how three
   releases got the wrong one.
-- Changing an error's `remedy` or `detail` wording, with the `code` and the
-  exit unchanged: **additive, so the patch position moves.** This is the row
-  above read against a different field, and it comes out the other way. `code`
-  is what this contract tells a consumer to branch on, and `remedy` is
-  documented two sections up as present "when there is something useful to
-  say": guidance for a person, whose whole job is to be better this release
-  than last. Reading it under the stable-text row would make every reworded
-  error message a breaking change, which would freeze the part of the output
-  most worth improving. The row was written on 2026-09-04 for 0.13.1, whose
-  `UNKNOWN_USER` remedy began naming `currentUser`, and the alternative
+- Changing an error's `message`, `remedy` or `detail` wording, with the `code`
+  and the exit unchanged: **additive, so the patch position moves.** This is
+  the row above read against a different field, and it comes out the other
+  way. `code` is what this contract tells a consumer to branch on, and
+  `remedy` is documented two sections up as present "when there is something
+  useful to say": guidance for a person, whose whole job is to be better this
+  release than last. Reading it under the stable-text row would make every
+  reworded error message a breaking change, which would freeze the part of the
+  output most worth improving. The row was written on 2026-09-04 for 0.13.1,
+  whose `UNKNOWN_USER` remedy began naming `currentUser`, and the alternative
   reading was available: a remedy is deterministic for a fixed input, and
   twenty goldens do pin remedy text for other codes. What decides it is that
   those goldens pin a *document's shape* and this contract names `code` as the
-  branch. **Moving text between `remedy` and `detail` is not this row** and is
-  breaking, because that is a consumer reading a different field: see 0.6.0,
-  where the near misses moved and the release took the minor.
+  branch. **Moving text between `message`, `remedy` and `detail` is not this
+  row** and is breaking, because that is a consumer reading a different field:
+  see 0.6.0, where the near misses moved and the release took the minor.
+  `message` joined the row on 2026-11-16 for 0.23.1, whose pflag 1.1.0 reworded
+  a typed flag's parse error from Go's `strconv.ParseInt: parsing "abc":
+  invalid syntax` to `must be an integer`, under `INVALID_USAGE` at exit 2.
+  Until then the row named only `remedy` and `detail`, and `message` fell to
+  the stable-text row, which would have priced a dependency's better sentence
+  as a minor. The reason is the same for all three: they are what a person
+  reads, and `code` is what a program branches on.
 - Adding an error `code` for a condition that used to be reported as a
   successful answer: **additive, so the patch position moves.** The invocation
   it changes is one whose previous answer was wrong, and a consumer branching on
