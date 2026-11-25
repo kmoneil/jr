@@ -417,7 +417,8 @@ Five things it will not pretend about:
   ```
 
   That misses a comment, or a change to a field other than status, on an issue
-  they are not otherwise tied to. When the whole sweep is the question, pass the
+  they are not otherwise tied to. The refusal's `remedy` spells the same clause
+  for whoever `--user` named. When the whole sweep is the question, pass the
   `--max-requests` value the refusal names.
 - **Some of it may be clipped**, and then the run exits 3 rather than looking
   whole. Cloud sends the newest twenty comments of a longer thread; both

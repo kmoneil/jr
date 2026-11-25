@@ -1,7 +1,10 @@
 package cli_test
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -37,6 +40,20 @@ func sweepJira(t *testing.T, deployment string, total int) *sweptJira {
 		case strings.HasSuffix(r.URL.Path, "/myself"):
 			_, _ = w.Write([]byte(`{"accountId":"acc-1","name":"ada",` +
 				`"displayName":"Ada Lovelace","timeZone":"Etc/UTC"}`))
+		case strings.HasSuffix(r.URL.Path, "/user/search"):
+			// One person per deployment, each with the id that deployment
+			// puts in JQL: an accountId on Cloud, and on Data Center a
+			// username holding the one character a shell-quoted clause
+			// has to escape.
+			if deployment == "Cloud" {
+				_, _ = w.Write([]byte(`[{"accountId":"712020:8f3a",` +
+					`"displayName":"Ada Lovelace","emailAddress":"ada@example.invalid",` +
+					`"active":true}]`))
+				return
+			}
+			_, _ = w.Write([]byte(`[{"name":"o'brien","key":"JIRAUSER10100",` +
+				`"displayName":"Grace O'Brien","emailAddress":"grace@example.invalid",` +
+				`"active":true}]`))
 		case strings.HasSuffix(r.URL.Path, "/serverInfo"):
 			_, _ = fmt.Fprintf(w, `{"version":"10.4.0","deploymentType":%q,`+
 				`"serverTime":"2026-09-30T12:00:00.000+0000"}`, deployment)
@@ -186,6 +203,156 @@ func TestTheRecordedRefusalReadsAsASentence(t *testing.T) {
 	if !strings.Contains(got.stderr, want) {
 		t.Errorf("want %q in:\n%s", want, got.stderr)
 	}
+}
+
+// TestTheRefusalForOnePersonNamesTheirInvolvement is issue 302.
+//
+// With --user and no --jql the remedy used to say "--jql" and stop, and the
+// clause it meant was in three documents and nowhere in the refusal. The
+// reporter had to go and read one of them, and with the clause the same week
+// was one page at exit 0. So the remedy now carries it, spelled for the person
+// --user named: currentUser() where that is what was typed, so the query says
+// "whoever runs this" as issue list does, and otherwise the id the deployment
+// puts in JQL. It is shell-quoted, because a Data Center username can hold the
+// one character that would end a single-quoted argument.
+//
+// The clause is not exact, which is why the remedy says what it misses. Both
+// refusals carry it: the one without --max-requests, and the one where it
+// leaves too little.
+func TestTheRefusalForOnePersonNamesTheirInvolvement(t *testing.T) {
+	const caveat = "which misses a comment, or a change to a field other than " +
+		"status, on an issue they are not otherwise tied to"
+	for _, tc := range []struct {
+		name, deployment, user string
+		budget                 []string
+		clause                 string
+	}{
+		{
+			name: "the reported run", deployment: "Server", user: "currentUser",
+			clause: `'assignee = currentUser() OR reporter = currentUser() OR ` +
+				`creator = currentUser() OR worklogAuthor = currentUser() OR ` +
+				`status CHANGED BY currentUser()'`,
+		},
+		{
+			name: "a name on Cloud", deployment: "Cloud", user: "Ada Lovelace",
+			clause: `'assignee = "712020:8f3a" OR reporter = "712020:8f3a" OR ` +
+				`creator = "712020:8f3a" OR worklogAuthor = "712020:8f3a" OR ` +
+				`status CHANGED BY "712020:8f3a"'`,
+		},
+		{
+			name: "a quote in a Data Center username", deployment: "Server",
+			user: "Grace O'Brien",
+			clause: `'assignee = "o'\''brien" OR reporter = "o'\''brien" OR ` +
+				`creator = "o'\''brien" OR worklogAuthor = "o'\''brien" OR ` +
+				`status CHANGED BY "o'\''brien"'`,
+		},
+		{
+			name: "a budget too small", deployment: "Server", user: "currentUser",
+			budget: []string{"--max-requests", "20"},
+			clause: `'assignee = currentUser() OR reporter = currentUser() OR ` +
+				`creator = currentUser() OR worklogAuthor = currentUser() OR ` +
+				`status CHANGED BY currentUser()'`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			jira := sweepJira(t, tc.deployment, 5873)
+			env := credentialed(t)
+			mustRun(t, env, "context", "create", "work", "--site", jira.url, "--project", "ENG")
+
+			args := append(append([]string{}, tc.budget...), "issue", "activity",
+				"--since", "-7d", "--user", tc.user, "--limit", "all", "--all-projects",
+				"--format", "json")
+			got := run(t, env, args...)
+			if code := errorCodeOf(t, got.stderr); code != "SWEEP_TOO_LARGE" {
+				t.Fatalf("code = %q, want SWEEP_TOO_LARGE\n%s", code, got.stderr)
+			}
+
+			remedy := remedyOf(t, got.stderr)
+			if !strings.Contains(remedy, "--jql "+tc.clause) {
+				t.Errorf("the remedy does not name the involvement clause\n"+
+					"want: --jql %s\nin:   %s", tc.clause, remedy)
+			}
+			if !strings.Contains(remedy, caveat) {
+				t.Errorf("the remedy names the clause without what it misses:\n%s", remedy)
+			}
+			// Narrowing is offered first and accepting the cost is still
+			// there, so the number the remedy names is the one it always was.
+			if !regexp.MustCompile(`--max-requests (to )?\d+ or more`).MatchString(remedy) {
+				t.Errorf("the remedy no longer names a --max-requests value:\n%s", remedy)
+			}
+		})
+	}
+}
+
+// TestTheRefusalLeavesAGivenQueryAlone is the other side of issue 302. A caller
+// who passed --jql has already narrowed the candidates their own way, and
+// handing them a second clause would be telling them their query was wrong.
+// Without --user there is no person to spell a clause for.
+func TestTheRefusalLeavesAGivenQueryAlone(t *testing.T) {
+	const generic = "narrow the candidates with --project, --jql or a shorter --since, " +
+		"or pass --max-requests"
+	for _, tc := range []struct {
+		name string
+		args []string
+	}{
+		{"--jql given", []string{"--user", "currentUser", "--jql", "labels = backend"}},
+		{"no --user", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			jira := sweepJira(t, "Server", 5873)
+			env := credentialed(t)
+			mustRun(t, env, "context", "create", "work", "--site", jira.url, "--project", "ENG")
+
+			args := append([]string{
+				"issue", "activity", "--since", "-7d",
+				"--all-projects", "--format", "json",
+			}, tc.args...)
+			got := run(t, env, args...)
+			if code := errorCodeOf(t, got.stderr); code != "SWEEP_TOO_LARGE" {
+				t.Fatalf("code = %q, want SWEEP_TOO_LARGE\n%s", code, got.stderr)
+			}
+			if remedy := remedyOf(t, got.stderr); !strings.HasPrefix(remedy, generic) {
+				t.Errorf("remedy = %q, want it to begin %q", remedy, generic)
+			}
+		})
+	}
+}
+
+// refusalOf reads the error document out of a JSON run's stderr. A warning
+// may be written ahead of it, so it reads documents until one is an error.
+func refusalOf(t *testing.T, stderr string) (code, remedy string) {
+	t.Helper()
+	dec := json.NewDecoder(strings.NewReader(stderr))
+	for {
+		var doc struct {
+			Error *struct {
+				Code   string `json:"code"`
+				Remedy string `json:"remedy"`
+			} `json:"error"`
+		}
+		err := dec.Decode(&doc)
+		if errors.Is(err, io.EOF) {
+			t.Fatalf("stderr holds no error document:\n%s", stderr)
+		}
+		if err != nil {
+			t.Fatalf("stderr is not JSON: %v\n%s", err, stderr)
+		}
+		if doc.Error != nil {
+			return doc.Error.Code, doc.Error.Remedy
+		}
+	}
+}
+
+func errorCodeOf(t *testing.T, stderr string) string {
+	t.Helper()
+	code, _ := refusalOf(t, stderr)
+	return code
+}
+
+func remedyOf(t *testing.T, stderr string) string {
+	t.Helper()
+	_, remedy := refusalOf(t, stderr)
+	return remedy
 }
 
 // namedBudget reads the --max-requests value out of the refusal's remedy.

@@ -3,8 +3,10 @@ package issue
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/kmoneil/jr/internal/errs"
+	"github.com/kmoneil/jr/internal/jql"
 	"github.com/kmoneil/jr/internal/registry"
 	"github.com/kmoneil/jr/internal/site"
 )
@@ -76,19 +78,82 @@ func refuseSweepTooLarge(ctx context.Context, inv *registry.Invocation) error {
 		countWords(count), plural(floor, "search request"))
 	detail := fmt.Sprintf("every candidate is read before --user, --kind and "+
 		"the field filters apply; the candidate query: %s", query)
+	narrow := narrowing(inv)
 	if remaining < 0 {
 		return errs.Usage("SWEEP_TOO_LARGE",
 			"%s, and it spends at most %d without --max-requests", sized, sweepCeiling).
 			WithDetail("%s", detail).
-			WithRemedy("narrow the candidates with --project, --jql or a shorter "+
-				"--since, or pass --max-requests %d or more to accept the cost", enough)
+			WithRemedy("%spass --max-requests %d or more to accept the cost", narrow, enough)
 	}
 	return errs.Usage("SWEEP_TOO_LARGE",
 		"%s, and --max-requests leaves %d", sized, remaining).
 		WithDetail("%s", detail).
-		WithRemedy("narrow the candidates with --project, --jql or a shorter "+
-			"--since, or raise --max-requests to %d or more; a sweep the budget "+
-			"cuts short cannot be resumed", enough)
+		WithRemedy("%sraise --max-requests to %d or more; a sweep the budget "+
+			"cuts short cannot be resumed", narrow, enough)
+}
+
+// narrowing is the first half of the refusal's remedy, up to the word that
+// introduces accepting the cost instead.
+//
+// With --user and no --jql it names the clause, spelled for that person, rather
+// than only the flag: issue 302, where the remedy said "--jql" and the clause it
+// meant was in three documents and nowhere in the refusal. A caller who passed
+// --jql has narrowed the candidates already, and is not told their query was
+// the wrong one.
+func narrowing(inv *registry.Invocation) string {
+	clause := involvementClause(inv)
+	if clause == "" || strings.TrimSpace(inv.Flags.String("jql")) != "" {
+		return "narrow the candidates with --project, --jql or a shorter --since, or "
+	}
+	return fmt.Sprintf("narrow the candidates with --project, a shorter --since, "+
+		"or the person's involvement, --jql %s, which misses a comment, or a "+
+		"change to a field other than %s, on an issue they are not otherwise "+
+		"tied to; or ", shellQuote(clause), DefaultChangedField)
+}
+
+// involvementClause is the JQL for the issues the --user person is tied to:
+// every field --involving covers, and the status changes they made. It is the
+// clause the docs give for narrowing a sweep, built from the same list
+// --involving is, so the two cannot disagree about which fields count.
+//
+// currentUser() where that is what was typed, so the query says "whoever runs
+// this" the way issue list's does. Anyone else is the id validation resolved,
+// which is what this deployment puts in JQL: an accountId on Cloud and a
+// username on Data Center. Built as values rather than through userExpr, so a
+// username that happens to be one of the sentinel words is still a username.
+// Empty when there is no person to spell it for.
+func involvementClause(inv *registry.Invocation) string {
+	typed := strings.TrimSpace(inv.Flags.String(userFlag))
+	if typed == "" {
+		return ""
+	}
+	var who jql.Value = &jql.Func{Name: "currentUser"}
+	if !isCurrentUser(typed) {
+		user, _ := inv.Value(activityUserKey).(site.User)
+		if user.ID == "" {
+			return ""
+		}
+		who = jql.Text(user.ID)
+	}
+	exprs := make([]jql.Expr, 0, len(InvolvingFields)+1)
+	for _, field := range InvolvingFields {
+		exprs = append(exprs, &jql.Clause{Field: field, Op: jql.OpEq, Value: who})
+	}
+	exprs = append(exprs, &jql.Clause{
+		Field: DefaultChangedField, Op: jql.OpChanged,
+		Predicates: []jql.Predicate{jql.By(who)},
+	})
+	clause, err := jql.Render(&jql.Query{Where: jql.AnyOf(exprs...)})
+	if err != nil {
+		return ""
+	}
+	return clause
+}
+
+// shellQuote makes s one single-quoted shell word, so a clause holding a
+// quote, as a Data Center username can, still pastes as one argument.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // sweepFloor is the fewest search requests a sweep over n candidates takes,
