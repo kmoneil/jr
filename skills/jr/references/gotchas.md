@@ -203,6 +203,8 @@ jr issue activity --since -7d --user currentUser --all-projects \
   --jql 'assignee = currentUser() OR reporter = currentUser() OR creator = currentUser() OR worklogAuthor = currentUser() OR status changed by currentUser()'
 ```
 
+The refusal's `remedy` spells this clause for whoever `--user` named, so copy it
+from there rather than rewriting it with a name in place of `currentUser()`.
 It misses a comment, or a change to any field but status, on an issue they are
 not otherwise tied to, which are the two limits above. If the question was
 "everything they did", say so in the answer. An issue they filed is covered:

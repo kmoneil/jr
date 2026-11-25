@@ -110,7 +110,10 @@ past what `--max-requests` leaves. The sweep reads every candidate's changelog,
 comments and worklogs before `--user` or `--kind` discard anything, so its cost
 follows everybody's updates in the window. The `message` names the count and
 the fewest requests the sweep takes; narrow the candidates, or pass the
-`--max-requests` the `remedy` names to accept the cost.
+`--max-requests` the `remedy` names to accept the cost. With `--user` and no
+`--jql`, the `remedy` also spells the involvement clause for that person; it
+misses a comment, or a non-status field change, on an issue they are not
+otherwise tied to.
 
 ## Resolution refusals
 

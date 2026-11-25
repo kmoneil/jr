@@ -848,7 +848,8 @@ $ jr issue activity --since -7d --user currentUser --all-projects \
 The third is the person's involvement: the fields `issue list --involving`
 covers, plus the transitions they made. It misses a comment, or a change to a
 field other than status, on an issue they are not otherwise tied to, because
-JQL cannot search either.
+JQL cannot search either. When `--user` is given and `--jql` is not, the
+refusal's `remedy` spells this clause for that person, ready to paste.
 
 When the whole sweep is what you want, pass the number the `remedy` names:
 

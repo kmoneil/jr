@@ -330,11 +330,13 @@ in the window rather than with the caller's. One request counts the candidates
 first. Above ten search pages, a thousand issues at the default page size, the
 run exits 2 with SWEEP_TOO_LARGE, naming the count and the fewest requests the
 sweep can take. Narrow it with --project, --jql or a shorter --since, or pass
---max-requests at or above that number to accept the cost. A --max-requests
-that leaves fewer is refused the same way, because this command has no resume
-token and a sweep the budget cuts short cannot be continued. The number is a
-floor: an issue holding more than twenty worklogs, or on Cloud more than forty
-saves in its changelog, costs one request more for each.
+--max-requests at or above that number to accept the cost. With --user and no
+--jql, the remedy spells out the --jql clause for that person's involvement and
+says what it misses. A --max-requests that leaves fewer is refused the same
+way, because this command has no resume token and a sweep the budget cuts short
+cannot be continued. The number is a floor: an issue holding more than twenty
+worklogs, or on Cloud more than forty saves in its changelog, costs one request
+more for each.
 
 **Where the comment half comes from.** Comment authorship is not searchable in
 JQL on either deployment, so comments are matched here rather than by the
