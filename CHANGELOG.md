@@ -20,6 +20,37 @@ accident.
 
 Nothing yet.
 
+## [0.24.1] - 2026-11-25
+
+**Take this one if you, or an agent, run `jr issue activity --user` across
+more than one project.** When such a sweep was too large to answer, the
+`SWEEP_TOO_LARGE` refusal said to narrow it with `--jql` and did not say with
+what (issue 302). It now spells out the clause for that person, ready to
+paste. No kind moved.
+
+### Changed
+
+- **`SWEEP_TOO_LARGE` names the `--jql` that narrows a `--user` sweep.** With
+  `--user` and no `--jql`, the `remedy` carries the person's involvement: the
+  fields `issue list --involving` covers, plus the status changes they made.
+  It names `currentUser()` where that was typed, and otherwise the id the
+  deployment puts in JQL, an accountId on Cloud and a username on Data
+  Center, shell-quoted. It says what the clause misses, as the docs do: a
+  comment, or a change to a field other than status, on an issue the person
+  is not otherwise tied to. With `--jql` given, or without `--user`, the
+  remedy reads as it did (PR 303).
+
+  ```json
+  "remedy": "narrow the candidates with --project, a shorter --since, or the person's involvement, --jql 'assignee = currentUser() OR reporter = currentUser() OR creator = currentUser() OR worklogAuthor = currentUser() OR status CHANGED BY currentUser()', which misses a comment, or a change to a field other than status, on an issue they are not otherwise tied to; or pass --max-requests 63 or more to accept the cost"
+  ```
+
+### Output contract
+
+- No kind's schema version moves.
+- **Priced a patch.** The `SWEEP_TOO_LARGE` `remedy` is reworded with its
+  `code` and exit unchanged, which is the stability policy's row for
+  rewording an error.
+
 ## [0.24.0] - 2026-11-16
 
 **Take this one if you installed with Homebrew and ever ran
